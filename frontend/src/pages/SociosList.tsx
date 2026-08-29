@@ -1,0 +1,111 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { api, mensajeError } from "../lib/api";
+import type { ListaSocios } from "../types";
+
+export default function SociosList() {
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const [resultado, setResultado] = useState<ListaSocios | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setCargando(true);
+    const timeout = setTimeout(() => {
+      api
+        .get<ListaSocios>("/socios", { params: { q: q || undefined, page }, signal: controller.signal })
+        .then(({ data }) => setResultado(data))
+        .catch((err) => {
+          if (err.name !== "CanceledError") setError(mensajeError(err));
+        })
+        .finally(() => setCargando(false));
+    }, 250);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [q, page]);
+
+  const totalPaginas = resultado ? Math.max(1, Math.ceil(resultado.total / resultado.pageSize)) : 1;
+
+  return (
+    <div>
+      <div className="page-head">
+        <div>
+          <h1>Socios</h1>
+          <p>Registro único de asociados — reemplaza el listado de Aportaciones.</p>
+        </div>
+        <Link to="/socios/nuevo" className="btn">
+          + Nuevo socio
+        </Link>
+      </div>
+
+      {error && <div className="alert error">{error}</div>}
+
+      <div className="searchbar">
+        <input
+          placeholder="Buscar por nombre, DPI o número de asociado…"
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setPage(1);
+          }}
+        />
+      </div>
+
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>No. asociado</th>
+              <th>Nombre</th>
+              <th>Agencia</th>
+              <th>Fecha de ingreso</th>
+              <th>Cuentas</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {resultado?.data.map((s) => (
+              <tr key={s.id}>
+                <td className="mono">{s.numero_asociado}</td>
+                <td>
+                  <Link to={`/socios/${s.id}`}>{s.nombres}</Link>
+                </td>
+                <td>{s.agencia_nombre}</td>
+                <td className="mono">{new Date(s.fecha_ingreso).toLocaleDateString("es-GT")}</td>
+                <td className="mono">{s.total_cuentas ?? 0}</td>
+                <td>
+                  <span className={`badge ${s.estado === "ACTIVO" ? "activo" : "inactivo"}`}>
+                    {s.estado === "ACTIVO" ? "Activo" : "Inactivo"}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!cargando && resultado?.data.length === 0 && (
+          <div className="empty">
+            {q ? `No hay socios que coincidan con "${q}".` : "Todavía no hay socios registrados."}
+          </div>
+        )}
+      </div>
+
+      {resultado && resultado.total > resultado.pageSize && (
+        <div className="pagination">
+          <button className="btn secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            Anterior
+          </button>
+          <span>
+            Página {page} de {totalPaginas} · {resultado.total} socios
+          </span>
+          <button className="btn secondary" disabled={page >= totalPaginas} onClick={() => setPage((p) => p + 1)}>
+            Siguiente
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

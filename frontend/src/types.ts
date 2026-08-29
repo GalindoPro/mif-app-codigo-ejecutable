@@ -1,0 +1,433 @@
+export type RolUsuario = "ADMIN" | "GERENCIA" | "SUPERVISOR" | "CAJERO" | "PROMOTOR";
+
+export interface UsuarioAutenticado {
+  id: string;
+  nombre: string;
+  email: string;
+  rol: RolUsuario;
+  agenciaId: string | null;
+}
+
+export interface Agencia {
+  id: string;
+  codigo: string;
+  nombre: string;
+  direccion: string | null;
+  activa: boolean;
+}
+
+export interface Socio {
+  id: string;
+  numero_asociado: string;
+  agencia_id: string;
+  agencia_nombre?: string;
+  agencia_codigo?: string;
+  nombres: string;
+  genero: "M" | "F" | null;
+  fecha_ingreso: string;
+  estado: "ACTIVO" | "INACTIVO";
+  dpi: string | null;
+  direccion: string | null;
+  telefono: string | null;
+  nombre_beneficiario: string | null;
+  total_cuentas?: number;
+  created_at: string;
+}
+
+export interface ListaSocios {
+  data: Socio[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export const ROL_LABEL: Record<RolUsuario, string> = {
+  ADMIN: "Administrador",
+  GERENCIA: "Gerencia",
+  SUPERVISOR: "Jefe de agencia",
+  CAJERO: "Operador",
+  PROMOTOR: "Promotor de crédito",
+};
+
+export type TipoCuentaAhorro = "AHORRO_CORRIENTE" | "AHORRO_PROGRAMADO" | "AHORRO_INFANTO_JUVENIL";
+
+export interface Cuenta {
+  id: string;
+  numero_cuenta: string;
+  tipo: TipoCuentaAhorro;
+  estado: "ACTIVA" | "CERRADA";
+  socio_id: string;
+  socio_nombres: string;
+  numero_asociado: string;
+  agencia_id: string;
+  agencia_nombre?: string;
+  saldo_inicial: string;
+  saldo_actual: string;
+  created_at: string;
+}
+
+export interface Movimiento {
+  id: string;
+  cuenta_id: string;
+  tipo: "DEPOSITO" | "RETIRO" | "AJUSTE";
+  monto: string;
+  fecha: string;
+  numero_recibo: string | null;
+  descripcion: string | null;
+  usuario_nombre: string;
+  created_at: string;
+}
+
+export type CuentaConMovimientos = Cuenta & { movimientos: Movimiento[] };
+
+export interface AhorroTipoConfig {
+  tipo: TipoCuentaAhorro;
+  slug: string;
+  titulo: string;
+  descripcion: string;
+}
+
+export const TIPOS_AHORRO: AhorroTipoConfig[] = [
+  {
+    tipo: "AHORRO_CORRIENTE",
+    slug: "corriente",
+    titulo: "Ahorro Corriente",
+    descripcion: "Depósitos y retiros de las cuentas de ahorro corriente.",
+  },
+  {
+    tipo: "AHORRO_PROGRAMADO",
+    slug: "programado",
+    titulo: "Ahorro Programado",
+    descripcion: "Cuentas de ahorro programado por socio.",
+  },
+  {
+    tipo: "AHORRO_INFANTO_JUVENIL",
+    slug: "infanto-juvenil",
+    titulo: "Ahorro Infanto Juvenil",
+    descripcion: "Cuentas de ahorro para niñas, niños y jóvenes asociados.",
+  },
+];
+
+export type CategoriaCajaChica =
+  | "SUMINISTROS_OFICINA"
+  | "CAFETERIA_LIMPIEZA"
+  | "COMBUSTIBLES_LUBRICANTES"
+  | "COMISIONES_GASTOS"
+  | "TELEFONO"
+  | "INTERNET"
+  | "ENERGIA_ELECTRICA"
+  | "GASTOS_DIVERSOS"
+  | "REPARACION_MANTENIMIENTO"
+  | "FLETES_ACARREO"
+  | "PROYECCION_SOCIAL"
+  | "OTRO";
+
+export const CATEGORIA_CAJA_CHICA_LABEL: Record<CategoriaCajaChica, string> = {
+  SUMINISTROS_OFICINA: "Suministros de oficina",
+  CAFETERIA_LIMPIEZA: "Cafetería y limpieza",
+  COMBUSTIBLES_LUBRICANTES: "Combustibles y lubricantes",
+  COMISIONES_GASTOS: "Comisiones gastos",
+  TELEFONO: "Teléfono",
+  INTERNET: "Internet",
+  ENERGIA_ELECTRICA: "Energía eléctrica",
+  GASTOS_DIVERSOS: "Gastos diversos de agencia",
+  REPARACION_MANTENIMIENTO: "Reparación y mantenimiento de agencia",
+  FLETES_ACARREO: "Fletes y acarreo",
+  PROYECCION_SOCIAL: "Proyección social",
+  OTRO: "Otro",
+};
+
+export interface CajaChicaComprobante {
+  id: string;
+  agencia_id: string;
+  fecha: string;
+  numero_documento: string | null;
+  beneficiario: string;
+  descripcion: string;
+  tipo: "INGRESO" | "EGRESO";
+  categoria: CategoriaCajaChica | null;
+  monto: string;
+  usuario_nombre: string;
+  created_at: string;
+}
+
+export interface TotalPorCategoria {
+  categoria: string;
+  total: number;
+}
+
+export interface ListaCajaChica {
+  data: CajaChicaComprobante[];
+  saldoActual: number;
+  totalIngresos: number;
+  totalEgresos: number;
+  totalesPorCategoria: TotalPorCategoria[];
+}
+
+export interface ResumenCuentas {
+  totalCuentas: number;
+  saldoTotal: number;
+  totalDepositos: number;
+  totalRetiros: number;
+}
+
+export interface ResumenAgencia {
+  agenciaId: string;
+  agenciaNombre: string;
+  agenciaCodigo: string;
+  cajaChica: { saldo: number };
+  ahorroCorriente: { totalCuentas: number; saldoTotal: number };
+  ahorroProgramado: { totalCuentas: number; saldoTotal: number };
+  ahorroInfantoJuvenil: { totalCuentas: number; saldoTotal: number };
+  totalSocios: number;
+  movimientosHoy: number;
+}
+
+export interface ResumenDashboard {
+  global: {
+    cajaChica: number;
+    ahorroCorriente: number;
+    ahorroProgramado: number;
+    ahorroInfantoJuvenil: number;
+    totalSocios: number;
+    movimientosHoy: number;
+  };
+  porAgencia: ResumenAgencia[];
+}
+
+// ---------------------------------------------------------------------------
+// Auxiliar de Caja (libro de caja diario)
+// ---------------------------------------------------------------------------
+
+export type CajaCategoria =
+  | "SERVICIOS_BI"
+  | "DEPOSITO_BI"
+  | "RETIRO_BI"
+  | "REMESA_BI"
+  | "DEPOSITO_AHORRO_CORRIENTE"
+  | "DEPOSITO_AHORRO_PROGRAMADO"
+  | "DEPOSITO_AHORRO_INFANTO_JUVENIL"
+  | "RETIRO_AHORRO_CORRIENTE"
+  | "RETIRO_AHORRO_PROGRAMADO"
+  | "RETIRO_AHORRO_INFANTO_JUVENIL"
+  | "DEPOSITO_PLAZO_FIJO"
+  | "RETIRO_PLAZO_FIJO"
+  | "APORTACION"
+  | "INGRESO_ASOCIADO"
+  | "COMISION"
+  | "ABONO_PRESTAMO_HIPOTECARIO"
+  | "INTERES_PRESTAMO_HIPOTECARIO"
+  | "MORA_PRESTAMO_HIPOTECARIO"
+  | "ABONO_PRESTAMO_FIDUCIARIO"
+  | "INTERES_PRESTAMO_FIDUCIARIO"
+  | "MORA_PRESTAMO_FIDUCIARIO"
+  | "COLOCACION_PRESTAMO"
+  | "EGRESO_VARIO"
+  | "INGRESO_VARIO";
+
+export interface CategoriaAuxiliarInfo {
+  seccion: "BI" | "PROPIO";
+  tipo: "INGRESO" | "EGRESO";
+  descripcion: string;
+  requiereCuenta?: TipoCuentaAhorro;
+  requiereSocio?: boolean;
+  sinModuloReal?: boolean;
+}
+
+export const CATEGORIAS_AUXILIAR: Record<CajaCategoria, CategoriaAuxiliarInfo> = {
+  SERVICIOS_BI: { seccion: "BI", tipo: "INGRESO", descripcion: "Cobros por cuenta ajena BI — Servicios" },
+  DEPOSITO_BI: { seccion: "BI", tipo: "INGRESO", descripcion: "Cobros por cuenta ajena BI — Depósitos" },
+  RETIRO_BI: { seccion: "BI", tipo: "EGRESO", descripcion: "Pago por cuenta ajena BI — Retiro" },
+  REMESA_BI: { seccion: "BI", tipo: "EGRESO", descripcion: "Pago por cuenta ajena BI — Remesa" },
+
+  DEPOSITO_AHORRO_CORRIENTE: {
+    seccion: "PROPIO",
+    tipo: "INGRESO",
+    descripcion: "Depósito de Ahorro Corriente",
+    requiereCuenta: "AHORRO_CORRIENTE",
+  },
+  DEPOSITO_AHORRO_PROGRAMADO: {
+    seccion: "PROPIO",
+    tipo: "INGRESO",
+    descripcion: "Depósito de Ahorro Programado",
+    requiereCuenta: "AHORRO_PROGRAMADO",
+  },
+  DEPOSITO_AHORRO_INFANTO_JUVENIL: {
+    seccion: "PROPIO",
+    tipo: "INGRESO",
+    descripcion: "Depósito de Ahorro Infanto Juvenil",
+    requiereCuenta: "AHORRO_INFANTO_JUVENIL",
+  },
+  RETIRO_AHORRO_CORRIENTE: {
+    seccion: "PROPIO",
+    tipo: "EGRESO",
+    descripcion: "Retiro de Ahorro Corriente",
+    requiereCuenta: "AHORRO_CORRIENTE",
+  },
+  RETIRO_AHORRO_PROGRAMADO: {
+    seccion: "PROPIO",
+    tipo: "EGRESO",
+    descripcion: "Retiro de Ahorro Programado",
+    requiereCuenta: "AHORRO_PROGRAMADO",
+  },
+  RETIRO_AHORRO_INFANTO_JUVENIL: {
+    seccion: "PROPIO",
+    tipo: "EGRESO",
+    descripcion: "Retiro de Ahorro Infanto Juvenil",
+    requiereCuenta: "AHORRO_INFANTO_JUVENIL",
+  },
+
+  DEPOSITO_PLAZO_FIJO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Depósito a Plazo Fijo", requiereSocio: true, sinModuloReal: true },
+  RETIRO_PLAZO_FIJO: { seccion: "PROPIO", tipo: "EGRESO", descripcion: "Retiro de Plazo Fijo", requiereSocio: true, sinModuloReal: true },
+
+  APORTACION: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Aportación", requiereSocio: true },
+  INGRESO_ASOCIADO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Ingreso de asociado (cuota de ingreso)", requiereSocio: true },
+  COMISION: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Comisión", requiereSocio: true },
+
+  ABONO_PRESTAMO_HIPOTECARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Abono sobre préstamo hipotecario", requiereSocio: true },
+  INTERES_PRESTAMO_HIPOTECARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Interés hipotecario", requiereSocio: true },
+  MORA_PRESTAMO_HIPOTECARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Mora sobre préstamo hipotecario", requiereSocio: true },
+  ABONO_PRESTAMO_FIDUCIARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Abono sobre préstamo fiduciario", requiereSocio: true },
+  INTERES_PRESTAMO_FIDUCIARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Interés fiduciario", requiereSocio: true },
+  MORA_PRESTAMO_FIDUCIARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Mora sobre préstamo fiduciario", requiereSocio: true },
+
+  COLOCACION_PRESTAMO: { seccion: "PROPIO", tipo: "EGRESO", descripcion: "Colocación de préstamo (desembolso)", requiereSocio: true, sinModuloReal: true },
+  EGRESO_VARIO: { seccion: "PROPIO", tipo: "EGRESO", descripcion: "Egreso vario" },
+  INGRESO_VARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Ingreso vario", requiereSocio: true },
+};
+
+export const CATEGORIA_AUXILIAR_KEYS = Object.keys(CATEGORIAS_AUXILIAR) as CajaCategoria[];
+
+// Denominaciones de billetes y monedas de Guatemala usadas en el arqueo.
+export const DENOMINACIONES_GT = [200, 100, 50, 20, 10, 5, 1, 0.5, 0.25, 0.1, 0.05, 0.01];
+
+export function labelDenominacion(valor: number): string {
+  return valor >= 1 ? `Q ${valor}` : `${Math.round(valor * 100)} ctv.`;
+}
+
+export interface CajaDia {
+  id: string;
+  agencia_id: string;
+  fecha: string;
+  saldo_inicial: string;
+  saldo_final: string | null;
+  estado: "ABIERTO" | "CERRADO";
+  created_at: string;
+}
+
+export type EstadoCajaAuxiliar =
+  | { estado: "ABIERTO"; dia: CajaDia }
+  | { estado: "SIN_ABRIR"; saldoSugerido: number | null; fechaUltimoCierre: string | null; esPrimeraVez: boolean };
+
+export interface CajaMovimientoAuxiliar {
+  id: string;
+  caja_dia_id: string;
+  seccion: "BI" | "PROPIO";
+  categoria: CajaCategoria;
+  tipo: "INGRESO" | "EGRESO";
+  contador: number;
+  referencia: string | null;
+  socio_id: string | null;
+  cuenta_id: string | null;
+  beneficiario: string;
+  descripcion: string;
+  doc_no: string | null;
+  monto: string;
+  saldo_acumulado: string;
+  usuario_nombre: string;
+  created_at: string;
+}
+
+export interface DetalleCajaAuxiliar {
+  dia: CajaDia;
+  movimientos: CajaMovimientoAuxiliar[];
+  totalIngreso: number;
+  totalEgreso: number;
+  saldoActual: number;
+  arqueo: { detalle: { valor: number; cantidad: number }[]; total_contado: string; diferencia: string } | null;
+}
+
+export function formatoQ(valor: string | number): string {
+  return `Q ${Number(valor).toLocaleString("es-GT", { minimumFractionDigits: 2 })}`;
+}
+
+export interface UsuarioItem {
+  id: string;
+  nombre: string;
+  email: string;
+  rol: RolUsuario;
+  activo: boolean;
+  agencia_id: string | null;
+  agencia_nombre?: string;
+  agencia_codigo?: string;
+  created_at: string;
+}
+
+export type TipoPrestamo = "FIDUCIARIO" | "HIPOTECARIO";
+export type EstadoPrestamo = "SOLICITUD" | "APROBADO" | "DESEMBOLSADO" | "CANCELADO" | "RECHAZADO";
+export type TipoAmortizacion = "CUOTA_NIVELADA" | "SOBRE_SALDOS";
+
+export interface CuotaAmortizacion {
+  numero: number;
+  fechaPago: string;
+  cuota: number;
+  capital: number;
+  interes: number;
+  saldoRestante: number;
+}
+
+export interface ResultadoSimulacion {
+  monto: number;
+  plazoMeses: number;
+  tasaInteresMensual: number;
+  tipoAmortizacion: TipoAmortizacion;
+  cuotaMensualEstimada: number;
+  totalIntereses: number;
+  totalPagar: number;
+  tabla: CuotaAmortizacion[];
+}
+
+export interface Prestamo {
+  id: string;
+  codigo: string;
+  socio_id: string;
+  socio_nombres?: string;
+  numero_asociado?: string;
+  socio_dpi?: string;
+  socio_telefono?: string;
+  socio_direccion?: string;
+  agencia_id: string;
+  agencia_nombre?: string;
+  promotor_id: string | null;
+  promotor_nombre?: string | null;
+  promotor_email?: string | null;
+  tipo: TipoPrestamo;
+  estado: EstadoPrestamo;
+  tipo_amortizacion: TipoAmortizacion;
+  monto_solicitado: string | number;
+  monto_aprobado: string | number | null;
+  tasa_interes_mensual: string | number;
+  plazo_meses: number;
+  cuota_mensual: string | number;
+  destino: string | null;
+  garantia: string | null;
+  observaciones: string | null;
+  fecha_solicitud: string;
+  fecha_aprobacion: string | null;
+  fecha_desembolso: string | null;
+  created_at: string;
+  amortizacion?: ResultadoSimulacion;
+}
+
+export const ESTADO_PRESTAMO_LABEL: Record<EstadoPrestamo, string> = {
+  SOLICITUD: "Solicitud",
+  APROBADO: "Aprobado",
+  DESEMBOLSADO: "Desembolsado",
+  CANCELADO: "Cancelado / Pagado",
+  RECHAZADO: "Rechazado",
+};
+
+export const TIPO_PRESTAMO_LABEL: Record<TipoPrestamo, string> = {
+  FIDUCIARIO: "Fiduciario",
+  HIPOTECARIO: "Hipotecario",
+};
