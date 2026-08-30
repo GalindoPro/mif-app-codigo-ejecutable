@@ -139,7 +139,10 @@ create table if not exists socios (
   dpi                  text unique,
   direccion            text,
   telefono             text,
+  edad                 integer,
   nombre_beneficiario  text,
+  dpi_beneficiario     text,
+  telefono_beneficiario text,
   creado_por_id        uuid references usuarios(id),
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
@@ -147,22 +150,33 @@ create table if not exists socios (
 create index if not exists idx_socios_agencia on socios(agencia_id);
 create index if not exists idx_socios_nombres on socios using gin (to_tsvector('spanish', nombres));
 
+alter table socios add column if not exists edad integer;
+alter table socios add column if not exists dpi_beneficiario text;
+alter table socios add column if not exists telefono_beneficiario text;
+
 -- ---------------------------------------------------------------------------
 -- Cuentas y movimientos
 -- ---------------------------------------------------------------------------
 create table if not exists cuentas (
-  id            uuid primary key default gen_random_uuid(),
-  numero_cuenta text not null unique,
-  tipo          tipo_cuenta not null,
-  estado        estado_cuenta not null default 'ACTIVA',
-  socio_id      uuid not null references socios(id),
-  agencia_id    uuid not null references agencias(id),
-  saldo_inicial numeric(14,2) not null default 0,
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
+  id                     uuid primary key default gen_random_uuid(),
+  numero_cuenta          text not null unique,
+  tipo                   tipo_cuenta not null,
+  estado                 estado_cuenta not null default 'ACTIVA',
+  socio_id               uuid not null references socios(id),
+  agencia_id             uuid not null references agencias(id),
+  saldo_inicial          numeric(14,2) not null default 0,
+  cuota_pactada          numeric(14,2),
+  observaciones_apertura text,
+  creado_por_id          uuid references usuarios(id),
+  created_at             timestamptz not null default now(),
+  updated_at             timestamptz not null default now()
 );
 create index if not exists idx_cuentas_socio on cuentas(socio_id);
 create index if not exists idx_cuentas_agencia_tipo on cuentas(agencia_id, tipo);
+
+alter table cuentas add column if not exists cuota_pactada numeric(14,2);
+alter table cuentas add column if not exists observaciones_apertura text;
+alter table cuentas add column if not exists creado_por_id uuid references usuarios(id);
 
 -- El saldo de una cuenta NUNCA se guarda como campo fijo: se calcula sumando
 -- sus movimientos (ver vista saldos_cuenta más abajo). Esto reemplaza las
@@ -219,6 +233,8 @@ create table if not exists plazo_fijo_contratos (
   updated_at             timestamptz not null default now()
 );
 create index if not exists idx_plazo_fijo_vencimiento on plazo_fijo_contratos(fecha_vencimiento);
+alter table plazo_fijo_contratos add column if not exists recibo_retiro text;
+alter table plazo_fijo_contratos add column if not exists monto_liquidado numeric(14,2);
 
 -- ---------------------------------------------------------------------------
 -- Caja chica
@@ -351,4 +367,31 @@ create index if not exists idx_prestamos_socio on prestamos(socio_id);
 create index if not exists idx_prestamos_agencia on prestamos(agencia_id);
 create index if not exists idx_prestamos_promotor on prestamos(promotor_id);
 create index if not exists idx_prestamos_estado on prestamos(estado);
+
+alter table prestamos add column if not exists saldo_capital numeric(14,2);
+alter table prestamos add column if not exists ubicacion_garantia text;
+alter table prestamos add column if not exists nombre_fiador text;
+alter table prestamos add column if not exists documento_desembolso text;
+alter table prestamos add column if not exists fecha_vencimiento date;
+
+create table if not exists prestamo_pagos (
+  id                       uuid primary key default gen_random_uuid(),
+  prestamo_id              uuid not null references prestamos(id),
+  socio_id                 uuid not null references socios(id),
+  agencia_id               uuid not null references agencias(id),
+  caja_dia_id              uuid references caja_dias(id),
+  caja_movimiento_id       uuid references caja_movimientos_auxiliar(id),
+  fecha                    date not null default current_date,
+  numero_recibo            text,
+  abono_capital            numeric(14,2) not null default 0,
+  interes                  numeric(14,2) not null default 0,
+  mora                     numeric(14,2) not null default 0,
+  total_pagado             numeric(14,2) not null,
+  saldo_capital_restante   numeric(14,2) not null,
+  usuario_id               uuid not null references usuarios(id),
+  created_at               timestamptz not null default now()
+);
+
+create index if not exists idx_prestamo_pagos_prestamo on prestamo_pagos(prestamo_id, fecha);
+create index if not exists idx_prestamo_pagos_socio on prestamo_pagos(socio_id);
 

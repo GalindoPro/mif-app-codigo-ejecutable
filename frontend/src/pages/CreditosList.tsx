@@ -13,6 +13,8 @@ export default function CreditosList() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<string>("");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   function cargar() {
     api
@@ -27,6 +29,7 @@ export default function CreditosList() {
   }
 
   useEffect(() => {
+    setPage(1);
     const timer = setTimeout(cargar, 200);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -39,6 +42,10 @@ export default function CreditosList() {
 
   const pendientes = prestamos?.filter((p) => p.estado === "SOLICITUD").length ?? 0;
   const aprobados = prestamos?.filter((p) => p.estado === "APROBADO").length ?? 0;
+
+  const totalCreditos = prestamos?.length ?? 0;
+  const totalPaginas = Math.max(1, Math.ceil(totalCreditos / pageSize));
+  const prestamosPaginados = prestamos?.slice((page - 1) * pageSize, page * pageSize) ?? [];
 
   return (
     <div>
@@ -128,7 +135,7 @@ export default function CreditosList() {
             </tr>
           </thead>
           <tbody>
-            {prestamos?.map((p) => (
+            {prestamosPaginados.map((p) => (
               <tr key={p.id}>
                 <td className="mono">
                   <Link to={`/creditos/${p.id}`}>{p.codigo}</Link>
@@ -182,6 +189,20 @@ export default function CreditosList() {
           <div className="empty">No se encontraron créditos registrados con los filtros aplicados.</div>
         )}
       </div>
+
+      {totalCreditos > pageSize && (
+        <div className="pagination" style={{ display: "flex", gap: "1rem", alignItems: "center", justifyContent: "center", marginTop: "1rem" }}>
+          <button className="btn secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            Anterior
+          </button>
+          <span>
+            Mostrando {prestamosPaginados.length} de {totalCreditos} créditos · Página {page} de {totalPaginas}
+          </span>
+          <button className="btn secondary" disabled={page >= totalPaginas} onClick={() => setPage((p) => p + 1)}>
+            Siguiente
+          </button>
+        </div>
+      )}
     </div>
   );
 }

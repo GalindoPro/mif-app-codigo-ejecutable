@@ -27,6 +27,14 @@ export default function CajaChica() {
   const [numeroDocumento, setNumeroDocumento] = useState("DTE");
   const [guardando, setGuardando] = useState(false);
 
+  // Estados para Reposición de Fondo Fijo
+  const [mostrarReposicion, setMostrarReposicion] = useState(false);
+  const [repoCheque, setRepoCheque] = useState("");
+  const [repoMonto, setRepoMonto] = useState("2000");
+  const [repoFecha, setRepoFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [repoDesc, setRepoDesc] = useState("Reposición mensual de fondo fijo de caja chica");
+  const [repoGuardando, setRepoGuardando] = useState(false);
+
   useEffect(() => {
     if (puedeElegirAgencia) api.get<Agencia[]>("/agencias").then(({ data }) => setAgencias(data));
   }, [puedeElegirAgencia]);
@@ -73,6 +81,32 @@ export default function CajaChica() {
     }
   }
 
+  async function handleReponerFondo(e: FormEvent) {
+    e.preventDefault();
+    if (!repoCheque.trim()) {
+      setError("El número de cheque o comprobante (No. CH.) es obligatorio.");
+      return;
+    }
+    setError(null);
+    setRepoGuardando(true);
+    try {
+      await api.post("/caja-chica/reponer-fondo", {
+        agenciaId,
+        monto: Number(repoMonto),
+        numeroCheque: repoCheque.trim(),
+        descripcion: repoDesc,
+        fecha: repoFecha,
+      });
+      setRepoCheque("");
+      setMostrarReposicion(false);
+      cargar();
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setRepoGuardando(false);
+    }
+  }
+
   return (
     <div>
       <div className="page-head">
@@ -80,12 +114,116 @@ export default function CajaChica() {
           <h1>Caja chica</h1>
           <p>Comprobantes de ingreso y egreso — reemplaza el libro auxiliar de caja chica.</p>
         </div>
-        <button className="btn" onClick={() => setMostrarForm((v) => !v)}>
-          {mostrarForm ? "Cancelar" : "+ Nuevo comprobante"}
-        </button>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          <button
+            className="btn"
+            style={{ background: "#059669", borderColor: "#059669" }}
+            onClick={() => {
+              setMostrarReposicion((v) => !v);
+              setMostrarForm(false);
+            }}
+          >
+            {mostrarReposicion ? "Cancelar reposición" : "📥 Reponer Fondo (Cheque)"}
+          </button>
+          <button
+            className="btn"
+            onClick={() => {
+              setMostrarForm((v) => !v);
+              setMostrarReposicion(false);
+            }}
+          >
+            {mostrarForm ? "Cancelar" : "+ Nuevo comprobante"}
+          </button>
+        </div>
       </div>
 
       {error && <div className="alert error">{error}</div>}
+
+      {/* Formulario de Reposición de Fondo Fijo de Caja Chica */}
+      {mostrarReposicion && (
+        <form
+          className="card"
+          onSubmit={handleReponerFondo}
+          style={{ maxWidth: 580, marginBottom: "1.5rem", border: "2px solid #059669", background: "#f0fdf4" }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+            <h3 style={{ margin: 0, color: "#065f46" }}>📥 Reposición de Fondo Fijo de Caja Chica</h3>
+            <span className="badge" style={{ background: "#dcfce7", color: "#166534", fontWeight: 700 }}>
+              Ingreso Bancario
+            </span>
+          </div>
+          <p style={{ fontSize: "0.85rem", color: "#047857", margin: "0 0 1rem" }}>
+            Recarga el saldo de caja chica mediante cheque emitido por la cooperativa (según formato <em>No. CH.</em> del libro).
+          </p>
+
+          <div className="form-grid">
+            <div className="field">
+              <label htmlFor="repo-fecha">Fecha del cheque / reposición</label>
+              <input
+                id="repo-fecha"
+                type="date"
+                value={repoFecha}
+                onChange={(e) => setRepoFecha(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="repo-cheque">
+                Número de Cheque (<strong>No. CH.</strong>)
+              </label>
+              <input
+                id="repo-cheque"
+                placeholder="Ej. 1290 o CH-4501"
+                value={repoCheque}
+                onChange={(e) => setRepoCheque(e.target.value)}
+                required
+                style={{ fontWeight: 700 }}
+              />
+              <span className="hint">Número de cheque emitido para alimentar la caja</span>
+            </div>
+          </div>
+
+          <div className="form-grid">
+            <div className="field">
+              <label htmlFor="repo-monto">Monto a ingresar (Q)</label>
+              <input
+                id="repo-monto"
+                type="number"
+                min="1"
+                step="0.01"
+                value={repoMonto}
+                onChange={(e) => setRepoMonto(e.target.value)}
+                required
+                style={{ fontWeight: 700, fontSize: "1.1rem" }}
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="repo-desc">Descripción</label>
+              <input
+                id="repo-desc"
+                value={repoDesc}
+                onChange={(e) => setRepoDesc(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
+            <button
+              type="submit"
+              className="btn"
+              style={{ background: "#059669", borderColor: "#059669" }}
+              disabled={repoGuardando}
+            >
+              {repoGuardando ? "Ingresando fondo…" : `Confirmar ingreso de ${formatoQ(Number(repoMonto) || 0)}`}
+            </button>
+            <button type="button" className="btn secondary" onClick={() => setMostrarReposicion(false)}>
+              Cancelar
+            </button>
+          </div>
+        </form>
+      )}
 
       {resultado && (
         <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 220px))" }}>

@@ -14,13 +14,30 @@ function checarAgencia(agenciaId: string, agenciaVisible: string | null) {
 
 export async function estado(agenciaId: string, agenciaVisible: string | null) {
   checarAgencia(agenciaId, agenciaVisible);
+  const fecha = hoyISO();
 
+  // 1. ¿Hay caja abierta actualmente?
   const { rows: abiertos } = await pool.query(
     `select * from caja_dias where agencia_id = $1 and estado = 'ABIERTO' order by fecha desc limit 1`,
     [agenciaId],
   );
   if (abiertos[0]) return { estado: "ABIERTO" as const, dia: abiertos[0] };
 
+  // 2. ¿La caja de hoy ya fue cerrada?
+  const { rows: cerradosHoy } = await pool.query(
+    `select * from caja_dias where agencia_id = $1 and fecha = $2 and estado = 'CERRADO' order by created_at desc limit 1`,
+    [agenciaId, fecha],
+  );
+  if (cerradosHoy[0]) {
+    const detalleCerrado = await detalle(cerradosHoy[0].id, agenciaVisible);
+    return {
+      estado: "CERRADO" as const,
+      dia: cerradosHoy[0],
+      detalle: detalleCerrado,
+    };
+  }
+
+  // 3. Pendiente de abrir (toma saldo de la última caja cerrada)
   const { rows: ultimos } = await pool.query(
     `select * from caja_dias where agencia_id = $1 order by fecha desc limit 1`,
     [agenciaId],
@@ -33,6 +50,27 @@ export async function estado(agenciaId: string, agenciaVisible: string | null) {
     esPrimeraVez: !ultimo,
   };
 }
+
+export async function historialDias(agenciaId: string, agenciaVisible: string | null, limite = 30) {
+  checarAgencia(agenciaId, agenciaVisible);
+  const { rows } = await pool.query(
+    `select d.*,
+       u_abrio.nombre as abierto_por_nombre,
+       u_cerro.nombre as cerrado_por_nombre,
+       (select count(*) from caja_movimientos_auxiliar m where m.caja_dia_id = d.id)::int as total_movimientos,
+       (select coalesce(sum(case when tipo = 'INGRESO' then monto else 0 end), 0) from caja_movimientos_auxiliar m where m.caja_dia_id = d.id) as total_ingresos,
+       (select coalesce(sum(case when tipo = 'EGRESO' then monto else 0 end), 0) from caja_movimientos_auxiliar m where m.caja_dia_id = d.id) as total_egresos
+     from caja_dias d
+     left join usuarios u_abrio on u_abrio.id = d.abierto_por
+     left join usuarios u_cerro on u_cerro.id = d.cerrado_por
+     where d.agencia_id = $1
+     order by d.fecha desc, d.created_at desc
+     limit $2`,
+    [agenciaId, limite],
+  );
+  return rows;
+}
+
 
 export async function abrirDia(agenciaId: string, usuarioId: string, agenciaVisible: string | null, saldoInicialManual?: number) {
   checarAgencia(agenciaId, agenciaVisible);
@@ -135,6 +173,61 @@ export async function crearMovimiento(
   const info = CATEGORIAS[data.categoria];
   if (!info) throw badRequest("Categoría de movimiento no reconocida");
   if (!data.monto || data.monto <= 0) throw badRequest("El monto debe ser mayor a cero");
+
+  // Validación de número de documento / recibo anti-duplicados
+  if (data.docNo && data.docNo.trim()) {
+    const doc = data.docNo.trim();
+    // 1. Checar en caja_movimientos_auxiliar
+    const { rows: repetidoAux } = await pool.query(
+      `select fecha, doc_no, beneficiario, descripcion
+       from caja_movimientos_auxiliar
+       where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
+       limit 1`,
+      [dia.agencia_id, doc],
+    );
+    if (repetidoAux[0]) {
+      const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
+      throw conflict(
+        `El número de documento/recibo "${doc}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten documentos duplicados.`,
+      );
+    }
+
+    // 2. Checar en prestamo_pagos
+    const { rows: repetidoPago } = await pool.query(
+      `select pp.fecha, pp.numero_recibo, p.codigo, s.nombres as socio_nombres
+       from prestamo_pagos pp
+       join prestamos p on p.id = pp.prestamo_id
+       join socios s on s.id = pp.socio_id
+       where pp.agencia_id = $1 and lower(trim(pp.numero_recibo)) = lower($2)
+       limit 1`,
+      [dia.agencia_id, doc],
+    );
+    if (repetidoPago[0]) {
+      const fechaStr = new Date(repetidoPago[0].fecha).toLocaleDateString("es-GT");
+      throw conflict(
+        `El número de recibo "${doc}" ya fue registrado el ${fechaStr} en el crédito ${repetidoPago[0].codigo} (${repetidoPago[0].socio_nombres}). No se permiten recibos duplicados.`,
+      );
+    }
+
+    // 3. Checar en movimientos de cuentas (si no requiereCuenta, pues requiereCuenta se valida en cuentasService)
+    if (!info.requiereCuenta) {
+      const { rows: repetidoMov } = await pool.query(
+        `select m.fecha, m.numero_recibo, c.numero_cuenta, s.nombres as socio_nombres
+         from movimientos m
+         join cuentas c on c.id = m.cuenta_id
+         join socios s on s.id = c.socio_id
+         where c.agencia_id = $1 and lower(trim(m.numero_recibo)) = lower($2)
+         limit 1`,
+        [dia.agencia_id, doc],
+      );
+      if (repetidoMov[0]) {
+        const fechaStr = new Date(repetidoMov[0].fecha).toLocaleDateString("es-GT");
+        throw conflict(
+          `El número de recibo "${doc}" ya fue registrado el ${fechaStr} en la cuenta ${repetidoMov[0].numero_cuenta} (${repetidoMov[0].socio_nombres}). No se permiten recibos duplicados.`,
+        );
+      }
+    }
+  }
 
   const { rows: contadorRows } = await pool.query(
     `select count(*)::int as total from caja_movimientos_auxiliar
@@ -310,3 +403,777 @@ export async function beneficiariosFrecuentes(agenciaId: string, q: string, agen
   );
   return rows.map((r) => r.beneficiario);
 }
+
+export interface DatosCobroCredito {
+  prestamoId: string;
+  socioId: string;
+  abonoCapital: number;
+  interes: number;
+  mora?: number;
+  docNo?: string;
+}
+
+export async function cobrarCuotaCredito(
+  diaId: string,
+  data: DatosCobroCredito,
+  usuarioId: string,
+  agenciaVisible: string | null,
+) {
+  const dia = await obtenerDiaCrudo(diaId, agenciaVisible);
+  if (dia.estado !== "ABIERTO") {
+    throw conflict("La caja de este día ya está cerrada; no se pueden registrar cobros.");
+  }
+
+  const { rows: prestamoRows } = await pool.query(
+    `select p.*, s.nombres as socio_nombres, s.numero_asociado
+     from prestamos p
+     join socios s on s.id = p.socio_id
+     where p.id = $1`,
+    [data.prestamoId],
+  );
+  const prestamo = prestamoRows[0];
+  if (!prestamo) throw notFound("Préstamo no encontrado");
+  if (agenciaVisible && prestamo.agencia_id !== agenciaVisible) {
+    throw forbidden("Ese préstamo pertenece a otra agencia");
+  }
+  if (prestamo.estado !== "DESEMBOLSADO" && prestamo.estado !== "APROBADO") {
+    throw badRequest(`El préstamo no está activo para cobro (estado actual: ${prestamo.estado})`);
+  }
+
+  const abonoCapital = Number(data.abonoCapital) || 0;
+  const interes = Number(data.interes) || 0;
+  const mora = Number(data.mora) || 0;
+  const totalCobro = Math.round((abonoCapital + interes + mora) * 100) / 100;
+
+  if (totalCobro <= 0) {
+    throw badRequest("El monto total a cobrar debe ser mayor a cero");
+  }
+
+  const saldoActualCapital = Number(
+    prestamo.saldo_capital !== null && prestamo.saldo_capital !== undefined
+      ? prestamo.saldo_capital
+      : prestamo.monto_aprobado || prestamo.monto_solicitado,
+  );
+  const nuevoSaldoCapital = Math.max(0, Math.round((saldoActualCapital - abonoCapital) * 100) / 100);
+  const nuevoEstadoPrestamo = nuevoSaldoCapital === 0 ? "CANCELADO" : prestamo.estado;
+
+  // Validación de número de recibo anti-duplicados
+  if (data.docNo && data.docNo.trim()) {
+    const doc = data.docNo.trim();
+    const { rows: repetidoPago } = await pool.query(
+      `select pp.fecha, pp.numero_recibo, p.codigo, s.nombres as socio_nombres
+       from prestamo_pagos pp
+       join prestamos p on p.id = pp.prestamo_id
+       join socios s on s.id = pp.socio_id
+       where pp.agencia_id = $1 and lower(trim(pp.numero_recibo)) = lower($2)
+       limit 1`,
+      [dia.agencia_id, doc],
+    );
+    if (repetidoPago[0]) {
+      const fechaStr = new Date(repetidoPago[0].fecha).toLocaleDateString("es-GT");
+      throw conflict(
+        `El número de recibo "${doc}" ya fue registrado el ${fechaStr} en el crédito ${repetidoPago[0].codigo} (${repetidoPago[0].socio_nombres}). No se permiten recibos duplicados.`,
+      );
+    }
+
+    const { rows: repetidoAux } = await pool.query(
+      `select fecha, doc_no, beneficiario, descripcion
+       from caja_movimientos_auxiliar
+       where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
+       limit 1`,
+      [dia.agencia_id, doc],
+    );
+    if (repetidoAux[0]) {
+      const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
+      throw conflict(
+        `El número de recibo/documento "${doc}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten documentos duplicados.`,
+      );
+    }
+
+    const { rows: repetidoMov } = await pool.query(
+      `select m.fecha, m.numero_recibo, c.numero_cuenta, s.nombres as socio_nombres
+       from movimientos m
+       join cuentas c on c.id = m.cuenta_id
+       join socios s on s.id = c.socio_id
+       where c.agencia_id = $1 and lower(trim(m.numero_recibo)) = lower($2)
+       limit 1`,
+      [dia.agencia_id, doc],
+    );
+    if (repetidoMov[0]) {
+      const fechaStr = new Date(repetidoMov[0].fecha).toLocaleDateString("es-GT");
+      throw conflict(
+        `El número de recibo "${doc}" ya fue registrado el ${fechaStr} en la cuenta ${repetidoMov[0].numero_cuenta} (${repetidoMov[0].socio_nombres}). No se permiten recibos duplicados.`,
+      );
+    }
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+
+    // 1. Contador correlativo para categoría prestamo
+    const categoriaPrestamo =
+      prestamo.tipo === "HIPOTECARIO" ? "ABONO_PRESTAMO_HIPOTECARIO" : "ABONO_PRESTAMO_FIDUCIARIO";
+    const info = CATEGORIAS[categoriaPrestamo];
+    const { rows: contadorRows } = await client.query(
+      `select count(*)::int as total from caja_movimientos_auxiliar
+       where agencia_id = $1 and categoria::text = any($2::text[])`,
+      [dia.agencia_id, categoriasDelGrupo(info.grupoContador)],
+    );
+    const contador = contadorRows[0].total + 1;
+
+    // 2. Saldo previo y acumulado en caja
+    const { rows: ultimoMovRows } = await client.query(
+      `select saldo_acumulado from caja_movimientos_auxiliar where caja_dia_id = $1 order by created_at desc limit 1`,
+      [diaId],
+    );
+    const saldoPrevio = ultimoMovRows[0] ? Number(ultimoMovRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
+    const saldoAcumulado = saldoPrevio + totalCobro;
+
+    // 3. Registrar en caja_movimientos_auxiliar
+    const ref = `${prestamo.codigo}-CUOTA`;
+    const descripcion = `Cobro cuota crédito ${prestamo.codigo} (Cap: Q${abonoCapital.toFixed(2)}, Int: Q${interes.toFixed(2)}${mora > 0 ? `, Mora: Q${mora.toFixed(2)}` : ""})`;
+
+    const { rows: cajaMovRows } = await client.query(
+      `insert into caja_movimientos_auxiliar (
+         caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador,
+         referencia, socio_id, beneficiario, descripcion, doc_no, monto, saldo_acumulado, usuario_id
+       ) values ($1, $2, $3, 'PROPIO', $4, 'INGRESO', $5, $6, $7, $8, $9, $10, $11, $12, $13)
+       returning *`,
+      [
+        diaId,
+        dia.agencia_id,
+        dia.fecha,
+        categoriaPrestamo,
+        contador,
+        ref,
+        prestamo.socio_id,
+        prestamo.socio_nombres,
+        descripcion,
+        data.docNo ?? null,
+        totalCobro,
+        saldoAcumulado,
+        usuarioId,
+      ],
+    );
+    const cajaMov = cajaMovRows[0];
+
+    // 4. Registrar en ingresos_comif
+    if (abonoCapital > 0) {
+      await client.query(
+        `insert into ingresos_comif (agencia_id, fecha, numero_documento, nombre_socio, categoria, monto, usuario_id)
+         values ($1, $2, $3, $4, 'ABONO_PRESTAMO', $5, $6)`,
+        [dia.agencia_id, dia.fecha, data.docNo ?? null, prestamo.socio_nombres, abonoCapital, usuarioId],
+      );
+    }
+    if (interes + mora > 0) {
+      await client.query(
+        `insert into ingresos_comif (agencia_id, fecha, numero_documento, nombre_socio, categoria, monto, usuario_id)
+         values ($1, $2, $3, $4, 'INTERES_PRESTAMO', $5, $6)`,
+        [dia.agencia_id, dia.fecha, data.docNo ?? null, prestamo.socio_nombres, interes + mora, usuarioId],
+      );
+    }
+
+    // 5. Actualizar préstamo (reducir saldo_capital y si llega a 0 cambiar a CANCELADO)
+    await client.query(
+      `update prestamos
+       set saldo_capital = $1,
+           estado = $2,
+           updated_at = now()
+       where id = $3`,
+      [nuevoSaldoCapital, nuevoEstadoPrestamo, prestamo.id],
+    );
+
+    // 6. Registrar en prestamo_pagos
+    const { rows: pagoRows } = await client.query(
+      `insert into prestamo_pagos (
+         prestamo_id, socio_id, agencia_id, caja_dia_id, caja_movimiento_id,
+         fecha, numero_recibo, abono_capital, interes, mora, total_pagado,
+         saldo_capital_restante, usuario_id
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+       returning *`,
+      [
+        prestamo.id,
+        prestamo.socio_id,
+        dia.agencia_id,
+        diaId,
+        cajaMov.id,
+        dia.fecha,
+        data.docNo ?? null,
+        abonoCapital,
+        interes,
+        mora,
+        totalCobro,
+        nuevoSaldoCapital,
+        usuarioId,
+      ],
+    );
+
+    await client.query("commit");
+
+    await registrarAuditoria({
+      entidad: "PrestamoPago",
+      entidadId: pagoRows[0].id,
+      accion: "CREAR",
+      usuarioId,
+      datosNuevos: {
+        prestamoId: prestamo.id,
+        codigo: prestamo.codigo,
+        pago: pagoRows[0],
+        nuevoSaldoCapital,
+      },
+    });
+
+    return {
+      pago: pagoRows[0],
+      cajaMovimiento: cajaMov,
+      saldoCapitalRestante: nuevoSaldoCapital,
+      prestamoCancelado: nuevoEstadoPrestamo === "CANCELADO",
+    };
+  } catch (err) {
+    await client.query("rollback");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export interface DatosDesembolsoCredito {
+  prestamoId: string;
+  docNo?: string;
+}
+
+export async function desembolsarCredito(
+  diaId: string,
+  data: DatosDesembolsoCredito,
+  usuarioId: string,
+  agenciaVisible: string | null,
+) {
+  const dia = await obtenerDiaCrudo(diaId, agenciaVisible);
+  if (dia.estado !== "ABIERTO") {
+    throw conflict("La caja de este día ya está cerrada; no se pueden realizar desembolsos.");
+  }
+
+  const { rows: prestamoRows } = await pool.query(
+    `select p.*, s.nombres as socio_nombres, s.numero_asociado
+     from prestamos p
+     join socios s on s.id = p.socio_id
+     where p.id = $1`,
+    [data.prestamoId],
+  );
+  const prestamo = prestamoRows[0];
+  if (!prestamo) throw notFound("Préstamo no encontrado");
+  if (agenciaVisible && prestamo.agencia_id !== agenciaVisible) {
+    throw forbidden("Ese préstamo pertenece a otra agencia");
+  }
+  if (prestamo.estado !== "APROBADO") {
+    throw badRequest(
+      `El préstamo debe estar en estado APROBADO para ser desembolsado en caja (estado actual: ${prestamo.estado})`,
+    );
+  }
+
+  const montoDesembolso = Number(prestamo.monto_aprobado || prestamo.monto_solicitado);
+  if (montoDesembolso <= 0) {
+    throw badRequest("El monto aprobado debe ser mayor a cero");
+  }
+
+  // Validar si hay saldo suficiente en la caja física
+  const { rows: ultimoMovRows } = await pool.query(
+    `select saldo_acumulado from caja_movimientos_auxiliar where caja_dia_id = $1 order by created_at desc limit 1`,
+    [diaId],
+  );
+  const saldoPrevio = ultimoMovRows[0] ? Number(ultimoMovRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
+
+  if (montoDesembolso > saldoPrevio) {
+    throw conflict(
+      `Saldo insuficiente en la caja física: Se requieren Q ${montoDesembolso.toFixed(2)} pero el saldo actual en caja es de Q ${saldoPrevio.toFixed(2)}. Ingrese fondos o reduzca la entrega.`,
+    );
+  }
+
+  // Validación de docNo anti-duplicados
+  if (data.docNo && data.docNo.trim()) {
+    const doc = data.docNo.trim();
+    const { rows: repetidoAux } = await pool.query(
+      `select fecha, doc_no, beneficiario, descripcion
+       from caja_movimientos_auxiliar
+       where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
+       limit 1`,
+      [dia.agencia_id, doc],
+    );
+    if (repetidoAux[0]) {
+      const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
+      throw conflict(
+        `El número de comprobante/recibo "${doc}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten documentos duplicados.`,
+      );
+    }
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+
+    // 1. Contador de colocación
+    const info = CATEGORIAS.COLOCACION_PRESTAMO;
+    const { rows: contadorRows } = await client.query(
+      `select count(*)::int as total from caja_movimientos_auxiliar
+       where agencia_id = $1 and categoria::text = any($2::text[])`,
+      [dia.agencia_id, categoriasDelGrupo(info.grupoContador)],
+    );
+    const contador = contadorRows[0].total + 1;
+    const saldoAcumulado = Math.round((saldoPrevio - montoDesembolso) * 100) / 100;
+
+    // 2. Registrar egreso en caja_movimientos_auxiliar
+    const descripcion = `Desembolso de crédito ${prestamo.codigo} (${prestamo.tipo})`;
+    const { rows: cajaMovRows } = await client.query(
+      `insert into caja_movimientos_auxiliar (
+         caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador,
+         referencia, socio_id, beneficiario, descripcion, doc_no, monto, saldo_acumulado, usuario_id
+       ) values ($1, $2, $3, 'PROPIO', 'COLOCACION_PRESTAMO', 'EGRESO', $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       returning *`,
+      [
+        diaId,
+        dia.agencia_id,
+        dia.fecha,
+        contador,
+        prestamo.codigo,
+        prestamo.socio_id,
+        prestamo.socio_nombres,
+        descripcion,
+        data.docNo ?? null,
+        montoDesembolso,
+        saldoAcumulado,
+        usuarioId,
+      ],
+    );
+    const cajaMov = cajaMovRows[0];
+
+    // 3. Actualizar estado del préstamo a DESEMBOLSADO
+    const { rows: prestamoActualizadoRows } = await client.query(
+      `update prestamos
+       set estado = 'DESEMBOLSADO',
+           fecha_desembolso = $1,
+           saldo_capital = $2,
+           updated_at = now()
+       where id = $3
+       returning *`,
+      [dia.fecha, montoDesembolso, prestamo.id],
+    );
+
+    await client.query("commit");
+
+    await registrarAuditoria({
+      entidad: "Prestamo",
+      entidadId: prestamo.id,
+      accion: "ACTUALIZAR",
+      usuarioId,
+      datosNuevos: {
+        estado: "DESEMBOLSADO",
+        desembolsoCajaMovimientoId: cajaMov.id,
+        monto: montoDesembolso,
+      },
+    });
+
+    return {
+      prestamo: prestamoActualizadoRows[0],
+      cajaMovimiento: cajaMov,
+      saldoCajaRestante: saldoAcumulado,
+    };
+  } catch (err) {
+    await client.query("rollback");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export interface DatosLiquidarPlazoFijoVentanilla {
+  contratoId: string;
+  reciboRetiro: string; // RE. No.
+  incluirIntereses?: boolean;
+}
+
+export async function liquidarPlazoFijo(
+  diaId: string,
+  data: DatosLiquidarPlazoFijoVentanilla,
+  usuarioId: string,
+  agenciaVisible: string | null,
+) {
+  const dia = await obtenerDiaCrudo(diaId, agenciaVisible);
+  if (dia.estado !== "ABIERTO") {
+    throw conflict("La caja de este día ya está cerrada. No se pueden registrar liquidaciones.");
+  }
+
+  if (!data.reciboRetiro || !data.reciboRetiro.trim()) {
+    throw badRequest("El número de recibo de egreso (RE. No.) es obligatorio para liquidar el plazo fijo.");
+  }
+  const recibo = data.reciboRetiro.trim();
+
+  // Obtener contrato
+  const { rows: contratoRows } = await pool.query(
+    `select pf.*, c.numero_cuenta, c.agencia_id, s.nombres as socio_nombres, s.id as socio_id, s.numero_asociado
+     from plazo_fijo_contratos pf
+     join cuentas c on c.id = pf.cuenta_id
+     join socios s on s.id = c.socio_id
+     where pf.id = $1`,
+    [data.contratoId],
+  );
+  const contrato = contratoRows[0];
+  if (!contrato) throw notFound("Contrato de plazo fijo no encontrado");
+  if (contrato.agencia_id !== dia.agencia_id) {
+    throw forbidden("Ese contrato pertenece a otra agencia");
+  }
+  if (contrato.estado === "LIQUIDADO") {
+    throw conflict(`El certificado No. ${contrato.numero_certificacion} ya fue liquidado anteriormente.`);
+  }
+
+  const montoALiquidar = data.incluirIntereses
+    ? Number(contrato.saldo_liquido_a_pagar)
+    : Number(contrato.monto_deposito);
+
+  // Validar saldo suficiente en caja
+  const { rows: ultimoMovRows } = await pool.query(
+    `select saldo_acumulado from caja_movimientos_auxiliar where caja_dia_id = $1 order by created_at desc limit 1`,
+    [diaId],
+  );
+  const saldoPrevio = ultimoMovRows[0] ? Number(ultimoMovRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
+  if (montoALiquidar > saldoPrevio) {
+    throw conflict(
+      `Saldo insuficiente en la caja física: Se requieren Q ${montoALiquidar.toFixed(2)} para liquidar el certificado pero la caja solo tiene Q ${saldoPrevio.toFixed(2)}. Ingrese fondos antes de pagar.`,
+    );
+  }
+
+  // Validación anti-duplicados del recibo de retiro
+  const { rows: repetidoAux } = await pool.query(
+    `select fecha, doc_no, beneficiario, descripcion
+     from caja_movimientos_auxiliar
+     where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
+     limit 1`,
+    [dia.agencia_id, recibo],
+  );
+  if (repetidoAux[0]) {
+    const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
+    throw conflict(
+      `El número de recibo de retiro "${recibo}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten recibos duplicados.`,
+    );
+  }
+
+  const { rows: repetidoPF } = await pool.query(
+    `select fecha_retiro, recibo_retiro, numero_certificacion
+     from plazo_fijo_contratos
+     where lower(trim(recibo_retiro)) = lower($1)
+     limit 1`,
+    [recibo],
+  );
+  if (repetidoPF[0]) {
+    const fechaStr = repetidoPF[0].fecha_retiro ? new Date(repetidoPF[0].fecha_retiro).toLocaleDateString("es-GT") : "";
+    throw conflict(
+      `El número de recibo "${recibo}" ya fue utilizado en la liquidación del certificado No. ${repetidoPF[0].numero_certificacion} el ${fechaStr}.`,
+    );
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+
+    const info = CATEGORIAS.RETIRO_PLAZO_FIJO;
+    const { rows: contadorRows } = await client.query(
+      `select count(*)::int as total from caja_movimientos_auxiliar
+       where agencia_id = $1 and categoria::text = any($2::text[])`,
+      [dia.agencia_id, categoriasDelGrupo(info.grupoContador)],
+    );
+    const contador = contadorRows[0].total + 1;
+    const saldoAcumulado = Math.round((saldoPrevio - montoALiquidar) * 100) / 100;
+
+    // 1. Insertar egreso en caja_movimientos_auxiliar
+    const { rows: cajaMovRows } = await client.query(
+      `insert into caja_movimientos_auxiliar (
+         caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador,
+         referencia, socio_id, cuenta_id, beneficiario, descripcion, doc_no,
+         monto, saldo_acumulado, usuario_id
+       ) values ($1, $2, $3, 'PROPIO', 'RETIRO_PLAZO_FIJO', 'EGRESO', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+       returning *`,
+      [
+        diaId,
+        dia.agencia_id,
+        dia.fecha,
+        contador,
+        contrato.numero_certificacion,
+        contrato.socio_id,
+        contrato.cuenta_id,
+        contrato.socio_nombres,
+        `Liquidación Plazo Fijo Certificado No. ${contrato.numero_certificacion}${data.incluirIntereses ? " (Cap + Int)" : " (Capital)"}`,
+        recibo,
+        montoALiquidar,
+        saldoAcumulado,
+        usuarioId,
+      ],
+    );
+    const cajaMov = cajaMovRows[0];
+
+    // 2. Actualizar contrato a LIQUIDADO
+    const { rows: pfActualizadoRows } = await client.query(
+      `update plazo_fijo_contratos
+       set estado = 'LIQUIDADO',
+           fecha_retiro = $1,
+           recibo_retiro = $2,
+           monto_liquidado = $3,
+           updated_at = now()
+       where id = $4
+       returning *`,
+      [dia.fecha, recibo, montoALiquidar, contrato.id],
+    );
+
+    // 3. Registrar retiro en la cuenta
+    const clienteMovId = `LIQ-PF-${contrato.id}-${Date.now()}`;
+    await client.query(
+      `insert into movimientos (cuenta_id, tipo, monto, fecha, descripcion, numero_recibo, usuario_id, cliente_movimiento_id)
+       values ($1, 'RETIRO', $2, $3, $4, $5, $6, $7)`,
+      [
+        contrato.cuenta_id,
+        montoALiquidar,
+        dia.fecha,
+        `Liquidación Certificado No. ${contrato.numero_certificacion}`,
+        recibo,
+        usuarioId,
+        clienteMovId,
+      ],
+    );
+
+    await client.query("commit");
+
+    await registrarAuditoria({
+      entidad: "PlazoFijoContrato",
+      entidadId: contrato.id,
+      accion: "ACTUALIZAR",
+      usuarioId,
+      datosNuevos: {
+        estado: "LIQUIDADO",
+        recibo_retiro: recibo,
+        monto_liquidado: montoALiquidar,
+        caja_movimiento_id: cajaMov.id,
+      },
+    });
+
+    return {
+      contrato: pfActualizadoRows[0],
+      cajaMovimiento: cajaMov,
+      saldoCajaRestante: saldoAcumulado,
+    };
+  } catch (err) {
+    await client.query("rollback");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function analiticaServicios(
+  agenciaId: string | null | undefined,
+  agenciaVisible: string | null,
+  periodo: "semana" | "mes" | "anio" = "mes",
+) {
+  let filtroAgenciaAux = "";
+  let filtroAgenciaCuentas = "";
+  let filtroAgenciaPrestamos = "";
+  const params: unknown[] = [];
+
+  const targetAgencia = agenciaVisible || (agenciaId && agenciaId !== "TODAS" ? agenciaId : null);
+  if (targetAgencia) {
+    params.push(targetAgencia);
+    filtroAgenciaAux = `and d.agencia_id = $${params.length}`;
+    filtroAgenciaCuentas = `and c.agencia_id = $${params.length}`;
+    filtroAgenciaPrestamos = `and p.agencia_id = $${params.length}`;
+  }
+
+  let fechaInicioSql = "current_date - interval '30 days'";
+  if (periodo === "semana") {
+    fechaInicioSql = "current_date - interval '7 days'";
+  } else if (periodo === "anio") {
+    fechaInicioSql = "date_trunc('year', current_date)";
+  }
+
+  const query = `
+    with ops as (
+      -- 1. Movimientos de Ventanilla en Auxiliar de Caja
+      select m.categoria::text, count(*)::int as cant, sum(m.monto)::numeric(14,2) as monto
+      from caja_movimientos_auxiliar m
+      join caja_dias d on d.id = m.caja_dia_id
+      where d.fecha >= ${fechaInicioSql} and d.fecha <= current_date + interval '1 day' ${filtroAgenciaAux}
+      group by m.categoria
+
+      union all
+
+      -- 2. Movimientos de Ahorros, Plazos Fijos y Aportaciones
+      select 
+        case 
+          when c.tipo = 'APORTACION' then 'APORTACION'
+          when c.tipo = 'AHORRO_CORRIENTE' and m.tipo = 'DEPOSITO' then 'DEPOSITO_AHORRO_CORRIENTE'
+          when c.tipo = 'AHORRO_CORRIENTE' and m.tipo = 'RETIRO' then 'RETIRO_AHORRO_CORRIENTE'
+          when c.tipo = 'AHORRO_PROGRAMADO' then 'DEPOSITO_AHORRO_PROGRAMADO'
+          when c.tipo = 'AHORRO_INFANTO_JUVENIL' then 'DEPOSITO_AHORRO_INFANTO_JUVENIL'
+          when c.tipo = 'AHORRO_PLAZO_FIJO' and m.tipo = 'DEPOSITO' then 'DEPOSITO_PLAZO_FIJO'
+          when c.tipo = 'AHORRO_PLAZO_FIJO' and m.tipo = 'RETIRO' then 'RETIRO_PLAZO_FIJO'
+          else 'INGRESO_VARIO'
+        end as categoria,
+        count(*)::int as cant,
+        sum(m.monto)::numeric(14,2) as monto
+      from movimientos m
+      join cuentas c on c.id = m.cuenta_id
+      where m.fecha >= ${fechaInicioSql} and m.fecha <= current_date + interval '1 day' ${filtroAgenciaCuentas}
+      group by 1
+
+      union all
+
+      -- 3. Préstamos Colocados
+      select 
+        case 
+          when p.tipo = 'HIPOTECARIO' then 'COLOCACION_PRESTAMO'
+          else 'COLOCACION_PRESTAMO'
+        end as categoria,
+        count(*)::int as cant,
+        sum(p.monto_aprobado)::numeric(14,2) as monto
+      from prestamos p
+      where coalesce(p.fecha_aprobacion, p.created_at::date) >= ${fechaInicioSql}
+        and coalesce(p.fecha_aprobacion, p.created_at::date) <= current_date + interval '1 day'
+        ${filtroAgenciaPrestamos}
+      group by 1
+    )
+    select categoria, sum(cant)::int as cantidad, sum(monto)::numeric(14,2) as total_monto
+    from ops
+    group by categoria
+    order by cantidad desc;
+  `;
+
+  const { rows } = await pool.query(query, params);
+
+  const GRUPOS: Record<string, { label: string; icon: string }> = {
+    SERVICIOS_BI: { label: "Pago de Servicios (Agente BI)", icon: "🏦" },
+    DEPOSITO_BI: { label: "Depósitos Agente BI", icon: "📥" },
+    RETIRO_BI: { label: "Retiros Agente BI", icon: "📤" },
+    REMESA_BI: { label: "Cobro de Remesas BI", icon: "💵" },
+    ABONO_PRESTAMO_HIPOTECARIO: { label: "Abono Préstamo Hipotecario", icon: "🏠" },
+    INTERES_PRESTAMO_HIPOTECARIO: { label: "Interés Préstamo Hipotecario", icon: "📊" },
+    MORA_PRESTAMO_HIPOTECARIO: { label: "Mora Préstamo Hipotecario", icon: "⚠️" },
+    ABONO_PRESTAMO_FIDUCIARIO: { label: "Abono Préstamo Fiduciario", icon: "🤝" },
+    INTERES_PRESTAMO_FIDUCIARIO: { label: "Interés Préstamo Fiduciario", icon: "📈" },
+    MORA_PRESTAMO_FIDUCIARIO: { label: "Mora Préstamo Fiduciario", icon: "⚠️" },
+    COLOCACION_PRESTAMO: { label: "Desembolso de Préstamos", icon: "💼" },
+    DEPOSITO_AHORRO_CORRIENTE: { label: "Depósito Ahorro Corriente", icon: "💰" },
+    RETIRO_AHORRO_CORRIENTE: { label: "Retiro Ahorro Corriente", icon: "💸" },
+    DEPOSITO_AHORRO_PROGRAMADO: { label: "Depósito Ahorro Programado", icon: "📅" },
+    RETIRO_AHORRO_PROGRAMADO: { label: "Retiro Ahorro Programado", icon: "📅" },
+    DEPOSITO_AHORRO_INFANTO_JUVENIL: { label: "Depósito Ahorro Infantil", icon: "🧒" },
+    RETIRO_AHORRO_INFANTO_JUVENIL: { label: "Retiro Ahorro Infantil", icon: "🧒" },
+    DEPOSITO_PLAZO_FIJO: { label: "Apertura Plazo Fijo", icon: "🔒" },
+    RETIRO_PLAZO_FIJO: { label: "Liquidación Plazo Fijo", icon: "📦" },
+    APORTACION: { label: "Aportaciones de Capital", icon: "🏛️" },
+    INGRESO_ASOCIADO: { label: "Cuotas de Ingreso Asociado", icon: "📝" },
+    COMISION: { label: "Comisiones por Servicios", icon: "🏷️" },
+    INGRESO_VARIO: { label: "Ingresos Varios", icon: "➕" },
+    EGRESO_VARIO: { label: "Egresos Varios", icon: "➖" },
+  };
+
+  const totalOperaciones = rows.reduce((acc, r) => acc + Number(r.cantidad), 0);
+  const volumenTotal = rows.reduce((acc, r) => acc + Number(r.total_monto), 0);
+
+  const servicios = rows.map((r) => {
+    const info = GRUPOS[r.categoria] ?? { label: r.categoria, icon: "📌" };
+    const cant = Number(r.cantidad);
+    const monto = Number(r.total_monto);
+    const pct = totalOperaciones > 0 ? Math.round((cant / totalOperaciones) * 1000) / 10 : 0;
+    return {
+      categoria: r.categoria,
+      label: info.label,
+      icon: info.icon,
+      cantidad: cant,
+      totalMonto: monto,
+      porcentaje: pct,
+    };
+  });
+
+  return {
+    periodo,
+    totalOperaciones,
+    volumenTotal,
+    servicioTop: servicios[0] ?? null,
+    servicios,
+  };
+}
+
+export async function arqueosMensuales(
+  agenciaId: string | null | undefined,
+  agenciaVisible: string | null,
+  mes?: string,
+) {
+  let targetAgencia = agenciaVisible || agenciaId;
+  if (!targetAgencia) {
+    const { rows: ags } = await pool.query("select id from agencias limit 1");
+    targetAgencia = ags[0]?.id;
+  }
+  if (!targetAgencia) throw badRequest("No hay agencias configuradas");
+  checarAgencia(targetAgencia, agenciaVisible);
+
+  const mesParam = mes && /^\d{4}-\d{2}$/.test(mes) ? mes : hoyISO().slice(0, 7);
+
+  const { rows } = await pool.query(
+    `select d.*,
+       u_abrio.nombre as abierto_por_nombre,
+       u_cerro.nombre as cerrado_por_nombre,
+       (select count(*) from caja_movimientos_auxiliar m where m.caja_dia_id = d.id)::int as total_movimientos,
+       coalesce((select sum(monto) from caja_movimientos_auxiliar m where m.caja_dia_id = d.id and m.tipo = 'INGRESO'), 0)::numeric(14,2) as total_ingresos,
+       coalesce((select sum(monto) from caja_movimientos_auxiliar m where m.caja_dia_id = d.id and m.tipo = 'EGRESO'), 0)::numeric(14,2) as total_egresos,
+       a.total_contado,
+       a.diferencia,
+       a.detalle as arqueo_detalle
+     from caja_dias d
+     left join usuarios u_abrio on u_abrio.id = d.abierto_por
+     left join usuarios u_cerro on u_cerro.id = d.cerrado_por
+     left join caja_arqueos a on a.caja_dia_id = d.id
+     where d.agencia_id = $1 and to_char(d.fecha, 'YYYY-MM') = $2
+     order by d.fecha asc`,
+    [agenciaId, mesParam],
+  );
+
+  let totalDiasOperados = rows.length;
+  let diasCuadrados = 0;
+  let diasConDiferencia = 0;
+  let totalSobrante = 0;
+  let totalFaltante = 0;
+  let totalMovimientosMes = 0;
+  let totalIngresosMes = 0;
+  let totalEgresosMes = 0;
+
+  for (const r of rows) {
+    totalMovimientosMes += Number(r.total_movimientos || 0);
+    totalIngresosMes += Number(r.total_ingresos || 0);
+    totalEgresosMes += Number(r.total_egresos || 0);
+
+    const dif = Number(r.diferencia || 0);
+    if (r.estado === "CERRADO") {
+      if (dif === 0) {
+        diasCuadrados++;
+      } else {
+        diasConDiferencia++;
+        if (dif > 0) totalSobrante += dif;
+        else totalFaltante += Math.abs(dif);
+      }
+    }
+  }
+
+  return {
+    mes: mesParam,
+    resumen: {
+      totalDiasOperados,
+      diasCuadrados,
+      diasConDiferencia,
+      totalSobrante,
+      totalFaltante,
+      totalMovimientosMes,
+      totalIngresosMes,
+      totalEgresosMes,
+    },
+    dias: rows,
+  };
+}
+
+

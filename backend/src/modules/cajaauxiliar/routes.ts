@@ -18,6 +18,35 @@ cajaAuxiliarRouter.get(
   }),
 );
 
+cajaAuxiliarRouter.get(
+  "/historial",
+  asyncHandler(async (req, res) => {
+    const agenciaId = (req.query.agenciaId as string) || req.user?.agenciaId;
+    if (!agenciaId) throw badRequest("Falta indicar la agencia");
+    const limite = req.query.limite ? Number(req.query.limite) : 30;
+    res.json(await service.historialDias(agenciaId, agenciaVisible(req), limite));
+  }),
+);
+
+cajaAuxiliarRouter.get(
+  "/analitica-servicios",
+  asyncHandler(async (req, res) => {
+    const agenciaId = (req.query.agenciaId as string) || req.user?.agenciaId || undefined;
+    const periodo = (req.query.periodo as "semana" | "mes" | "anio") || "mes";
+    res.json(await service.analiticaServicios(agenciaId, agenciaVisible(req), periodo));
+  }),
+);
+
+cajaAuxiliarRouter.get(
+  "/arqueos-mes",
+  asyncHandler(async (req, res) => {
+    const agenciaId = (req.query.agenciaId as string) || req.user?.agenciaId || undefined;
+    const mes = typeof req.query.mes === "string" ? req.query.mes : undefined;
+    res.json(await service.arqueosMensuales(agenciaId, agenciaVisible(req), mes));
+  }),
+);
+
+
 const abrirSchema = z.object({
   agenciaId: z.string().uuid(),
   saldoInicial: z.number().nonnegative().optional(),
@@ -91,3 +120,58 @@ cajaAuxiliarRouter.post(
     res.json(await service.cerrarDia(req.params.id, data.conteo, req.user!.id, agenciaVisible(req)));
   }),
 );
+
+const cobroCreditoSchema = z.object({
+  prestamoId: z.string().uuid(),
+  socioId: z.string().uuid(),
+  abonoCapital: z.number().min(0),
+  interes: z.number().min(0),
+  mora: z.number().min(0).optional(),
+  docNo: z.string().optional(),
+});
+
+cajaAuxiliarRouter.post(
+  "/:id/cobro-credito",
+  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  asyncHandler(async (req, res) => {
+    const data = cobroCreditoSchema.parse(req.body);
+    res.status(201).json(
+      await service.cobrarCuotaCredito(req.params.id, data, req.user!.id, agenciaVisible(req)),
+    );
+  }),
+);
+
+const desembolsoCreditoSchema = z.object({
+  prestamoId: z.string().uuid(),
+  docNo: z.string().optional(),
+});
+
+cajaAuxiliarRouter.post(
+  "/:id/desembolso-credito",
+  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  asyncHandler(async (req, res) => {
+    const data = desembolsoCreditoSchema.parse(req.body);
+    res.status(201).json(
+      await service.desembolsarCredito(req.params.id, data, req.user!.id, agenciaVisible(req)),
+    );
+  }),
+);
+
+const liquidarPlazoFijoSchema = z.object({
+  contratoId: z.string().uuid(),
+  reciboRetiro: z.string().min(1, "El número de recibo de retiro (RE. No.) es obligatorio"),
+  incluirIntereses: z.boolean().optional(),
+});
+
+cajaAuxiliarRouter.post(
+  "/:id/liquidar-plazo-fijo",
+  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  asyncHandler(async (req, res) => {
+    const data = liquidarPlazoFijoSchema.parse(req.body);
+    res.status(201).json(
+      await service.liquidarPlazoFijo(req.params.id, data, req.user!.id, agenciaVisible(req)),
+    );
+  }),
+);
+
+

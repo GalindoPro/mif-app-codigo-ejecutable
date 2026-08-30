@@ -47,6 +47,20 @@ prestamosRouter.get(
   }),
 );
 
+prestamosRouter.get(
+  "/kardex-cartera",
+  asyncHandler(async (req, res) => {
+    const agenciaId = agenciaVisible(req) ?? (req.query.agenciaId as string) ?? null;
+    const promotorId =
+      req.user?.rol === "PROMOTOR"
+        ? req.user.id
+        : (req.query.promotorId as string) || null;
+    const tipo = req.query.tipo as any;
+    const mes = req.query.mes as string | undefined;
+    res.json(await service.obtenerKardexCartera({ agenciaId, promotorId, tipo, mes }));
+  }),
+);
+
 const crearSchema = z.object({
   agenciaId: z.string().uuid(),
   socioId: z.string().uuid(),
@@ -58,6 +72,9 @@ const crearSchema = z.object({
   tasaInteresMensual: z.number().positive().default(2.0),
   destino: z.string().optional(),
   garantia: z.string().optional(),
+  ubicacionGarantia: z.string().optional().nullable(),
+  nombreFiador: z.string().optional().nullable(),
+  documentoDesembolso: z.string().optional().nullable(),
   observaciones: z.string().optional(),
   fechaSolicitud: z.string().optional(),
 });
@@ -66,6 +83,9 @@ prestamosRouter.post(
   "/",
   asyncHandler(async (req, res) => {
     const data = crearSchema.parse(req.body);
+    if (req.user?.rol === "PROMOTOR" && !data.promotorId) {
+      data.promotorId = req.user.id;
+    }
     const prestamo = await service.crear(data, req.user!.id);
     res.status(201).json(prestamo);
   }),
@@ -97,5 +117,12 @@ prestamosRouter.patch(
       montoAprobado,
     );
     res.json(actualizado);
+  }),
+);
+
+prestamosRouter.get(
+  "/:id/pagos",
+  asyncHandler(async (req, res) => {
+    res.json(await service.listarPagos(req.params.id));
   }),
 );

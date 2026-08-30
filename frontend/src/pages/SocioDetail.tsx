@@ -26,6 +26,7 @@ const TIPO_SLUG: Record<string, string> = {
   AHORRO_CORRIENTE: "corriente",
   AHORRO_PROGRAMADO: "programado",
   AHORRO_INFANTO_JUVENIL: "infanto-juvenil",
+  AHORRO_PLAZO_FIJO: "plazo-fijo",
 };
 
 export default function SocioDetail() {
@@ -38,10 +39,13 @@ export default function SocioDetail() {
 
   const [form, setForm] = useState({
     nombres: "",
+    edad: "",
     dpi: "",
     direccion: "",
     telefono: "",
     nombreBeneficiario: "",
+    dpiBeneficiario: "",
+    telefonoBeneficiario: "",
   });
 
   function cargar() {
@@ -52,10 +56,13 @@ export default function SocioDetail() {
         setSocio(data);
         setForm({
           nombres: data.nombres,
+          edad: data.edad ? String(data.edad) : "",
           dpi: data.dpi ?? "",
           direccion: data.direccion ?? "",
           telefono: data.telefono ?? "",
           nombreBeneficiario: data.nombre_beneficiario ?? "",
+          dpiBeneficiario: data.dpi_beneficiario ?? "",
+          telefonoBeneficiario: data.telefono_beneficiario ?? "",
         });
       })
       .catch((err) => setError(mensajeError(err)));
@@ -71,10 +78,13 @@ export default function SocioDetail() {
     try {
       await api.patch(`/socios/${id}`, {
         nombres: form.nombres,
+        edad: form.edad ? Number(form.edad) : null,
         dpi: form.dpi || undefined,
         direccion: form.direccion || undefined,
         telefono: form.telefono || undefined,
         nombreBeneficiario: form.nombreBeneficiario || undefined,
+        dpiBeneficiario: form.dpiBeneficiario || undefined,
+        telefonoBeneficiario: form.telefonoBeneficiario || undefined,
       });
       setEditando(false);
       cargar();
@@ -160,6 +170,15 @@ export default function SocioDetail() {
                 />
               </div>
               <div className="field">
+                <label htmlFor="edit-edad">Edad</label>
+                <input
+                  id="edit-edad"
+                  type="number"
+                  value={form.edad}
+                  onChange={(e) => setForm({ ...form, edad: e.target.value })}
+                />
+              </div>
+              <div className="field">
                 <label htmlFor="edit-telefono">Teléfono</label>
                 <input
                   id="edit-telefono"
@@ -183,6 +202,22 @@ export default function SocioDetail() {
                   onChange={(e) => setForm({ ...form, nombreBeneficiario: e.target.value })}
                 />
               </div>
+              <div className="field">
+                <label htmlFor="edit-dpi-ben">DPI Beneficiario</label>
+                <input
+                  id="edit-dpi-ben"
+                  value={form.dpiBeneficiario}
+                  onChange={(e) => setForm({ ...form, dpiBeneficiario: e.target.value })}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="edit-tel-ben">Teléfono Beneficiario</label>
+                <input
+                  id="edit-tel-ben"
+                  value={form.telefonoBeneficiario}
+                  onChange={(e) => setForm({ ...form, telefonoBeneficiario: e.target.value })}
+                />
+              </div>
               <div style={{ display: "flex", gap: "0.6rem" }}>
                 <button className="btn" type="submit" disabled={guardando}>
                   {guardando ? "Guardando…" : "Guardar cambios"}
@@ -198,6 +233,8 @@ export default function SocioDetail() {
               <dd className="mono" style={{ margin: 0 }}>{new Date(socio.fecha_ingreso).toLocaleDateString("es-GT")}</dd>
               <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Género</dt>
               <dd style={{ margin: 0 }}>{socio.genero === "F" ? "Femenino" : socio.genero === "M" ? "Masculino" : "—"}</dd>
+              <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Edad</dt>
+              <dd className="mono" style={{ margin: 0 }}>{socio.edad ? `${socio.edad} años` : "—"}</dd>
               <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>DPI</dt>
               <dd className="mono" style={{ margin: 0 }}>{socio.dpi ?? "—"}</dd>
               <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Teléfono</dt>
@@ -205,7 +242,15 @@ export default function SocioDetail() {
               <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Dirección</dt>
               <dd style={{ margin: 0 }}>{socio.direccion ?? "—"}</dd>
               <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Beneficiario</dt>
-              <dd style={{ margin: 0 }}>{socio.nombre_beneficiario ?? "—"}</dd>
+              <dd style={{ margin: 0 }}>
+                <strong>{socio.nombre_beneficiario ?? "—"}</strong>
+                {(socio.dpi_beneficiario || socio.telefono_beneficiario) && (
+                  <div style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "0.15rem" }}>
+                    {socio.dpi_beneficiario ? `DPI: ${socio.dpi_beneficiario} ` : ""}
+                    {socio.telefono_beneficiario ? `· Tel: ${socio.telefono_beneficiario}` : ""}
+                  </div>
+                )}
+              </dd>
             </dl>
           )}
         </div>

@@ -12,6 +12,7 @@ import { cajaAuxiliarRouter } from "./modules/cajaauxiliar/routes";
 import { dashboardRouter } from "./modules/dashboard/routes";
 import { sistemaRouter } from "./modules/sistema/routes";
 import { prestamosRouter } from "./modules/prestamos/routes";
+import { plazoFijoRouter } from "./modules/plazofijo/routes";
 
 export const app = express();
 
@@ -30,6 +31,7 @@ app.use("/api/caja-auxiliar", cajaAuxiliarRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/sistema", sistemaRouter);
 app.use("/api/prestamos", prestamosRouter);
+app.use("/api/plazo-fijo", plazoFijoRouter);
 
 app.use((_req, res) => res.status(404).json({ error: "Ruta no encontrada" }));
 app.use(errorHandler);

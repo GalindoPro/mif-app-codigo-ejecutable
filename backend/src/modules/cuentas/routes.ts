@@ -39,6 +39,14 @@ cuentasRouter.get(
 );
 
 cuentasRouter.get(
+  "/novedades-campo",
+  asyncHandler(async (req, res) => {
+    const agenciaId = agenciaVisible(req) || (req.query.agenciaId as string) || null;
+    res.json(await service.listarNovedadesCampo(agenciaId));
+  }),
+);
+
+cuentasRouter.get(
   "/:id",
   asyncHandler(async (req, res) => {
     res.json(await service.obtener(req.params.id, agenciaVisible(req)));
@@ -51,11 +59,13 @@ const crearSchema = z.object({
   socioId: z.string().uuid(),
   numeroCuenta: z.string().min(1),
   saldoInicial: z.number().nonnegative().optional(),
+  cuotaPactada: z.number().positive().optional().nullable(),
+  observacionesApertura: z.string().optional().nullable(),
 });
 
 cuentasRouter.post(
   "/",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO", "PROMOTOR"),
   asyncHandler(async (req, res) => {
     const data = crearSchema.parse(req.body);
     const visible = agenciaVisible(req);

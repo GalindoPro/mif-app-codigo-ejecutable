@@ -1,83 +1,192 @@
-# Sistema Integral MIF — Código para revisión
+# Sistema Integral MIF — Estado y Control de Desarrollo
 
-Estos archivos contienen el **código real y completo** del proyecto, tal como
-está construido y probado hasta ahora (Fase 1 + avance de Fase 2), en formato
-Markdown para que lo puedas leer, comentar y pedir cambios antes de la
-siguiente entrega (el zip con el proyecto listo para instalar).
+Este documento registra el **avance real y completo** del sistema de la Cooperativa Integral de Ahorro y Crédito "Maya Inversiones Futuras" R.L. (MIF), detallando los módulos completados, la estructura operativa y las siguientes funciones en cola.
 
-## Cómo están organizados
+---
 
-- **`01-codigo-backend.md`** — la API (Node.js + TypeScript + PostgreSQL):
-  esquema de base de datos, autenticación, roles, auditoría, y los módulos de
-  agencias, usuarios, socios, cuentas de ahorro (corriente/programado/infanto
-  juvenil), caja chica, **auxiliar de caja** (libro de caja diario) y tablero
-  (dashboard). Incluye también, al final, el borrador de esquema adaptado a
-  Supabase (`db/schema.supabase.sql`), en pausa por el tema de red que ya
-  hablamos.
-- **`02-codigo-frontend.md`** — la app web (React + TypeScript + Vite,
-  configurada como PWA): login, tablero, socios, cuentas de ahorro, caja
-  chica, auxiliar de caja y agencias.
+## 1. Estado Actual de Módulos
 
-Cada archivo del proyecto aparece con su ruta como título (por ejemplo
-`backend/src/modules/socios/service.ts`) y su contenido completo en un bloque
-de código, en el mismo orden en que están en el proyecto real.
+### ✅ Módulos Completados y Probados
 
-## Estado actual
+1. **Autenticación y Matriz de Roles:**
+   - Roles configurados: `ADMIN` (Administrador), `GERENCIA` (Gerencia), `SUPERVISOR` (Jefe de agencia), `CAJERO` (Operador) y `PROMOTOR` (Promotor de crédito).
+   - Control de permisos en Frontend y Backend: cada rol ve exclusivamente las opciones y tarjetas que le corresponden.
+   - Gestión de usuarios y asignación de personal a agencias (`/usuarios`).
+   - Base de datos conectada localmente a PostgreSQL 18 (`mif_dev`, usuario `galindo`).
 
-- ✅ **Fase 1 completa y probada**: esquema de base de datos, autenticación
-  con roles, módulo de Socios de punta a punta (alta, edición, búsqueda,
-  activar/inactivar), auditoría.
-- ✅ **Fase 2 en avance, probado**: roles renombrados en la interfaz
-  (Operador / Jefe de agencia), Tablero con resumen consolidado y detalle por
-  agencia, módulo de Caja Chica (con categorías de gasto y número de
-  documento por defecto "DTE"), el módulo genérico de Ahorro (Corriente,
-  Programado, Infanto Juvenil) con búsqueda de socio, registro de depósitos y
-  retiros, y totales de depósitos/retiros por tipo de cuenta, y el nuevo
-  **Auxiliar de Caja** (libro de caja diario, ver más abajo).
-- 🔜 **Pendiente**: ajustar el número de cuenta al formato real de la
-  cooperativa (`agencia-asociado-tipo-secuencia`, ya tengo los códigos por
-  tipo de cuenta, falta el número de agencia de Chajul) y construir el nuevo
-  módulo de **Créditos** (roles de Promotor, tabla de amortización, 2% de
-  interés mensual, simulador de crédito).
+2. **Módulo de Socios y Padrón de Aportaciones (`/socios` y `/aportaciones`):**
+   - Basado en el libro oficial `caja/APORTACIONES 31-08-26.xlsx`.
+   - **Campos del asociado:** Nombres, DPI, Género (`M`/`F`), Edad (años), Dirección y Teléfono.
+   - **Datos de la persona beneficiaria:** Nombre completo, DPI y Teléfono de contacto.
+   - **Apertura automática de Aportaciones:** Creación de cuenta `CHAJUL-APOR-XXXX` para cada socio.
+   - **Padrón de Aportaciones de Capital (`/aportaciones`):**
+     - Métricas clave: Capital Social Total Aportado, Total de Asociados Inscritos, Aportación Promedio por Socio.
+     - Tabla del padrón con filtro en tiempo real y vista imprimible (`🖨️ Imprimir`).
+   - Permiso habilitado para que los **Promotores de crédito (`PROMOTOR`)** registren y actualicen asociados directamente en campo.
 
-## Auxiliar de Caja (nuevo)
-Construido a partir del Excel real "Auxiliar de Caja COMIF CHAJUL" que
-compartiste. Funciona así:
-- Cada día la caja se **abre** con el saldo de cierre del día anterior
-  (automático) o, la primera vez, con un saldo que se captura manualmente.
-- Se registran movimientos en dos secciones, igual que en el Excel:
-  **transacciones como agente Banco Industrial** (Servicios, Depósitos,
-  Retiro, Remesa — con beneficiario libre y número de autorización BI) e
-  **ingresos/egresos propios** (Ahorro Corriente/Programado/Infanto Juvenil,
-  Plazo Fijo, Aportación, Ingreso de asociado, Comisión, abonos/intereses/
-  mora de préstamos hipotecarios y fiduciarios, colocación de préstamos,
-  varios). Cada categoría lleva su propio contador correlativo, continuo por
-  agencia (nunca se reinicia por día), igual que en el libro real.
-- Cuando el movimiento es de Ahorro Corriente/Programado/Infanto Juvenil,
-  **crea automáticamente el depósito o retiro real** en la cuenta del socio
-  (la misma que ves en `/ahorros/...`) y arma la referencia con el formato
-  que pediste: `{número de cuenta}-IN` para ingresos y `{número de
-  cuenta}-EN` para egresos.
-- Al final del día se **cierra la caja**: se captura el conteo de billetes y
-  monedas de Guatemala (Q200 a Q0.01) y el sistema exige que cuadre
-  exactamente con el saldo calculado antes de dejar cerrar — si no cuadra,
-  muestra la diferencia para que se revise.
-- Lo que todavía no tiene módulo propio (Plazo Fijo real y Colocación de
-  préstamos, porque esos módulos no están construidos aún) queda igual
-  registrado en el auxiliar del día para que la caja cuadre hoy mismo, listo
-  para conectarse a esos módulos cuando se construyan.
-- 🔜 **Pendiente de decidir**: cómo terminamos de conectar Supabase. Ya
-  preparé el esquema con Row Level Security (`db/schema.supabase.sql`), pero
-  el código del backend y el frontend que ves aquí **todavía usa el login
-  propio (usuario/contraseña con JWT) y PostgreSQL local** — no está
-  reescrito para usar Supabase Auth todavía.
+3. **Caja Chica (`/caja-chica`):**
+   - Basado en `caja/Caja Chica 30-07-2026.xlsx`.
+   - Registro de comprobantes de ingreso y egreso con categorías contables y documentos (DTE, factura, recibo).
+   - **Reposición del Fondo Fijo (`📥 Reponer Fondo (Cheque)`):**
+     - Recarga oficial del saldo de caja chica mediante cheque emitido por la cooperativa (`No. CH.`, ej. *1290*, *2000*).
+     - Validación anti-duplicados para evitar registrar dos veces el mismo cheque.
+     - Incremento inmediato del saldo disponible para gastos operativos.
+   - Arqueo físico interactivo de billetes y monedas (Q200 a Q0.01) con cálculo de diferencia y saldo acumulado.
 
-## Cómo pedir cambios
 
-Dime el archivo y qué quieres ajustar (por ejemplo: "en
-`backend/src/modules/socios/service.ts`, agrega tal validación") y lo aplico
-directo sobre el proyecto real; estos `.md` son una copia de lectura, no la
-fuente que edito.
+4. **Cuentas de Ahorro a la Vista y Programado (`/ahorros/...`):**
+   - Basado en `caja/AHORRO CORRIENTE`, `AHORRO PROGRAMADO` y `AHORRO INFANTO JUVENIL`.
+   - Libreta única por producto para cada asociado (evita duplicación accidental).
+   - Registro de movimientos, depósitos, retiros y cálculo de saldo acumulado en tiempo real con la vista `saldos_cuenta`.
 
-Cuando quede como quieres, te entrego el proyecto completo en un `.zip` listo
-para instalar (con su `README.md` de instrucciones).
+5. **Ahorro a Plazo Fijo — Kardex PF (`/ahorros/plazo-fijo`):**
+   - Basado en `caja/KARDEX AHORRO PF 2026-08.xlsx` y `caja/EJEMPLO 2.xlsx`.
+   - Emisión de Certificados de Inversión a Plazo Fijo con correlativo (`CHAJUL-PF-XXXX`).
+   - Motor financiero oficial:
+     - Interés generado al plazo pactado: $P \times (r / 100) \times (n / 12)$.
+     - Retención legal de ISR del 10% sobre intereses brutos.
+     - Interés neto y saldo líquido a pagar.
+     - Cálculo exacto de fecha de vencimiento.
+   - Alertas visuales para certificados vencidos listos para cobro.
+   - Liquidación y pago del certificado al vencimiento (`LIQUIDADO`) con generación de recibo contable.
+
+6. **Créditos y Promotor (`/creditos`):**
+   - Roles de promotores de campo asignados a cada crédito.
+   - **Simulador de crédito:** cotizador al 2% mensual (24% anual) con cuota nivelada (francesa) y sobre saldos (alemana).
+   - Generación de tabla mensual oficial de amortización (No. cuota, fecha de pago, cuota mensual, capital, intereses y saldo deudor).
+   - Solicitudes de crédito fiduciario e hipotecario, registro de garantías/fiadores y flujo de estados (`SOLICITUD` → `APROBADO` → `DESEMBOLSADO` → `CANCELADO`).
+
+7. **Auxiliar de Caja — Ventanilla e Ingresos COMIF (`/auxiliar-caja`):**
+   - Basado en `caja/INGRESOS COMIF CHAJUL 31-08-26.xlsx` y `caja/EJEMPLO 2.xlsx`.
+   - Libro de caja diario: operaciones como agente Banco Industrial y operaciones propias de la cooperativa.
+   - Correlativos continuos por agencia y categoría.
+   - **Cobro ágil de cuota de crédito en ventanilla (`💵 Cobro cuota de crédito`):**
+     - Búsqueda de socio y detección automática de préstamos activos.
+     - Desglose inteligente de cuota: **Abono a Capital**, **Intereses al 2% mensual** y **Mora**.
+     - Impacto simultáneo en un solo clic:
+       1. Incrementa el saldo diario en caja con referencia contable `{codigo_prestamo}-CUOTA`.
+       2. Registra las partidas desglosadas en el libro oficial de `ingresos_comif`.
+       3. Guarda el recibo en la tabla `prestamo_pagos`.
+       4. Descuenta el saldo deudor del préstamo (`saldo_capital`), cancelándolo automáticamente si el saldo llega a Q 0.00.
+   - **Desembolso de crédito en ventanilla (`📤 Desembolso de crédito`):**
+     - Detección de préstamos en estado `APROBADO` en la agencia.
+     - Validación de saldo físico disponible en caja antes de entregar el dinero.
+     - Registro del comprobante de egreso y descuento automático del efectivo en la categoría contable oficial **Colocación**.
+     - Activación automática del crédito a `DESEMBOLSADO` con su fecha de entrega y saldo capital activo.
+   - **Liquidación de Plazo Fijo en Ventanilla (`📦 Liquidar Plazo Fijo`):**
+     - Basado en el libro real `LIQUIDACION DE PF 2025 8.xlsx` y `KARDEX AHORRO PF 2026-08.xlsx`.
+     - Detección de contratos de plazo fijo vigentes en la agencia.
+     - Opción de entrega de fondos: **Solo Capital** (Q) o **Capital + Interés Neto Líquido** (Q).
+     - **Control de solvencia física:** valida que la gaveta de caja tenga suficiente efectivo antes de autorizar la entrega.
+     - **Registro obligatorio de `RE. No.` (Recibo de Retiro):** protegido contra duplicados en todo el sistema.
+     - Impacto simultáneo: descuenta el efectivo en el Auxiliar de Caja en la categoría contable oficial **Retiro de Plazo Fijo**, registra el retiro en la cuenta y actualiza el contrato a `LIQUIDADO` con su fecha y monto entregado.
+   - **Panel de Novedades de Campo en Tiempo Real (`🔔 Novedades de Campo`):**
+     - Visualización instantánea para el cajero de cuentas creadas por Promotores en campo con cuota pactada (Programado / Infanto-Juvenil) y justificación de apertura.
+     - Botón directo para registrar el primer depósito sin tener que buscar o reescribir datos.
+   - **Arqueo y Cierre Diario de Caja:** recuento interactivo de billetes y monedas (Q200 a Q0.01) con cálculo de diferencia (cuadrada, sobrante o faltante).
+   - **Vista de Caja Cerrada y Acta Oficial de Arqueo (`🖨️ Imprimir Acta Oficial de Arqueo`):**
+     - Basado en las hojas reales de auditoría `Arqueo Caja Ag Chaj...` de `Auxiliar de Caja COMIF CHAJUL 15-08-2026.xlsx`.
+     - Resumen de turno finalizado: Saldo inicial, total ingresos, total egresos, saldo final del libro, total efectivo contado y diferencia de arqueo.
+     - **Acta Oficial Imprimible:** Encabezado de *Maya Inversiones Futuras, R.L.*, cuadro de recuento de billetes y monedas, texto formal de auditoría y 4 firmas institucionales de conformidad (**Receptor Pagador, Presidente, Secretaria y Vocal I de la Comisión de Vigilancia**).
+   - **Historial de Días de Caja (`📅 Historial de Cajas`):**
+     - Consulta cronológica de cajas diarias anteriores para supervisores y auditoría.
+     - Permite inspeccionar movimientos de cualquier fecha anterior y reimprimir su Acta Oficial de Arqueo en un clic.
+
+8. **Escudo Anti-Duplicados y Validación Cruzada en Tiempo Real:**
+   - Previene el doble trabajo y los errores de digitación durante el uso de talonarios físicos de papel.
+   - **Bloqueo estricto de números de recibo / documento:** validación cruzada instantánea entre Auxiliar de Caja (`caja_movimientos_auxiliar`), Ahorros (`movimientos`) y Créditos (`prestamo_pagos`). Si un recibo ya se usó, el sistema lo bloquea y notifica: fecha, cuenta y nombre del socio original.
+   - **Bloqueo de número de cuenta y certificados:** previene registrar dos cuentas o certificados a plazo fijo con el mismo correlativo.
+   - **Bloqueo de número de asociado y DPI:** previene duplicar socios en el padrón.
+
+9. **Herramientas de Soporte y Pruebas:**
+   - Botón y endpoint de **Reinicio a Cero** (`POST /api/sistema/reset` y script `npm run db:reset`), para limpiar datos de prueba manteniendo la agencia y usuarios intactos.
+
+10. **Kardex Maestro de Cartera del Promotor (`/promotor/cartera`):**
+    - Elimina por completo la transcripción manual del Excel de 168 columnas (`KARDEX PRESTAMOS... promotor 2.xlsx`).
+    - **Pestañas Hipotecario y Fiduciario:** clasificación automática de la cartera por tipo de garantía.
+    - **Ficha de colocación enriquecida:** captura de comunidad / ubicación de garantía (*Aldea Campo Alegre*, *Cantón Ilom*, etc.), nombre del fiador, documento de desembolso y fecha de vencimiento.
+    - **Alimentación automática en vivo:** cada vez que el cajero cobra una cuota en ventanilla, el abono a capital, fecha, recibo y saldo deudor restante se registran de inmediato en el Kardex del Promotor sin intervención manual.
+    - **Semáforo de cobro mensual:** detección inteligente de socios 🟢 Al día vs 🔴 Pendientes de pago del mes para enfocar las visitas de cobro en campo.
+    - **Reporte oficial imprimible:** botón directo `🖨️ Imprimir Kardex` para supervisión y gerencia.
+
+11. **Carga Inicial y Migración Masiva de Datos Históricos (`npm run db:seed:excel`):**
+    - Script de importación automatizada desde los archivos reales de la cooperativa:
+      * **`caja/APORTACIONES 31-08-26.xlsx`:** Importa el padrón con DPI, fecha de ingreso, edad, género y cuenta de aportación de capital.
+      * **`promotor/KARDEX PRESTAMOS 01-07-26 AL 31-07-26 promotor 2.xlsx`:** Importa la cartera hipotecaria y fiduciaria con su saldo vivo al 2026, fiador, comunidad de garantía y vencimiento.
+      * **`caja/KARDEX AHORRO PF 2026-08.xlsx`:** Importa el histórico completo de certificados de plazo fijo, depósitos, intereses netos, retenciones de ISR y registros de liquidación con `RE. No.`.
+    - **Totales Reales Migrados:**
+      * **569 Socios** registrados y unificados sin duplicados.
+      * **Q 11,600.00** en Aportaciones de Capital activas.
+      * **66 Préstamos Vivos** con un saldo deudor total de **Q 15,221,556.49**.
+      * **692 Certificados de Inversión a Plazo Fijo** con un total invertido de **Q 19,897,503.72**.
+
+12. **Gráfica y Monitoreo de Servicios para el Supervisor (`/tablero`):**
+    - Selector interactivo de período: **Semanal (7 días)**, **Mensual (30 días)** y **Anual (año en curso)**.
+    - Métricas clave: Servicio Top 1 más demandado, total de transacciones procesadas y volumen financiero operado (Q).
+    - Gráfica de barras horizontales con ranking y porcentaje: Agente Banco Industrial, Cobros de Crédito (Capital, Intereses, Mora), Ahorros (Corriente, Programado, Infantil), Plazo Fijo, Aportaciones y Desembolsos.
+    - Permite al Jefe de Agencia / Supervisor tomar decisiones de liquidez, promociones y asignación de ventanillas.
+
+13. **Libro Mensual de Arqueos para la Comisión de Vigilancia (`/arqueos/mensual`):**
+    - Resuelve la auditoría mensual sin necesidad de revisar día por día.
+    - Selector por mes (ej. *Agosto 2026*).
+    - Sábana consolidada de todos los días operados en el mes: Saldo inicial, ingresos, egresos, saldo de libro, recuento físico contado, diferencia (cuadrado / faltante / sobrante) y cajero operador.
+    - Resumen mensual: Total de días operados, % de días cuadrados, total ingresos y total egresos.
+    - **Acta Mensual Imprimible (`🖨️ Imprimir Acta Mensual Consolidada`):** Formato institucional con texto legal de auditoría y 4 firmas de conformidad (**Presidente, Secretaria, Vocal I de la Comisión de Vigilancia y Receptor Pagador**).
+
+14. **Control de Acceso y Menú Estricto por Rol (RBAC):**
+    - Filtro de navegación y redirección inteligente para que cada usuario solo vea su pantalla:
+      * **`CAJERO`:** Entrada directa a Auxiliar de Caja (`/auxiliar-caja`), Caja Chica y Consulta de Socios.
+      * **`PROMOTOR`:** Entrada directa a Kardex de Cartera (`/promotor/cartera`), Afiliación de Socios en campo, Cuentas de Ahorro y Créditos & Simulador.
+      * **`SUPERVISOR`:** Entrada directa a Tablero (`/tablero`), Gráficas de Servicios, Libro Mensual de Arqueos (`/arqueos/mensual`), Bandeja de Créditos, Kardex de Cartera, Historial de Cajas y Socios/Aportaciones.
+      * **`ADMIN` / `GERENCIA`:** Acceso total a todos los módulos, Agencias y Gestión de Usuarios.
+
+15. **Ajuste Responsivo (PC, Tablet y Móvil), Impresión y Listado de 10 Asociados Ascendente:**
+    - **Gráfica de Servicios Unificada en Vivo:** Agrega y visualiza de inmediato las operaciones del sistema (Plazos Fijos, Aportaciones, Créditos desembolsados y Ventanilla), con opción de filtro por agencia o consolidado global.
+    - **Listado de Asociados de 10 en 10 Ascendente:** Padrón ordenado correlativamente desde el socio No. 1 (`CHAJ-0001` en adelante) con paginación fluida.
+    - **Tipografía y Diseño Adaptativo Multi-Dispositivo:**
+      * **PC:** Vista completa a pantalla panorámica con barra lateral fija.
+      * **Tablet y Móvil:** Barra de navegación superior con desplazamiento horizontal táctil, cuadrícula de estadísticas compacta de 2 columnas y contenedores con scroll protegido para no desbordar la pantalla.
+      * **Tipografía moderna:** Fuentes geométricas y nítidas de alta legibilidad en pantallas táctiles y Retina.
+    - **Optimización de Impresión Oficial (`@media print`):** Oculta automáticamente barras laterales, botones de acción y controles interactivos, ajustando el contenido al 100% de la hoja tamaño Carta con bordes negros de alta precisión para auditorías y actas.
+
+16. **Paginación Universal de 10 en 10 en Todas las Cuentas y Filtro Dinámico Temporal de Gráficas:**
+    - **Paginación estándar de 10 en 10:** Aplicada en todos los módulos de cuentas y cartera del sistema con barra de navegación (`Anterior` / `Siguiente`):
+      * **Ahorro Corriente, Programado e Infanto-Juvenil** (`/ahorros/...`).
+      * **Padrón de Aportaciones de Capital** (`/aportaciones`).
+      * **Kardex de Plazo Fijo** (`/ahorros/plazo-fijo`) (gestión ágil de los 692 certificados).
+      * **Módulo de Créditos** (`/creditos`).
+      * **Kardex de Cartera del Promotor** (`/promotor/cartera`).
+    - **Filtro Temporal Dinámico de la Gráfica del Supervisor (`/tablero`):**
+      * Corrección del rango de fechas (`fecha >= fechaInicioSql and fecha <= current_date`) en todas las operaciones unificadas.
+      * Ahora al alternar entre **Semanal**, **Mensual** y **Anual**, la gráfica actualiza en tiempo real sus volúmenes, operaciones y el ranking de demanda por servicio.
+
+17. **Diseño Panorámico Moderno de Pantalla Completa y Eliminación de Espacios Vacíos:**
+    - **Aprovechamiento Integral de Pantalla:** Se retiró el límite estrecho de 1,180px, haciendo que la aplicación utilice el 100% del ancho del monitor o laptop de forma fluida, eliminando espacios en blanco innecesarios.
+    - **Tablero Ejecutivo en 2 Columnas Balanceadas (`.dashboard-grid`):**
+      * **Columna Izquierda:** Cuadrícula de 7 KPIs financieros de alta densidad + Panel de accesos directos de ventanilla y campo (`💵 Ventanilla`, `📂 Kardex Cartera`, `📑 Libro Arqueos`, `👥 Padrón`, `🔒 Plazo Fijo`, `🏛️ Aportaciones`) + Desglose por agencia.
+      * **Columna Derecha:** Gráfica interactiva de demanda de servicios en tiempo real alineada a la misma altura, con podio y barras de progreso en Quetzales. Toda la visión operativa se aprecia en una sola pantalla.
+    - **Barra Lateral Institucional:** Emblema esmeralda `[M] MIF COOP`, indicador de operatividad `🟢 Agencia Chajul · Activa`, navegación categorizada por áreas de trabajo y tarjeta de usuario con avatar.
+    - **Acabados Fintech y Tablas Nítidas:** Paleta moderna Slate/Esmeralda, microanimaciones de elevación al posar el cursor, y zebra striping suave en tablas para una lectura descansada y profesional.
+
+
+
+
+
+## 2. Usuarios de Prueba Configurados
+
+| Rol | Correo electrónico | Contraseña | Enfoque |
+| :--- | :--- | :--- | :--- |
+| **Administrador** | `admin@mif.coop` | `CambiaEsto123!` | Configuración total, agencias, usuarios y reinicio. |
+| **Jefe de Agencia** | `supervisor@mif.coop` | `CambiaEsto123!` | Supervisión de agencia, aprobación de créditos y arqueos. |
+| **Cajero (Operador)** | `cajero@mif.coop` | `CambiaEsto123!` | Ventanilla de caja, depósitos, retiros y caja chica. |
+| **Promotor de crédito** | `promotor@mif.coop` | `CambiaEsto123!` | Campo, prospectación de socios, créditos y ahorros. |
+
+---
+
+## 3. Hoja de Ruta Inmediata
+
+¡Todas las funciones de los 8 libros de Excel de Caja han sido cubiertas e integradas exitosamente!
+
+- 🎯 **Siguiente etapa (Auxiliar y Promotor):**
+  - Pasar a la revisión e implementación de las herramientas y flujos especializados de **Auxiliar** y **Promotor** según lo que compartas.
+

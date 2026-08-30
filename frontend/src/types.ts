@@ -24,14 +24,35 @@ export interface Socio {
   agencia_codigo?: string;
   nombres: string;
   genero: "M" | "F" | null;
+  edad?: number | null;
   fecha_ingreso: string;
   estado: "ACTIVO" | "INACTIVO";
   dpi: string | null;
   direccion: string | null;
   telefono: string | null;
   nombre_beneficiario: string | null;
+  dpi_beneficiario?: string | null;
+  telefono_beneficiario?: string | null;
   total_cuentas?: number;
   created_at: string;
+}
+
+export interface AportacionSocio {
+  socio_id: string;
+  numero_asociado: string;
+  nombres: string;
+  dpi: string | null;
+  edad: number | null;
+  genero: "M" | "F" | null;
+  fecha_ingreso: string;
+  direccion: string | null;
+  telefono: string | null;
+  nombre_beneficiario: string | null;
+  dpi_beneficiario: string | null;
+  telefono_beneficiario: string | null;
+  estado: "ACTIVO" | "INACTIVO";
+  agencia_nombre: string;
+  total_aportaciones: string | number;
 }
 
 export interface ListaSocios {
@@ -49,7 +70,11 @@ export const ROL_LABEL: Record<RolUsuario, string> = {
   PROMOTOR: "Promotor de crédito",
 };
 
-export type TipoCuentaAhorro = "AHORRO_CORRIENTE" | "AHORRO_PROGRAMADO" | "AHORRO_INFANTO_JUVENIL";
+export type TipoCuentaAhorro =
+  | "AHORRO_CORRIENTE"
+  | "AHORRO_PROGRAMADO"
+  | "AHORRO_INFANTO_JUVENIL"
+  | "AHORRO_PLAZO_FIJO";
 
 export interface Cuenta {
   id: string;
@@ -63,6 +88,12 @@ export interface Cuenta {
   agencia_nombre?: string;
   saldo_inicial: string;
   saldo_actual: string;
+  cuota_pactada?: string | number | null;
+  observaciones_apertura?: string | null;
+  creado_por_id?: string | null;
+  promotor_nombre?: string | null;
+  promotor_email?: string | null;
+  socio_telefono?: string | null;
   created_at: string;
 }
 
@@ -105,6 +136,12 @@ export const TIPOS_AHORRO: AhorroTipoConfig[] = [
     slug: "infanto-juvenil",
     titulo: "Ahorro Infanto Juvenil",
     descripcion: "Cuentas de ahorro para niñas, niños y jóvenes asociados.",
+  },
+  {
+    tipo: "AHORRO_PLAZO_FIJO",
+    slug: "plazo-fijo",
+    titulo: "Ahorro a Plazo Fijo",
+    descripcion: "Certificados de depósito a plazo fijo (Kardex PF) con cálculo de intereses e ISR.",
   },
 ];
 
@@ -317,7 +354,8 @@ export interface CajaDia {
 
 export type EstadoCajaAuxiliar =
   | { estado: "ABIERTO"; dia: CajaDia }
-  | { estado: "SIN_ABRIR"; saldoSugerido: number | null; fechaUltimoCierre: string | null; esPrimeraVez: boolean };
+  | { estado: "SIN_ABRIR"; saldoSugerido: number | null; fechaUltimoCierre: string | null; esPrimeraVez: boolean }
+  | { estado: "CERRADO"; dia: CajaDia; detalle: DetalleCajaAuxiliar };
 
 export interface CajaMovimientoAuxiliar {
   id: string;
@@ -406,17 +444,69 @@ export interface Prestamo {
   tipo_amortizacion: TipoAmortizacion;
   monto_solicitado: string | number;
   monto_aprobado: string | number | null;
+  saldo_capital?: string | number | null;
   tasa_interes_mensual: string | number;
   plazo_meses: number;
   cuota_mensual: string | number;
   destino: string | null;
   garantia: string | null;
+  ubicacion_garantia?: string | null;
+  nombre_fiador?: string | null;
+  documento_desembolso?: string | null;
   observaciones: string | null;
   fecha_solicitud: string;
   fecha_aprobacion: string | null;
   fecha_desembolso: string | null;
+  fecha_vencimiento?: string | null;
   created_at: string;
   amortizacion?: ResultadoSimulacion;
+}
+
+export interface PrestamoPago {
+  id: string;
+  prestamo_id: string;
+  socio_id: string;
+  agencia_id: string;
+  caja_dia_id: string | null;
+  caja_movimiento_id: string | null;
+  fecha: string;
+  numero_recibo: string | null;
+  abono_capital: string | number;
+  interes: string | number;
+  mora: string | number;
+  total_pagado: string | number;
+  saldo_capital_restante: string | number;
+  usuario_id: string;
+  usuario_nombre?: string;
+  created_at: string;
+}
+
+export interface KardexCarteraItem extends Prestamo {
+  pagos: PrestamoPago[];
+  mesFiltro: string;
+  pagosMesCount: number;
+  totalPagadoMes: number;
+  abonoCapitalMes: number;
+  totalPagadoHistorico: number;
+  ultimoPagoFecha: string | null;
+  ultimoPagoRecibo: string | null;
+  estadoCuotaMes: "AL_DIA" | "PENDIENTE_MES" | "CANCELADO";
+}
+
+export interface KardexCarteraRespuesta {
+  items: KardexCarteraItem[];
+  resumen: {
+    mes: string;
+    totalCreditos: number;
+    totalCarteraViva: number;
+    totalColocadoHipotecario: number;
+    countHipotecarios: number;
+    totalColocadoFiduciario: number;
+    countFiduciarios: number;
+    sociosAlDia: number;
+    sociosPendientes: number;
+    totalCobradoMes: number;
+  };
 }
 
 export const ESTADO_PRESTAMO_LABEL: Record<EstadoPrestamo, string> = {
@@ -430,4 +520,54 @@ export const ESTADO_PRESTAMO_LABEL: Record<EstadoPrestamo, string> = {
 export const TIPO_PRESTAMO_LABEL: Record<TipoPrestamo, string> = {
   FIDUCIARIO: "Fiduciario",
   HIPOTECARIO: "Hipotecario",
+};
+
+export type EstadoPlazoFijo = "ACTIVO" | "LIQUIDADO";
+
+export interface PlazoFijoContrato {
+  id: string;
+  cuenta_id: string;
+  numero_cuenta: string;
+  agencia_id: string;
+  agencia_nombre?: string;
+  socio_id: string;
+  socio_nombres?: string;
+  numero_asociado?: string;
+  socio_dpi?: string;
+  socio_telefono?: string;
+  socio_direccion?: string;
+  numero_certificacion: string | null;
+  plazo_meses: number;
+  tasa_anual: string | number;
+  isr_porcentaje: string | number;
+  monto_deposito: string | number;
+  fecha_inicio: string;
+  fecha_vencimiento: string;
+  interes_generado: string | number;
+  interes_neto: string | number;
+  saldo_liquido_a_pagar: string | number;
+  estado: EstadoPlazoFijo;
+  fecha_retiro: string | null;
+  recibo_retiro?: string | null;
+  monto_liquidado?: string | number | null;
+  created_at: string;
+  saldo_actual?: string | number;
+}
+
+export interface ResultadoSimulacionPF {
+  montoDeposito: number;
+  plazoMeses: number;
+  tasaAnual: number;
+  isrPorcentaje: number;
+  fechaInicio: string;
+  fechaVencimiento: string;
+  interesGenerado: number;
+  isrRetencion: number;
+  interesNeto: number;
+  saldoLiquidoAPagar: number;
+}
+
+export const ESTADO_PLAZO_FIJO_LABEL: Record<EstadoPlazoFijo, string> = {
+  ACTIVO: "Vigente / Activo",
+  LIQUIDADO: "Liquidado / Pagado",
 };

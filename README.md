@@ -48,18 +48,9 @@ cd backend
 cp .env.example .env      # y ajusta DATABASE_URL / JWT_SECRET
 npm install
 npm run db:migrate        # aplica backend/db/schema.sql (idempotente)
-npm run db:seed           # crea la agencia Chajul y el usuario administrador
-npm run dev                # http://localhost:4000
+npm run db:seed           # crea la agencia Chajul y los 4 usuarios iniciales
+npm run dev               # http://localhost:4000
 ```
-
-El seed deja creado un usuario administrador para el primer ingreso:
-
-- **Correo:** `admin@mif.coop`
-- **Contraseña temporal:** `CambiaEsto123!`
-
-Cámbiala (o crea el resto de usuarios) desde el módulo de Usuarios una vez
-adentro; por ahora `POST /api/usuarios` (solo ADMIN) permite crear usuarios
-Supervisor/Cajero por agencia.
 
 ### 3. Frontend
 
@@ -67,23 +58,37 @@ Supervisor/Cajero por agencia.
 cd frontend
 cp .env.example .env      # VITE_API_URL debe apuntar al backend
 npm install
-npm run dev                # http://localhost:5173
+npm run dev               # http://localhost:5173
 ```
 
-Abre `http://localhost:5173`, inicia sesión con el usuario administrador de
-arriba, crea la primera agencia real (Agencias → Nueva agencia) y empieza a
-registrar socios.
+### 4. Ejecución simplificada (desde la raíz del proyecto)
+
+```bash
+npm run dev               # Ejecuta Backend (:4000) y Frontend (:5173) al mismo tiempo
+npm run db:reset          # Reinicia los datos transaccionales de prueba a cero
+```
+
+### Usuarios iniciales configurados (Contraseña para todos: `CambiaEsto123!`):
+
+| Rol | Correo electrónico | Acceso y funciones |
+| :--- | :--- | :--- |
+| **Administrador** | `admin@mif.coop` | Acceso global, configuración, agencias, usuarios y reinicio |
+| **Jefe de Agencia** | `supervisor@mif.coop` | Supervisión de agencia, aprobación de créditos y arqueos |
+| **Cajero (Operador)** | `cajero@mif.coop` | Ventanilla de caja, depósitos, retiros y caja chica |
+| **Promotor de crédito** | `promotor@mif.coop` | Campo, prospección de socios, créditos y solicitudes |
 
 ## Scripts útiles
 
 | Carpeta  | Comando           | Qué hace                                       |
 | -------- | ----------------- | ----------------------------------------------- |
-| backend  | `npm run dev`      | Backend con recarga automática                  |
-| backend  | `npm run build`    | Compila a `dist/` para producción                |
-| backend  | `npm run db:migrate` | Aplica `db/schema.sql` (se puede correr varias veces) |
-| backend  | `npm run db:seed`  | Crea la agencia y el usuario administrador inicial |
-| frontend | `npm run dev`      | Frontend con recarga automática                  |
-| frontend | `npm run build`    | Build de producción (incluye el service worker) |
+| raíz     | `npm run dev`     | Ejecuta Backend y Frontend simultáneamente      |
+| raíz     | `npm run db:reset`| Trunca tablas transaccionales a cero            |
+| backend  | `npm run dev`     | Backend con recarga automática                  |
+| backend  | `npm run build`   | Compila a `dist/` para producción               |
+| backend  | `npm run db:migrate` | Aplica `db/schema.sql`                       |
+| backend  | `npm run db:seed` | Crea agencia y usuarios iniciales               |
+| frontend | `npm run dev`     | Frontend con recarga automática                 |
+| frontend | `npm run build`   | Build de producción PWA                         |
 
 ## Decisiones técnicas de esta fase
 

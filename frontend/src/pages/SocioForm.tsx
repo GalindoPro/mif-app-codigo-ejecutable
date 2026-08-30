@@ -15,11 +15,14 @@ export default function SocioForm() {
   const [numeroAsociado, setNumeroAsociado] = useState("");
   const [nombres, setNombres] = useState("");
   const [genero, setGenero] = useState<"M" | "F" | "">("");
+  const [edad, setEdad] = useState("");
   const [fechaIngreso, setFechaIngreso] = useState(() => new Date().toISOString().slice(0, 10));
   const [dpi, setDpi] = useState("");
   const [direccion, setDireccion] = useState("");
   const [telefono, setTelefono] = useState("");
   const [nombreBeneficiario, setNombreBeneficiario] = useState("");
+  const [dpiBeneficiario, setDpiBeneficiario] = useState("");
+  const [telefonoBeneficiario, setTelefonoBeneficiario] = useState("");
 
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -47,11 +50,14 @@ export default function SocioForm() {
         agenciaId,
         nombres,
         genero: genero || undefined,
+        edad: edad ? Number(edad) : undefined,
         fechaIngreso,
         dpi: dpi || undefined,
         direccion: direccion || undefined,
         telefono: telefono || undefined,
         nombreBeneficiario: nombreBeneficiario || undefined,
+        dpiBeneficiario: dpiBeneficiario || undefined,
+        telefonoBeneficiario: telefonoBeneficiario || undefined,
       });
       navigate(`/socios/${data.id}`);
     } catch (err) {
@@ -110,6 +116,19 @@ export default function SocioForm() {
           </div>
 
           <div className="field">
+            <label htmlFor="edad">Edad (años)</label>
+            <input
+              id="edad"
+              type="number"
+              min="1"
+              max="120"
+              value={edad}
+              onChange={(e) => setEdad(e.target.value)}
+              placeholder="Ej. 35"
+            />
+          </div>
+
+          <div className="field">
             <label htmlFor="fecha">Fecha de ingreso</label>
             <input
               id="fecha"
@@ -121,26 +140,55 @@ export default function SocioForm() {
           </div>
 
           <div className="field">
-            <label htmlFor="dpi">DPI</label>
+            <label htmlFor="dpi">DPI del asociado</label>
             <input id="dpi" value={dpi} onChange={(e) => setDpi(e.target.value)} maxLength={13} placeholder="13 dígitos" />
           </div>
 
           <div className="field">
             <label htmlFor="telefono">Teléfono</label>
-            <input id="telefono" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+            <input id="telefono" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="8 dígitos" />
           </div>
 
           <div className="field" style={{ gridColumn: "1 / -1" }}>
-            <label htmlFor="direccion">Dirección</label>
-            <input id="direccion" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
+            <label htmlFor="direccion">Dirección / Comunidad</label>
+            <input id="direccion" value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Ej. Cantón Ilom, Chajul" />
+          </div>
+
+          <div style={{ gridColumn: "1 / -1", marginTop: "0.5rem", borderTop: "1px solid var(--line)", paddingTop: "1rem" }}>
+            <h3 style={{ margin: "0 0 0.5rem", fontSize: "1rem" }}>Datos de la Persona Beneficiaria</h3>
+            <p style={{ margin: "0 0 1rem", fontSize: "0.82rem", color: "var(--ink-soft)" }}>
+              Persona designada por el asociado según el libro oficial de aportaciones.
+            </p>
           </div>
 
           <div className="field" style={{ gridColumn: "1 / -1" }}>
-            <label htmlFor="beneficiario">Nombre de la persona beneficiaria</label>
+            <label htmlFor="beneficiario">Nombre completo del beneficiario</label>
             <input
               id="beneficiario"
               value={nombreBeneficiario}
               onChange={(e) => setNombreBeneficiario(e.target.value)}
+              placeholder="Ej. María Elena Pérez Gómez"
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="dpi-ben">DPI del beneficiario</label>
+            <input
+              id="dpi-ben"
+              value={dpiBeneficiario}
+              onChange={(e) => setDpiBeneficiario(e.target.value)}
+              maxLength={13}
+              placeholder="13 dígitos"
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="tel-ben">Teléfono del beneficiario</label>
+            <input
+              id="tel-ben"
+              value={telefonoBeneficiario}
+              onChange={(e) => setTelefonoBeneficiario(e.target.value)}
+              placeholder="8 dígitos"
             />
           </div>
         </div>

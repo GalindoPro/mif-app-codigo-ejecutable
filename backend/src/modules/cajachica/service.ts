@@ -107,3 +107,57 @@ export async function crear(data: DatosComprobante, usuarioId: string) {
   });
   return comprobante;
 }
+
+export interface DatosReposicionCajaChica {
+  agenciaId: string;
+  monto: number;
+  numeroCheque: string;
+  descripcion?: string;
+  fecha?: string;
+}
+
+export async function reponerFondo(data: DatosReposicionCajaChica, usuarioId: string) {
+  if (!data.numeroCheque || !data.numeroCheque.trim()) {
+    throw conflict("El número de cheque o documento de reposición (No. CH.) es obligatorio.");
+  }
+  const fecha = data.fecha || new Date().toISOString().slice(0, 10);
+  const ch = data.numeroCheque.trim();
+
+  // Validar anti-duplicados del cheque en caja chica
+  const { rows: repetido } = await pool.query(
+    `select fecha, numero_documento, descripcion from caja_chica_comprobantes
+     where agencia_id = $1 and tipo = 'INGRESO' and lower(trim(numero_documento)) = lower($2) limit 1`,
+    [data.agenciaId, ch],
+  );
+  if (repetido[0]) {
+    const fechaStr = new Date(repetido[0].fecha).toLocaleDateString("es-GT");
+    throw conflict(`El cheque o recibo de reposición "${ch}" ya fue registrado el ${fechaStr} en Caja Chica.`);
+  }
+
+  const { rows } = await pool.query(
+    `insert into caja_chica_comprobantes (agencia_id, fecha, numero_documento, beneficiario, descripcion, tipo, monto, usuario_id)
+     values ($1, $2, $3, $4, $5, 'INGRESO', $6, $7)
+     returning *`,
+    [
+      data.agenciaId,
+      fecha,
+      ch,
+      `BANCO / REPOSICIÓN CHEQUE No. ${ch}`,
+      data.descripcion?.trim() || `Reposición de Fondo Fijo de Caja Chica (Cheque No. ${ch})`,
+      data.monto,
+      usuarioId,
+    ],
+  );
+  const comprobante = rows[0];
+
+  await registrarAuditoria({
+    entidad: "CajaChicaComprobante",
+    entidadId: comprobante.id,
+    accion: "CREAR",
+    usuarioId,
+    datosNuevos: comprobante,
+  });
+
+  return comprobante;
+}
+

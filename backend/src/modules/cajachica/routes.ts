@@ -54,3 +54,23 @@ cajaChicaRouter.post(
     res.status(201).json(await service.crear(data, req.user!.id));
   }),
 );
+
+const reponerFondoSchema = z.object({
+  agenciaId: z.string().uuid(),
+  monto: z.number().positive("El monto a reponer debe ser mayor a 0"),
+  numeroCheque: z.string().min(1, "El número de cheque o documento (No. CH.) es obligatorio"),
+  descripcion: z.string().optional(),
+  fecha: z.string().optional(),
+});
+
+cajaChicaRouter.post(
+  "/reponer-fondo",
+  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  asyncHandler(async (req, res) => {
+    const data = reponerFondoSchema.parse(req.body);
+    const visible = agenciaVisible(req);
+    if (visible && data.agenciaId !== visible) throw forbidden("No puedes reponer caja chica en otra agencia");
+    res.status(201).json(await service.reponerFondo(data, req.user!.id));
+  }),
+);
+

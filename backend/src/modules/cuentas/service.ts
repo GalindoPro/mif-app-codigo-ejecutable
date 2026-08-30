@@ -121,6 +121,8 @@ export interface DatosCuenta {
   socioId: string;
   numeroCuenta: string;
   saldoInicial?: number;
+  cuotaPactada?: number | null;
+  observacionesApertura?: string | null;
 }
 
 export async function crear(data: DatosCuenta, usuarioId: string) {
@@ -134,15 +136,57 @@ export async function crear(data: DatosCuenta, usuarioId: string) {
     );
   }
 
+  const { rows: cuentaRepetida } = await pool.query(
+    `select c.numero_cuenta, s.nombres as socio_nombres
+     from cuentas c
+     join socios s on s.id = c.socio_id
+     where lower(trim(c.numero_cuenta)) = lower(trim($1))
+     limit 1`,
+    [data.numeroCuenta],
+  );
+  if (cuentaRepetida[0]) {
+    throw conflict(
+      `El número de cuenta "${data.numeroCuenta}" ya existe y pertenece al socio "${cuentaRepetida[0].socio_nombres}". No se permiten números de cuenta duplicados.`,
+    );
+  }
+
   const { rows } = await pool.query(
-    `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial)
-     values ($1,$2,$3,$4,$5)
+    `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, cuota_pactada, observaciones_apertura, creado_por_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8)
      returning *`,
-    [data.numeroCuenta, data.tipo, data.socioId, data.agenciaId, data.saldoInicial ?? 0],
+    [
+      data.numeroCuenta,
+      data.tipo,
+      data.socioId,
+      data.agenciaId,
+      data.saldoInicial ?? 0,
+      data.cuotaPactada ?? null,
+      data.observacionesApertura ?? null,
+      usuarioId,
+    ],
   );
   const cuenta = rows[0];
   await registrarAuditoria({ entidad: "Cuenta", entidadId: cuenta.id, accion: "CREAR", usuarioId, datosNuevos: cuenta });
   return cuenta;
+}
+
+export async function listarNovedadesCampo(agenciaId: string | null) {
+  const where = agenciaId ? "where c.agencia_id = $1" : "";
+  const params = agenciaId ? [agenciaId] : [];
+  const { rows } = await pool.query(
+    `select c.*, s.nombres as socio_nombres, s.numero_asociado, s.telefono as socio_telefono,
+            u.nombre as promotor_nombre, u.email as promotor_email,
+            coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
+     from cuentas c
+     join socios s on s.id = c.socio_id
+     left join usuarios u on u.id = c.creado_por_id
+     left join saldos_cuenta sc on sc.cuenta_id = c.id
+     ${where}
+     order by c.created_at desc
+     limit 25`,
+    params,
+  );
+  return rows;
 }
 
 export interface DatosMovimiento {
@@ -166,6 +210,43 @@ export async function registrarMovimiento(
     throw conflict(
       `El retiro (Q ${Number(data.monto).toFixed(2)}) es mayor que el saldo disponible (Q ${Number(cuenta.saldo_actual).toFixed(2)})`,
     );
+  }
+
+  // Validación de número de recibo anti-duplicados
+  if (data.numeroRecibo && data.numeroRecibo.trim()) {
+    const recibo = data.numeroRecibo.trim();
+
+    // 1. Checar en movimientos de cuentas
+    const { rows: repetidoMov } = await pool.query(
+      `select m.fecha, m.numero_recibo, c.numero_cuenta, s.nombres as socio_nombres
+       from movimientos m
+       join cuentas c on c.id = m.cuenta_id
+       join socios s on s.id = c.socio_id
+       where c.agencia_id = $1 and lower(trim(m.numero_recibo)) = lower($2)
+       limit 1`,
+      [cuenta.agencia_id, recibo],
+    );
+    if (repetidoMov[0]) {
+      const fechaStr = new Date(repetidoMov[0].fecha).toLocaleDateString("es-GT");
+      throw conflict(
+        `El número de recibo "${recibo}" ya fue registrado el ${fechaStr} en la cuenta ${repetidoMov[0].numero_cuenta} (${repetidoMov[0].socio_nombres}). Verifique el talonario físico; no se permiten recibos duplicados.`,
+      );
+    }
+
+    // 2. Checar en auxiliar de caja
+    const { rows: repetidoAux } = await pool.query(
+      `select fecha, doc_no, beneficiario, descripcion
+       from caja_movimientos_auxiliar
+       where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
+       limit 1`,
+      [cuenta.agencia_id, recibo],
+    );
+    if (repetidoAux[0]) {
+      const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
+      throw conflict(
+        `El número de recibo "${recibo}" ya fue registrado en Auxiliar de Caja el ${fechaStr} (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten recibos duplicados.`,
+      );
+    }
   }
 
   const clienteMovimientoId = `srv-${cuentaId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;

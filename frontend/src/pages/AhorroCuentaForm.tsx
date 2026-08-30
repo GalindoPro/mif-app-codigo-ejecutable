@@ -19,9 +19,14 @@ export default function AhorroCuentaForm() {
   const [socio, setSocio] = useState<Socio | null>(null);
   const [numeroCuenta, setNumeroCuenta] = useState("");
   const [saldoInicial, setSaldoInicial] = useState("0");
+  const [cuotaPactada, setCuotaPactada] = useState("");
+  const [observacionesApertura, setObservacionesApertura] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [cuentaExistente, setCuentaExistente] = useState<{ id: string; numero_cuenta: string } | null>(null);
+
+  const esProgramadoOInfanto =
+    config?.tipo === "AHORRO_PROGRAMADO" || config?.tipo === "AHORRO_INFANTO_JUVENIL";
 
   useEffect(() => {
     if (puedeElegirAgencia) api.get<Agencia[]>("/agencias").then(({ data }) => setAgencias(data));
@@ -69,6 +74,8 @@ export default function AhorroCuentaForm() {
         socioId: socio.id,
         numeroCuenta,
         saldoInicial: Number(saldoInicial) || 0,
+        cuotaPactada: cuotaPactada ? Number(cuotaPactada) : undefined,
+        observacionesApertura: observacionesApertura || undefined,
       });
       navigate(`/ahorros/${config!.slug}/${data.id}`);
     } catch (err) {
@@ -140,6 +147,39 @@ export default function AhorroCuentaForm() {
           <label htmlFor="numero">Número de cuenta</label>
           <input id="numero" value={numeroCuenta} onChange={(e) => setNumeroCuenta(e.target.value)} required />
           <span className="hint">Sugerido automáticamente; puedes ajustarlo.</span>
+        </div>
+
+        {esProgramadoOInfanto && (
+          <div className="field">
+            <label htmlFor="cuota-pactada">Cuota periódica acordada (Q)</label>
+            <input
+              id="cuota-pactada"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Ej. 100.00"
+              value={cuotaPactada}
+              onChange={(e) => setCuotaPactada(e.target.value)}
+            />
+            <span className="hint">
+              Monto periódico comprometido por el socio (se reflejará en tiempo real en Auxiliar de Caja).
+            </span>
+          </div>
+        )}
+
+        <div className="field">
+          <label htmlFor="obs-apertura">
+            {usuario?.rol === "PROMOTOR" ? "Justificación de apertura en campo" : "Observaciones de apertura"}
+          </label>
+          <input
+            id="obs-apertura"
+            placeholder="Ej. Apertura en visita de campo comunidad Ilom, cuota pactada Q100"
+            value={observacionesApertura}
+            onChange={(e) => setObservacionesApertura(e.target.value)}
+          />
+          <span className="hint">
+            Visible inmediatamente para el Auxiliar de Caja para no duplicar movimientos.
+          </span>
         </div>
 
         <div className="field">

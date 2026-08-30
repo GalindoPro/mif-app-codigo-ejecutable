@@ -34,6 +34,8 @@ export default function CreditoForm() {
   const [tasaInteresMensual, setTasaInteresMensual] = useState(searchParams.get("tasa") || "2.0");
   const [destino, setDestino] = useState("Capital de trabajo / Comercio");
   const [garantia, setGarantia] = useState("");
+  const [ubicacionGarantia, setUbicacionGarantia] = useState("");
+  const [nombreFiador, setNombreFiador] = useState("");
   const [observaciones, setObservaciones] = useState("");
 
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +78,8 @@ export default function CreditoForm() {
         tasaInteresMensual: Number(tasaInteresMensual),
         destino: destino || undefined,
         garantia: garantia || undefined,
+        ubicacionGarantia: ubicacionGarantia || undefined,
+        nombreFiador: nombreFiador || undefined,
         observaciones: observaciones || undefined,
       });
       navigate(`/creditos/${data.id}`);
@@ -226,6 +230,29 @@ export default function CreditoForm() {
               }}
             />
           </div>
+
+          <div className="field">
+            <label htmlFor="cred-ubicacion">Ubicación de garantía / Comunidad</label>
+            <input
+              id="cred-ubicacion"
+              value={ubicacionGarantia}
+              onChange={(e) => setUbicacionGarantia(e.target.value)}
+              placeholder="Ej. Cantón Ilom, Aldea Campo Alegre, Chajul"
+            />
+            <span className="hint">Identifica la comunidad para la visita y el Kardex del Promotor</span>
+          </div>
+
+          {tipo === "FIDUCIARIO" && (
+            <div className="field">
+              <label htmlFor="cred-fiador">Nombre del Fiador Principal</label>
+              <input
+                id="cred-fiador"
+                value={nombreFiador}
+                onChange={(e) => setNombreFiador(e.target.value)}
+                placeholder="Nombre completo del fiador"
+              />
+            </div>
+          )}
 
           <div className="field" style={{ gridColumn: "1 / -1" }}>
             <label htmlFor="cred-observaciones">Observaciones adicionales</label>

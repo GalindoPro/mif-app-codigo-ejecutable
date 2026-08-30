@@ -15,7 +15,10 @@ export default function SociosList() {
     setCargando(true);
     const timeout = setTimeout(() => {
       api
-        .get<ListaSocios>("/socios", { params: { q: q || undefined, page }, signal: controller.signal })
+        .get<ListaSocios>("/socios", {
+          params: { q: q || undefined, page, pageSize: 10 },
+          signal: controller.signal,
+        })
         .then(({ data }) => setResultado(data))
         .catch((err) => {
           if (err.name !== "CanceledError") setError(mensajeError(err));
@@ -34,8 +37,15 @@ export default function SociosList() {
     <div>
       <div className="page-head">
         <div>
-          <h1>Socios</h1>
-          <p>Registro único de asociados — reemplaza el listado de Aportaciones.</p>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+            <h1>Socios y Asociados</h1>
+            <span className="badge" style={{ background: "#ecfdf5", color: "#065f46", fontWeight: 700 }}>
+              Orden Ascendente (Primeros 10)
+            </span>
+          </div>
+          <p>
+            Padrón oficial de la cooperativa · Mostrando de 10 en 10 en orden correlativo ascendente.
+          </p>
         </div>
         <Link to="/socios/nuevo" className="btn">
           + Nuevo socio

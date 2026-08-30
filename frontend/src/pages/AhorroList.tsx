@@ -13,9 +13,13 @@ export default function AhorroList() {
   const [resumen, setResumen] = useState<ResumenCuentas | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+
   useEffect(() => {
     if (!config) return;
     setCuentas(null);
+    setPage(1);
     const timeout = setTimeout(() => {
       api
         .get<Cuenta[]>("/cuentas", { params: { tipo: config.tipo, q: q || undefined } })
@@ -36,12 +40,20 @@ export default function AhorroList() {
   if (!config) return <div className="alert error">Tipo de ahorro no reconocido.</div>;
 
   const saldoTotal = resumen?.saldoTotal ?? cuentas?.reduce((acc, c) => acc + Number(c.saldo_actual), 0) ?? 0;
+  const totalCuentas = cuentas?.length ?? 0;
+  const totalPaginas = Math.max(1, Math.ceil(totalCuentas / pageSize));
+  const cuentasPaginadas = cuentas?.slice((page - 1) * pageSize, page * pageSize) ?? [];
 
   return (
     <div>
       <div className="page-head">
         <div>
-          <h1>{config.titulo}</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+            <h1>{config.titulo}</h1>
+            <span className="badge" style={{ background: "#ecfdf5", color: "#065f46", fontWeight: 700 }}>
+              10 por página
+            </span>
+          </div>
           <p>{config.descripcion}</p>
         </div>
         <Link to={`/ahorros/${config.slug}/nueva`} className="btn">
@@ -68,7 +80,14 @@ export default function AhorroList() {
       </div>
 
       <div className="searchbar">
-        <input placeholder="Buscar por socio o número de cuenta…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input
+          placeholder="Buscar por socio o número de cuenta…"
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setPage(1);
+          }}
+        />
       </div>
 
       <div className="table-wrap">
@@ -82,7 +101,7 @@ export default function AhorroList() {
             </tr>
           </thead>
           <tbody>
-            {cuentas?.map((c) => (
+            {cuentasPaginadas.map((c) => (
               <tr key={c.id}>
                 <td className="mono">
                   <Link to={`/ahorros/${config.slug}/${c.id}`}>{c.numero_cuenta}</Link>
@@ -108,6 +127,20 @@ export default function AhorroList() {
           </div>
         )}
       </div>
+
+      {totalCuentas > pageSize && (
+        <div className="pagination">
+          <button className="btn secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            Anterior
+          </button>
+          <span>
+            Mostrando {cuentasPaginadas.length} de {totalCuentas} cuentas · Página {page} de {totalPaginas}
+          </span>
+          <button className="btn secondary" disabled={page >= totalPaginas} onClick={() => setPage((p) => p + 1)}>
+            Siguiente
+          </button>
+        </div>
+      )}
     </div>
   );
 }

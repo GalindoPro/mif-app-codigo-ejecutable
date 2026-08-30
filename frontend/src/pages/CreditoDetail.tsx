@@ -7,7 +7,7 @@ import {
   formatoQ,
   TIPO_PRESTAMO_LABEL,
 } from "../types";
-import type { EstadoPrestamo, Prestamo } from "../types";
+import type { EstadoPrestamo, Prestamo, PrestamoPago } from "../types";
 
 export default function CreditoDetail() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +15,7 @@ export default function CreditoDetail() {
   const { usuario } = useAuth();
 
   const [prestamo, setPrestamo] = useState<Prestamo | null>(null);
+  const [pagos, setPagos] = useState<PrestamoPago[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
@@ -27,6 +28,11 @@ export default function CreditoDetail() {
       .get<Prestamo>(`/prestamos/${id}`)
       .then(({ data }) => setPrestamo(data))
       .catch((err) => setError(mensajeError(err)));
+
+    api
+      .get<PrestamoPago[]>(`/prestamos/${id}/pagos`)
+      .then(({ data }) => setPagos(data))
+      .catch(() => {});
   }
 
   useEffect(cargar, [id]);
@@ -171,6 +177,21 @@ export default function CreditoDetail() {
           </span>
           <span className="sub">al finalizar el crédito</span>
         </div>
+
+        <div className="stat-card" style={{ background: "var(--paper-raised)" }}>
+          <span className="label">Saldo capital restante</span>
+          <span
+            className="value"
+            style={{
+              color: Number(prestamo.saldo_capital ?? montoMostrar) > 0 ? "var(--accent)" : "#16a34a",
+            }}
+          >
+            {formatoQ(prestamo.saldo_capital ?? montoMostrar)}
+          </span>
+          <span className="sub">
+            {prestamo.estado === "CANCELADO" ? "Crédito pagado al 100%" : "Deuda viva en cartera"}
+          </span>
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "1.5rem", marginBottom: "1.5rem" }}>
@@ -191,35 +212,95 @@ export default function CreditoDetail() {
             <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Teléfono</dt>
             <dd style={{ margin: 0 }}>{prestamo.socio_telefono ?? "—"}</dd>
 
+            <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Dirección</dt>
+            <dd style={{ margin: 0 }}>{prestamo.socio_direccion ?? "—"}</dd>
+
+            <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Destino</dt>
+            <dd style={{ margin: 0 }}>{prestamo.destino || "Sin especificar"}</dd>
+          </dl>
+        </div>
+
+        <div className="card">
+          <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Detalles de la colocación</h2>
+          <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "auto 1fr", rowGap: "0.6rem", columnGap: "1rem" }}>
+            <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Código</dt>
+            <dd className="mono" style={{ margin: 0, fontWeight: 600 }}>{prestamo.codigo}</dd>
+
+            <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Agencia</dt>
+            <dd style={{ margin: 0 }}>{prestamo.agencia_nombre}</dd>
+
+            <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Promotor</dt>
+            <dd style={{ margin: 0 }}>{prestamo.promotor_nombre ? `${prestamo.promotor_nombre}` : "Sin promotor"}</dd>
+
+            <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Garantía / Fiador</dt>
+            <dd style={{ margin: 0 }}>{prestamo.garantia || "Sin garantía registrada"}</dd>
+
             <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Fecha solicitud</dt>
             <dd className="mono" style={{ margin: 0 }}>
               {new Date(prestamo.fecha_solicitud).toLocaleDateString("es-GT")}
             </dd>
 
-            <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Desembolsado el</dt>
+            <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Fecha desembolso</dt>
             <dd className="mono" style={{ margin: 0 }}>
               {prestamo.fecha_desembolso ? new Date(prestamo.fecha_desembolso).toLocaleDateString("es-GT") : "Pendiente"}
             </dd>
           </dl>
         </div>
-
-        <div className="card">
-          <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Garantía y Promotor</h2>
-          <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "auto 1fr", rowGap: "0.6rem", columnGap: "1rem" }}>
-            <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Promotor asignado</dt>
-            <dd style={{ margin: 0, fontWeight: 600 }}>{prestamo.promotor_nombre ?? "Sin asignar"}</dd>
-
-            <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Destino</dt>
-            <dd style={{ margin: 0 }}>{prestamo.destino ?? "—"}</dd>
-
-            <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Garantía / Fiador</dt>
-            <dd style={{ margin: 0, whiteSpace: "pre-wrap" }}>{prestamo.garantia ?? "Sin garantía especificada"}</dd>
-
-            <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Observaciones</dt>
-            <dd style={{ margin: 0 }}>{prestamo.observaciones ?? "Ninguna"}</dd>
-          </dl>
-        </div>
       </div>
+
+      {pagos.length > 0 && (
+        <div className="card" style={{ marginBottom: "1.5rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: "1.05rem" }}>Historial de Pagos de Cuotas (Ventanilla)</h2>
+              <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--ink-soft)" }}>
+                Cobros registrados en caja según libro de Ingresos COMIF.
+              </p>
+            </div>
+          </div>
+
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>No. Recibo</th>
+                  <th>Abono Capital</th>
+                  <th>Interés</th>
+                  <th>Mora</th>
+                  <th>Total Cobrado</th>
+                  <th>Saldo Capital Restante</th>
+                  <th>Cajero / Operador</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagos.map((p) => (
+                  <tr key={p.id}>
+                    <td className="mono">{new Date(p.fecha).toLocaleDateString("es-GT")}</td>
+                    <td className="mono">{p.numero_recibo ?? "—"}</td>
+                    <td className="mono" style={{ color: "var(--accent)", fontWeight: 600 }}>
+                      {formatoQ(p.abono_capital)}
+                    </td>
+                    <td className="mono" style={{ color: "#d97706" }}>
+                      {formatoQ(p.interes)}
+                    </td>
+                    <td className="mono" style={{ color: Number(p.mora) > 0 ? "#dc2626" : "inherit" }}>
+                      {formatoQ(p.mora)}
+                    </td>
+                    <td className="mono" style={{ fontWeight: 700 }}>
+                      {formatoQ(p.total_pagado)}
+                    </td>
+                    <td className="mono" style={{ fontWeight: 600 }}>
+                      {formatoQ(p.saldo_capital_restante)}
+                    </td>
+                    <td>{p.usuario_nombre ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {prestamo.amortizacion && (
         <div className="card">
