@@ -72,45 +72,87 @@ export default function AhorroCuentaDetail() {
         </div>
       </div>
 
+      {cuenta.tipo === "AHORRO_SOBRE_PRESTAMO" && (
+        <div
+          style={{
+            background: cuenta.prestamo_estado === "CANCELADO" ? "#ecfdf5" : "rgba(245, 158, 11, 0.1)",
+            border: `1px solid ${cuenta.prestamo_estado === "CANCELADO" ? "#10b981" : "#f59e0b"}`,
+            borderRadius: "8px",
+            padding: "0.85rem 1rem",
+            marginBottom: "1.25rem",
+            color: cuenta.prestamo_estado === "CANCELADO" ? "#065f46" : "#92400e",
+          }}
+        >
+          <div style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span>🛡️</span> Cuenta de Ahorro sobre Préstamo (Fondo en Garantía)
+            {cuenta.prestamo_codigo && (
+              <span className="mono" style={{ background: "rgba(0,0,0,0.06)", padding: "0.15rem 0.4rem", borderRadius: "4px" }}>
+                Crédito: {cuenta.prestamo_codigo} ({cuenta.prestamo_estado})
+              </span>
+            )}
+          </div>
+          <p style={{ fontSize: "0.84rem", margin: "0.35rem 0 0", lineHeight: 1.4 }}>
+            {cuenta.prestamo_estado === "CANCELADO"
+              ? "✓ El crédito vinculado ha sido cancelado en su totalidad. Los retiros y liquidaciones de esta cuenta han sido habilitados."
+              : "🔒 Por política estatutaria, los fondos de esta cuenta están en garantía de crédito activo y NO se pueden retirar hasta su liquidación total. Ante mora o atraso, la cooperativa puede aplicar débitos para cubrir cuotas."}
+          </p>
+        </div>
+      )}
+
       {error && <div className="alert error">{error}</div>}
 
-      <form className="movs-form" onSubmit={registrarMovimiento}>
-        <div className="tipo-toggle">
-          <button
-            type="button"
-            className={tipoMov === "DEPOSITO" ? "on deposito" : ""}
-            onClick={() => setTipoMov("DEPOSITO")}
-          >
-            Depósito
-          </button>
-          <button type="button" className={tipoMov === "RETIRO" ? "on retiro" : ""} onClick={() => setTipoMov("RETIRO")}>
-            Retiro
-          </button>
-        </div>
-        <div className="field">
-          <label htmlFor="mov-monto">Monto</label>
-          <input
-            id="mov-monto"
-            type="number"
-            min="0.01"
-            step="0.01"
-            value={monto}
-            onChange={(e) => setMonto(e.target.value)}
-            required
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="mov-fecha">Fecha</label>
-          <input id="mov-fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
-        </div>
-        <div className="field grow">
-          <label htmlFor="mov-recibo">No. de recibo</label>
-          <input id="mov-recibo" value={numeroRecibo} onChange={(e) => setNumeroRecibo(e.target.value)} />
-        </div>
-        <button type="submit" className="btn" disabled={guardando}>
-          {guardando ? "Guardando…" : "Registrar"}
-        </button>
-      </form>
+      {(() => {
+        const retiroBloqueado = Boolean(
+          cuenta.tipo === "AHORRO_SOBRE_PRESTAMO" &&
+          cuenta.prestamo_estado &&
+          cuenta.prestamo_estado !== "CANCELADO" &&
+          cuenta.prestamo_estado !== "RECHAZADO" &&
+          tipoMov === "RETIRO"
+        );
+        return (
+          <form className="movs-form" onSubmit={registrarMovimiento}>
+            <div className="tipo-toggle">
+              <button
+                type="button"
+                className={tipoMov === "DEPOSITO" ? "on deposito" : ""}
+                onClick={() => setTipoMov("DEPOSITO")}
+              >
+                Depósito
+              </button>
+              <button
+                type="button"
+                className={tipoMov === "RETIRO" ? "on retiro" : ""}
+                onClick={() => setTipoMov("RETIRO")}
+              >
+                Retiro
+              </button>
+            </div>
+            <div className="field">
+              <label htmlFor="mov-monto">Monto</label>
+              <input
+                id="mov-monto"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={monto}
+                onChange={(e) => setMonto(e.target.value)}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="mov-fecha">Fecha</label>
+              <input id="mov-fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
+            </div>
+            <div className="field grow">
+              <label htmlFor="mov-recibo">No. de recibo</label>
+              <input id="mov-recibo" value={numeroRecibo} onChange={(e) => setNumeroRecibo(e.target.value)} />
+            </div>
+            <button type="submit" className="btn" disabled={guardando || retiroBloqueado}>
+              {guardando ? "Guardando…" : retiroBloqueado ? "Retiro bloqueado (crédito activo)" : "Registrar"}
+            </button>
+          </form>
+        );
+      })()}
 
       <div className="table-wrap">
         <table>

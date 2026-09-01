@@ -411,6 +411,7 @@ export interface DatosCobroCredito {
   interes: number;
   mora?: number;
   docNo?: string;
+  cuentaDebitoId?: string;
 }
 
 export async function cobrarCuotaCredito(
@@ -530,9 +531,45 @@ export async function cobrarCuotaCredito(
     const saldoPrevio = ultimoMovRows[0] ? Number(ultimoMovRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
     const saldoAcumulado = saldoPrevio + totalCobro;
 
+    // Débito a cuenta de ahorro (ej. Ahorro sobre Préstamo) si se indicó
+    let infoCuentaDebito: { id: string; numero_cuenta: string } | null = null;
+    if (data.cuentaDebitoId) {
+      const { rows: ctaRows } = await client.query(
+        `select c.id, c.numero_cuenta, coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
+         from cuentas c
+         left join saldos_cuenta sc on sc.cuenta_id = c.id
+         where c.id = $1 and c.socio_id = $2`,
+        [data.cuentaDebitoId, prestamo.socio_id],
+      );
+      const cta = ctaRows[0];
+      if (!cta) throw badRequest("La cuenta seleccionada para débito no pertenece al socio del crédito");
+      if (Number(cta.saldo_actual) < totalCobro) {
+        throw conflict(
+          `Saldo insuficiente en la cuenta ${cta.numero_cuenta}: tiene Q ${Number(cta.saldo_actual).toFixed(2)} y el cobro es de Q ${totalCobro.toFixed(2)}`,
+        );
+      }
+      infoCuentaDebito = cta;
+
+      const clienteMovId = `DEB-CUOTA-${prestamo.id}-${Date.now()}`;
+      await client.query(
+        `insert into movimientos (cuenta_id, tipo, monto, fecha, numero_recibo, descripcion, usuario_id, cliente_movimiento_id)
+         values ($1, 'RETIRO', $2, $3, $4, $5, $6, $7)`,
+        [
+          cta.id,
+          totalCobro,
+          dia.fecha,
+          data.docNo ?? null,
+          `Débito para pago de cuota crédito ${prestamo.codigo}`,
+          usuarioId,
+          clienteMovId,
+        ],
+      );
+    }
+
     // 3. Registrar en caja_movimientos_auxiliar
     const ref = `${prestamo.codigo}-CUOTA`;
-    const descripcion = `Cobro cuota crédito ${prestamo.codigo} (Cap: Q${abonoCapital.toFixed(2)}, Int: Q${interes.toFixed(2)}${mora > 0 ? `, Mora: Q${mora.toFixed(2)}` : ""})`;
+    const detalleDebito = infoCuentaDebito ? ` (Cobrado con débito de cuenta ${infoCuentaDebito.numero_cuenta})` : "";
+    const descripcion = `Cobro cuota crédito ${prestamo.codigo} (Cap: Q${abonoCapital.toFixed(2)}, Int: Q${interes.toFixed(2)}${mora > 0 ? `, Mora: Q${mora.toFixed(2)}` : ""})${detalleDebito}`;
 
     const { rows: cajaMovRows } = await client.query(
       `insert into caja_movimientos_auxiliar (
@@ -975,6 +1012,7 @@ export async function analiticaServicios(
   let filtroAgenciaAux = "";
   let filtroAgenciaCuentas = "";
   let filtroAgenciaPrestamos = "";
+  let filtroAgenciaCajaChica = "";
   const params: unknown[] = [];
 
   const targetAgencia = agenciaVisible || (agenciaId && agenciaId !== "TODAS" ? agenciaId : null);
@@ -983,6 +1021,7 @@ export async function analiticaServicios(
     filtroAgenciaAux = `and d.agencia_id = $${params.length}`;
     filtroAgenciaCuentas = `and c.agencia_id = $${params.length}`;
     filtroAgenciaPrestamos = `and p.agencia_id = $${params.length}`;
+    filtroAgenciaCajaChica = `and cc.agencia_id = $${params.length}`;
   }
 
   let fechaInicioSql = "current_date - interval '30 days'";
@@ -1011,6 +1050,8 @@ export async function analiticaServicios(
           when c.tipo = 'AHORRO_CORRIENTE' and m.tipo = 'RETIRO' then 'RETIRO_AHORRO_CORRIENTE'
           when c.tipo = 'AHORRO_PROGRAMADO' then 'DEPOSITO_AHORRO_PROGRAMADO'
           when c.tipo = 'AHORRO_INFANTO_JUVENIL' then 'DEPOSITO_AHORRO_INFANTO_JUVENIL'
+          when c.tipo = 'AHORRO_SOBRE_PRESTAMO' and m.tipo = 'DEPOSITO' then 'DEPOSITO_AHORRO_SOBRE_PRESTAMO'
+          when c.tipo = 'AHORRO_SOBRE_PRESTAMO' and m.tipo = 'RETIRO' then 'RETIRO_AHORRO_SOBRE_PRESTAMO'
           when c.tipo = 'AHORRO_PLAZO_FIJO' and m.tipo = 'DEPOSITO' then 'DEPOSITO_PLAZO_FIJO'
           when c.tipo = 'AHORRO_PLAZO_FIJO' and m.tipo = 'RETIRO' then 'RETIRO_PLAZO_FIJO'
           else 'INGRESO_VARIO'
@@ -1036,6 +1077,19 @@ export async function analiticaServicios(
       where coalesce(p.fecha_aprobacion, p.created_at::date) >= ${fechaInicioSql}
         and coalesce(p.fecha_aprobacion, p.created_at::date) <= current_date + interval '1 day'
         ${filtroAgenciaPrestamos}
+      group by 1
+
+      union all
+
+      -- 4. Gastos y Comprobantes de Caja Chica
+      select
+        coalesce('CAJA_CHICA_' || cc.categoria::text, 'CAJA_CHICA_GASTO') as categoria,
+        count(*)::int as cant,
+        sum(cc.monto)::numeric(14,2) as monto
+      from caja_chica_comprobantes cc
+      where cc.fecha >= ${fechaInicioSql}
+        and cc.fecha <= current_date + interval '1 day'
+        ${filtroAgenciaCajaChica}
       group by 1
     )
     select categoria, sum(cant)::int as cantidad, sum(monto)::numeric(14,2) as total_monto
@@ -1064,6 +1118,8 @@ export async function analiticaServicios(
     RETIRO_AHORRO_PROGRAMADO: { label: "Retiro Ahorro Programado", icon: "📅" },
     DEPOSITO_AHORRO_INFANTO_JUVENIL: { label: "Depósito Ahorro Infantil", icon: "🧒" },
     RETIRO_AHORRO_INFANTO_JUVENIL: { label: "Retiro Ahorro Infantil", icon: "🧒" },
+    DEPOSITO_AHORRO_SOBRE_PRESTAMO: { label: "Depósito Ahorro sobre Préstamo", icon: "🛡️" },
+    RETIRO_AHORRO_SOBRE_PRESTAMO: { label: "Retiro Ahorro sobre Préstamo", icon: "🛡️" },
     DEPOSITO_PLAZO_FIJO: { label: "Apertura Plazo Fijo", icon: "🔒" },
     RETIRO_PLAZO_FIJO: { label: "Liquidación Plazo Fijo", icon: "📦" },
     APORTACION: { label: "Aportaciones de Capital", icon: "🏛️" },
@@ -1071,7 +1127,27 @@ export async function analiticaServicios(
     COMISION: { label: "Comisiones por Servicios", icon: "🏷️" },
     INGRESO_VARIO: { label: "Ingresos Varios", icon: "➕" },
     EGRESO_VARIO: { label: "Egresos Varios", icon: "➖" },
+    CAJA_CHICA_SUMINISTROS_OFICINA: { label: "Papelería y Suministros (C.Chica)", icon: "📎" },
+    CAJA_CHICA_CAFETERIA_LIMPIEZA: { label: "Cafetería y Limpieza (C.Chica)", icon: "☕" },
+    CAJA_CHICA_COMBUSTIBLES_LUBRICANTES: { label: "Combustibles (C.Chica)", icon: "⛽" },
+    CAJA_CHICA_COMISIONES_GASTOS: { label: "Comisiones y Gastos (C.Chica)", icon: "🧾" },
+    CAJA_CHICA_TELEFONO: { label: "Telefonía (C.Chica)", icon: "📞" },
+    CAJA_CHICA_INTERNET: { label: "Internet (C.Chica)", icon: "🌐" },
+    CAJA_CHICA_ENERGIA_ELECTRICA: { label: "Energía Eléctrica (C.Chica)", icon: "⚡" },
+    CAJA_CHICA_GASTOS_DIVERSOS: { label: "Gastos Diversos (C.Chica)", icon: "📦" },
+    CAJA_CHICA_REPARACION_MANTENIMIENTO: { label: "Mantenimiento (C.Chica)", icon: "🔧" },
+    CAJA_CHICA_FLETES_ACARREO: { label: "Fletes y Acarreo (C.Chica)", icon: "🚚" },
+    CAJA_CHICA_PROYECCION_SOCIAL: { label: "Proyección Social (C.Chica)", icon: "🤝" },
+    CAJA_CHICA_OTRO: { label: "Otros Gastos C.Chica", icon: "📋" },
+    CAJA_CHICA_GASTO: { label: "Gastos Operativos (C.Chica)", icon: "☕" },
   };
+
+  function determinarModulo(cat: string): "AHORROS" | "CREDITOS" | "CAJA_CHICA" | "VENTANILLA" {
+    if (cat.startsWith("CAJA_CHICA")) return "CAJA_CHICA";
+    if (cat.includes("PRESTAMO")) return "CREDITOS";
+    if (cat.includes("AHORRO") || cat.includes("PLAZO_FIJO") || cat === "APORTACION") return "AHORROS";
+    return "VENTANILLA";
+  }
 
   const totalOperaciones = rows.reduce((acc, r) => acc + Number(r.cantidad), 0);
   const volumenTotal = rows.reduce((acc, r) => acc + Number(r.total_monto), 0);
@@ -1083,6 +1159,7 @@ export async function analiticaServicios(
     const pct = totalOperaciones > 0 ? Math.round((cant / totalOperaciones) * 1000) / 10 : 0;
     return {
       categoria: r.categoria,
+      modulo: determinarModulo(r.categoria),
       label: info.label,
       icon: info.icon,
       cantidad: cant,

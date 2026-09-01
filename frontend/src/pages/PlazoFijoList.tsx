@@ -6,6 +6,7 @@ import {
   formatoQ,
 } from "../types";
 import type { PlazoFijoContrato } from "../types";
+import { formatearDPI } from "../lib/formatters";
 
 export default function PlazoFijoList() {
   const [contratos, setContratos] = useState<PlazoFijoContrato[] | null>(null);
@@ -142,11 +143,12 @@ export default function PlazoFijoList() {
                       style={{
                         display: "inline-block",
                         padding: "0.2rem 0.5rem",
-                        background: "var(--paper-raised)",
+                        background: "var(--mono-bg)",
                         borderRadius: "6px",
                         fontWeight: 700,
                         textDecoration: "none",
                         color: "var(--accent)",
+                        border: "1px solid var(--line)",
                       }}
                     >
                       Cert. #{c.numero_certificacion ?? "—"}
@@ -155,7 +157,7 @@ export default function PlazoFijoList() {
                   <td className="mono">{c.numero_cuenta}</td>
                   <td>
                     <strong>{c.socio_nombres}</strong>
-                    {c.socio_dpi && <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>DPI: {c.socio_dpi}</div>}
+                    {c.socio_dpi && <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>DPI: {formatearDPI(c.socio_dpi)}</div>}
                   </td>
                   <td className="mono" style={{ fontWeight: 700 }}>{formatoQ(c.monto_deposito)}</td>
                   <td className="mono">{c.plazo_meses} meses</td>
@@ -164,28 +166,18 @@ export default function PlazoFijoList() {
                     <span
                       style={{
                         fontWeight: estaVencido ? 700 : 500,
-                        color: estaVencido ? "#dc2626" : "inherit",
+                        color: estaVencido ? "#f87171" : "inherit",
                       }}
                     >
                       {new Date(c.fecha_vencimiento).toLocaleDateString("es-GT")}
                       {estaVencido && " (Vencido)"}
                     </span>
                   </td>
-                  <td className="mono" style={{ color: "#d97706" }}>
+                  <td className="mono" style={{ color: "#f59e0b" }}>
                     {formatoQ(c.interes_neto)}
                   </td>
                   <td>
-                    <span
-                      style={{
-                        display: "inline-block",
-                        padding: "0.2rem 0.55rem",
-                        borderRadius: "6px",
-                        fontSize: "0.8rem",
-                        fontWeight: 600,
-                        background: c.estado === "ACTIVO" ? (estaVencido ? "#fef2f2" : "#ecfdf5") : "#f1f5f9",
-                        color: c.estado === "ACTIVO" ? (estaVencido ? "#b91c1c" : "#065f46") : "#475569",
-                      }}
-                    >
+                    <span className={`badge ${c.estado === "ACTIVO" ? (estaVencido ? "danger" : "activo") : "inactivo"}`}>
                       {ESTADO_PLAZO_FIJO_LABEL[c.estado]}
                     </span>
                   </td>

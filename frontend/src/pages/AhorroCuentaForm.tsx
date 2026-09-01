@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { TIPOS_AHORRO } from "../types";
-import type { Agencia, Socio } from "../types";
+import type { Agencia, Socio, Prestamo } from "../types";
 import BuscadorSocio from "../components/BuscadorSocio";
 
 export default function AhorroCuentaForm() {
@@ -20,10 +20,12 @@ export default function AhorroCuentaForm() {
   const [numeroCuenta, setNumeroCuenta] = useState("");
   const [saldoInicial, setSaldoInicial] = useState("0");
   const [cuotaPactada, setCuotaPactada] = useState("");
-  const [observacionesApertura, setObservacionesApertura] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [cuentaExistente, setCuentaExistente] = useState<{ id: string; numero_cuenta: string } | null>(null);
+  const [saldoAportacion, setSaldoAportacion] = useState<number | null>(null);
+  const [prestamosSocio, setPrestamosSocio] = useState<Prestamo[]>([]);
+  const [prestamoSeleccionadoId, setPrestamoSeleccionadoId] = useState<string>("");
 
   const esProgramadoOInfanto =
     config?.tipo === "AHORRO_PROGRAMADO" || config?.tipo === "AHORRO_INFANTO_JUVENIL";
@@ -42,15 +44,36 @@ export default function AhorroCuentaForm() {
   useEffect(() => {
     if (!socio || !config) {
       setCuentaExistente(null);
+      setSaldoAportacion(null);
+      setPrestamosSocio([]);
+      setPrestamoSeleccionadoId("");
       return;
     }
     api
-      .get<{ cuentas: Array<{ id: string; numero_cuenta: string; tipo: string; estado: string }> }>(`/socios/${socio.id}`)
+      .get<{ cuentas: Array<{ id: string; numero_cuenta: string; tipo: string; estado: string; saldo_actual?: string }> }>(`/socios/${socio.id}`)
       .then(({ data }) => {
+        const apor = data.cuentas?.find((c) => c.tipo === "APORTACION" && c.estado === "ACTIVA");
+        const saldo = apor ? Number(apor.saldo_actual ?? 0) : 0;
+        setSaldoAportacion(saldo);
+
         const encontrada = data.cuentas?.find((c) => c.tipo === config.tipo && c.estado === "ACTIVA");
         setCuentaExistente(encontrada ? { id: encontrada.id, numero_cuenta: encontrada.numero_cuenta } : null);
       })
-      .catch(() => setCuentaExistente(null));
+      .catch(() => {
+        setCuentaExistente(null);
+        setSaldoAportacion(null);
+      });
+
+    if (config.tipo === "AHORRO_SOBRE_PRESTAMO") {
+      api
+        .get<Prestamo[]>("/prestamos", { params: { socioId: socio.id } })
+        .then(({ data }) => {
+          const activos = data.filter((p) => p.estado !== "CANCELADO" && p.estado !== "RECHAZADO");
+          setPrestamosSocio(activos);
+          if (activos[0]) setPrestamoSeleccionadoId(activos[0].id);
+        })
+        .catch(() => setPrestamosSocio([]));
+    }
   }, [socio, config]);
 
   if (!config) return <div className="alert error">Tipo de ahorro no reconocido.</div>;
@@ -65,6 +88,12 @@ export default function AhorroCuentaForm() {
       setError(`Este socio ya tiene la cuenta ${cuentaExistente.numero_cuenta} de ${config!.titulo}.`);
       return;
     }
+    if (saldoAportacion !== null && saldoAportacion < 100) {
+      setError(
+        `Regla de la cooperativa: El socio debe tener un saldo de aportaciones de al menos Q 100.00 para poder abrir cuentas de ahorro infantil, corriente o programado (saldo actual: Q ${saldoAportacion.toFixed(2)}).`
+      );
+      return;
+    }
     setError(null);
     setGuardando(true);
     try {
@@ -75,7 +104,7 @@ export default function AhorroCuentaForm() {
         numeroCuenta,
         saldoInicial: Number(saldoInicial) || 0,
         cuotaPactada: cuotaPactada ? Number(cuotaPactada) : undefined,
-        observacionesApertura: observacionesApertura || undefined,
+        prestamoId: prestamoSeleccionadoId || undefined,
       });
       navigate(`/ahorros/${config!.slug}/${data.id}`);
     } catch (err) {
@@ -141,6 +170,44 @@ export default function AhorroCuentaForm() {
               </div>
             </div>
           )}
+
+          {socio && saldoAportacion !== null && (
+            saldoAportacion < 100 ? (
+              <div
+                style={{
+                  marginTop: "0.6rem",
+                  padding: "0.75rem 0.9rem",
+                  borderRadius: "8px",
+                  background: "rgba(239, 68, 68, 0.1)",
+                  color: "#ef4444",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  fontSize: "0.86rem",
+                  lineHeight: 1.45,
+                }}
+              >
+                ⚠️ <strong>Aportación estatutaria insuficiente:</strong> El socio tiene un saldo de aportaciones de{" "}
+                <strong>Q {saldoAportacion.toFixed(2)}</strong>. La regla de la cooperativa exige contar con al menos{" "}
+                <strong>Q 100.00</strong> en aportaciones para habilitar la apertura de cuentas de {config.titulo.toLowerCase()}.
+              </div>
+            ) : (
+              <div
+                style={{
+                  marginTop: "0.6rem",
+                  padding: "0.5rem 0.8rem",
+                  borderRadius: "8px",
+                  background: "rgba(16, 185, 129, 0.1)",
+                  color: "#10b981",
+                  border: "1px solid rgba(16, 185, 129, 0.25)",
+                  fontSize: "0.82rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                }}
+              >
+                <span>✓</span> Aportación estatutaria activa: <strong>Q {saldoAportacion.toFixed(2)}</strong> (Cumple con el requisito mínimo de Q 100.00)
+              </div>
+            )
+          )}
         </div>
 
         <div className="field">
@@ -149,9 +216,47 @@ export default function AhorroCuentaForm() {
           <span className="hint">Sugerido automáticamente; puedes ajustarlo.</span>
         </div>
 
+        {config.tipo === "AHORRO_SOBRE_PRESTAMO" && (
+          <div
+            className="field"
+            style={{
+              background: "rgba(59, 130, 246, 0.08)",
+              border: "1px solid rgba(59, 130, 246, 0.25)",
+              borderRadius: "8px",
+              padding: "0.85rem 1rem",
+            }}
+          >
+            <label htmlFor="prestamo-vinculado" style={{ fontWeight: 700, color: "var(--accent)" }}>
+              🛡️ Préstamo vinculado en garantía
+            </label>
+            {prestamosSocio.length > 0 ? (
+              <select
+                id="prestamo-vinculado"
+                value={prestamoSeleccionadoId}
+                onChange={(e) => setPrestamoSeleccionadoId(e.target.value)}
+                style={{ width: "100%", padding: "0.5rem", marginTop: "0.4rem" }}
+              >
+                {prestamosSocio.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.codigo} — {p.tipo} ({p.estado}) · Saldo/Monto: Q{Number(p.saldo_capital || p.monto_aprobado || p.monto_solicitado).toFixed(2)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", margin: "0.4rem 0 0" }}>
+                El socio no tiene créditos activos registrados. Esta cuenta actuará como fondo de garantía de crédito general.
+              </p>
+            )}
+            <span className="hint" style={{ marginTop: "0.5rem", display: "block" }}>
+              🔒 <strong>Regla estatutaria:</strong> Esta cuenta no permite retiros en ventanilla mientras el crédito esté activo.
+              Si el asociado cae en mora o deja de pagar su cuota, la cooperativa podrá debitar de este ahorro para cubrir el saldo adeudado.
+            </span>
+          </div>
+        )}
+
         {esProgramadoOInfanto && (
           <div className="field">
-            <label htmlFor="cuota-pactada">Cuota periódica acordada (Q)</label>
+            <label htmlFor="cuota-pactada">Cuota mensual acordada (Q)</label>
             <input
               id="cuota-pactada"
               type="number"
@@ -162,25 +267,10 @@ export default function AhorroCuentaForm() {
               onChange={(e) => setCuotaPactada(e.target.value)}
             />
             <span className="hint">
-              Monto periódico comprometido por el socio (se reflejará en tiempo real en Auxiliar de Caja).
+              Monto mensual comprometido por el socio (se reflejará en tiempo real en Auxiliar de Caja).
             </span>
           </div>
         )}
-
-        <div className="field">
-          <label htmlFor="obs-apertura">
-            {usuario?.rol === "PROMOTOR" ? "Justificación de apertura en campo" : "Observaciones de apertura"}
-          </label>
-          <input
-            id="obs-apertura"
-            placeholder="Ej. Apertura en visita de campo comunidad Ilom, cuota pactada Q100"
-            value={observacionesApertura}
-            onChange={(e) => setObservacionesApertura(e.target.value)}
-          />
-          <span className="hint">
-            Visible inmediatamente para el Auxiliar de Caja para no duplicar movimientos.
-          </span>
-        </div>
 
         <div className="field">
           <label htmlFor="saldo">Saldo inicial (si viene de otro registro)</label>
@@ -195,7 +285,11 @@ export default function AhorroCuentaForm() {
         </div>
 
         <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
-          <button type="submit" className="btn" disabled={guardando || !agenciaId || Boolean(cuentaExistente)}>
+          <button
+            type="submit"
+            className="btn"
+            disabled={guardando || !agenciaId || Boolean(cuentaExistente) || (saldoAportacion !== null && saldoAportacion < 100)}
+          >
             {guardando ? "Guardando…" : "Abrir cuenta"}
           </button>
           <button type="button" className="btn secondary" onClick={() => navigate(-1)}>

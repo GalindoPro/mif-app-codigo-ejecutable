@@ -8,9 +8,14 @@ const PREFIJO_TIPO: Record<string, string> = {
   AHORRO_CORRIENTE: "AC",
   AHORRO_PROGRAMADO: "AP",
   AHORRO_INFANTO_JUVENIL: "AIJ",
+  AHORRO_SOBRE_PRESTAMO: "ASP",
 };
 
-export type TipoCuentaAhorro = "AHORRO_CORRIENTE" | "AHORRO_PROGRAMADO" | "AHORRO_INFANTO_JUVENIL";
+export type TipoCuentaAhorro =
+  | "AHORRO_CORRIENTE"
+  | "AHORRO_PROGRAMADO"
+  | "AHORRO_INFANTO_JUVENIL"
+  | "AHORRO_SOBRE_PRESTAMO";
 
 export async function listar(params: {
   tipo: TipoCuentaAhorro;
@@ -32,9 +37,11 @@ export async function listar(params: {
 
   const { rows } = await pool.query(
     `select c.*, s.nombres as socio_nombres, s.numero_asociado,
+            p.codigo as prestamo_codigo, p.estado as prestamo_estado,
             coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
      from cuentas c
      join socios s on s.id = c.socio_id
+     left join prestamos p on p.id = c.prestamo_id
      left join saldos_cuenta sc on sc.cuenta_id = c.id
      where ${condiciones.join(" and ")}
      order by c.created_at desc`,
@@ -92,10 +99,12 @@ export async function siguienteNumero(agenciaId: string, tipo: TipoCuentaAhorro)
 export async function obtener(id: string, agenciaVisible: string | null) {
   const { rows } = await pool.query(
     `select c.*, s.nombres as socio_nombres, s.numero_asociado, a.nombre as agencia_nombre,
+            p.codigo as prestamo_codigo, p.estado as prestamo_estado, p.saldo_capital as prestamo_saldo_capital,
             coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
      from cuentas c
      join socios s on s.id = c.socio_id
      join agencias a on a.id = c.agencia_id
+     left join prestamos p on p.id = c.prestamo_id
      left join saldos_cuenta sc on sc.cuenta_id = c.id
      where c.id = $1`,
     [id],
@@ -123,17 +132,46 @@ export interface DatosCuenta {
   saldoInicial?: number;
   cuotaPactada?: number | null;
   observacionesApertura?: string | null;
+  prestamoId?: string | null;
 }
 
 export async function crear(data: DatosCuenta, usuarioId: string) {
-  const { rows: existente } = await pool.query(
-    `select numero_cuenta from cuentas where socio_id = $1 and tipo = $2 and estado = 'ACTIVA'`,
-    [data.socioId, data.tipo],
+  const { rows: aporRows } = await pool.query(
+    `select coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_aportacion
+     from cuentas c
+     left join saldos_cuenta sc on sc.cuenta_id = c.id
+     where c.socio_id = $1 and c.tipo = 'APORTACION' and c.estado = 'ACTIVA'
+     limit 1`,
+    [data.socioId],
   );
-  if (existente[0]) {
-    throw conflict(
-      `El socio ya tiene una cuenta activa de este tipo (${existente[0].numero_cuenta}). Cada socio solo puede tener una cuenta por tipo de ahorro.`,
+  const saldoApor = aporRows[0] ? Number(aporRows[0].saldo_aportacion) : 0;
+  if (saldoApor < 100) {
+    throw badRequest(
+      `Regla de la cooperativa: El asociado debe tener una aportación mínima de Q 100.00 para poder abrir cuentas de ahorro infantil, corriente, programado o sobre préstamo (saldo actual de aportaciones: Q ${saldoApor.toFixed(2)}).`,
     );
+  }
+
+  // Verificación de cuenta existente
+  if (data.tipo === "AHORRO_SOBRE_PRESTAMO" && data.prestamoId) {
+    const { rows: existente } = await pool.query(
+      `select numero_cuenta from cuentas where socio_id = $1 and tipo = $2 and prestamo_id = $3 and estado = 'ACTIVA'`,
+      [data.socioId, data.tipo, data.prestamoId],
+    );
+    if (existente[0]) {
+      throw conflict(
+        `El socio ya tiene una cuenta de Ahorro sobre Préstamo activa vinculada a este crédito (${existente[0].numero_cuenta}).`,
+      );
+    }
+  } else {
+    const { rows: existente } = await pool.query(
+      `select numero_cuenta from cuentas where socio_id = $1 and tipo = $2 and estado = 'ACTIVA'`,
+      [data.socioId, data.tipo],
+    );
+    if (existente[0]) {
+      throw conflict(
+        `El socio ya tiene una cuenta activa de este tipo (${existente[0].numero_cuenta}). Cada socio solo puede tener una cuenta por tipo de ahorro.`,
+      );
+    }
   }
 
   const { rows: cuentaRepetida } = await pool.query(
@@ -151,8 +189,8 @@ export async function crear(data: DatosCuenta, usuarioId: string) {
   }
 
   const { rows } = await pool.query(
-    `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, cuota_pactada, observaciones_apertura, creado_por_id)
-     values ($1,$2,$3,$4,$5,$6,$7,$8)
+    `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, cuota_pactada, observaciones_apertura, prestamo_id, creado_por_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      returning *`,
     [
       data.numeroCuenta,
@@ -162,6 +200,7 @@ export async function crear(data: DatosCuenta, usuarioId: string) {
       data.saldoInicial ?? 0,
       data.cuotaPactada ?? null,
       data.observacionesApertura ?? null,
+      data.prestamoId ?? null,
       usuarioId,
     ],
   );
@@ -206,10 +245,29 @@ export async function registrarMovimiento(
   const cuenta = await obtener(cuentaId, agenciaVisible);
   if (cuenta.estado !== "ACTIVA") throw badRequest("Esta cuenta está cerrada; no se pueden registrar movimientos");
 
-  if (data.tipo === "RETIRO" && Number(data.monto) > Number(cuenta.saldo_actual)) {
-    throw conflict(
-      `El retiro (Q ${Number(data.monto).toFixed(2)}) es mayor que el saldo disponible (Q ${Number(cuenta.saldo_actual).toFixed(2)})`,
-    );
+  if (data.tipo === "RETIRO") {
+    // REGLA CRÍTICA: Ahorro sobre Préstamo no se toca hasta que termine el pago del crédito
+    if (cuenta.tipo === "AHORRO_SOBRE_PRESTAMO") {
+      const { rows: prestamosActivos } = await pool.query(
+        `select codigo, estado, saldo_capital
+         from prestamos
+         where (id = $1 or (socio_id = $2 and estado in ('SOLICITUD', 'APROBADO', 'DESEMBOLSADO')))
+           and estado != 'CANCELADO' and estado != 'RECHAZADO'
+         limit 1`,
+        [cuenta.prestamo_id, cuenta.socio_id],
+      );
+      if (prestamosActivos[0]) {
+        throw badRequest(
+          `Esta cuenta de Ahorro sobre Préstamo está en garantía del crédito activo "${prestamosActivos[0].codigo}" (${prestamosActivos[0].estado}). Por regla estatutaria de la cooperativa, los fondos no pueden retirarse hasta que el préstamo sea cancelado en su totalidad.`,
+        );
+      }
+    }
+
+    if (Number(data.monto) > Number(cuenta.saldo_actual)) {
+      throw conflict(
+        `El retiro (Q ${Number(data.monto).toFixed(2)}) es mayor que el saldo disponible (Q ${Number(cuenta.saldo_actual).toFixed(2)})`,
+      );
+    }
   }
 
   // Validación de número de recibo anti-duplicados

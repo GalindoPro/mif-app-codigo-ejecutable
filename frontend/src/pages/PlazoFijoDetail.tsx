@@ -7,6 +7,7 @@ import {
   formatoQ,
 } from "../types";
 import type { PlazoFijoContrato } from "../types";
+import { formatearDPI } from "../lib/formatters";
 
 export default function PlazoFijoDetail() {
   const { id } = useParams<{ id: string }>();
@@ -88,13 +89,10 @@ export default function PlazoFijoDetail() {
 
         <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
           <span
+            className={`badge ${contrato.estado === "ACTIVO" ? (estaVencido ? "danger" : "activo") : "inactivo"}`}
             style={{
               padding: "0.35rem 0.8rem",
-              borderRadius: "8px",
-              fontWeight: 700,
               fontSize: "0.9rem",
-              background: contrato.estado === "ACTIVO" ? (estaVencido ? "#fef2f2" : "#ecfdf5") : "#f1f5f9",
-              color: contrato.estado === "ACTIVO" ? (estaVencido ? "#b91c1c" : "#065f46") : "#475569",
             }}
           >
             {ESTADO_PLAZO_FIJO_LABEL[contrato.estado]}
@@ -261,10 +259,28 @@ export default function PlazoFijoDetail() {
             <dd className="mono" style={{ margin: 0 }}>{contrato.numero_asociado ?? "—"}</dd>
 
             <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>DPI</dt>
-            <dd className="mono" style={{ margin: 0 }}>{contrato.socio_dpi ?? "—"}</dd>
+            <dd className="mono" style={{ margin: 0 }}>{contrato.socio_dpi ? formatearDPI(contrato.socio_dpi) : "—"}</dd>
 
             <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Teléfono</dt>
-            <dd style={{ margin: 0 }}>{contrato.socio_telefono ?? "—"}</dd>
+            <dd style={{ margin: 0 }}>
+              {contrato.socio_telefono ? (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span className="mono">{contrato.socio_telefono}</span>
+                  <a
+                    href={`https://wa.me/${contrato.socio_telefono.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn secondary"
+                    style={{ padding: "0.15rem 0.45rem", fontSize: "0.75rem", borderRadius: "4px" }}
+                    title="Enviar WhatsApp"
+                  >
+                    💬 WhatsApp
+                  </a>
+                </span>
+              ) : (
+                "—"
+              )}
+            </dd>
 
             <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Dirección</dt>
             <dd style={{ margin: 0 }}>{contrato.socio_direccion ?? "—"}</dd>

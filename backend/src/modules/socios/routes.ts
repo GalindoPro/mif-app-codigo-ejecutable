@@ -38,6 +38,18 @@ sociosRouter.get(
 );
 
 sociosRouter.get(
+  "/verificar-dpi",
+  asyncHandler(async (req, res) => {
+    const dpi = typeof req.query.dpi === "string" ? req.query.dpi : "";
+    const socioId = typeof req.query.socioId === "string" ? req.query.socioId : undefined;
+    if (!dpi) {
+      return res.json({ valido: false, mensaje: "Se requiere el número de DPI" });
+    }
+    res.json(await service.verificarDpi(dpi, socioId));
+  }),
+);
+
+sociosRouter.get(
   "/:id",
   asyncHandler(async (req, res) => {
     res.json(await service.obtener(req.params.id, agenciaVisible(req)));
@@ -51,12 +63,28 @@ const datosSocioSchema = z.object({
   genero: z.enum(["M", "F"]).optional().nullable(),
   edad: z.number().int().min(1).max(120).optional().nullable(),
   fechaIngreso: z.string().min(1, "La fecha de ingreso es obligatoria"),
-  dpi: z.string().min(13).max(13).optional().or(z.literal("")).transform((v) => (v ? v : undefined)),
+  dpi: z
+    .string()
+    .refine((v) => !v || v.replace(/\D/g, "").length === 13, "El DPI debe contener 13 dígitos numéricos")
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => (v ? v.trim() : undefined)),
   direccion: z.string().optional().nullable(),
   telefono: z.string().optional().nullable(),
   nombreBeneficiario: z.string().optional().nullable(),
-  dpiBeneficiario: z.string().optional().nullable(),
+  dpiBeneficiario: z
+    .string()
+    .refine((v) => !v || v.replace(/\D/g, "").length === 13, "El DPI del beneficiario debe contener 13 dígitos")
+    .optional()
+    .nullable(),
   telefonoBeneficiario: z.string().optional().nullable(),
+  parentescoBeneficiario: z.string().optional().nullable(),
+  montoAportacionInicial: z
+    .number()
+    .min(100, "La aportación inicial mínima de la cooperativa es de Q 100.00")
+    .optional()
+    .default(100),
+  reciboAportacionInicial: z.string().optional().nullable(),
 });
 
 sociosRouter.post(

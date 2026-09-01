@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import type { ListaSocios } from "../types";
+import { formatearDPI } from "../lib/formatters";
 
 export default function SociosList() {
   const [q, setQ] = useState("");
@@ -82,7 +83,16 @@ export default function SociosList() {
               <tr key={s.id}>
                 <td className="mono">{s.numero_asociado}</td>
                 <td>
-                  <Link to={`/socios/${s.id}`}>{s.nombres}</Link>
+                  <Link to={`/socios/${s.id}`} style={{ fontWeight: 600 }}>
+                    {s.nombres}
+                  </Link>
+                  {(s.dpi || s.telefono) && (
+                    <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", marginTop: "0.15rem" }}>
+                      {s.dpi && <span>DPI: <span className="mono">{formatearDPI(s.dpi)}</span></span>}
+                      {s.dpi && s.telefono && <span> · </span>}
+                      {s.telefono && <span>Tel: <span className="mono">{s.telefono}</span></span>}
+                    </div>
+                  )}
                 </td>
                 <td>{s.agencia_nombre}</td>
                 <td className="mono">{new Date(s.fecha_ingreso).toLocaleDateString("es-GT")}</td>

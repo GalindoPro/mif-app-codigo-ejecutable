@@ -15,6 +15,8 @@ export type CajaCategoria =
   | "RETIRO_AHORRO_CORRIENTE"
   | "RETIRO_AHORRO_PROGRAMADO"
   | "RETIRO_AHORRO_INFANTO_JUVENIL"
+  | "DEPOSITO_AHORRO_SOBRE_PRESTAMO"
+  | "RETIRO_AHORRO_SOBRE_PRESTAMO"
   | "DEPOSITO_PLAZO_FIJO"
   | "RETIRO_PLAZO_FIJO"
   | "APORTACION"
@@ -30,7 +32,11 @@ export type CajaCategoria =
   | "EGRESO_VARIO"
   | "INGRESO_VARIO";
 
-export type TipoCuentaAuxiliar = "AHORRO_CORRIENTE" | "AHORRO_PROGRAMADO" | "AHORRO_INFANTO_JUVENIL";
+export type TipoCuentaAuxiliar =
+  | "AHORRO_CORRIENTE"
+  | "AHORRO_PROGRAMADO"
+  | "AHORRO_INFANTO_JUVENIL"
+  | "AHORRO_SOBRE_PRESTAMO";
 
 export interface CategoriaInfo {
   seccion: "BI" | "PROPIO";
@@ -115,6 +121,22 @@ export const CATEGORIAS: Record<CajaCategoria, CategoriaInfo> = {
     grupoContador: "egreso_propio",
     descripcion: "Retiro de Ahorro Infanto Juvenil",
     requiereCuenta: "AHORRO_INFANTO_JUVENIL",
+    movimientoTipo: "RETIRO",
+  },
+  DEPOSITO_AHORRO_SOBRE_PRESTAMO: {
+    seccion: "PROPIO",
+    tipo: "INGRESO",
+    grupoContador: "ahorro_sobre_prestamo",
+    descripcion: "Depósito Ahorro sobre Préstamo",
+    requiereCuenta: "AHORRO_SOBRE_PRESTAMO",
+    movimientoTipo: "DEPOSITO",
+  },
+  RETIRO_AHORRO_SOBRE_PRESTAMO: {
+    seccion: "PROPIO",
+    tipo: "EGRESO",
+    grupoContador: "egreso_propio",
+    descripcion: "Retiro Ahorro sobre Préstamo",
+    requiereCuenta: "AHORRO_SOBRE_PRESTAMO",
     movimientoTipo: "RETIRO",
   },
 

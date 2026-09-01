@@ -543,6 +543,24 @@ function NuevoMovimientoForm({ agenciaId, diaId, onCreado }: { agenciaId: string
                 Referencia: {referenciaPreview}
               </span>
             )}
+            {info.tipo === "EGRESO" && cuenta?.tipo === "AHORRO_SOBRE_PRESTAMO" && cuenta.prestamo_estado && cuenta.prestamo_estado !== "CANCELADO" && cuenta.prestamo_estado !== "RECHAZADO" && (
+              <div
+                style={{
+                  marginTop: "0.6rem",
+                  padding: "0.75rem 0.9rem",
+                  borderRadius: "8px",
+                  background: "#fee2e2",
+                  color: "#991b1b",
+                  border: "1px solid #ef4444",
+                  fontSize: "0.85rem",
+                  lineHeight: 1.45,
+                }}
+              >
+                🛑 <strong>Retiro bloqueado (Cuenta en garantía):</strong> Esta cuenta está asociada al crédito{" "}
+                <strong>{cuenta.prestamo_codigo || "activo"}</strong> ({cuenta.prestamo_estado}). Por política estatutaria de la cooperativa,
+                los fondos de <em>Ahorro sobre Préstamo</em> <strong>no se pueden tocar</strong> hasta que el crédito termine de pagarse por completo.
+              </div>
+            )}
           </div>
         )}
 
@@ -638,9 +656,20 @@ function NuevoMovimientoForm({ agenciaId, diaId, onCreado }: { agenciaId: string
 
       {error && <div className="alert error">{error}</div>}
 
-      <button type="submit" className="btn" disabled={guardando}>
-        {guardando ? "Guardando…" : `Registrar ${info.tipo === "INGRESO" ? "ingreso" : "egreso"}`}
-      </button>
+      {(() => {
+        const retiroBloqueado = Boolean(
+          info.tipo === "EGRESO" &&
+          cuenta?.tipo === "AHORRO_SOBRE_PRESTAMO" &&
+          cuenta.prestamo_estado &&
+          cuenta.prestamo_estado !== "CANCELADO" &&
+          cuenta.prestamo_estado !== "RECHAZADO"
+        );
+        return (
+          <button type="submit" className="btn" disabled={guardando || retiroBloqueado}>
+            {guardando ? "Guardando…" : retiroBloqueado ? "Retiro bloqueado por crédito activo" : `Registrar ${info.tipo === "INGRESO" ? "ingreso" : "egreso"}`}
+          </button>
+        );
+      })()}
     </form>
   );
 }
@@ -772,6 +801,10 @@ function CobroCreditoForm({
   const [mora, setMora] = useState("0");
   const [docNo, setDocNo] = useState("");
 
+  const [cuentasDebito, setCuentasDebito] = useState<Cuenta[]>([]);
+  const [usarDebitoAhorro, setUsarDebitoAhorro] = useState(false);
+  const [cuentaDebitoSeleccionada, setCuentaDebitoSeleccionada] = useState<string>("");
+
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -796,6 +829,9 @@ function CobroCreditoForm({
     if (!socio) {
       setPrestamos([]);
       setPrestamo(null);
+      setCuentasDebito([]);
+      setUsarDebitoAhorro(false);
+      setCuentaDebitoSeleccionada("");
       return;
     }
     setCargandoPrestamos(true);
@@ -812,6 +848,20 @@ function CobroCreditoForm({
       })
       .catch((err) => setError(mensajeError(err)))
       .finally(() => setCargandoPrestamos(false));
+
+    // Cargar cuentas del socio para verificar si tiene Ahorro sobre Préstamo u otras cuentas con saldo
+    api
+      .get<{ cuentas?: Cuenta[] }>(`/socios/${socio.id}`)
+      .then(({ data }) => {
+        const activas = (data.cuentas || []).filter(
+          (c) => c.estado === "ACTIVA" && Number(c.saldo_actual) > 0,
+        );
+        setCuentasDebito(activas);
+        const asp = activas.find((c) => c.tipo === "AHORRO_SOBRE_PRESTAMO");
+        if (asp) setCuentaDebitoSeleccionada(asp.id);
+        else if (activas[0]) setCuentaDebitoSeleccionada(activas[0].id);
+      })
+      .catch(() => setCuentasDebito([]));
   }, [socio]);
 
   const saldoActual = prestamo
@@ -835,6 +885,11 @@ function CobroCreditoForm({
       return;
     }
 
+    if (usarDebitoAhorro && !cuentaDebitoSeleccionada) {
+      setError("Selecciona la cuenta de ahorro a debitar.");
+      return;
+    }
+
     setError(null);
     setGuardando(true);
     try {
@@ -845,6 +900,7 @@ function CobroCreditoForm({
         interes: intNum,
         mora: morNum,
         docNo: docNo || undefined,
+        cuentaDebitoId: usarDebitoAhorro && cuentaDebitoSeleccionada ? cuentaDebitoSeleccionada : undefined,
       });
       onCobrado();
     } catch (err) {
@@ -1007,19 +1063,73 @@ function CobroCreditoForm({
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <span style={{ fontSize: "0.82rem", color: "#166534" }}>Total a recibir en caja: </span>
+              <span style={{ fontSize: "0.82rem", color: "#166534" }}>Total del cobro: </span>
               <strong style={{ fontSize: "1.25rem", color: "#166534" }}>{formatoQ(totalCobro)}</strong>
             </div>
+          </div>
+
+          {/* Opción de cobro mediante Ahorro sobre Préstamo (Garantía) */}
+          <div
+            className="field"
+            style={{
+              background: usarDebitoAhorro ? "rgba(245, 158, 11, 0.08)" : "var(--paper-raised)",
+              border: usarDebitoAhorro ? "1px solid #f59e0b" : "1px solid var(--line)",
+              padding: "0.85rem 1rem",
+              borderRadius: "8px",
+              marginTop: "0.75rem",
+            }}
+          >
+            <label style={{ display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", fontWeight: 700, color: "var(--ink)" }}>
+              <input
+                type="checkbox"
+                checked={usarDebitoAhorro}
+                onChange={(e) => setUsarDebitoAhorro(e.target.checked)}
+                style={{ width: "1.15rem", height: "1.15rem" }}
+              />
+              🛡️ Cobrar cuota mediante débito a Cuenta de Ahorro sobre Préstamo (Garantía)
+            </label>
+            {usarDebitoAhorro && (
+              <div style={{ marginTop: "0.6rem" }}>
+                <p style={{ fontSize: "0.82rem", color: "var(--ink-soft)", margin: "0 0 0.5rem" }}>
+                  Aplica fondos de la cuenta de ahorro en garantía del socio para amortizar esta cuota (por mora o impago).
+                </p>
+                {cuentasDebito.length > 0 ? (
+                  <select
+                    value={cuentaDebitoSeleccionada}
+                    onChange={(e) => setCuentaDebitoSeleccionada(e.target.value)}
+                    style={{ width: "100%", padding: "0.55rem", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--paper)" }}
+                  >
+                    {cuentasDebito.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.tipo === "AHORRO_SOBRE_PRESTAMO" ? "🛡️ [Ahorro sobre Préstamo] " : ""}
+                        {c.numero_cuenta} — Saldo disponible: {formatoQ(c.saldo_actual)}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div style={{ color: "#ef4444", fontSize: "0.85rem", marginTop: "0.4rem" }}>
+                    ⚠️ El socio no tiene cuentas de ahorro con saldo disponible para debitar.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
             <button
               type="submit"
               className="btn"
-              style={{ background: "#059669", borderColor: "#059669" }}
-              disabled={guardando || totalCobro <= 0}
+              style={{
+                background: usarDebitoAhorro ? "#d97706" : "#059669",
+                borderColor: usarDebitoAhorro ? "#d97706" : "#059669",
+              }}
+              disabled={guardando || totalCobro <= 0 || (usarDebitoAhorro && (!cuentaDebitoSeleccionada || cuentasDebito.length === 0))}
             >
-              {guardando ? "Registrando cobro…" : `💵 Registrar cobro de ${formatoQ(totalCobro)}`}
+              {guardando
+                ? "Registrando cobro…"
+                : usarDebitoAhorro
+                ? `🛡️ Cobrar con débito de ahorro ${formatoQ(totalCobro)}`
+                : `💵 Registrar cobro de ${formatoQ(totalCobro)}`}
             </button>
           </div>
         </>
@@ -1589,7 +1699,7 @@ function CajaCerradaCard({
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              <span className="badge" style={{ background: "#f1f5f9", color: "#334155", fontWeight: 700, padding: "0.3rem 0.75rem" }}>
+              <span className="badge inactivo" style={{ fontWeight: 700, padding: "0.3rem 0.75rem" }}>
                 🔒 Caja del Día Cerrada
               </span>
               <span className="sub" style={{ margin: 0, fontWeight: 600 }}>
@@ -1788,24 +1898,24 @@ function ActaArqueoModal({
 
         {/* Resumen del Libro de Caja */}
         <div style={{ marginBottom: "1.25rem" }}>
-          <h4 style={{ margin: "0 0 0.5rem", fontSize: "0.88rem", color: "#1e293b", textTransform: "uppercase", borderBottom: "1px solid #cbd5e1", paddingBottom: "0.25rem" }}>
+          <h4 style={{ margin: "0 0 0.5rem", fontSize: "0.88rem", color: "var(--ink)", textTransform: "uppercase", borderBottom: "1px solid var(--line)", paddingBottom: "0.25rem" }}>
             1. Movimientos según Libro Auxiliar de Caja
           </h4>
           <table style={{ width: "100%", fontSize: "0.85rem", borderCollapse: "collapse" }}>
             <tbody>
-              <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
+              <tr style={{ borderBottom: "1px solid var(--line)" }}>
                 <td style={{ padding: "0.35rem 0" }}>Saldo Inicial Según Auxiliar:</td>
                 <td style={{ textAlign: "right", fontWeight: 600 }} className="mono">{formatoQ(dia.saldo_inicial)}</td>
               </tr>
-              <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                <td style={{ padding: "0.35rem 0", color: "#065f46" }}>(+) Total Ingresos del Día:</td>
-                <td style={{ textAlign: "right", fontWeight: 600, color: "#065f46" }} className="mono">{formatoQ(detalle.totalIngreso)}</td>
+              <tr style={{ borderBottom: "1px solid var(--line)" }}>
+                <td style={{ padding: "0.35rem 0", color: "#34d399" }}>(+) Total Ingresos del Día:</td>
+                <td style={{ textAlign: "right", fontWeight: 600, color: "#34d399" }} className="mono">{formatoQ(detalle.totalIngreso)}</td>
               </tr>
-              <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                <td style={{ padding: "0.35rem 0", color: "#991b1b" }}>(-) Total Egresos del Día:</td>
-                <td style={{ textAlign: "right", fontWeight: 600, color: "#991b1b" }} className="mono">{formatoQ(detalle.totalEgreso)}</td>
+              <tr style={{ borderBottom: "1px solid var(--line)" }}>
+                <td style={{ padding: "0.35rem 0", color: "#f87171" }}>(-) Total Egresos del Día:</td>
+                <td style={{ textAlign: "right", fontWeight: 600, color: "#f87171" }} className="mono">{formatoQ(detalle.totalEgreso)}</td>
               </tr>
-              <tr style={{ borderTop: "2px solid #334155", background: "#f8fafc" }}>
+              <tr style={{ borderTop: "2px solid var(--line)", background: "var(--mono-bg)" }}>
                 <td style={{ padding: "0.5rem 0", fontWeight: 700 }}>(=) Saldo Final según Auxiliar de Caja:</td>
                 <td style={{ textAlign: "right", fontWeight: 800, fontSize: "0.95rem" }} className="mono">{formatoQ(saldoEsperado)}</td>
               </tr>
@@ -2049,7 +2159,7 @@ function HistorialCajasModal({
                       {new Date(d.fecha).toLocaleDateString("es-GT")}
                     </td>
                     <td>
-                      <span className="badge" style={{ background: d.estado === "ABIERTO" ? "#ecfdf5" : "#f1f5f9", color: d.estado === "ABIERTO" ? "#065f46" : "#475569" }}>
+                      <span className={`badge ${d.estado === "ABIERTO" ? "activo" : "inactivo"}`}>
                         {d.estado === "ABIERTO" ? "🟢 Abierto" : "🔒 Cerrado"}
                       </span>
                     </td>

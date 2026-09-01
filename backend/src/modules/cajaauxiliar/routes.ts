@@ -128,6 +128,7 @@ const cobroCreditoSchema = z.object({
   interes: z.number().min(0),
   mora: z.number().min(0).optional(),
   docNo: z.string().optional(),
+  cuentaDebitoId: z.string().uuid().optional(),
 });
 
 cajaAuxiliarRouter.post(

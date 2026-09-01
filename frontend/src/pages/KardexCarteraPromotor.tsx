@@ -53,6 +53,63 @@ export default function KardexCarteraPromotor() {
   const totalPaginas = Math.max(1, Math.ceil(totalItems / pageSize));
   const itemsPaginados = itemsFiltrados.slice((page - 1) * pageSize, page * pageSize);
 
+  const [reseteando, setReseteando] = useState(false);
+  const [recargando, setRecargando] = useState(false);
+  const [mensajeExito, setMensajeExito] = useState<string | null>(null);
+
+  async function handleReset() {
+    const confirmado = window.confirm(
+      "⚠️ ¿Estás seguro de que deseas REINICIAR EL SISTEMA DESDE CERO?\n\n" +
+      "Esta acción borrará:\n" +
+      "• Toda la cartera de préstamos activa\n" +
+      "• Todos los socios registrados\n" +
+      "• Todas las cuentas de ahorro y aportaciones\n" +
+      "• Todos los movimientos de ventanilla\n\n" +
+      "El sistema quedará completamente limpio para arrancar de nuevo."
+    );
+    if (!confirmado) return;
+
+    setReseteando(true);
+    setError(null);
+    setMensajeExito(null);
+
+    try {
+      const { data } = await api.post<{ ok: boolean; mensaje: string }>("/sistema/reset");
+      setMensajeExito(data.mensaje);
+      cargarKardex();
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setReseteando(false);
+    }
+  }
+
+  async function handleRecargarDatos() {
+    const confirmado = window.confirm(
+      "📥 ¿Deseas RECARGAR TODOS LOS DATOS EXISTENTES de los libros Excel?\n\n" +
+      "Esta acción restaurará la base de datos oficial:\n" +
+      "• 65 préstamos de cartera viva con garantías y fiadores\n" +
+      "• 568 asociados con sus cuentas de aportaciones\n" +
+      "• 692 certificados de ahorro a plazo fijo\n\n" +
+      "Se cargarán los datos originales de los archivos Excel para continuar operando."
+    );
+    if (!confirmado) return;
+
+    setRecargando(true);
+    setError(null);
+    setMensajeExito(null);
+
+    try {
+      const { data } = await api.post<{ ok: boolean; mensaje: string }>("/sistema/recargar-datos");
+      setMensajeExito(data.mensaje);
+      cargarKardex();
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setRecargando(false);
+    }
+  }
+
   return (
     <div>
       {/* Encabezado */}
@@ -67,7 +124,7 @@ export default function KardexCarteraPromotor() {
             necesidad de transcribir en Excel.
           </p>
         </div>
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <label htmlFor="mes-kardex" style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 600 }}>
               Mes:
@@ -86,9 +143,39 @@ export default function KardexCarteraPromotor() {
           <Link to="/creditos/nuevo" className="btn">
             + Nueva Solicitud en Campo
           </Link>
+          <button
+            type="button"
+            className="btn secondary"
+            onClick={handleRecargarDatos}
+            disabled={recargando || reseteando}
+            style={{
+              fontSize: "0.82rem",
+              padding: "0.35rem 0.75rem",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              borderColor: "rgba(2, 132, 199, 0.5)",
+              color: "#38bdf8",
+              background: "rgba(2, 132, 199, 0.1)",
+            }}
+            title="Restaurar los 65 préstamos y socios desde los archivos Excel"
+          >
+            {recargando ? "⏳ Recargando..." : "📥 Recargar Datos (Excel)"}
+          </button>
+          <button
+            type="button"
+            className="btn danger"
+            onClick={handleReset}
+            disabled={reseteando || recargando}
+            style={{ fontSize: "0.82rem", padding: "0.35rem 0.75rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+            title="Borrar todos los datos y reiniciar el sistema limpio desde cero"
+          >
+            {reseteando ? "⏳ Reiniciando..." : "⚠️ Reiniciar a Cero"}
+          </button>
         </div>
       </div>
 
+      {mensajeExito && <div className="alert success" style={{ marginBottom: "1rem" }}>{mensajeExito}</div>}
       {error && <div className="alert error">{error}</div>}
 
       {/* Tarjetas KPI de Cartera */}
@@ -193,18 +280,18 @@ export default function KardexCarteraPromotor() {
 
       {!cargando && itemsFiltrados.length > 0 && (
         <div className="card" style={{ padding: 0, overflowX: "auto" }}>
-          <table className="table" style={{ margin: 0, fontSize: "0.85rem" }}>
+          <table className="table" style={{ width: "100%", margin: 0, fontSize: "0.85rem" }}>
             <thead>
-              <tr style={{ background: "var(--paper-raised)" }}>
-                <th>Código / Socio</th>
-                <th>Comunidad / Ubicación</th>
-                <th>Garantía & Fiador</th>
-                <th>Plazo / Vencimiento</th>
-                <th style={{ textAlign: "right" }}>Valor Crédito</th>
-                <th style={{ textAlign: "right" }}>Saldo Vivo Capital</th>
-                <th style={{ textAlign: "right" }}>Cuota Mensual</th>
-                <th>Estado {mes}</th>
-                <th style={{ textAlign: "center" }}>Acción</th>
+              <tr style={{ background: "var(--mono-bg)" }}>
+                <th style={{ width: "16%" }}>Código / Socio</th>
+                <th style={{ width: "13%" }}>Comunidad / Ubicación</th>
+                <th style={{ width: "14%" }}>Garantía & Fiador</th>
+                <th style={{ width: "10%" }}>Plazo / Vence</th>
+                <th style={{ width: "11%", textAlign: "right" }}>Valor Crédito</th>
+                <th style={{ width: "11%", textAlign: "right" }}>Saldo Vivo Capital</th>
+                <th style={{ width: "10%", textAlign: "right" }}>Cuota Mensual</th>
+                <th style={{ width: "8%", textAlign: "center" }}>Estado {mes}</th>
+                <th style={{ width: "7%", textAlign: "center" }}>Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -215,8 +302,8 @@ export default function KardexCarteraPromotor() {
 
                 return (
                   <tr key={p.id} style={{ verticalAlign: "middle" }}>
-                    <td colSpan={esExpandido ? 9 : undefined} style={esExpandido ? { padding: 0 } : undefined}>
-                      {esExpandido ? (
+                    {esExpandido ? (
+                      <td colSpan={9} style={{ padding: 0 }}>
                         <div style={{ padding: "1rem", background: "var(--paper-raised)" }}>
                           {/* Fila principal en modo expandido */}
                           <div
@@ -265,7 +352,7 @@ export default function KardexCarteraPromotor() {
                               gap: "0.75rem",
                               marginBottom: "1rem",
                               fontSize: "0.82rem",
-                              background: "#fff",
+                              background: "var(--paper-raised)",
                               padding: "0.75rem",
                               borderRadius: "6px",
                               border: "1px solid var(--line)",
@@ -309,9 +396,9 @@ export default function KardexCarteraPromotor() {
                             </div>
                           ) : (
                             <div style={{ overflowX: "auto" }}>
-                              <table style={{ width: "100%", fontSize: "0.78rem", background: "#fff" }}>
+                              <table style={{ width: "100%", fontSize: "0.78rem", background: "var(--paper-raised)" }}>
                                 <thead>
-                                  <tr style={{ background: "#f1f5f9" }}>
+                                  <tr style={{ background: "var(--mono-bg)" }}>
                                     <th>Fecha</th>
                                     <th>Recibo</th>
                                     <th style={{ textAlign: "right" }}>Abono Capital</th>
@@ -348,8 +435,9 @@ export default function KardexCarteraPromotor() {
                             </div>
                           )}
                         </div>
-                      ) : (
-                        <>
+                      </td>
+                    ) : (
+                      <>
                           <td style={{ fontWeight: 600 }}>
                             <div className="mono" style={{ color: "var(--accent)" }}>
                               {p.codigo}
@@ -392,15 +480,15 @@ export default function KardexCarteraPromotor() {
                           </td>
                           <td>
                             {p.estadoCuotaMes === "CANCELADO" ? (
-                              <span className="badge" style={{ background: "#e2e8f0", color: "#475569" }}>
+                              <span className="badge inactivo">
                                 ⚪ Liquidado
                               </span>
                             ) : p.estadoCuotaMes === "AL_DIA" ? (
-                              <span className="badge" style={{ background: "#dcfce7", color: "#166534", fontWeight: 700 }}>
+                              <span className="badge activo">
                                 🟢 Al día ({formatoQ(p.totalPagadoMes)})
                               </span>
                             ) : (
-                              <span className="badge" style={{ background: "#fee2e2", color: "#991b1b", fontWeight: 700 }}>
+                              <span className="badge danger">
                                 🔴 Pendiente
                               </span>
                             )}
@@ -417,7 +505,6 @@ export default function KardexCarteraPromotor() {
                           </td>
                         </>
                       )}
-                    </td>
                   </tr>
                 );
               })}

@@ -44,11 +44,20 @@ export async function listar(params: {
     condiciones.push(`pf.estado = $${valores.length}`);
   }
   if (params.q) {
+    const qClean = params.q.replace(/\D/g, "");
     valores.push(`%${params.q.toLowerCase()}%`);
     const idx = valores.length;
-    condiciones.push(
-      `(lower(s.nombres) like $${idx} or lower(c.numero_cuenta) like $${idx} or pf.numero_certificacion like $${idx} or s.dpi like $${idx})`,
-    );
+    if (qClean.length >= 3) {
+      valores.push(`%${qClean}%`);
+      const idxClean = valores.length;
+      condiciones.push(
+        `(lower(s.nombres) like $${idx} or lower(c.numero_cuenta) like $${idx} or pf.numero_certificacion like $${idx} or s.dpi like $${idx} or regexp_replace(coalesce(s.dpi, ''), '[^0-9]', '', 'g') like $${idxClean})`,
+      );
+    } else {
+      condiciones.push(
+        `(lower(s.nombres) like $${idx} or lower(c.numero_cuenta) like $${idx} or pf.numero_certificacion like $${idx} or s.dpi like $${idx})`,
+      );
+    }
   }
 
   const query = `
@@ -149,6 +158,21 @@ export async function crear(data: DatosCrearPlazoFijo, usuarioId: string) {
   if (cuentaRepetida[0]) {
     throw conflict(
       `El número de cuenta "${numeroCuenta}" ya está registrado para el socio "${cuentaRepetida[0].socio_nombres}". No se permiten números de cuenta duplicados.`,
+    );
+  }
+
+  const { rows: aporRows } = await pool.query(
+    `select coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_aportacion
+     from cuentas c
+     left join saldos_cuenta sc on sc.cuenta_id = c.id
+     where c.socio_id = $1 and c.tipo = 'APORTACION' and c.estado = 'ACTIVA'
+     limit 1`,
+    [data.socioId],
+  );
+  const saldoApor = aporRows[0] ? Number(aporRows[0].saldo_aportacion) : 0;
+  if (saldoApor < 100) {
+    throw badRequest(
+      `Regla de la cooperativa: El socio debe tener una aportación mínima de Q 100.00 para constituir contratos de ahorro a plazo fijo (saldo actual de aportación: Q ${saldoApor.toFixed(2)}).`,
     );
   }
 

@@ -8,7 +8,12 @@ import * as service from "./service";
 export const cuentasRouter = Router();
 cuentasRouter.use(requireAuth);
 
-const TIPOS = ["AHORRO_CORRIENTE", "AHORRO_PROGRAMADO", "AHORRO_INFANTO_JUVENIL"] as const;
+const TIPOS = [
+  "AHORRO_CORRIENTE",
+  "AHORRO_PROGRAMADO",
+  "AHORRO_INFANTO_JUVENIL",
+  "AHORRO_SOBRE_PRESTAMO",
+] as const;
 const tipoSchema = z.enum(TIPOS);
 
 cuentasRouter.get(
@@ -61,6 +66,7 @@ const crearSchema = z.object({
   saldoInicial: z.number().nonnegative().optional(),
   cuotaPactada: z.number().positive().optional().nullable(),
   observacionesApertura: z.string().optional().nullable(),
+  prestamoId: z.string().uuid().optional().nullable(),
 });
 
 cuentasRouter.post(

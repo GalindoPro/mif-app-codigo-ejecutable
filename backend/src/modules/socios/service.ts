@@ -1,7 +1,7 @@
 import { pool } from "../../db/pool";
 import { Socio } from "../../types/models";
 import { registrarAuditoria } from "../../utils/auditoria";
-import { notFound, forbidden, conflict } from "../../utils/errors";
+import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
 
 export interface FiltrosSocios {
   agenciaId: string | null; // null = todas (ADMIN/GERENCIA)
@@ -9,6 +9,39 @@ export interface FiltrosSocios {
   estado?: "ACTIVO" | "INACTIVO";
   page: number;
   pageSize: number;
+}
+
+const CONECTORES_NOMBRE = new Set(["de", "del", "la", "las", "los", "y", "e"]);
+
+export function capitalizarNombre(valor?: string | null): string | null | undefined {
+  if (!valor) return valor;
+  let texto = valor.trim();
+  if (/^[\p{Lu}\s\p{P}]+$/u.test(texto) && texto.length > 2) {
+    texto = texto.toLowerCase();
+  }
+  const palabras = texto.split(/(\s+)/);
+  return palabras
+    .map((p, idx) => {
+      if (/^\s+$/.test(p)) return p;
+      const norm = p.toLowerCase();
+      if (idx > 0 && CONECTORES_NOMBRE.has(norm)) {
+        return norm;
+      }
+      return p.replace(/(^|[^\p{L}\p{N}])(\p{L})/gu, (_, sep, letra) => sep + letra.toUpperCase());
+    })
+    .join("");
+}
+
+export function capitalizarDescripcion(valor?: string | null): string | null | undefined {
+  if (!valor) return valor;
+  const texto = valor.trim();
+  const primerIndice = texto.search(/\S/);
+  if (primerIndice === -1) return texto;
+  return (
+    texto.slice(0, primerIndice) +
+    texto.charAt(primerIndice).toUpperCase() +
+    texto.slice(primerIndice + 1)
+  );
 }
 
 export async function listar(filtros: FiltrosSocios) {
@@ -24,11 +57,20 @@ export async function listar(filtros: FiltrosSocios) {
     condiciones.push(`s.estado = $${valores.length}`);
   }
   if (filtros.q) {
+    const qClean = filtros.q.replace(/\D/g, "");
     valores.push(`%${filtros.q.toLowerCase()}%`);
     const idx = valores.length;
-    condiciones.push(
-      `(lower(s.nombres) like $${idx} or s.dpi like $${idx} or lower(s.numero_asociado) like $${idx})`,
-    );
+    if (qClean.length >= 3) {
+      valores.push(`%${qClean}%`);
+      const idxClean = valores.length;
+      condiciones.push(
+        `(lower(s.nombres) like $${idx} or s.dpi like $${idx} or lower(s.numero_asociado) like $${idx} or regexp_replace(coalesce(s.dpi, ''), '[^0-9]', '', 'g') like $${idxClean} or regexp_replace(coalesce(s.telefono, ''), '[^0-9]', '', 'g') like $${idxClean})`,
+      );
+    } else {
+      condiciones.push(
+        `(lower(s.nombres) like $${idx} or s.dpi like $${idx} or lower(s.numero_asociado) like $${idx})`,
+      );
+    }
   }
 
   const where = condiciones.length ? `where ${condiciones.join(" and ")}` : "";
@@ -107,6 +149,9 @@ export interface DatosSocio {
   nombreBeneficiario?: string | null;
   dpiBeneficiario?: string | null;
   telefonoBeneficiario?: string | null;
+  parentescoBeneficiario?: string | null;
+  montoAportacionInicial?: number;
+  reciboAportacionInicial?: string | null;
 }
 
 export async function crear(data: DatosSocio, usuarioId: string): Promise<Socio> {
@@ -120,54 +165,96 @@ export async function crear(data: DatosSocio, usuarioId: string): Promise<Socio>
     );
   }
 
+  const montoApor = data.montoAportacionInicial !== undefined ? Number(data.montoAportacionInicial) : 100;
+  if (isNaN(montoApor) || montoApor < 100) {
+    throw badRequest("La aportación inicial mínima de la cooperativa es de Q 100.00 para afiliarse como socio.");
+  }
+
   if (data.dpi && data.dpi.trim()) {
-    const { rows: dpiRepetido } = await pool.query(
-      `select dpi, nombres, numero_asociado from socios where trim(dpi) = trim($1) limit 1`,
-      [data.dpi.trim()],
-    );
-    if (dpiRepetido[0]) {
-      throw conflict(
-        `El DPI "${data.dpi.trim()}" ya está registrado para el socio "${dpiRepetido[0].nombres}" (Asociado: ${dpiRepetido[0].numero_asociado}).`,
+    const rawDpi = data.dpi.replace(/\D/g, "");
+    if (rawDpi.length === 13) {
+      const { rows: dpiRepetido } = await pool.query(
+        `select dpi, nombres, numero_asociado from socios where regexp_replace(dpi, '[^0-9]', '', 'g') = $1 limit 1`,
+        [rawDpi],
       );
+      if (dpiRepetido[0]) {
+        throw conflict(
+          `El DPI "${data.dpi.trim()}" ya está registrado para el socio "${dpiRepetido[0].nombres}" (Asociado: ${dpiRepetido[0].numero_asociado}).`,
+        );
+      }
     }
   }
 
   const { rows } = await pool.query<Socio>(
     `insert into socios
-      (numero_asociado, agencia_id, nombres, genero, edad, fecha_ingreso, dpi, direccion, telefono, nombre_beneficiario, dpi_beneficiario, telefono_beneficiario, creado_por_id)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      (numero_asociado, agencia_id, nombres, genero, edad, fecha_ingreso, dpi, direccion, telefono, nombre_beneficiario, dpi_beneficiario, telefono_beneficiario, parentesco_beneficiario, creado_por_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
      returning *`,
     [
       data.numeroAsociado,
       data.agenciaId,
-      data.nombres,
+      capitalizarNombre(data.nombres)!,
       data.genero ?? null,
       data.edad ?? null,
       data.fechaIngreso,
       data.dpi ?? null,
-      data.direccion ?? null,
+      capitalizarDescripcion(data.direccion) ?? null,
       data.telefono ?? null,
-      data.nombreBeneficiario ?? null,
+      capitalizarNombre(data.nombreBeneficiario) ?? null,
       data.dpiBeneficiario ?? null,
       data.telefonoBeneficiario ?? null,
+      data.parentescoBeneficiario ?? null,
       usuarioId,
     ],
   );
   const socio = rows[0];
 
-  // Crear automáticamente la cuenta de APORTACION del socio
+  // Crear automáticamente la cuenta de APORTACION del socio con la aportación estatutaria inicial (mínimo Q 100.00)
   const { rows: agencias } = await pool.query(`select codigo from agencias where id = $1`, [data.agenciaId]);
   const codAgencia = agencias[0]?.codigo ?? "MIF";
   const numCuentaAportacion = `${codAgencia}-APOR-${data.numeroAsociado}`;
+  const obsApertura = data.reciboAportacionInicial
+    ? `Aportación estatutaria inicial. Comprobante/Recibo: ${data.reciboAportacionInicial.trim()}`
+    : "Aportación estatutaria inicial al afiliarse";
+
   await pool.query(
-    `insert into cuentas (numero_cuenta, tipo, estado, socio_id, agencia_id, saldo_inicial)
-     values ($1, 'APORTACION', 'ACTIVA', $2, $3, 0)
-     on conflict (numero_cuenta) do nothing`,
-    [numCuentaAportacion, socio.id, data.agenciaId],
+    `insert into cuentas (numero_cuenta, tipo, estado, socio_id, agencia_id, saldo_inicial, observaciones_apertura, creado_por_id)
+     values ($1, 'APORTACION', 'ACTIVA', $2, $3, $4, $5, $6)
+     on conflict (numero_cuenta) do update set saldo_inicial = $4, observaciones_apertura = $5`,
+    [numCuentaAportacion, socio.id, data.agenciaId, montoApor, obsApertura, usuarioId],
   );
 
   await registrarAuditoria({ entidad: "Socio", entidadId: socio.id, accion: "CREAR", usuarioId, datosNuevos: socio });
   return socio;
+}
+
+export async function verificarDpi(dpi: string, socioIdActual?: string) {
+  const rawDpi = dpi.replace(/\D/g, "");
+  if (rawDpi.length !== 13) {
+    return { valido: false, mensaje: "El DPI debe contener 13 dígitos numéricos" };
+  }
+  const params: unknown[] = [rawDpi];
+  let query = `select id, nombres, numero_asociado, dpi from socios where regexp_replace(dpi, '[^0-9]', '', 'g') = $1`;
+  if (socioIdActual) {
+    params.push(socioIdActual);
+    query += ` and id != $2`;
+  }
+  query += ` limit 1`;
+
+  const { rows } = await pool.query(query, params);
+  if (rows[0]) {
+    return {
+      valido: true,
+      disponible: false,
+      socio: {
+        id: rows[0].id,
+        nombres: rows[0].nombres,
+        numeroAsociado: rows[0].numero_asociado,
+        dpi: rows[0].dpi,
+      },
+    };
+  }
+  return { valido: true, disponible: true };
 }
 
 export async function actualizar(
@@ -178,17 +265,34 @@ export async function actualizar(
 ): Promise<Socio> {
   const anterior = await obtener(id, agenciaVisibleParaUsuario);
 
+  if (data.dpi && data.dpi.trim()) {
+    const rawDpi = data.dpi.replace(/\D/g, "");
+    if (rawDpi.length === 13) {
+      const { rows: dpiRepetido } = await pool.query(
+        `select dpi, nombres, numero_asociado from socios 
+         where regexp_replace(dpi, '[^0-9]', '', 'g') = $1 and id != $2 limit 1`,
+        [rawDpi, id],
+      );
+      if (dpiRepetido[0]) {
+        throw conflict(
+          `El DPI "${data.dpi.trim()}" ya está registrado para el socio "${dpiRepetido[0].nombres}" (Asociado: ${dpiRepetido[0].numero_asociado}).`,
+        );
+      }
+    }
+  }
+
   const campos: Record<string, unknown> = {
-    nombres: data.nombres,
+    nombres: data.nombres !== undefined ? (data.nombres ? capitalizarNombre(data.nombres) : data.nombres) : undefined,
     genero: data.genero,
     edad: data.edad,
     fecha_ingreso: data.fechaIngreso,
     dpi: data.dpi,
-    direccion: data.direccion,
+    direccion: data.direccion !== undefined ? (data.direccion ? capitalizarDescripcion(data.direccion) : data.direccion) : undefined,
     telefono: data.telefono,
-    nombre_beneficiario: data.nombreBeneficiario,
+    nombre_beneficiario: data.nombreBeneficiario !== undefined ? (data.nombreBeneficiario ? capitalizarNombre(data.nombreBeneficiario) : data.nombreBeneficiario) : undefined,
     dpi_beneficiario: data.dpiBeneficiario,
     telefono_beneficiario: data.telefonoBeneficiario,
+    parentesco_beneficiario: data.parentescoBeneficiario,
     estado: data.estado,
   };
 
@@ -238,16 +342,25 @@ export async function listarAportaciones(params: { agenciaId: string | null; q?:
     condiciones.push(`s.agencia_id = $${valores.length}`);
   }
   if (params.q) {
+    const qClean = params.q.replace(/\D/g, "");
     valores.push(`%${params.q.toLowerCase()}%`);
     const idx = valores.length;
-    condiciones.push(`(lower(s.nombres) like $${idx} or lower(s.numero_asociado) like $${idx} or s.dpi like $${idx})`);
+    if (qClean.length >= 3) {
+      valores.push(`%${qClean}%`);
+      const idxClean = valores.length;
+      condiciones.push(
+        `(lower(s.nombres) like $${idx} or lower(s.numero_asociado) like $${idx} or s.dpi like $${idx} or regexp_replace(coalesce(s.dpi, ''), '[^0-9]', '', 'g') like $${idxClean} or regexp_replace(coalesce(s.telefono, ''), '[^0-9]', '', 'g') like $${idxClean})`,
+      );
+    } else {
+      condiciones.push(`(lower(s.nombres) like $${idx} or lower(s.numero_asociado) like $${idx} or s.dpi like $${idx})`);
+    }
   }
 
   const where = condiciones.length ? `where ${condiciones.join(" and ")}` : "";
 
   const query = `
     select s.id as socio_id, s.numero_asociado, s.nombres, s.dpi, s.edad, s.genero, s.fecha_ingreso, s.direccion, s.telefono,
-           s.nombre_beneficiario, s.dpi_beneficiario, s.telefono_beneficiario, s.estado,
+           s.nombre_beneficiario, s.dpi_beneficiario, s.telefono_beneficiario, s.parentesco_beneficiario, s.estado,
            a.nombre as agencia_nombre,
            coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0) as total_aportaciones
     from socios s

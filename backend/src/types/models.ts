@@ -41,6 +41,7 @@ export interface Socio {
   nombre_beneficiario: string | null;
   dpi_beneficiario: string | null;
   telefono_beneficiario: string | null;
+  parentesco_beneficiario: string | null;
   creado_por_id: string | null;
   created_at: Date;
   updated_at: Date;

@@ -166,7 +166,33 @@ Este documento registra el **avance real y completo** del sistema de la Cooperat
       * **Columna Izquierda:** Cuadrícula de 7 KPIs financieros de alta densidad + Panel de accesos directos de ventanilla y campo (`💵 Ventanilla`, `📂 Kardex Cartera`, `📑 Libro Arqueos`, `👥 Padrón`, `🔒 Plazo Fijo`, `🏛️ Aportaciones`) + Desglose por agencia.
       * **Columna Derecha:** Gráfica interactiva de demanda de servicios en tiempo real alineada a la misma altura, con podio y barras de progreso en Quetzales. Toda la visión operativa se aprecia en una sola pantalla.
     - **Barra Lateral Institucional:** Emblema esmeralda `[M] MIF COOP`, indicador de operatividad `🟢 Agencia Chajul · Activa`, navegación categorizada por áreas de trabajo y tarjeta de usuario con avatar.
-    - **Acabados Fintech y Tablas Nítidas:** Paleta moderna Slate/Esmeralda, microanimaciones de elevación al posar el cursor, y zebra striping suave en tablas para una lectura descansada y profesional.
+
+18. **Eliminación de Colores Claros/Brillantes y Supresión Total del Cambio de Color en Hover:**
+    - **Cero cambio de color al pasar el cursor:** Se eliminó por completo el efecto hover en filas (`tbody tr:hover { background: inherit !important; }`), garantizando una navegación fija y estable sin parpadeos ni destellos claros en ningún módulo (Kardex, Plazos Fijos, Cuentas de Ahorro, Créditos, Socios, Caja).
+    - **Paleta Oscura Uniforme y Descansada:** Se reemplazaron los fondos blancos deslumbrantes en tablas (`#f1f5f9`, `#f8fafc`, `rgba(248, 250, 252, ...)`) por tonos pizarra oscuros consistentes (`--paper: #0b121e`, `--paper-raised: #111a2d`, `--mono-bg: #1e293b`).
+    - **Distintivos y Badges de Estado Nítidos:** Las píldoras de estado (`Activo`, `Liquidado / Pagado`, `Al Día`, `Pendiente`) ahora utilizan fondos traslúcidos oscuros con bordes suaves de color (`.badge.activo`, `.badge.inactivo`, `.badge.danger`, `.badge.info`), eliminando los recuadros blancos que contrastaban negativamente.
+
+19. **Distribución Panorámica Equilibrada y Corrección de Espacios Vacíos en Kardex de Cartera:**
+    - **Alineación Perfecta de Columnas:** Se subsanó la estructura HTML del listado donde una celda externa comprimía los 9 datos en la primera columna, desplazando los encabezados y generando vacíos gigantes a la derecha.
+    - **Ocupación Total del Ancho sin Scroll Horizontal:** Las 9 columnas (`Código/Socio 16%`, `Comunidad 13%`, `Garantía/Fiador 14%`, `Plazo/Vence 10%`, `Valor Crédito 11%`, `Saldo Vivo 11%`, `Cuota Mensual 10%`, `Estado 8%`, `Acción 7%`) cubren el 100% de la pantalla de forma simétrica y limpia, sin huecos vacíos ni barras de desplazamiento innecesarias.
+
+20. **Panel de Supervisión del Jefe de Agencia y Gráfica Segmentada por Categorías:**
+    - **Segmentación Dinámica de Servicios (Drill-Down):** La gráfica del supervisor incorpora un selector de pestañas para alternar entre `🌐 Consolidado General`, `🏦 Ahorros & Plazo Fijo`, `💼 Cartera & Préstamos`, `☕ Caja Chica & Gastos` y `💵 Agente BI & Ventanilla`. Cada categoría recalcula porcentajes, barras y podios de demanda en tiempo real.
+    - **Panel de Control y Auditoría de Jefatura:** Los accesos directos se ajustaron según el rol del usuario; para el Jefe de Agencia se configuraron enlaces de supervisión (`📑 Libro Arqueos`, `🤝 Aprobar Créditos`, `📂 Kardex Cartera`, `👥 Padrón Socios`, `🔒 Plazos Fijos`, `🏛️ Aportaciones`, `📊 Historial Cierres`), excluyendo operaciones de cobro en ventanilla bajo el principio de segregación de funciones.
+    - **Métricas Financieras Vivas en KPIs:** El tablero principal ahora refleja los saldos consolidados reales: Cartera de Crédito activa (Q 15,210,193.13), Plazos Fijos (Q 19,897,503.72), Aportaciones de Capital (Q 11,600.00) y Socios activos (569).
+
+21. **Botones de Reinicio del Sistema a Cero y Recarga de Datos Existentes (Excel):**
+    - **⚠️ Reiniciar a Cero:** Permite vaciar todas las tablas transaccionales (socios, cuentas de ahorro, aportaciones, préstamos, contratos de plazo fijo, movimientos, comprobantes y arqueos de caja) para dejar la base de datos completamente limpia y lista para nuevas pruebas o para iniciar en producción.
+    - **📥 Recargar Datos Existentes (Excel):** Ejecuta la migración automatizada de los libros originales de Excel en menos de 2 segundos, restaurando los 568 asociados, 65 préstamos de cartera viva (Q 15.2M) y 692 certificados de plazo fijo (Q 19.8M).
+    - **Disponibilidad Omnipresente:** Los botones están disponibles en tres ubicaciones estratégicas:
+      1. **En el Menú Lateral (Sidebar):** En una caja permanente titulada `⚙️ Control de Datos`, accesible desde cualquier pantalla del sistema sin importar el rol activo.
+      2. **En el Kardex de Cartera de Préstamos (`/promotor/cartera`):** En la cabecera superior, junto al botón de nueva solicitud e imprimir.
+      3. **En el Tablero Principal (`/tablero`):** En la esquina superior derecha, junto a refrescar.
+
+
+
+
+
 
 
 
@@ -183,10 +209,17 @@ Este documento registra el **avance real y completo** del sistema de la Cooperat
 
 ---
 
-## 3. Hoja de Ruta Inmediata
+## 3. Bitácora de Mejoras Recientes Implementadas
 
-¡Todas las funciones de los 8 libros de Excel de Caja han sido cubiertas e integradas exitosamente!
+Todas las especificaciones operativas y estatutarias acordadas se encuentran documentadas en detalle en [MEJORAS_SISTEMA_MIF.md](file:///Users/galindo/Downloads/mif-app-codigo-ejecutable/MEJORAS_SISTEMA_MIF.md):
 
-- 🎯 **Siguiente etapa (Auxiliar y Promotor):**
-  - Pasar a la revisión e implementación de las herramientas y flujos especializados de **Auxiliar** y **Promotor** según lo que compartas.
+1. **Formato DPI y Detección de Duplicados en Vivo:** Estándar `xxxx-xxxxx-xxxx` con bloqueo al detectar DPIs repetidos.
+2. **Teléfono con WhatsApp (+502):** Conexión directa para notificaciones de apertura de cuenta.
+3. **Parentesco del Beneficiario:** Lista oficial de parentescos en ficha de socio y padrón.
+4. **Aportación Inicial Estatutaria Mínima de Q 100.00:** Validación obligatoria para aperturas de cuentas de ahorro y plazo fijo.
+5. **Autocompletado Inteligente y Corrección de Tildes:** Con respeto a conectores (`de`, `del`, `la`) y borrado fluido.
+6. **Módulo de Ahorro sobre Préstamo (Garantía):** Línea `ASP` con retiros bloqueados ("no se toca") y cobro de cuotas mediante débito.
+7. **Formulario de Créditos Optimizado:** Tipos Fiduciario e Hipotecario, tasa fija al 2.0%, Sobre Saldos, y casillas individuales para fiador.
+8. **Simplificación en Ahorros:** Retiro del campo de justificación de apertura para altas inmediatas.
+9. **Plazo Fijo con Rendimiento Diario Exacto:** Botones `[6%]` (para 6 meses) y `[14%]` (para 12 meses o más), cálculo día por día según calendario real (365 días), retención ISR del 10% y desglose total en pantalla.
 

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { formatoQ } from "../types";
 import type { AportacionSocio } from "../types";
+import { formatearDPI } from "../lib/formatters";
 
 export default function AportacionesList() {
   const [aportaciones, setAportaciones] = useState<AportacionSocio[] | null>(null);
@@ -109,18 +110,19 @@ export default function AportacionesList() {
                     <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>Tel: {a.telefono}</div>
                   )}
                 </td>
-                <td className="mono">{a.dpi ?? "—"}</td>
+                <td className="mono">{a.dpi ? formatearDPI(a.dpi) : "—"}</td>
                 <td className="mono">{a.edad ? `${a.edad} años` : "—"}</td>
                 <td>
                   <span
                     style={{
                       display: "inline-block",
-                      padding: "0.15rem 0.45rem",
+                      padding: "0.15rem 0.5rem",
                       borderRadius: "4px",
                       fontSize: "0.78rem",
                       fontWeight: 600,
-                      background: a.genero === "F" ? "#fdf2f8" : a.genero === "M" ? "#eff6ff" : "transparent",
-                      color: a.genero === "F" ? "#9d174d" : a.genero === "M" ? "#1e40af" : "inherit",
+                      background: "var(--mono-bg)",
+                      color: a.genero === "F" ? "#f472b6" : a.genero === "M" ? "#60a5fa" : "var(--ink-soft)",
+                      border: "1px solid var(--line)",
                     }}
                   >
                     {a.genero === "F" ? "Femenino" : a.genero === "M" ? "Masculino" : "—"}
@@ -131,9 +133,25 @@ export default function AportacionesList() {
                 </td>
                 <td>
                   <strong>{a.nombre_beneficiario ?? "—"}</strong>
+                  {a.parentesco_beneficiario && (
+                    <span
+                      style={{
+                        marginLeft: "0.35rem",
+                        fontSize: "0.74rem",
+                        fontWeight: 600,
+                        padding: "0.1rem 0.35rem",
+                        borderRadius: "4px",
+                        background: "var(--mono-bg)",
+                        border: "1px solid var(--line)",
+                        color: "var(--accent)",
+                      }}
+                    >
+                      {a.parentesco_beneficiario}
+                    </span>
+                  )}
                   {(a.dpi_beneficiario || a.telefono_beneficiario) && (
-                    <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
-                      {a.dpi_beneficiario ? `DPI: ${a.dpi_beneficiario} ` : ""}
+                    <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", marginTop: "0.15rem" }}>
+                      {a.dpi_beneficiario ? `DPI: ${formatearDPI(a.dpi_beneficiario)} ` : ""}
                       {a.telefono_beneficiario ? `· Tel: ${a.telefono_beneficiario}` : ""}
                     </div>
                   )}

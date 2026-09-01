@@ -33,9 +33,26 @@ export interface Socio {
   nombre_beneficiario: string | null;
   dpi_beneficiario?: string | null;
   telefono_beneficiario?: string | null;
+  parentesco_beneficiario?: string | null;
   total_cuentas?: number;
   created_at: string;
 }
+
+export const PARENTESCOS_BENEFICIARIO = [
+  "Cónyuge / Esposo(a)",
+  "Hijo(a)",
+  "Padre / Madre",
+  "Hermano(a)",
+  "Abuelo(a)",
+  "Nieto(a)",
+  "Tío(a)",
+  "Primo(a)",
+  "Sobrino(a)",
+  "Suegro(a)",
+  "Yerno / Nuera",
+  "Amigo(a)",
+  "Otro",
+] as const;
 
 export interface AportacionSocio {
   socio_id: string;
@@ -50,6 +67,7 @@ export interface AportacionSocio {
   nombre_beneficiario: string | null;
   dpi_beneficiario: string | null;
   telefono_beneficiario: string | null;
+  parentesco_beneficiario?: string | null;
   estado: "ACTIVO" | "INACTIVO";
   agencia_nombre: string;
   total_aportaciones: string | number;
@@ -74,6 +92,7 @@ export type TipoCuentaAhorro =
   | "AHORRO_CORRIENTE"
   | "AHORRO_PROGRAMADO"
   | "AHORRO_INFANTO_JUVENIL"
+  | "AHORRO_SOBRE_PRESTAMO"
   | "AHORRO_PLAZO_FIJO";
 
 export interface Cuenta {
@@ -90,6 +109,10 @@ export interface Cuenta {
   saldo_actual: string;
   cuota_pactada?: string | number | null;
   observaciones_apertura?: string | null;
+  prestamo_id?: string | null;
+  prestamo_codigo?: string | null;
+  prestamo_estado?: string | null;
+  prestamo_saldo_capital?: string | number | null;
   creado_por_id?: string | null;
   promotor_nombre?: string | null;
   promotor_email?: string | null;
@@ -136,6 +159,12 @@ export const TIPOS_AHORRO: AhorroTipoConfig[] = [
     slug: "infanto-juvenil",
     titulo: "Ahorro Infanto Juvenil",
     descripcion: "Cuentas de ahorro para niñas, niños y jóvenes asociados.",
+  },
+  {
+    tipo: "AHORRO_SOBRE_PRESTAMO",
+    slug: "sobre-prestamo",
+    titulo: "Ahorro sobre Préstamo",
+    descripcion: "Cuenta en garantía de crédito; no se toca hasta que concluye el pago del préstamo.",
   },
   {
     tipo: "AHORRO_PLAZO_FIJO",
@@ -216,6 +245,9 @@ export interface ResumenAgencia {
   ahorroCorriente: { totalCuentas: number; saldoTotal: number };
   ahorroProgramado: { totalCuentas: number; saldoTotal: number };
   ahorroInfantoJuvenil: { totalCuentas: number; saldoTotal: number };
+  carteraPrestamos?: { count: number; saldo: number };
+  plazoFijo?: { count: number; monto: number };
+  aportaciones?: { count: number; saldo: number };
   totalSocios: number;
   movimientosHoy: number;
 }
@@ -226,6 +258,9 @@ export interface ResumenDashboard {
     ahorroCorriente: number;
     ahorroProgramado: number;
     ahorroInfantoJuvenil: number;
+    carteraPrestamos?: { count: number; saldo: number };
+    plazoFijo?: { count: number; monto: number };
+    aportaciones?: { count: number; saldo: number };
     totalSocios: number;
     movimientosHoy: number;
   };
@@ -244,9 +279,11 @@ export type CajaCategoria =
   | "DEPOSITO_AHORRO_CORRIENTE"
   | "DEPOSITO_AHORRO_PROGRAMADO"
   | "DEPOSITO_AHORRO_INFANTO_JUVENIL"
+  | "DEPOSITO_AHORRO_SOBRE_PRESTAMO"
   | "RETIRO_AHORRO_CORRIENTE"
   | "RETIRO_AHORRO_PROGRAMADO"
   | "RETIRO_AHORRO_INFANTO_JUVENIL"
+  | "RETIRO_AHORRO_SOBRE_PRESTAMO"
   | "DEPOSITO_PLAZO_FIJO"
   | "RETIRO_PLAZO_FIJO"
   | "APORTACION"
@@ -295,6 +332,12 @@ export const CATEGORIAS_AUXILIAR: Record<CajaCategoria, CategoriaAuxiliarInfo> =
     descripcion: "Depósito de Ahorro Infanto Juvenil",
     requiereCuenta: "AHORRO_INFANTO_JUVENIL",
   },
+  DEPOSITO_AHORRO_SOBRE_PRESTAMO: {
+    seccion: "PROPIO",
+    tipo: "INGRESO",
+    descripcion: "Depósito Ahorro sobre Préstamo (Garantía)",
+    requiereCuenta: "AHORRO_SOBRE_PRESTAMO",
+  },
   RETIRO_AHORRO_CORRIENTE: {
     seccion: "PROPIO",
     tipo: "EGRESO",
@@ -312,6 +355,12 @@ export const CATEGORIAS_AUXILIAR: Record<CajaCategoria, CategoriaAuxiliarInfo> =
     tipo: "EGRESO",
     descripcion: "Retiro de Ahorro Infanto Juvenil",
     requiereCuenta: "AHORRO_INFANTO_JUVENIL",
+  },
+  RETIRO_AHORRO_SOBRE_PRESTAMO: {
+    seccion: "PROPIO",
+    tipo: "EGRESO",
+    descripcion: "Retiro Ahorro sobre Préstamo (Garantía)",
+    requiereCuenta: "AHORRO_SOBRE_PRESTAMO",
   },
 
   DEPOSITO_PLAZO_FIJO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Depósito a Plazo Fijo", requiereSocio: true, sinModuloReal: true },
@@ -452,6 +501,8 @@ export interface Prestamo {
   garantia: string | null;
   ubicacion_garantia?: string | null;
   nombre_fiador?: string | null;
+  dpi_fiador?: string | null;
+  telefono_fiador?: string | null;
   documento_desembolso?: string | null;
   observaciones: string | null;
   fecha_solicitud: string;
@@ -561,6 +612,7 @@ export interface ResultadoSimulacionPF {
   isrPorcentaje: number;
   fechaInicio: string;
   fechaVencimiento: string;
+  diasExactos: number;
   interesGenerado: number;
   isrRetencion: number;
   interesNeto: number;

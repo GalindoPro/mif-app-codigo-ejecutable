@@ -74,9 +74,12 @@ const crearSchema = z.object({
   garantia: z.string().optional(),
   ubicacionGarantia: z.string().optional().nullable(),
   nombreFiador: z.string().optional().nullable(),
+  dpiFiador: z.string().optional().nullable(),
+  telefonoFiador: z.string().optional().nullable(),
   documentoDesembolso: z.string().optional().nullable(),
   observaciones: z.string().optional(),
   fechaSolicitud: z.string().optional(),
+  crearCuentaAhorroSobrePrestamo: z.boolean().optional(),
 });
 
 prestamosRouter.post(

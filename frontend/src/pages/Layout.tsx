@@ -1,10 +1,56 @@
+import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ROL_LABEL, TIPOS_AHORRO } from "../types";
+import { api, mensajeError } from "../lib/api";
 
 export default function Layout() {
   const { usuario, logout } = useAuth();
   const navigate = useNavigate();
+  const [reseteando, setReseteando] = useState(false);
+  const [recargando, setRecargando] = useState(false);
+
+  async function handleResetGlobal() {
+    const confirmado = window.confirm(
+      "⚠️ ¿Estás seguro de que deseas REINICIAR EL SISTEMA DESDE CERO?\n\n" +
+      "Esta acción vaciará todas las tablas (socios, créditos, ahorros, movimientos, cajas) para empezar limpio."
+    );
+    if (!confirmado) return;
+
+    setReseteando(true);
+    try {
+      const { data } = await api.post<{ ok: boolean; mensaje: string }>("/sistema/reset");
+      alert(data.mensaje);
+      window.location.reload();
+    } catch (err) {
+      alert(mensajeError(err));
+    } finally {
+      setReseteando(false);
+    }
+  }
+
+  async function handleRecargarGlobal() {
+    const confirmado = window.confirm(
+      "📥 ¿Deseas RECARGAR TODOS LOS DATOS EXISTENTES de los libros Excel?\n\n" +
+      "Esta acción restaurará la base de datos oficial:\n" +
+      "• 568 asociados con sus aportaciones\n" +
+      "• 65 préstamos de cartera viva\n" +
+      "• 692 certificados de plazo fijo"
+    );
+    if (!confirmado) return;
+
+    setRecargando(true);
+    try {
+      const { data } = await api.post<{ ok: boolean; mensaje: string }>("/sistema/recargar-datos");
+      alert(data.mensaje);
+      window.location.reload();
+    } catch (err) {
+      alert(mensajeError(err));
+    } finally {
+      setRecargando(false);
+    }
+  }
+
   const cls = ({ isActive }: { isActive: boolean }) => (isActive ? "active" : "");
 
   return (
@@ -195,6 +241,69 @@ export default function Layout() {
             </>
           )}
         </nav>
+
+        {/* Herramientas de Mantenimiento de Datos (Visible en todo el sistema) */}
+        <div
+          style={{
+            margin: "0.5rem 0.25rem 0.75rem",
+            padding: "0.55rem 0.5rem",
+            background: "rgba(2, 132, 199, 0.08)",
+            borderRadius: "8px",
+            border: "1px solid rgba(2, 132, 199, 0.25)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              color: "#38bdf8",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              marginBottom: "0.4rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.3rem",
+            }}
+          >
+            ⚙️ Control de Datos
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={handleRecargarGlobal}
+              disabled={recargando || reseteando}
+              style={{
+                fontSize: "0.72rem",
+                padding: "0.35rem 0.45rem",
+                width: "100%",
+                justifyContent: "center",
+                borderColor: "rgba(2, 132, 199, 0.4)",
+                color: "#38bdf8",
+                fontWeight: 600,
+              }}
+              title="Restaurar los 568 socios, 65 créditos y 692 plazos fijos de Excel"
+            >
+              {recargando ? "⏳ Recargando..." : "📥 Recargar Excel"}
+            </button>
+            <button
+              type="button"
+              className="btn danger"
+              onClick={handleResetGlobal}
+              disabled={reseteando || recargando}
+              style={{
+                fontSize: "0.72rem",
+                padding: "0.35rem 0.45rem",
+                width: "100%",
+                justifyContent: "center",
+                fontWeight: 600,
+              }}
+              title="Borrar todos los datos y reiniciar el sistema limpio desde cero"
+            >
+              {reseteando ? "⏳ Reiniciando..." : "⚠️ Reiniciar a Cero"}
+            </button>
+          </div>
+        </div>
 
         <div className="sidebar-footer" style={{ padding: "0.75rem 0.5rem", background: "var(--mono-bg)", borderRadius: "8px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>

@@ -28,7 +28,7 @@ exception when duplicate_object then null; end $$;
 do $$ begin
   create type tipo_cuenta as enum (
     'APORTACION', 'AHORRO_CORRIENTE', 'AHORRO_PROGRAMADO',
-    'AHORRO_INFANTO_JUVENIL', 'AHORRO_PLAZO_FIJO'
+    'AHORRO_INFANTO_JUVENIL', 'AHORRO_PLAZO_FIJO', 'AHORRO_SOBRE_PRESTAMO'
   );
 exception when duplicate_object then null; end $$;
 
@@ -143,6 +143,7 @@ create table if not exists socios (
   nombre_beneficiario  text,
   dpi_beneficiario     text,
   telefono_beneficiario text,
+  parentesco_beneficiario text,
   creado_por_id        uuid references usuarios(id),
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
@@ -153,6 +154,7 @@ create index if not exists idx_socios_nombres on socios using gin (to_tsvector('
 alter table socios add column if not exists edad integer;
 alter table socios add column if not exists dpi_beneficiario text;
 alter table socios add column if not exists telefono_beneficiario text;
+alter table socios add column if not exists parentesco_beneficiario text;
 
 -- ---------------------------------------------------------------------------
 -- Cuentas y movimientos
@@ -167,15 +169,19 @@ create table if not exists cuentas (
   saldo_inicial          numeric(14,2) not null default 0,
   cuota_pactada          numeric(14,2),
   observaciones_apertura text,
+  prestamo_id            uuid references prestamos(id) on delete set null,
   creado_por_id          uuid references usuarios(id),
   created_at             timestamptz not null default now(),
   updated_at             timestamptz not null default now()
 );
 create index if not exists idx_cuentas_socio on cuentas(socio_id);
 create index if not exists idx_cuentas_agencia_tipo on cuentas(agencia_id, tipo);
+create index if not exists idx_cuentas_prestamo on cuentas(prestamo_id);
 
+alter type tipo_cuenta add value if not exists 'AHORRO_SOBRE_PRESTAMO';
 alter table cuentas add column if not exists cuota_pactada numeric(14,2);
 alter table cuentas add column if not exists observaciones_apertura text;
+alter table cuentas add column if not exists prestamo_id uuid references prestamos(id) on delete set null;
 alter table cuentas add column if not exists creado_por_id uuid references usuarios(id);
 
 -- El saldo de una cuenta NUNCA se guarda como campo fijo: se calcula sumando
@@ -371,6 +377,8 @@ create index if not exists idx_prestamos_estado on prestamos(estado);
 alter table prestamos add column if not exists saldo_capital numeric(14,2);
 alter table prestamos add column if not exists ubicacion_garantia text;
 alter table prestamos add column if not exists nombre_fiador text;
+alter table prestamos add column if not exists dpi_fiador text;
+alter table prestamos add column if not exists telefono_fiador text;
 alter table prestamos add column if not exists documento_desembolso text;
 alter table prestamos add column if not exists fecha_vencimiento date;
 

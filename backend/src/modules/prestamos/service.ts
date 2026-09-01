@@ -1,6 +1,7 @@
 import { pool } from "../../db/pool";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden } from "../../utils/errors";
+import * as cuentasService from "../cuentas/service";
 import { calcularAmortizacion } from "./amortizacion";
 import type { OpcionesSimulacion } from "./amortizacion";
 import type {
@@ -49,9 +50,18 @@ export async function listar(params: {
     condiciones.push(`p.estado = $${valores.length}`);
   }
   if (params.q) {
+    const qClean = params.q.replace(/\D/g, "");
     valores.push(`%${params.q.toLowerCase()}%`);
     const idx = valores.length;
-    condiciones.push(`(lower(s.nombres) like $${idx} or lower(p.codigo) like $${idx} or s.dpi like $${idx})`);
+    if (qClean.length >= 3) {
+      valores.push(`%${qClean}%`);
+      const idxClean = valores.length;
+      condiciones.push(
+        `(lower(s.nombres) like $${idx} or lower(p.codigo) like $${idx} or s.dpi like $${idx} or regexp_replace(coalesce(s.dpi, ''), '[^0-9]', '', 'g') like $${idxClean})`,
+      );
+    } else {
+      condiciones.push(`(lower(s.nombres) like $${idx} or lower(p.codigo) like $${idx} or s.dpi like $${idx})`);
+    }
   }
 
   const where = condiciones.length ? `where ${condiciones.join(" and ")}` : "";
@@ -118,9 +128,12 @@ export interface DatosCrearPrestamo {
   garantia?: string;
   ubicacionGarantia?: string | null;
   nombreFiador?: string | null;
+  dpiFiador?: string | null;
+  telefonoFiador?: string | null;
   documentoDesembolso?: string | null;
   observaciones?: string;
   fechaSolicitud?: string;
+  crearCuentaAhorroSobrePrestamo?: boolean;
 }
 
 export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
@@ -128,7 +141,7 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
   if (data.plazoMeses < 1) throw badRequest("El plazo debe ser de al menos 1 mes");
 
   const tasa = data.tasaInteresMensual !== undefined ? Number(data.tasaInteresMensual) : 2.0;
-  const tipoAmort = data.tipoAmortizacion ?? "CUOTA_NIVELADA";
+  const tipoAmort = data.tipoAmortizacion ?? "SOBRE_SALDOS";
 
   const sim = calcularAmortizacion({
     monto: data.montoSolicitado,
@@ -144,8 +157,8 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
     `insert into prestamos (
        codigo, socio_id, agencia_id, promotor_id, tipo, estado,
        tipo_amortizacion, monto_solicitado, monto_aprobado, saldo_capital, tasa_interes_mensual,
-       plazo_meses, cuota_mensual, destino, garantia, ubicacion_garantia, nombre_fiador, documento_desembolso, observaciones, fecha_solicitud
-     ) values ($1, $2, $3, $4, $5, 'SOLICITUD', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+       plazo_meses, cuota_mensual, destino, garantia, ubicacion_garantia, nombre_fiador, dpi_fiador, telefono_fiador, documento_desembolso, observaciones, fecha_solicitud
+     ) values ($1, $2, $3, $4, $5, 'SOLICITUD', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
      returning *`,
     [
       codigo,
@@ -164,6 +177,8 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
       data.garantia ?? null,
       data.ubicacionGarantia ?? null,
       data.nombreFiador ?? null,
+      data.dpiFiador ?? null,
+      data.telefonoFiador ?? null,
       data.documentoDesembolso ?? null,
       data.observaciones ?? null,
       data.fechaSolicitud || new Date().toISOString().slice(0, 10),
@@ -171,6 +186,28 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
   );
 
   const prestamo = rows[0];
+
+  // Si se solicitó, abrir automáticamente la cuenta de Ahorro sobre Préstamo
+  if (data.crearCuentaAhorroSobrePrestamo) {
+    try {
+      const { numeroCuenta } = await cuentasService.siguienteNumero(data.agenciaId, "AHORRO_SOBRE_PRESTAMO");
+      await pool.query(
+        `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, observaciones_apertura, prestamo_id, creado_por_id)
+         values ($1, 'AHORRO_SOBRE_PRESTAMO', $2, $3, 0, $4, $5, $6)
+         on conflict do nothing`,
+        [
+          numeroCuenta,
+          data.socioId,
+          data.agenciaId,
+          `Cuenta de ahorro en garantía vinculada al crédito ${prestamo.codigo}`,
+          prestamo.id,
+          usuarioId,
+        ],
+      );
+    } catch (err) {
+      console.error("Error al crear automáticamente cuenta de ahorro sobre préstamo:", err);
+    }
+  }
 
   await registrarAuditoria({
     entidad: "Prestamo",

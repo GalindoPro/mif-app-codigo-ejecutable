@@ -154,29 +154,15 @@ export default function CreditosList() {
                 <td>{p.promotor_nombre ?? <span style={{ color: "var(--ink-soft)" }}>—</span>}</td>
                 <td>
                   <span
-                    style={{
-                      display: "inline-block",
-                      padding: "0.2rem 0.55rem",
-                      borderRadius: "6px",
-                      fontSize: "0.8rem",
-                      fontWeight: 600,
-                      background:
-                        p.estado === "DESEMBOLSADO"
-                          ? "#ecfdf5"
-                          : p.estado === "APROBADO"
-                            ? "#eff6ff"
-                            : p.estado === "SOLICITUD"
-                              ? "#fef3c7"
-                              : "#f1f5f9",
-                      color:
-                        p.estado === "DESEMBOLSADO"
-                          ? "#065f46"
-                          : p.estado === "APROBADO"
-                            ? "#1e40af"
-                            : p.estado === "SOLICITUD"
-                              ? "#92400e"
-                              : "#475569",
-                    }}
+                    className={`badge ${
+                      p.estado === "DESEMBOLSADO"
+                        ? "activo"
+                        : p.estado === "APROBADO"
+                          ? "info"
+                          : p.estado === "SOLICITUD"
+                            ? "warning"
+                            : "inactivo"
+                    }`}
                   >
                     {ESTADO_PRESTAMO_LABEL[p.estado]}
                   </span>

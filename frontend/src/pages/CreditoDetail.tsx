@@ -8,6 +8,7 @@ import {
   TIPO_PRESTAMO_LABEL,
 } from "../types";
 import type { EstadoPrestamo, Prestamo, PrestamoPago } from "../types";
+import { formatearDPI } from "../lib/formatters";
 
 export default function CreditoDetail() {
   const { id } = useParams<{ id: string }>();
@@ -77,27 +78,18 @@ export default function CreditoDetail() {
 
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
           <span
+            className={`badge ${
+              prestamo.estado === "DESEMBOLSADO"
+                ? "activo"
+                : prestamo.estado === "APROBADO"
+                  ? "info"
+                  : prestamo.estado === "SOLICITUD"
+                    ? "warning"
+                    : "inactivo"
+            }`}
             style={{
               padding: "0.35rem 0.8rem",
-              borderRadius: "8px",
-              fontWeight: 700,
               fontSize: "0.9rem",
-              background:
-                prestamo.estado === "DESEMBOLSADO"
-                  ? "#ecfdf5"
-                  : prestamo.estado === "APROBADO"
-                    ? "#eff6ff"
-                    : prestamo.estado === "SOLICITUD"
-                      ? "#fef3c7"
-                      : "#f1f5f9",
-              color:
-                prestamo.estado === "DESEMBOLSADO"
-                  ? "#065f46"
-                  : prestamo.estado === "APROBADO"
-                    ? "#1e40af"
-                    : prestamo.estado === "SOLICITUD"
-                      ? "#92400e"
-                      : "#475569",
             }}
           >
             {ESTADO_PRESTAMO_LABEL[prestamo.estado]}
@@ -207,10 +199,28 @@ export default function CreditoDetail() {
             <dd className="mono" style={{ margin: 0 }}>{prestamo.numero_asociado ?? "—"}</dd>
 
             <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>DPI</dt>
-            <dd className="mono" style={{ margin: 0 }}>{prestamo.socio_dpi ?? "—"}</dd>
+            <dd className="mono" style={{ margin: 0 }}>{prestamo.socio_dpi ? formatearDPI(prestamo.socio_dpi) : "—"}</dd>
 
             <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Teléfono</dt>
-            <dd style={{ margin: 0 }}>{prestamo.socio_telefono ?? "—"}</dd>
+            <dd style={{ margin: 0 }}>
+              {prestamo.socio_telefono ? (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span className="mono">{prestamo.socio_telefono}</span>
+                  <a
+                    href={`https://wa.me/${prestamo.socio_telefono.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn secondary"
+                    style={{ padding: "0.15rem 0.45rem", fontSize: "0.75rem", borderRadius: "4px" }}
+                    title="Enviar WhatsApp"
+                  >
+                    💬 WhatsApp
+                  </a>
+                </span>
+              ) : (
+                "—"
+              )}
+            </dd>
 
             <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Dirección</dt>
             <dd style={{ margin: 0 }}>{prestamo.socio_direccion ?? "—"}</dd>
@@ -232,8 +242,66 @@ export default function CreditoDetail() {
             <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Promotor</dt>
             <dd style={{ margin: 0 }}>{prestamo.promotor_nombre ? `${prestamo.promotor_nombre}` : "Sin promotor"}</dd>
 
-            <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Garantía / Fiador</dt>
-            <dd style={{ margin: 0 }}>{prestamo.garantia || "Sin garantía registrada"}</dd>
+            {prestamo.tipo === "FIDUCIARIO" ? (
+              <>
+                <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Fiador</dt>
+                <dd style={{ margin: 0, fontWeight: 600 }}>{prestamo.nombre_fiador || prestamo.garantia || "Sin fiador registrado"}</dd>
+
+                {prestamo.dpi_fiador && (
+                  <>
+                    <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>DPI Fiador</dt>
+                    <dd className="mono" style={{ margin: 0 }}>{formatearDPI(prestamo.dpi_fiador)}</dd>
+                  </>
+                )}
+
+                {prestamo.telefono_fiador && (
+                  <>
+                    <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Teléfono Fiador</dt>
+                    <dd style={{ margin: 0 }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span className="mono">{prestamo.telefono_fiador}</span>
+                        <a
+                          href={`https://wa.me/${prestamo.telefono_fiador.replace(/\D/g, "")}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn secondary"
+                          style={{ padding: "0.15rem 0.45rem", fontSize: "0.75rem", borderRadius: "4px" }}
+                          title="Enviar WhatsApp al fiador"
+                        >
+                          💬 WhatsApp
+                        </a>
+                      </span>
+                    </dd>
+                  </>
+                )}
+
+                {prestamo.ubicacion_garantia && (
+                  <>
+                    <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Lugar / Trabajo</dt>
+                    <dd style={{ margin: 0 }}>{prestamo.ubicacion_garantia}</dd>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Garantía Inmueble</dt>
+                <dd style={{ margin: 0 }}>{prestamo.garantia || "Sin descripción"}</dd>
+
+                {prestamo.documento_desembolso && (
+                  <>
+                    <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Finca / Folio / Doc.</dt>
+                    <dd className="mono" style={{ margin: 0 }}>{prestamo.documento_desembolso}</dd>
+                  </>
+                )}
+
+                {prestamo.ubicacion_garantia && (
+                  <>
+                    <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Ubicación</dt>
+                    <dd style={{ margin: 0 }}>{prestamo.ubicacion_garantia}</dd>
+                  </>
+                )}
+              </>
+            )}
 
             <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Fecha solicitud</dt>
             <dd className="mono" style={{ margin: 0 }}>

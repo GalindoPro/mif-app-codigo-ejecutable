@@ -7,10 +7,17 @@ import BuscadorSocio from "../components/BuscadorSocio";
 import type {
   Agencia,
   Socio,
-  TipoAmortizacion,
   TipoPrestamo,
   UsuarioItem,
 } from "../types";
+import {
+  capitalizarDescripcion,
+  formatearDPI,
+  formatearTelefono,
+  limpiarDPI,
+  prepararTelefonoParaGuardar,
+} from "../lib/formatters";
+import InputNombreAutoCompletar from "../components/InputNombreAutoCompletar";
 
 export default function CreditoForm() {
   const { usuario } = useAuth();
@@ -26,17 +33,16 @@ export default function CreditoForm() {
   const [socio, setSocio] = useState<Socio | null>(null);
   const [promotorId, setPromotorId] = useState(usuario?.rol === "PROMOTOR" ? usuario.id : "");
   const [tipo, setTipo] = useState<TipoPrestamo>("FIDUCIARIO");
-  const [tipoAmortizacion, setTipoAmortizacion] = useState<TipoAmortizacion>(
-    (searchParams.get("tipoAmort") as TipoAmortizacion) || "CUOTA_NIVELADA",
-  );
   const [montoSolicitado, setMontoSolicitado] = useState(searchParams.get("monto") || "10000");
   const [plazoMeses, setPlazoMeses] = useState(searchParams.get("plazo") || "12");
-  const [tasaInteresMensual, setTasaInteresMensual] = useState(searchParams.get("tasa") || "2.0");
   const [destino, setDestino] = useState("Capital de trabajo / Comercio");
   const [garantia, setGarantia] = useState("");
   const [ubicacionGarantia, setUbicacionGarantia] = useState("");
   const [nombreFiador, setNombreFiador] = useState("");
-  const [observaciones, setObservaciones] = useState("");
+  const [dpiFiador, setDpiFiador] = useState("");
+  const [telefonoFiador, setTelefonoFiador] = useState("");
+  const [documentoDesembolso, setDocumentoDesembolso] = useState("");
+  const [crearCuentaAhorro, setCrearCuentaAhorro] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -72,15 +78,23 @@ export default function CreditoForm() {
         socioId: socio.id,
         promotorId: promotorId || undefined,
         tipo,
-        tipoAmortizacion,
+        tipoAmortizacion: "SOBRE_SALDOS",
         montoSolicitado: Number(montoSolicitado),
         plazoMeses: Number(plazoMeses),
-        tasaInteresMensual: Number(tasaInteresMensual),
+        tasaInteresMensual: 2.0,
         destino: destino || undefined,
-        garantia: garantia || undefined,
+        garantia:
+          tipo === "FIDUCIARIO"
+            ? nombreFiador
+              ? `Fiador: ${nombreFiador}${dpiFiador ? `, DPI: ${dpiFiador}` : ""}${telefonoFiador ? `, Tel: ${telefonoFiador}` : ""}`
+              : undefined
+            : garantia || undefined,
         ubicacionGarantia: ubicacionGarantia || undefined,
-        nombreFiador: nombreFiador || undefined,
-        observaciones: observaciones || undefined,
+        nombreFiador: tipo === "FIDUCIARIO" ? nombreFiador || undefined : undefined,
+        dpiFiador: tipo === "FIDUCIARIO" ? (dpiFiador ? limpiarDPI(dpiFiador) : undefined) : undefined,
+        telefonoFiador: tipo === "FIDUCIARIO" ? (telefonoFiador ? prepararTelefonoParaGuardar(telefonoFiador) : undefined) : undefined,
+        documentoDesembolso: tipo === "HIPOTECARIO" ? documentoDesembolso || undefined : undefined,
+        crearCuentaAhorroSobrePrestamo: crearCuentaAhorro,
       });
       navigate(`/creditos/${data.id}`);
     } catch (err) {
@@ -141,8 +155,8 @@ export default function CreditoForm() {
           <div className="field">
             <label htmlFor="cred-tipo">Tipo de crédito</label>
             <select id="cred-tipo" value={tipo} onChange={(e) => setTipo(e.target.value as TipoPrestamo)}>
-              <option value="FIDUCIARIO">Fiduciario (con fiador)</option>
-              <option value="HIPOTECARIO">Hipotecario (con bien inmueble)</option>
+              <option value="FIDUCIARIO">Fiduciario</option>
+              <option value="HIPOTECARIO">Hipotecario</option>
             </select>
           </div>
 
@@ -173,27 +187,36 @@ export default function CreditoForm() {
           </div>
 
           <div className="field">
-            <label htmlFor="cred-tasa">Tasa de interés mensual (%)</label>
+            <label htmlFor="cred-tasa">Tasa de interés mensual</label>
             <input
               id="cred-tasa"
-              type="number"
-              step="0.1"
-              value={tasaInteresMensual}
-              onChange={(e) => setTasaInteresMensual(e.target.value)}
-              required
+              value="2.0% mensual"
+              readOnly
+              disabled
+              style={{
+                background: "rgba(0,0,0,0.06)",
+                cursor: "not-allowed",
+                fontWeight: 700,
+                color: "var(--ink)",
+              }}
             />
-            <span className="hint">MIF estándar: 2.0% mensual</span>
+            <span className="hint">🔒 Tasa oficial cooperativa: 2.0% mensual fija</span>
           </div>
 
           <div className="field">
             <label>Sistema de amortización</label>
-            <select
-              value={tipoAmortizacion}
-              onChange={(e) => setTipoAmortizacion(e.target.value as TipoAmortizacion)}
-            >
-              <option value="CUOTA_NIVELADA">Cuota Nivelada (Fija)</option>
-              <option value="SOBRE_SALDOS">Sobre Saldos (Capital constante)</option>
-            </select>
+            <input
+              value="Sobre saldos (Capital constante)"
+              readOnly
+              disabled
+              style={{
+                background: "rgba(0,0,0,0.06)",
+                cursor: "not-allowed",
+                fontWeight: 700,
+                color: "var(--ink)",
+              }}
+            />
+            <span className="hint">🔒 Sistema oficial MIF: Amortización sobre saldos</span>
           </div>
 
           <div className="field" style={{ gridColumn: "1 / -1" }}>
@@ -201,76 +224,168 @@ export default function CreditoForm() {
             <input
               id="cred-destino"
               value={destino}
-              onChange={(e) => setDestino(e.target.value)}
+              onChange={(e) => setDestino(capitalizarDescripcion(e.target.value))}
               placeholder="Ej. Compra de mercadería para tienda, abono agrícola, etc."
             />
           </div>
 
-          <div className="field" style={{ gridColumn: "1 / -1" }}>
-            <label htmlFor="cred-garantia">
-              {tipo === "FIDUCIARIO" ? "Datos del fiador / Garantía fiduciaria" : "Datos de la garantía hipotecaria"}
-            </label>
-            <textarea
-              id="cred-garantia"
-              rows={2}
-              value={garantia}
-              onChange={(e) => setGarantia(e.target.value)}
-              placeholder={
-                tipo === "FIDUCIARIO"
-                  ? "Nombre del fiador, DPI, teléfono, lugar de trabajo o ingresos..."
-                  : "Número de finca, folio, libro, ubicación del inmueble, valor estimado..."
-              }
-              style={{
-                border: "1px solid var(--line)",
-                borderRadius: "8px",
-                padding: "0.55rem",
-                background: "var(--paper)",
-                color: "var(--ink)",
-                fontFamily: "inherit",
-              }}
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="cred-ubicacion">Ubicación de garantía / Comunidad</label>
-            <input
-              id="cred-ubicacion"
-              value={ubicacionGarantia}
-              onChange={(e) => setUbicacionGarantia(e.target.value)}
-              placeholder="Ej. Cantón Ilom, Aldea Campo Alegre, Chajul"
-            />
-            <span className="hint">Identifica la comunidad para la visita y el Kardex del Promotor</span>
-          </div>
-
           {tipo === "FIDUCIARIO" && (
-            <div className="field">
-              <label htmlFor="cred-fiador">Nombre del Fiador Principal</label>
-              <input
-                id="cred-fiador"
-                value={nombreFiador}
-                onChange={(e) => setNombreFiador(e.target.value)}
-                placeholder="Nombre completo del fiador"
-              />
+            <div
+              style={{
+                gridColumn: "1 / -1",
+                background: "var(--paper-raised)",
+                border: "1px solid var(--line)",
+                borderRadius: "10px",
+                padding: "1rem 1.25rem",
+                marginTop: "0.25rem",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.85rem" }}>
+                <span style={{ fontSize: "1.15rem" }}>👤</span>
+                <h3 style={{ margin: 0, fontSize: "1rem", color: "var(--ink)", fontWeight: 700 }}>
+                  Datos del Fiador (Garantía Fiduciaria)
+                </h3>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem" }}>
+                <div className="field">
+                  <label htmlFor="fiador-nombre">Nombre completo del fiador</label>
+                  <InputNombreAutoCompletar
+                    id="fiador-nombre"
+                    value={nombreFiador}
+                    onChange={setNombreFiador}
+                    placeholder="Ej. Juan Escobar del Barrio"
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="fiador-dpi">No. de DPI del fiador</label>
+                  <input
+                    id="fiador-dpi"
+                    value={dpiFiador}
+                    onChange={(e) => setDpiFiador(formatearDPI(e.target.value))}
+                    placeholder="xxxx-xxxxx-xxxx (13 dígitos)"
+                    maxLength={15}
+                  />
+                  <span className="hint">{limpiarDPI(dpiFiador).length}/13 dígitos</span>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="fiador-tel">Teléfono del fiador</label>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <span
+                      style={{
+                        padding: "0.55rem 0.65rem",
+                        background: "rgba(0,0,0,0.05)",
+                        border: "1px solid var(--line)",
+                        borderRight: "none",
+                        borderRadius: "8px 0 0 8px",
+                        fontSize: "0.85rem",
+                        color: "var(--ink-soft)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      +502
+                    </span>
+                    <input
+                      id="fiador-tel"
+                      value={telefonoFiador}
+                      onChange={(e) => setTelefonoFiador(formatearTelefono(e.target.value))}
+                      placeholder="xxxx-xxxx"
+                      maxLength={9}
+                      style={{ borderRadius: "0 8px 8px 0" }}
+                    />
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="fiador-lugar">Lugar / Comunidad o Trabajo del fiador</label>
+                  <input
+                    id="fiador-lugar"
+                    value={ubicacionGarantia}
+                    onChange={(e) => setUbicacionGarantia(capitalizarDescripcion(e.target.value))}
+                    placeholder="Ej. Cantón Ilom, Chajul"
+                  />
+                </div>
+              </div>
             </div>
           )}
 
-          <div className="field" style={{ gridColumn: "1 / -1" }}>
-            <label htmlFor="cred-observaciones">Observaciones adicionales</label>
-            <textarea
-              id="cred-observaciones"
-              rows={2}
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
-              placeholder="Notas de evaluación del promotor..."
+          {tipo === "HIPOTECARIO" && (
+            <div
               style={{
+                gridColumn: "1 / -1",
+                background: "var(--paper-raised)",
                 border: "1px solid var(--line)",
-                borderRadius: "8px",
-                padding: "0.55rem",
-                background: "var(--paper)",
-                color: "var(--ink)",
-                fontFamily: "inherit",
+                borderRadius: "10px",
+                padding: "1rem 1.25rem",
+                marginTop: "0.25rem",
               }}
-            />
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.85rem" }}>
+                <span style={{ fontSize: "1.15rem" }}>🏡</span>
+                <h3 style={{ margin: 0, fontSize: "1rem", color: "var(--ink)", fontWeight: 700 }}>
+                  Datos de la Garantía Hipotecaria (Bien Inmueble)
+                </h3>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem" }}>
+                <div className="field" style={{ gridColumn: "1 / -1" }}>
+                  <label htmlFor="hip-desc">Descripción del bien inmueble o terreno</label>
+                  <input
+                    id="hip-desc"
+                    value={garantia}
+                    onChange={(e) => setGarantia(capitalizarDescripcion(e.target.value))}
+                    placeholder="Ej. Terreno de 20x30 mts con cultivo de café y construcción de block"
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="hip-doc">No. de Finca / Folio / Libro (o Título de posesión)</label>
+                  <input
+                    id="hip-doc"
+                    value={documentoDesembolso}
+                    onChange={(e) => setDocumentoDesembolso(e.target.value)}
+                    placeholder="Ej. Finca 1245, Folio 45, Libro 89 de El Quiché"
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="hip-lugar">Ubicación / Comunidad del inmueble</label>
+                  <input
+                    id="hip-lugar"
+                    value={ubicacionGarantia}
+                    onChange={(e) => setUbicacionGarantia(capitalizarDescripcion(e.target.value))}
+                    placeholder="Ej. Aldea Xolcuay, Chajul, Quiché"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div
+            className="field"
+            style={{
+              gridColumn: "1 / -1",
+              background: "rgba(16, 185, 129, 0.08)",
+              border: "1px solid rgba(16, 185, 129, 0.3)",
+              borderRadius: "8px",
+              padding: "0.85rem 1rem",
+            }}
+          >
+            <label style={{ display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", fontWeight: 700, color: "#065f46" }}>
+              <input
+                type="checkbox"
+                checked={crearCuentaAhorro}
+                onChange={(e) => setCrearCuentaAhorro(e.target.checked)}
+                style={{ width: "1.15rem", height: "1.15rem" }}
+              />
+              🛡️ Apertura automática de Cuenta de Ahorro sobre Préstamo (Garantía de Crédito)
+            </label>
+            <p style={{ margin: "0.4rem 0 0 1.75rem", fontSize: "0.82rem", color: "var(--ink-soft)", lineHeight: 1.4 }}>
+              Abre automáticamente una cuenta de ahorro vinculada a este crédito. Los fondos permanecerán bloqueados (no se tocan)
+              hasta la cancelación total del préstamo, protegiendo a la cooperativa para cubrir cuotas atrasadas ante cualquier impago.
+            </p>
           </div>
         </div>
 

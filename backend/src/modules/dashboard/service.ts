@@ -41,9 +41,40 @@ export async function resumen(agenciaId: string | null) {
      group by cu.agencia_id`,
   );
 
+  const { rows: prestamos } = await pool.query(
+    `select p.agencia_id,
+            count(*)::int as total_prestamos,
+            coalesce(sum(coalesce(p.saldo_capital, p.monto_aprobado)), 0)::numeric(14,2) as saldo_total
+     from prestamos p
+     where p.estado in ('DESEMBOLSADO', 'APROBADO')
+     group by p.agencia_id`,
+  );
+
+  const { rows: plazoFijo } = await pool.query(
+    `select c.agencia_id,
+            count(*)::int as total_certificados,
+            coalesce(sum(pf.monto_deposito), 0)::numeric(14,2) as monto_total
+     from plazo_fijo_contratos pf
+     join cuentas c on c.id = pf.cuenta_id
+     group by c.agencia_id`,
+  );
+
+  const { rows: aportaciones } = await pool.query(
+    `select c.agencia_id,
+            count(*)::int as total_aportantes,
+            coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0)::numeric(14,2) as saldo_total
+     from cuentas c
+     left join saldos_cuenta sc on sc.cuenta_id = c.id
+     where c.tipo = 'APORTACION'
+     group by c.agencia_id`,
+  );
+
   const mapaCajaChica = new Map(cajaChica.map((r) => [r.agencia_id, Number(r.saldo)]));
   const mapaSocios = new Map(socios.map((r) => [r.agencia_id, r.total]));
   const mapaMovHoy = new Map(movimientosHoy.map((r) => [r.agencia_id, r.total]));
+  const mapaPrestamos = new Map(prestamos.map((r) => [r.agencia_id, { count: r.total_prestamos, saldo: Number(r.saldo_total) }]));
+  const mapaPlazoFijo = new Map(plazoFijo.map((r) => [r.agencia_id, { count: r.total_certificados, monto: Number(r.monto_total) }]));
+  const mapaAportaciones = new Map(aportaciones.map((r) => [r.agencia_id, { count: r.total_aportantes, saldo: Number(r.saldo_total) }]));
 
   const porAgencia = agencias.map((ag) => {
     const ahorrosAgencia = ahorros.filter((a) => a.agencia_id === ag.id);
@@ -59,6 +90,9 @@ export async function resumen(agenciaId: string | null) {
       ahorroCorriente: porTipo("AHORRO_CORRIENTE"),
       ahorroProgramado: porTipo("AHORRO_PROGRAMADO"),
       ahorroInfantoJuvenil: porTipo("AHORRO_INFANTO_JUVENIL"),
+      carteraPrestamos: mapaPrestamos.get(ag.id) ?? { count: 0, saldo: 0 },
+      plazoFijo: mapaPlazoFijo.get(ag.id) ?? { count: 0, monto: 0 },
+      aportaciones: mapaAportaciones.get(ag.id) ?? { count: 0, saldo: 0 },
       totalSocios: mapaSocios.get(ag.id) ?? 0,
       movimientosHoy: mapaMovHoy.get(ag.id) ?? 0,
     };
@@ -70,10 +104,32 @@ export async function resumen(agenciaId: string | null) {
       ahorroCorriente: acc.ahorroCorriente + a.ahorroCorriente.saldoTotal,
       ahorroProgramado: acc.ahorroProgramado + a.ahorroProgramado.saldoTotal,
       ahorroInfantoJuvenil: acc.ahorroInfantoJuvenil + a.ahorroInfantoJuvenil.saldoTotal,
+      carteraPrestamos: {
+        count: acc.carteraPrestamos.count + a.carteraPrestamos.count,
+        saldo: acc.carteraPrestamos.saldo + a.carteraPrestamos.saldo,
+      },
+      plazoFijo: {
+        count: acc.plazoFijo.count + a.plazoFijo.count,
+        monto: acc.plazoFijo.monto + a.plazoFijo.monto,
+      },
+      aportaciones: {
+        count: acc.aportaciones.count + a.aportaciones.count,
+        saldo: acc.aportaciones.saldo + a.aportaciones.saldo,
+      },
       totalSocios: acc.totalSocios + a.totalSocios,
       movimientosHoy: acc.movimientosHoy + a.movimientosHoy,
     }),
-    { cajaChica: 0, ahorroCorriente: 0, ahorroProgramado: 0, ahorroInfantoJuvenil: 0, totalSocios: 0, movimientosHoy: 0 },
+    {
+      cajaChica: 0,
+      ahorroCorriente: 0,
+      ahorroProgramado: 0,
+      ahorroInfantoJuvenil: 0,
+      carteraPrestamos: { count: 0, saldo: 0 },
+      plazoFijo: { count: 0, monto: 0 },
+      aportaciones: { count: 0, saldo: 0 },
+      totalSocios: 0,
+      movimientosHoy: 0,
+    },
   );
 
   return { global, porAgencia };

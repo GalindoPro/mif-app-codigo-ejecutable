@@ -19,20 +19,56 @@ export default function PlazoFijoForm() {
   const [numeroCuenta, setNumeroCuenta] = useState("");
   const [numeroCertificacion, setNumeroCertificacion] = useState("");
   const [montoDeposito, setMontoDeposito] = useState("50000");
-  const [plazoMeses, setPlazoMeses] = useState("12");
+  const [plazoMeses, setPlazoMeses] = useState("6");
   const [tasaAnual, setTasaAnual] = useState("6.0");
-  const [isrPorcentaje, setIsrPorcentaje] = useState("10.0");
+  const isrPorcentaje = "10.0";
   const [fechaInicio, setFechaInicio] = useState(new Date().toISOString().slice(0, 10));
+
+  function handleCambioPlazo(valor: string) {
+    setPlazoMeses(valor);
+    const num = Number(valor);
+    if (!isNaN(num) && num > 0) {
+      if (num >= 12) {
+        setTasaAnual("14.0");
+      } else {
+        setTasaAnual("6.0");
+      }
+    }
+  }
+
+  function seleccionarPlazo(meses: "6" | "12") {
+    setPlazoMeses(meses);
+    if (meses === "6") {
+      setTasaAnual("6.0");
+    } else {
+      setTasaAnual("14.0");
+    }
+  }
 
   const [simulacion, setSimulacion] = useState<ResultadoSimulacionPF | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [saldoAportacion, setSaldoAportacion] = useState<number | null>(null);
 
   useEffect(() => {
     if (puedeElegirAgencia) {
       api.get<Agencia[]>("/agencias").then(({ data }) => setAgencias(data));
     }
   }, [puedeElegirAgencia]);
+
+  useEffect(() => {
+    if (!socio) {
+      setSaldoAportacion(null);
+      return;
+    }
+    api
+      .get<{ cuentas: Array<{ id: string; numero_cuenta: string; tipo: string; estado: string; saldo_actual?: string }> }>(`/socios/${socio.id}`)
+      .then(({ data }) => {
+        const apor = data.cuentas?.find((c) => c.tipo === "APORTACION" && c.estado === "ACTIVA");
+        setSaldoAportacion(apor ? Number(apor.saldo_actual ?? 0) : 0);
+      })
+      .catch(() => setSaldoAportacion(null));
+  }, [socio]);
 
   useEffect(() => {
     if (!agenciaId) return;
@@ -72,6 +108,12 @@ export default function PlazoFijoForm() {
     e.preventDefault();
     if (!socio) {
       setError("Selecciona el socio inversionista.");
+      return;
+    }
+    if (saldoAportacion !== null && saldoAportacion < 100) {
+      setError(
+        `Regla de la cooperativa: El socio debe contar con una aportación mínima de Q 100.00 para constituir contratos a plazo fijo (saldo actual: Q ${saldoAportacion.toFixed(2)}).`
+      );
       return;
     }
     if (!agenciaId) {
@@ -136,6 +178,43 @@ export default function PlazoFijoForm() {
           <div className="field">
             <label>Socio inversionista</label>
             <BuscadorSocio agenciaId={agenciaId || undefined} seleccionado={socio} onSeleccionar={setSocio} />
+            {socio && saldoAportacion !== null && (
+              saldoAportacion < 100 ? (
+                <div
+                  style={{
+                    marginTop: "0.6rem",
+                    padding: "0.75rem 0.9rem",
+                    borderRadius: "8px",
+                    background: "rgba(239, 68, 68, 0.1)",
+                    color: "#ef4444",
+                    border: "1px solid rgba(239, 68, 68, 0.3)",
+                    fontSize: "0.86rem",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  ⚠️ <strong>Aportación estatutaria insuficiente:</strong> El socio tiene un saldo de aportaciones de{" "}
+                  <strong>Q {saldoAportacion.toFixed(2)}</strong>. La regla de la cooperativa exige tener al menos{" "}
+                  <strong>Q 100.00</strong> en aportaciones para constituir certificados a plazo fijo.
+                </div>
+              ) : (
+                <div
+                  style={{
+                    marginTop: "0.6rem",
+                    padding: "0.5rem 0.8rem",
+                    borderRadius: "8px",
+                    background: "rgba(16, 185, 129, 0.1)",
+                    color: "#10b981",
+                    border: "1px solid rgba(16, 185, 129, 0.25)",
+                    fontSize: "0.82rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.4rem",
+                  }}
+                >
+                  <span>✓</span> Aportación estatutaria activa: <strong>Q {saldoAportacion.toFixed(2)}</strong> (Cumple con el requisito mínimo de Q 100.00)
+                </div>
+              )
+            )}
           </div>
 
           <div className="form-grid">
@@ -184,53 +263,87 @@ export default function PlazoFijoForm() {
               min="1"
               max="120"
               value={plazoMeses}
-              onChange={(e) => setPlazoMeses(e.target.value)}
+              onChange={(e) => handleCambioPlazo(e.target.value)}
+              placeholder="Ej. 6, 12, 14, 20..."
               required
             />
-            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.3rem" }}>
-              {[6, 12, 18, 24, 36].map((meses) => (
-                <button
-                  key={meses}
-                  type="button"
-                  className={`btn secondary ${plazoMeses === String(meses) ? "active" : ""}`}
-                  style={{ fontSize: "0.8rem", padding: "0.2rem 0.6rem" }}
-                  onClick={() => setPlazoMeses(String(meses))}
-                >
-                  {meses} meses
-                </button>
-              ))}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "0.35rem" }}>
+              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>Tasas oficiales:</span>
+              <button
+                type="button"
+                className={`btn ${plazoMeses === "6" ? "" : "secondary"}`}
+                style={{
+                  fontSize: "0.82rem",
+                  padding: "0.22rem 0.75rem",
+                  fontWeight: 700,
+                  borderRadius: "6px",
+                  border: plazoMeses === "6" ? "2px solid var(--accent)" : "1px solid var(--line)",
+                }}
+                onClick={() => seleccionarPlazo("6")}
+                title="Aplica 6 meses con tasa del 6.0%"
+              >
+                6%
+              </button>
+              <button
+                type="button"
+                className={`btn ${plazoMeses === "12" ? "" : "secondary"}`}
+                style={{
+                  fontSize: "0.82rem",
+                  padding: "0.22rem 0.75rem",
+                  fontWeight: 700,
+                  borderRadius: "6px",
+                  border: plazoMeses === "12" ? "2px solid var(--accent)" : "1px solid var(--line)",
+                }}
+                onClick={() => seleccionarPlazo("12")}
+                title="Aplica 12 meses con tasa del 14.0%"
+              >
+                14%
+              </button>
             </div>
+            <span className="hint">
+              {Number(plazoMeses) >= 12
+                ? `🔒 Tasa oficial del 14.0% aplicada automáticamente para ${plazoMeses} meses (12 meses en adelante).`
+                : `🔒 Tasa oficial del 6.0% aplicada automáticamente para ${plazoMeses} meses (calculada día a día según meses reales).`}
+            </span>
           </div>
 
           <div className="form-grid">
             <div className="field">
-              <label htmlFor="pf-tasa">Tasa de interés anual (%)</label>
+              <label htmlFor="pf-tasa">Tasa de interés</label>
               <input
                 id="pf-tasa"
-                type="number"
-                step="0.1"
-                min="0.1"
-                max="30"
-                value={tasaAnual}
-                onChange={(e) => setTasaAnual(e.target.value)}
-                required
+                value={`${tasaAnual}%`}
+                readOnly
+                disabled
+                style={{
+                  background: "rgba(0,0,0,0.06)",
+                  cursor: "not-allowed",
+                  fontWeight: 700,
+                  color: "var(--ink)",
+                }}
               />
-              <span className="hint">Ej. 6.0% anual</span>
+              <span className="hint">
+                {plazoMeses === "6"
+                  ? "🔒 6.0% fija (calculado por días exactos de mes)"
+                  : "🔒 14.0% fija (contrato oficial a partir de 12 meses)"}
+              </span>
             </div>
 
             <div className="field">
-              <label htmlFor="pf-isr">Retención ISR (%)</label>
+              <label htmlFor="pf-isr">Retención ISR</label>
               <input
                 id="pf-isr"
-                type="number"
-                step="0.1"
-                min="0"
-                max="20"
-                value={isrPorcentaje}
-                onChange={(e) => setIsrPorcentaje(e.target.value)}
-                required
+                value="10.0%"
+                readOnly
+                disabled
+                style={{
+                  background: "rgba(0,0,0,0.06)",
+                  cursor: "not-allowed",
+                  fontWeight: 700,
+                  color: "var(--ink)",
+                }}
               />
-              <span className="hint">10.0% estándar en Guatemala</span>
+              <span className="hint">🔒 10.0% retención legal fija en Guatemala</span>
             </div>
           </div>
 
@@ -246,7 +359,11 @@ export default function PlazoFijoForm() {
           </div>
 
           <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.75rem" }}>
-            <button type="submit" className="btn" disabled={guardando || !socio}>
+            <button
+              type="submit"
+              className="btn"
+              disabled={guardando || !socio || (saldoAportacion !== null && saldoAportacion < 100)}
+            >
               {guardando ? "Emitiendo certificado…" : "Emitir Certificado a Plazo Fijo"}
             </button>
             <button type="button" className="btn secondary" onClick={() => navigate(-1)}>
@@ -258,28 +375,36 @@ export default function PlazoFijoForm() {
         {simulacion && (
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             <div className="stat-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
-              <div className="stat-card accent">
-                <span className="label">Saldo Líquido a Pagar</span>
-                <span className="value">{formatoQ(simulacion.saldoLiquidoAPagar)}</span>
-                <span className="sub">Capital + Interés Neto</span>
+              <div className="stat-card accent" style={{ gridColumn: "1 / -1" }}>
+                <span className="label">SALDO LÍQUIDO TOTAL A PAGAR</span>
+                <span className="value" style={{ fontSize: "1.85rem" }}>{formatoQ(simulacion.saldoLiquidoAPagar)}</span>
+                <span className="sub">Capital invertido + Interés Neto ganado</span>
               </div>
 
-              <div className="stat-card">
-                <span className="label">Fecha de Vencimiento</span>
-                <span className="value mono" style={{ fontSize: "1.2rem" }}>
-                  {new Date(simulacion.fechaVencimiento).toLocaleDateString("es-GT")}
+              <div className="stat-card" style={{ background: "rgba(59, 130, 246, 0.08)", border: "1px solid rgba(59, 130, 246, 0.25)" }}>
+                <span className="label" style={{ color: "var(--accent)" }}>DÍAS EXACTOS DE INVERSIÓN</span>
+                <span className="value mono" style={{ fontSize: "1.35rem", color: "var(--accent)" }}>
+                  {simulacion.diasExactos} días
                 </span>
-                <span className="sub">A {simulacion.plazoMeses} meses plazo</span>
+                <span className="sub">Cálculo día a día según meses reales</span>
               </div>
 
               <div className="stat-card">
-                <span className="label">Interés Bruto Generado</span>
+                <span className="label">FECHA DE VENCIMIENTO</span>
+                <span className="value mono" style={{ fontSize: "1.25rem" }}>
+                  {new Date(simulacion.fechaVencimiento + "T00:00:00").toLocaleDateString("es-GT")}
+                </span>
+                <span className="sub">Plazo de {simulacion.plazoMeses} meses</span>
+              </div>
+
+              <div className="stat-card">
+                <span className="label">INTERÉS BRUTO GENERADO</span>
                 <span className="value">{formatoQ(simulacion.interesGenerado)}</span>
-                <span className="sub">Al {simulacion.tasaAnual}% anual</span>
+                <span className="sub">Tasa pactada: {simulacion.tasaAnual}%</span>
               </div>
 
               <div className="stat-card">
-                <span className="label">Retención ISR (10%)</span>
+                <span className="label">RETENCIÓN ISR (10%)</span>
                 <span className="value" style={{ color: "#dc2626" }}>
                   - {formatoQ(simulacion.isrRetencion)}
                 </span>
@@ -287,11 +412,11 @@ export default function PlazoFijoForm() {
               </div>
 
               <div className="stat-card" style={{ gridColumn: "1 / -1" }}>
-                <span className="label">Interés Neto que cobrará el socio</span>
-                <span className="value" style={{ color: "#16a34a" }}>
+                <span className="label">INTERÉS NETO QUE COBRARÁ EL ASOCIADO</span>
+                <span className="value" style={{ color: "#16a34a", fontSize: "1.5rem" }}>
                   {formatoQ(simulacion.interesNeto)}
                 </span>
-                <span className="sub">Ganancia libre de impuestos</span>
+                <span className="sub">Ganancia líquida libre de impuestos</span>
               </div>
             </div>
 
@@ -299,10 +424,13 @@ export default function PlazoFijoForm() {
               <h3 style={{ marginTop: 0, fontSize: "0.95rem" }}>Resumen del Certificado</h3>
               <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--ink-soft)", lineHeight: 1.5 }}>
                 El socio <strong>{socio?.nombres ?? "(Seleccionar socio)"}</strong> invertirá un capital de{" "}
-                <strong>{formatoQ(simulacion.montoDeposito)}</strong> durante <strong>{simulacion.plazoMeses} meses</strong>. Al vencer el{" "}
-                <strong>{new Date(simulacion.fechaVencimiento).toLocaleDateString("es-GT")}</strong>, la cooperativa le pagará un total de{" "}
+                <strong>{formatoQ(simulacion.montoDeposito)}</strong> durante <strong>{simulacion.plazoMeses} meses</strong> (
+                <strong>{simulacion.diasExactos} días calendario exactos</strong>). Del{" "}
+                <strong>{new Date(simulacion.fechaInicio + "T00:00:00").toLocaleDateString("es-GT")}</strong> al{" "}
+                <strong>{new Date(simulacion.fechaVencimiento + "T00:00:00").toLocaleDateString("es-GT")}</strong>, la cooperativa calculará el{" "}
+                <strong>{simulacion.tasaAnual}%</strong> por cada día transcurrido. Al vencer el contrato, el asociado cobrará un total de{" "}
                 <strong>{formatoQ(simulacion.saldoLiquidoAPagar)}</strong> (que incluye{" "}
-                <strong>{formatoQ(simulacion.interesNeto)}</strong> de intereses netos).
+                <strong>{formatoQ(simulacion.interesNeto)}</strong> de ganancia neta tras descontar el 10% de ISR).
               </p>
             </div>
           </div>
