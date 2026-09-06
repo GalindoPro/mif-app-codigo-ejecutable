@@ -667,17 +667,26 @@ td a {
 /* ==========================================================================
    ESTILOS OFICIALES DE IMPRESIÓN (AJUSTE PERFECTO EN PAPEL CARTA)
    ========================================================================== */
+.print-only {
+  display: none !important;
+}
+
 @media print {
   @page {
-    size: letter portrait;
-    margin: 1cm;
+    size: letter landscape;
+    margin: 0.6cm;
   }
 
   body {
     background: #ffffff !important;
     color: #000000 !important;
-    font-size: 9.5pt !important;
+    font-size: 8pt !important;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+  }
+
+  /* Mostrar elementos exclusivamente para impresión */
+  .print-only {
+    display: block !important;
   }
 
   /* Ocultar barra lateral, botones, controles de navegación y alertas */
@@ -720,11 +729,11 @@ td a {
     width: 100% !important;
     min-width: 100% !important;
     border-collapse: collapse !important;
-    font-size: 8pt !important;
+    font-size: 7.5pt !important;
   }
   th, td {
     border: 1px solid #cbd5e1 !important;
-    padding: 4px 6px !important;
+    padding: 2px 4px !important;
     color: #000000 !important;
   }
   th {
@@ -757,6 +766,24 @@ td a {
   .stat-grid {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+  }
+
+  /* Modal de Informe de Caja Chica optimizado para imprimir */
+  .caja-chica-modal-overlay {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .caja-chica-modal-card {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
   }
 }
 

@@ -72,7 +72,7 @@ export default function InputNombreAutoCompletar({
     }
   }, [value, cursorPos, enfocado]);
 
-  // Aplica la sugerencia seleccionada
+  // Aplica la sugerencia seleccionada (vía Tab o Clic)
   function aplicarSugerencia(sugerencia: string) {
     const { inicio, fin } = palabraActual;
     const antes = value.slice(0, inicio);
@@ -109,26 +109,15 @@ export default function InputNombreAutoCompletar({
       return;
     }
 
-    // Tecla Barra Espaciadora:
-    // Solo autocompleta con espacio si la palabra tiene 2 o más letras (ej. 'tom' -> 'Tomás', 'sanc' -> 'Sánchez')
-    // NUNCA autocompleta en una sola letra (para permitir letras sueltas como 'J.', 'T.')
-    // y NUNCA en conectores como 'de', 'del', 'la'
-    if (e.key === " " && sugerencias.length > 0) {
-      const palabra = palabraActual.palabra;
-      const norm = normalizarParaBusqueda(palabra);
-
-      if (palabra.length >= 2 && !PARTICULAS_IGNORADAS.has(norm)) {
-        e.preventDefault();
-        aplicarSugerencia(sugerencias[0]);
-      }
-    }
+    // NOTA: La tecla espaciadora ya NO fuerza palabras más largas (ej. 'rosa' NUNCA se convertirá en 'Rosales').
+    // La espaciadora solo aplica tilde exacta si corresponde (ej. 'tomas' -> 'Tomás') a través de handleChange.
   }
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const nuevoValor = e.target.value;
     const nuevaPos = e.target.selectionStart ?? nuevoValor.length;
 
-    // REGLA CRÍTICA 1: Si el usuario está BORRANDO (longitud menor), NUNCA interferir ni trabar
+    // REGLA CRÍTICA 1: Si el usuario está BORRANDO (longitud menor), NUNCA interferir ni autocompletar
     if (nuevoValor.length < value.length) {
       setCursorPos(nuevaPos);
       onChange(nuevoValor);
@@ -136,13 +125,13 @@ export default function InputNombreAutoCompletar({
     }
 
     // REGLA CRÍTICA 2: Si el usuario ingresó un espacio al final de una palabra
-    // Verificamos si la palabra recién terminada lleva tilde (ej. 'tomas ' -> 'Tomás ', 'sanchez ' -> 'Sánchez ')
+    // Verificamos si la palabra exacta lleva tilde (ej. 'tomas ' -> 'Tomás ', 'sanchez ' -> 'Sánchez ', 'maria ' -> 'María ')
+    // Si no lleva tilde (ej. 'rosa '), se respeta intacta y se capitaliza 'Rosa ' SIN cambiarla por 'Rosales'.
     if (nuevoValor.endsWith(" ") && !value.endsWith(" ")) {
       const palabras = nuevoValor.trim().split(/\s+/);
       const ultimaPalabra = palabras[palabras.length - 1];
 
       if (ultimaPalabra) {
-        // ¿Lleva tilde según el diccionario?
         const tildeExacta = corregirTildeExacta(ultimaPalabra);
         if (tildeExacta) {
           palabras[palabras.length - 1] = tildeExacta;
@@ -150,19 +139,6 @@ export default function InputNombreAutoCompletar({
           setCursorPos(textoAcentuado.length);
           onChange(capitalizarNombre(textoAcentuado));
           return;
-        }
-
-        // Si escribió 2 o más letras y había sugerencia activa (soporte móvil virtual keyboard)
-        const norm = normalizarParaBusqueda(ultimaPalabra);
-        if (ultimaPalabra.length >= 2 && !PARTICULAS_IGNORADAS.has(norm)) {
-          const sugs = buscarSugerenciasNombre(ultimaPalabra, 1);
-          if (sugs.length > 0) {
-            palabras[palabras.length - 1] = sugs[0];
-            const textoCompletado = palabras.join(" ") + " ";
-            setCursorPos(textoCompletado.length);
-            onChange(capitalizarNombre(textoCompletado));
-            return;
-          }
         }
       }
     }
@@ -203,7 +179,7 @@ export default function InputNombreAutoCompletar({
         }}
       />
 
-      {/* Barra de sugerencias visibles para Tocar en Móvil o Clic en PC */}
+      {/* Barra de sugerencias visibles para Tocar en Móvil o Clic/Tab en PC */}
       {sugerencias.length > 0 && enfocado && (
         <div
           style={{
@@ -234,7 +210,7 @@ export default function InputNombreAutoCompletar({
               userSelect: "none",
             }}
           >
-            <span>💡</span> Toca para completar:
+            <span>💡</span> Presiona [Tab] o toca:
           </span>
 
           {sugerencias.map((sug, idx) => (
@@ -249,7 +225,7 @@ export default function InputNombreAutoCompletar({
                 e.preventDefault();
                 aplicarSugerencia(sug);
               }}
-              title={`Completar con ${sug}`}
+              title={`Completar con ${sug} (o presiona Tab)`}
               style={{
                 display: "inline-flex",
                 alignItems: "center",

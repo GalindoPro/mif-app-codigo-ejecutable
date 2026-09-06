@@ -185,6 +185,48 @@ export async function crear(data: DatosSocio, usuarioId: string): Promise<Socio>
     }
   }
 
+  // Validación de teléfono del socio (no repetible en todo el sistema)
+  if (data.telefono && data.telefono.trim()) {
+    const rawTel = data.telefono.replace(/\D/g, "");
+    const localTel = rawTel.startsWith("502") && rawTel.length > 8 ? rawTel.slice(3) : rawTel.slice(-8);
+    if (localTel.length === 8) {
+      const { rows: telRepetido } = await pool.query(
+        `select telefono, nombres, numero_asociado from socios where regexp_replace(telefono, '[^0-9]', '', 'g') like $1 limit 1`,
+        [`%${localTel}`],
+      );
+      if (telRepetido[0]) {
+        throw conflict(
+          `El teléfono "${data.telefono.trim()}" ya está registrado para el socio "${telRepetido[0].nombres}" (Asociado: ${telRepetido[0].numero_asociado}). No se permiten números de teléfono duplicados.`,
+        );
+      }
+    }
+  }
+
+  // Validación de teléfono del beneficiario (no repetible con otro socio ni beneficiario)
+  if (data.telefonoBeneficiario && data.telefonoBeneficiario.trim()) {
+    const rawTelBen = data.telefonoBeneficiario.replace(/\D/g, "");
+    const localTelBen = rawTelBen.startsWith("502") && rawTelBen.length > 8 ? rawTelBen.slice(3) : rawTelBen.slice(-8);
+    if (localTelBen.length === 8) {
+      const { rows: telBenRepetido } = await pool.query(
+        `select nombres, numero_asociado, 'Socio' as tipo from socios where regexp_replace(telefono, '[^0-9]', '', 'g') like $1
+         union all
+         select coalesce(nombre_beneficiario, nombres) as nombres, numero_asociado, 'Beneficiario' as tipo from socios where regexp_replace(telefono_beneficiario, '[^0-9]', '', 'g') like $1
+         limit 1`,
+        [`%${localTelBen}`],
+      );
+      if (telBenRepetido[0]) {
+        throw conflict(
+          `El teléfono del beneficiario "${data.telefonoBeneficiario.trim()}" ya está registrado en el sistema (${telBenRepetido[0].tipo}: ${telBenRepetido[0].nombres}, Asociado: ${telBenRepetido[0].numero_asociado}).`,
+        );
+      }
+    }
+  }
+
+  // Validación obligatoria de número de boleta / recibo de pago
+  if (!data.reciboAportacionInicial || !data.reciboAportacionInicial.trim()) {
+    throw badRequest("El número de boleta o recibo de pago es obligatorio para respaldar la aportación estatutaria inicial.");
+  }
+
   const { rows } = await pool.query<Socio>(
     `insert into socios
       (numero_asociado, agencia_id, nombres, genero, edad, fecha_ingreso, dpi, direccion, telefono, nombre_beneficiario, dpi_beneficiario, telefono_beneficiario, parentesco_beneficiario, creado_por_id)
@@ -257,6 +299,108 @@ export async function verificarDpi(dpi: string, socioIdActual?: string) {
   return { valido: true, disponible: true };
 }
 
+export async function verificarTelefono(
+  telefono: string,
+  socioIdActual?: string,
+  tipo: "SOCIO" | "BENEFICIARIO" = "SOCIO",
+) {
+  const rawTel = telefono.replace(/\D/g, "");
+  const localTel = rawTel.startsWith("502") && rawTel.length > 8 ? rawTel.slice(3) : rawTel.slice(-8);
+
+  if (localTel.length !== 8) {
+    return { valido: false, mensaje: "El teléfono debe contener 8 dígitos numéricos" };
+  }
+
+  // 1. Verificar si coincide con el teléfono de algún socio
+  let querySocio = `select id, nombres, numero_asociado, telefono from socios where regexp_replace(telefono, '[^0-9]', '', 'g') like $1`;
+  const paramsSocio: unknown[] = [`%${localTel}`];
+  if (socioIdActual) {
+    paramsSocio.push(socioIdActual);
+    querySocio += ` and id != $2`;
+  }
+  querySocio += ` limit 1`;
+
+  const { rows: socioRows } = await pool.query(querySocio, paramsSocio);
+  if (socioRows[0]) {
+    return {
+      valido: true,
+      disponible: false,
+      registrado: {
+        id: socioRows[0].id,
+        nombres: socioRows[0].nombres,
+        numeroAsociado: socioRows[0].numero_asociado,
+        rol: "Socio registrado",
+      },
+    };
+  }
+
+  // 2. Si se verifica beneficiario, también verificar en beneficiarios registrados
+  if (tipo === "BENEFICIARIO") {
+    let queryBen = `select id, nombres, numero_asociado, nombre_beneficiario, telefono_beneficiario from socios where regexp_replace(telefono_beneficiario, '[^0-9]', '', 'g') like $1`;
+    const paramsBen: unknown[] = [`%${localTel}`];
+    if (socioIdActual) {
+      paramsBen.push(socioIdActual);
+      queryBen += ` and id != $2`;
+    }
+    queryBen += ` limit 1`;
+
+    const { rows: benRows } = await pool.query(queryBen, paramsBen);
+    if (benRows[0]) {
+      return {
+        valido: true,
+        disponible: false,
+        registrado: {
+          id: benRows[0].id,
+          nombres: benRows[0].nombre_beneficiario || benRows[0].nombres,
+          numeroAsociado: benRows[0].numero_asociado,
+          rol: `Beneficiario del socio ${benRows[0].nombres}`,
+        },
+      };
+    }
+  }
+
+  return { valido: true, disponible: true };
+}
+
+export async function abrirAportacionSocio(
+  socioId: string,
+  monto: number = 100,
+  recibo?: string | null,
+  usuarioId: string = ""
+) {
+  const { rows: socioRows } = await pool.query(
+    `select s.*, a.codigo as agencia_codigo from socios s join agencias a on a.id = s.agencia_id where s.id = $1`,
+    [socioId]
+  );
+  if (!socioRows[0]) throw notFound("Socio no encontrado");
+  const socio = socioRows[0];
+
+  const montoApor = Number(monto) >= 100 ? Number(monto) : 100;
+  const codAgencia = socio.agencia_codigo ?? "MIF";
+  const numCuentaAportacion = `${codAgencia}-APOR-${socio.numero_asociado}`;
+  const obsApertura = recibo?.trim()
+    ? `Aportación estatutaria inicial. Comprobante/Recibo: ${recibo.trim()}`
+    : "Aportación estatutaria inicial";
+
+  const { rows: cuentaRows } = await pool.query(
+    `insert into cuentas (numero_cuenta, tipo, estado, socio_id, agencia_id, saldo_inicial, observaciones_apertura, creado_por_id)
+     values ($1, 'APORTACION', 'ACTIVA', $2, $3, $4, $5, $6)
+     on conflict (numero_cuenta) do update set saldo_inicial = $4, estado = 'ACTIVA', observaciones_apertura = $5
+     returning *`,
+    [numCuentaAportacion, socio.id, socio.agencia_id, montoApor, obsApertura, usuarioId || null]
+  );
+
+  await registrarAuditoria({
+    entidad: "Cuenta",
+    entidadId: cuentaRows[0].id,
+    accion: "CREAR",
+    usuarioId,
+    datosNuevos: { tipo: "APORTACION", saldo_inicial: montoApor, socio_id: socio.id },
+  });
+
+  return cuentaRows[0];
+}
+
 export async function actualizar(
   id: string,
   data: Partial<DatosSocio> & { estado?: "ACTIVO" | "INACTIVO" },
@@ -276,6 +420,44 @@ export async function actualizar(
       if (dpiRepetido[0]) {
         throw conflict(
           `El DPI "${data.dpi.trim()}" ya está registrado para el socio "${dpiRepetido[0].nombres}" (Asociado: ${dpiRepetido[0].numero_asociado}).`,
+        );
+      }
+    }
+  }
+
+  if (data.telefono && data.telefono.trim()) {
+    const rawTel = data.telefono.replace(/\D/g, "");
+    const localTel = rawTel.startsWith("502") && rawTel.length > 8 ? rawTel.slice(3) : rawTel.slice(-8);
+    if (localTel.length === 8) {
+      const { rows: telRepetido } = await pool.query(
+        `select telefono, nombres, numero_asociado from socios 
+         where regexp_replace(telefono, '[^0-9]', '', 'g') like $1 and id != $2 limit 1`,
+        [`%${localTel}`, id],
+      );
+      if (telRepetido[0]) {
+        throw conflict(
+          `El teléfono "${data.telefono.trim()}" ya está registrado para el socio "${telRepetido[0].nombres}" (Asociado: ${telRepetido[0].numero_asociado}).`,
+        );
+      }
+    }
+  }
+
+  if (data.telefonoBeneficiario && data.telefonoBeneficiario.trim()) {
+    const rawTelBen = data.telefonoBeneficiario.replace(/\D/g, "");
+    const localTelBen = rawTelBen.startsWith("502") && rawTelBen.length > 8 ? rawTelBen.slice(3) : rawTelBen.slice(-8);
+    if (localTelBen.length === 8) {
+      const { rows: telBenRepetido } = await pool.query(
+        `select nombres, numero_asociado, 'Socio' as tipo from socios 
+         where regexp_replace(telefono, '[^0-9]', '', 'g') like $1 and id != $2
+         union all
+         select coalesce(nombre_beneficiario, nombres) as nombres, numero_asociado, 'Beneficiario' as tipo from socios 
+         where regexp_replace(telefono_beneficiario, '[^0-9]', '', 'g') like $1 and id != $2
+         limit 1`,
+        [`%${localTelBen}`, id],
+      );
+      if (telBenRepetido[0]) {
+        throw conflict(
+          `El teléfono del beneficiario "${data.telefonoBeneficiario.trim()}" ya está registrado en el sistema (${telBenRepetido[0].tipo}: ${telBenRepetido[0].nombres}, Asociado: ${telBenRepetido[0].numero_asociado}).`,
         );
       }
     }

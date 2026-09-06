@@ -34,6 +34,28 @@ prestamosRouter.get(
 );
 
 prestamosRouter.get(
+  "/verificar-fiador",
+  asyncHandler(async (req, res) => {
+    const dpi = typeof req.query.dpi === "string" ? req.query.dpi : "";
+    const socioId = typeof req.query.socioId === "string" ? req.query.socioId : undefined;
+    if (!dpi) {
+      return res.json({ valido: false, mensaje: "Se requiere el DPI del fiador" });
+    }
+    res.json(await service.verificarFiador(dpi, socioId));
+  }),
+);
+
+prestamosRouter.get(
+  "/fiadores",
+  asyncHandler(async (req, res) => {
+    const agenciaId = agenciaVisible(req) ?? (req.query.agenciaId as string) ?? null;
+    const q = typeof req.query.q === "string" ? req.query.q : undefined;
+    const tipoFiltro = (req.query.tipoFiltro as "TODOS" | "EXTERNOS" | "SOCIOS") || "TODOS";
+    res.json(await service.listarFiadores({ agenciaId, q, tipoFiltro }));
+  }),
+);
+
+prestamosRouter.get(
   "/",
   asyncHandler(async (req, res) => {
     const prestamos = await service.listar({
@@ -129,3 +151,12 @@ prestamosRouter.get(
     res.json(await service.listarPagos(req.params.id));
   }),
 );
+
+prestamosRouter.get(
+  "/:id/liquidacion",
+  asyncHandler(async (req, res) => {
+    const fecha = req.query.fecha as string | undefined;
+    res.json(await service.obtenerLiquidacion(req.params.id, fecha));
+  }),
+);
+

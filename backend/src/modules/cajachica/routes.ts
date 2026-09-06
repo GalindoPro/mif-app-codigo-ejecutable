@@ -17,6 +17,22 @@ cajaChicaRouter.get(
   }),
 );
 
+cajaChicaRouter.get(
+  "/reporte",
+  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  asyncHandler(async (req, res) => {
+    const visible = agenciaVisible(req);
+    const agenciaId = (visible || req.query.agenciaId) as string;
+    if (!agenciaId) throw badRequest("Falta indicar la agencia para el reporte");
+
+    const fechaInicio = typeof req.query.fechaInicio === "string" ? req.query.fechaInicio : undefined;
+    const fechaFin = typeof req.query.fechaFin === "string" ? req.query.fechaFin : undefined;
+    const categoria = typeof req.query.categoria === "string" ? req.query.categoria : undefined;
+
+    res.json(await service.generarReporte({ agenciaId, fechaInicio, fechaFin, categoria }));
+  }),
+);
+
 const CATEGORIAS_CAJA_CHICA = [
   "SUMINISTROS_OFICINA",
   "CAFETERIA_LIMPIEZA",

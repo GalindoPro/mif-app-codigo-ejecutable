@@ -50,6 +50,19 @@ sociosRouter.get(
 );
 
 sociosRouter.get(
+  "/verificar-telefono",
+  asyncHandler(async (req, res) => {
+    const telefono = typeof req.query.telefono === "string" ? req.query.telefono : "";
+    const socioId = typeof req.query.socioId === "string" ? req.query.socioId : undefined;
+    const tipo = (req.query.tipo as "SOCIO" | "BENEFICIARIO") || "SOCIO";
+    if (!telefono) {
+      return res.json({ valido: false, mensaje: "Se requiere el número de teléfono" });
+    }
+    res.json(await service.verificarTelefono(telefono, socioId, tipo));
+  }),
+);
+
+sociosRouter.get(
   "/:id",
   asyncHandler(async (req, res) => {
     res.json(await service.obtener(req.params.id, agenciaVisible(req)));
@@ -74,7 +87,7 @@ const datosSocioSchema = z.object({
   nombreBeneficiario: z.string().optional().nullable(),
   dpiBeneficiario: z
     .string()
-    .refine((v) => !v || v.replace(/\D/g, "").length === 13, "El DPI del beneficiario debe contener 13 dígitos")
+    .refine((v) => !v || v.replace(/\D/g, "").length === 13, "El DPI/CUI del beneficiario debe contener 13 dígitos")
     .optional()
     .nullable(),
   telefonoBeneficiario: z.string().optional().nullable(),
@@ -84,7 +97,7 @@ const datosSocioSchema = z.object({
     .min(100, "La aportación inicial mínima de la cooperativa es de Q 100.00")
     .optional()
     .default(100),
-  reciboAportacionInicial: z.string().optional().nullable(),
+  reciboAportacionInicial: z.string().min(1, "El número de boleta o recibo de pago es obligatorio"),
 });
 
 sociosRouter.post(
@@ -111,3 +124,18 @@ sociosRouter.patch(
     res.json(await service.actualizar(req.params.id, data, req.user!.id, agenciaVisible(req)));
   }),
 );
+
+const abrirAportacionSchema = z.object({
+  monto: z.number().min(100, "Monto mínimo Q 100.00").optional().default(100),
+  recibo: z.string().optional().nullable(),
+});
+
+sociosRouter.post(
+  "/:id/abrir-aportacion",
+  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO", "PROMOTOR"),
+  asyncHandler(async (req, res) => {
+    const data = abrirAportacionSchema.parse(req.body || {});
+    res.status(201).json(await service.abrirAportacionSocio(req.params.id, data.monto, data.recibo, req.user!.id));
+  }),
+);
+

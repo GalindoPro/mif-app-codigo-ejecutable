@@ -4,6 +4,7 @@ import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { CATEGORIA_CAJA_CHICA_LABEL, formatoQ } from "../types";
 import type { Agencia, CategoriaCajaChica, ListaCajaChica } from "../types";
+import CajaChicaReporteModal from "../components/CajaChicaReporteModal";
 
 const CATEGORIAS = Object.entries(CATEGORIA_CAJA_CHICA_LABEL) as [CategoriaCajaChica, string][];
 
@@ -15,6 +16,7 @@ export default function CajaChica() {
   const [resultado, setResultado] = useState<ListaCajaChica | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [mostrarReporte, setMostrarReporte] = useState(false);
   const [agencias, setAgencias] = useState<Agencia[]>([]);
 
   const [agenciaId, setAgenciaId] = useState(usuario?.agenciaId ?? "");
@@ -109,12 +111,21 @@ export default function CajaChica() {
 
   return (
     <div>
-      <div className="page-head">
+      <div className={mostrarReporte ? "no-print" : ""}>
+        <div className="page-head">
         <div>
           <h1>Caja chica</h1>
           <p>Comprobantes de ingreso y egreso — reemplaza el libro auxiliar de caja chica.</p>
         </div>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="btn secondary"
+            style={{ fontWeight: 700, borderColor: "var(--accent)" }}
+            onClick={() => setMostrarReporte(true)}
+          >
+            📄 Informe de Gastos
+          </button>
           <button
             className="btn"
             style={{ background: "#059669", borderColor: "#059669" }}
@@ -389,6 +400,16 @@ export default function CajaChica() {
         </table>
         {resultado?.data.length === 0 && <div className="empty">Todavía no hay comprobantes registrados.</div>}
       </div>
+      </div>
+
+      {mostrarReporte && (
+        <CajaChicaReporteModal
+          agenciaId={agenciaId || agencias[0]?.id || ""}
+          agencias={agencias}
+          puedeElegirAgencia={puedeElegirAgencia}
+          onClose={() => setMostrarReporte(false)}
+        />
+      )}
     </div>
   );
 }

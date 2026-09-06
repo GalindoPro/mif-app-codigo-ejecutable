@@ -91,3 +91,12 @@ export function capitalizarDescripcion(valor: string): string {
     valor.slice(primerIndice + 1)
   );
 }
+
+export function formatearQuetzales(valor: number | string | null | undefined): string {
+  if (valor === null || valor === undefined || valor === "") return "Q 0.00";
+  const num = typeof valor === "string" ? parseFloat(valor) : valor;
+  if (isNaN(num)) return "Q 0.00";
+  return `Q ${num.toLocaleString("es-GT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+

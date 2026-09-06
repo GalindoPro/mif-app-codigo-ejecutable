@@ -410,6 +410,7 @@ export interface DatosCobroCredito {
   abonoCapital: number;
   interes: number;
   mora?: number;
+  ahorroSobrePrestamo?: number;
   docNo?: string;
   cuentaDebitoId?: string;
 }
@@ -444,7 +445,8 @@ export async function cobrarCuotaCredito(
   const abonoCapital = Number(data.abonoCapital) || 0;
   const interes = Number(data.interes) || 0;
   const mora = Number(data.mora) || 0;
-  const totalCobro = Math.round((abonoCapital + interes + mora) * 100) / 100;
+  const ahorroSobrePrestamo = Number(data.ahorroSobrePrestamo) || 0;
+  const totalCobro = Math.round((abonoCapital + interes + mora + ahorroSobrePrestamo) * 100) / 100;
 
   if (totalCobro <= 0) {
     throw badRequest("El monto total a cobrar debe ser mayor a cero");
@@ -531,7 +533,7 @@ export async function cobrarCuotaCredito(
     const saldoPrevio = ultimoMovRows[0] ? Number(ultimoMovRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
     const saldoAcumulado = saldoPrevio + totalCobro;
 
-    // Débito a cuenta de ahorro (ej. Ahorro sobre Préstamo) si se indicó
+    // Débito a cuenta de ahorro si se indicó
     let infoCuentaDebito: { id: string; numero_cuenta: string } | null = null;
     if (data.cuentaDebitoId) {
       const { rows: ctaRows } = await client.query(
@@ -566,10 +568,58 @@ export async function cobrarCuotaCredito(
       );
     }
 
-    // 3. Registrar en caja_movimientos_auxiliar
+    // 3. Si se incluye Ahorro sobre Préstamo, acreditar depósito a la cuenta ASP del socio
+    let cuentaAspInfo: { id: string; numero_cuenta: string } | null = null;
+    if (ahorroSobrePrestamo > 0) {
+      const { rows: ctaAspRows } = await client.query(
+        `select id, numero_cuenta from cuentas
+         where socio_id = $1 and tipo = 'AHORRO_SOBRE_PRESTAMO'
+         order by (case when prestamo_id = $2 then 0 else 1 end), created_at desc
+         limit 1`,
+        [prestamo.socio_id, prestamo.id],
+      );
+
+      let ctaAsp = ctaAspRows[0];
+      if (!ctaAsp) {
+        const { numeroCuenta } = await cuentasService.siguienteNumero(dia.agencia_id, "AHORRO_SOBRE_PRESTAMO");
+        const { rows: nuevaCta } = await client.query(
+          `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, observaciones_apertura, prestamo_id, creado_por_id)
+           values ($1, 'AHORRO_SOBRE_PRESTAMO', $2, $3, 0, $4, $5, $6)
+           returning id, numero_cuenta`,
+          [
+            numeroCuenta,
+            prestamo.socio_id,
+            dia.agencia_id,
+            `Cuenta de ahorro en garantía vinculada al crédito ${prestamo.codigo}`,
+            prestamo.id,
+            usuarioId,
+          ],
+        );
+        ctaAsp = nuevaCta[0];
+      }
+      cuentaAspInfo = ctaAsp;
+
+      const clienteMovAspId = `DEP-ASP-CUOTA-${prestamo.id}-${Date.now()}`;
+      await client.query(
+        `insert into movimientos (cuenta_id, tipo, monto, fecha, numero_recibo, descripcion, usuario_id, cliente_movimiento_id)
+         values ($1, 'DEPOSITO', $2, $3, $4, $5, $6, $7)`,
+        [
+          ctaAsp.id,
+          ahorroSobrePrestamo,
+          dia.fecha,
+          data.docNo ?? null,
+          `Aporte Ahorro sobre Préstamo cuota crédito ${prestamo.codigo}`,
+          usuarioId,
+          clienteMovAspId,
+        ],
+      );
+    }
+
+    // 4. Registrar en caja_movimientos_auxiliar
     const ref = `${prestamo.codigo}-CUOTA`;
     const detalleDebito = infoCuentaDebito ? ` (Cobrado con débito de cuenta ${infoCuentaDebito.numero_cuenta})` : "";
-    const descripcion = `Cobro cuota crédito ${prestamo.codigo} (Cap: Q${abonoCapital.toFixed(2)}, Int: Q${interes.toFixed(2)}${mora > 0 ? `, Mora: Q${mora.toFixed(2)}` : ""})${detalleDebito}`;
+    const detalleAsp = ahorroSobrePrestamo > 0 ? `, Ahorro: Q${ahorroSobrePrestamo.toFixed(2)}` : "";
+    const descripcion = `Cobro cuota crédito ${prestamo.codigo} (Cap: Q${abonoCapital.toFixed(2)}, Int: Q${interes.toFixed(2)}${detalleAsp}${mora > 0 ? `, Mora: Q${mora.toFixed(2)}` : ""})${detalleDebito}`;
 
     const { rows: cajaMovRows } = await client.query(
       `insert into caja_movimientos_auxiliar (
@@ -595,7 +645,7 @@ export async function cobrarCuotaCredito(
     );
     const cajaMov = cajaMovRows[0];
 
-    // 4. Registrar en ingresos_comif
+    // 5. Registrar en ingresos_comif
     if (abonoCapital > 0) {
       await client.query(
         `insert into ingresos_comif (agencia_id, fecha, numero_documento, nombre_socio, categoria, monto, usuario_id)
@@ -611,7 +661,7 @@ export async function cobrarCuotaCredito(
       );
     }
 
-    // 5. Actualizar préstamo (reducir saldo_capital y si llega a 0 cambiar a CANCELADO)
+    // 6. Actualizar préstamo (reducir saldo_capital y si llega a 0 cambiar a CANCELADO)
     await client.query(
       `update prestamos
        set saldo_capital = $1,
@@ -621,7 +671,7 @@ export async function cobrarCuotaCredito(
       [nuevoSaldoCapital, nuevoEstadoPrestamo, prestamo.id],
     );
 
-    // 6. Registrar en prestamo_pagos
+    // 7. Registrar en prestamo_pagos
     const { rows: pagoRows } = await client.query(
       `insert into prestamo_pagos (
          prestamo_id, socio_id, agencia_id, caja_dia_id, caja_movimiento_id,
@@ -657,6 +707,8 @@ export async function cobrarCuotaCredito(
         prestamoId: prestamo.id,
         codigo: prestamo.codigo,
         pago: pagoRows[0],
+        ahorroSobrePrestamo,
+        cuentaAsp: cuentaAspInfo,
         nuevoSaldoCapital,
       },
     });
@@ -665,6 +717,8 @@ export async function cobrarCuotaCredito(
       pago: pagoRows[0],
       cajaMovimiento: cajaMov,
       saldoCapitalRestante: nuevoSaldoCapital,
+      ahorroSobrePrestamoAcreditado: ahorroSobrePrestamo,
+      cuentaAsp: cuentaAspInfo,
       prestamoCancelado: nuevoEstadoPrestamo === "CANCELADO",
     };
   } catch (err) {
@@ -678,6 +732,7 @@ export async function cobrarCuotaCredito(
 export interface DatosDesembolsoCredito {
   prestamoId: string;
   docNo?: string;
+  montoAhorroSobrePrestamo?: number;
 }
 
 export async function desembolsarCredito(
@@ -714,16 +769,19 @@ export async function desembolsarCredito(
     throw badRequest("El monto aprobado debe ser mayor a cero");
   }
 
-  // Validar si hay saldo suficiente en la caja física
+  const montoAsp = Math.max(0, Math.min(montoDesembolso, Math.round((Number(data.montoAhorroSobrePrestamo) || 0) * 100) / 100));
+  const efectivoNetoRequerido = Math.round((montoDesembolso - montoAsp) * 100) / 100;
+
+  // Validar si hay saldo suficiente en la caja física para el efectivo neto a entregar
   const { rows: ultimoMovRows } = await pool.query(
     `select saldo_acumulado from caja_movimientos_auxiliar where caja_dia_id = $1 order by created_at desc limit 1`,
     [diaId],
   );
   const saldoPrevio = ultimoMovRows[0] ? Number(ultimoMovRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
 
-  if (montoDesembolso > saldoPrevio) {
+  if (efectivoNetoRequerido > saldoPrevio) {
     throw conflict(
-      `Saldo insuficiente en la caja física: Se requieren Q ${montoDesembolso.toFixed(2)} pero el saldo actual en caja es de Q ${saldoPrevio.toFixed(2)}. Ingrese fondos o reduzca la entrega.`,
+      `Saldo insuficiente en la caja física: Se requieren Q ${efectivoNetoRequerido.toFixed(2)} en efectivo pero el saldo actual en caja es de Q ${saldoPrevio.toFixed(2)}. Ingrese fondos o reduzca la entrega.`,
     );
   }
 
@@ -757,10 +815,11 @@ export async function desembolsarCredito(
       [dia.agencia_id, categoriasDelGrupo(info.grupoContador)],
     );
     const contador = contadorRows[0].total + 1;
-    const saldoAcumulado = Math.round((saldoPrevio - montoDesembolso) * 100) / 100;
+    let saldoAcumulado = Math.round((saldoPrevio - montoDesembolso) * 100) / 100;
 
-    // 2. Registrar egreso en caja_movimientos_auxiliar
-    const descripcion = `Desembolso de crédito ${prestamo.codigo} (${prestamo.tipo})`;
+    // 2. Registrar egreso en caja_movimientos_auxiliar (Colocación Préstamo)
+    const detalleAspDesc = montoAsp > 0 ? ` (Retención Ahorro: Q${montoAsp.toFixed(2)}, Neto entregado: Q${efectivoNetoRequerido.toFixed(2)})` : "";
+    const descripcion = `Desembolso de crédito ${prestamo.codigo} (${prestamo.tipo})${detalleAspDesc}`;
     const { rows: cajaMovRows } = await client.query(
       `insert into caja_movimientos_auxiliar (
          caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador,
@@ -784,7 +843,84 @@ export async function desembolsarCredito(
     );
     const cajaMov = cajaMovRows[0];
 
-    // 3. Actualizar estado del préstamo a DESEMBOLSADO
+    // 3. Si se especificó retención de Ahorro sobre Préstamo, acreditar a la cuenta y registrar ingreso
+    let cuentaAspInfo: { id: string; numero_cuenta: string } | null = null;
+    if (montoAsp > 0) {
+      const { rows: ctaAspRows } = await client.query(
+        `select id, numero_cuenta from cuentas
+         where socio_id = $1 and tipo = 'AHORRO_SOBRE_PRESTAMO'
+         order by (case when prestamo_id = $2 then 0 else 1 end), created_at desc
+         limit 1`,
+        [prestamo.socio_id, prestamo.id],
+      );
+
+      let cta = ctaAspRows[0];
+      if (!cta) {
+        const { numeroCuenta } = await cuentasService.siguienteNumero(dia.agencia_id, "AHORRO_SOBRE_PRESTAMO");
+        const { rows: nuevaCta } = await client.query(
+          `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, observaciones_apertura, prestamo_id, creado_por_id)
+           values ($1, 'AHORRO_SOBRE_PRESTAMO', $2, $3, 0, $4, $5, $6)
+           returning id, numero_cuenta`,
+          [
+            numeroCuenta,
+            prestamo.socio_id,
+            dia.agencia_id,
+            `Cuenta de ahorro en garantía vinculada al crédito ${prestamo.codigo}`,
+            prestamo.id,
+            usuarioId,
+          ],
+        );
+        cta = nuevaCta[0];
+      }
+      cuentaAspInfo = cta;
+
+      const clienteMovId = `DEP-ASP-${prestamo.id}-${Date.now()}`;
+      await client.query(
+        `insert into movimientos (cuenta_id, tipo, monto, fecha, numero_recibo, descripcion, usuario_id, cliente_movimiento_id)
+         values ($1, 'DEPOSITO', $2, $3, $4, $5, $6, $7)`,
+        [
+          cta.id,
+          montoAsp,
+          dia.fecha,
+          data.docNo ?? null,
+          `Acreditación de retención Ahorro sobre Préstamo (Garantía) - Crédito ${prestamo.codigo}`,
+          usuarioId,
+          clienteMovId,
+        ],
+      );
+
+      const infoAsp = CATEGORIAS.DEPOSITO_AHORRO_SOBRE_PRESTAMO;
+      const { rows: contadorAspRows } = await client.query(
+        `select count(*)::int as total from caja_movimientos_auxiliar
+         where agencia_id = $1 and categoria::text = any($2::text[])`,
+        [dia.agencia_id, categoriasDelGrupo(infoAsp.grupoContador)],
+      );
+      const contadorAsp = contadorAspRows[0].total + 1;
+      saldoAcumulado = Math.round((saldoAcumulado + montoAsp) * 100) / 100;
+
+      await client.query(
+        `insert into caja_movimientos_auxiliar (
+           caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador,
+           referencia, socio_id, beneficiario, descripcion, doc_no, monto, saldo_acumulado, usuario_id
+         ) values ($1, $2, $3, 'PROPIO', 'DEPOSITO_AHORRO_SOBRE_PRESTAMO', 'INGRESO', $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        [
+          diaId,
+          dia.agencia_id,
+          dia.fecha,
+          contadorAsp,
+          `${cta.numero_cuenta}-IN`,
+          prestamo.socio_id,
+          prestamo.socio_nombres,
+          `Retención Ahorro sobre Préstamo crédito ${prestamo.codigo} (Cuenta ${cta.numero_cuenta})`,
+          data.docNo ?? null,
+          montoAsp,
+          saldoAcumulado,
+          usuarioId,
+        ],
+      );
+    }
+
+    // 4. Actualizar estado del préstamo a DESEMBOLSADO
     const { rows: prestamoActualizadoRows } = await client.query(
       `update prestamos
        set estado = 'DESEMBOLSADO',
@@ -807,6 +943,8 @@ export async function desembolsarCredito(
         estado: "DESEMBOLSADO",
         desembolsoCajaMovimientoId: cajaMov.id,
         monto: montoDesembolso,
+        montoAhorroSobrePrestamo: montoAsp,
+        cuentaAsp: cuentaAspInfo,
       },
     });
 
@@ -814,6 +952,8 @@ export async function desembolsarCredito(
       prestamo: prestamoActualizadoRows[0],
       cajaMovimiento: cajaMov,
       saldoCajaRestante: saldoAcumulado,
+      montoAhorroSobrePrestamo: montoAsp,
+      cuentaAsp: cuentaAspInfo,
     };
   } catch (err) {
     await client.query("rollback");
@@ -1208,7 +1348,7 @@ export async function arqueosMensuales(
      left join caja_arqueos a on a.caja_dia_id = d.id
      where d.agencia_id = $1 and to_char(d.fecha, 'YYYY-MM') = $2
      order by d.fecha asc`,
-    [agenciaId, mesParam],
+    [targetAgencia, mesParam],
   );
 
   let totalDiasOperados = rows.length;
@@ -1226,14 +1366,12 @@ export async function arqueosMensuales(
     totalEgresosMes += Number(r.total_egresos || 0);
 
     const dif = Number(r.diferencia || 0);
-    if (r.estado === "CERRADO") {
-      if (dif === 0) {
-        diasCuadrados++;
-      } else {
-        diasConDiferencia++;
-        if (dif > 0) totalSobrante += dif;
-        else totalFaltante += Math.abs(dif);
-      }
+    if (dif === 0) {
+      diasCuadrados++;
+    } else {
+      diasConDiferencia++;
+      if (dif > 0) totalSobrante += dif;
+      else totalFaltante += Math.abs(dif);
     }
   }
 

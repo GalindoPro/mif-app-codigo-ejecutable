@@ -127,6 +127,7 @@ const cobroCreditoSchema = z.object({
   abonoCapital: z.number().min(0),
   interes: z.number().min(0),
   mora: z.number().min(0).optional(),
+  ahorroSobrePrestamo: z.number().min(0).optional(),
   docNo: z.string().optional(),
   cuentaDebitoId: z.string().uuid().optional(),
 });
@@ -145,6 +146,7 @@ cajaAuxiliarRouter.post(
 const desembolsoCreditoSchema = z.object({
   prestamoId: z.string().uuid(),
   docNo: z.string().optional(),
+  montoAhorroSobrePrestamo: z.number().min(0).optional(),
 });
 
 cajaAuxiliarRouter.post(

@@ -44,8 +44,29 @@ export default function CreditoForm() {
   const [documentoDesembolso, setDocumentoDesembolso] = useState("");
   const [crearCuentaAhorro, setCrearCuentaAhorro] = useState(true);
 
+  const [fiadorDuplicado, setFiadorDuplicado] = useState<{
+    motivo: string;
+    mensaje: string;
+    prestamo?: { codigo: string; socioNombre: string; numeroAsociado: string; estado: string };
+  } | null>(null);
+  const [fiadorInfo, setFiadorInfo] = useState<string | null>(null);
+  const [verificandoFiador, setVerificandoFiador] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    const sId = searchParams.get("socioId");
+    if (sId && !socio) {
+      api
+        .get<Socio>(`/socios/${sId}`)
+        .then(({ data }) => {
+          setSocio(data);
+          if (data.agencia_id) setAgenciaId(data.agencia_id);
+        })
+        .catch(() => {});
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (puedeElegirAgencia) {
@@ -58,6 +79,55 @@ export default function CreditoForm() {
     });
   }, [puedeElegirAgencia]);
 
+  // Verificación en tiempo real de DPI del fiador (evitar duplicados o que sea el mismo socio)
+  useEffect(() => {
+    if (tipo !== "FIDUCIARIO") {
+      setFiadorDuplicado(null);
+      setFiadorInfo(null);
+      setVerificandoFiador(false);
+      return;
+    }
+    const raw = limpiarDPI(dpiFiador);
+    if (raw.length === 13) {
+      setVerificandoFiador(true);
+      const timer = setTimeout(() => {
+        api
+          .get<{
+            valido: boolean;
+            disponible?: boolean;
+            motivo?: string;
+            mensaje?: string;
+            prestamo?: { codigo: string; socioNombre: string; numeroAsociado: string; estado: string };
+          }>("/prestamos/verificar-fiador", {
+            params: { dpi: raw, socioId: socio?.id },
+          })
+          .then(({ data }) => {
+            if (data.disponible === false) {
+              setFiadorDuplicado({
+                motivo: data.motivo || "DUPLICADO",
+                mensaje: data.mensaje || "El fiador no está disponible.",
+                prestamo: data.prestamo,
+              });
+              setFiadorInfo(null);
+            } else {
+              setFiadorDuplicado(null);
+              setFiadorInfo(data.mensaje || "✓ Fiador válido y disponible (13 dígitos)");
+            }
+          })
+          .catch(() => {
+            setFiadorDuplicado(null);
+            setFiadorInfo(null);
+          })
+          .finally(() => setVerificandoFiador(false));
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      setFiadorDuplicado(null);
+      setFiadorInfo(null);
+      setVerificandoFiador(false);
+    }
+  }, [dpiFiador, socio, tipo]);
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!socio) {
@@ -66,6 +136,10 @@ export default function CreditoForm() {
     }
     if (!agenciaId) {
       setError("Selecciona una agencia.");
+      return;
+    }
+    if (tipo === "FIDUCIARIO" && fiadorDuplicado) {
+      setError(fiadorDuplicado.mensaje);
       return;
     }
 
@@ -262,12 +336,33 @@ export default function CreditoForm() {
                   <label htmlFor="fiador-dpi">No. de DPI del fiador</label>
                   <input
                     id="fiador-dpi"
+                    inputMode="numeric"
                     value={dpiFiador}
-                    onChange={(e) => setDpiFiador(formatearDPI(e.target.value))}
+                    onChange={(e) => setDpiFiador(formatearDPI(e.target.value.replace(/[^0-9-]/g, "")))}
                     placeholder="xxxx-xxxxx-xxxx (13 dígitos)"
                     maxLength={15}
+                    style={{
+                      fontFamily: "monospace",
+                      letterSpacing: "0.5px",
+                      borderColor: fiadorDuplicado ? "var(--danger, #ef4444)" : undefined,
+                    }}
                   />
-                  <span className="hint">{limpiarDPI(dpiFiador).length}/13 dígitos</span>
+                  <div style={{ minHeight: "1.1rem", marginTop: "0.2rem" }}>
+                    {verificandoFiador && <span className="hint">🔍 Verificando fiador en el sistema...</span>}
+                    {fiadorDuplicado && (
+                      <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                        ⚠️ {fiadorDuplicado.mensaje}
+                      </span>
+                    )}
+                    {!verificandoFiador && !fiadorDuplicado && fiadorInfo && limpiarDPI(dpiFiador).length === 13 && (
+                      <span style={{ color: "#10b981", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                        {fiadorInfo}
+                      </span>
+                    )}
+                    {limpiarDPI(dpiFiador).length > 0 && limpiarDPI(dpiFiador).length < 13 && (
+                      <span className="hint">{limpiarDPI(dpiFiador).length}/13 dígitos numéricos</span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="field">
@@ -276,26 +371,32 @@ export default function CreditoForm() {
                     <span
                       style={{
                         padding: "0.55rem 0.65rem",
-                        background: "rgba(0,0,0,0.05)",
+                        background: "var(--mono-bg, #1e293b)",
                         border: "1px solid var(--line)",
                         borderRight: "none",
                         borderRadius: "8px 0 0 8px",
                         fontSize: "0.85rem",
-                        color: "var(--ink-soft)",
+                        color: "var(--ink)",
                         fontWeight: 600,
                       }}
                     >
-                      +502
+                      🇬🇹 +502
                     </span>
                     <input
                       id="fiador-tel"
+                      inputMode="numeric"
                       value={telefonoFiador}
-                      onChange={(e) => setTelefonoFiador(formatearTelefono(e.target.value))}
+                      onChange={(e) => setTelefonoFiador(formatearTelefono(e.target.value.replace(/[^0-9-]/g, "")))}
                       placeholder="xxxx-xxxx"
                       maxLength={9}
-                      style={{ borderRadius: "0 8px 8px 0" }}
+                      style={{
+                        borderRadius: "0 8px 8px 0",
+                        fontFamily: "monospace",
+                        letterSpacing: "0.5px",
+                      }}
                     />
                   </div>
+                  <span className="hint">8 dígitos locales (opcional)</span>
                 </div>
 
                 <div className="field">
@@ -390,7 +491,17 @@ export default function CreditoForm() {
         </div>
 
         <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.75rem" }}>
-          <button type="submit" className="btn" disabled={guardando || !socio}>
+          <button
+            type="submit"
+            className="btn"
+            disabled={
+              guardando ||
+              !socio ||
+              !agenciaId ||
+              (tipo === "FIDUCIARIO" && Boolean(fiadorDuplicado)) ||
+              verificandoFiador
+            }
+          >
             {guardando ? "Registrando solicitud…" : "Crear solicitud de crédito"}
           </button>
           <button type="button" className="btn secondary" onClick={() => navigate(-1)}>

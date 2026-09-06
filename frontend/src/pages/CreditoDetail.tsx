@@ -9,6 +9,7 @@ import {
 } from "../types";
 import type { EstadoPrestamo, Prestamo, PrestamoPago } from "../types";
 import { formatearDPI } from "../lib/formatters";
+import type { ResultadoLiquidacion } from "../lib/liquidacionCredito";
 
 export default function CreditoDetail() {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +18,7 @@ export default function CreditoDetail() {
 
   const [prestamo, setPrestamo] = useState<Prestamo | null>(null);
   const [pagos, setPagos] = useState<PrestamoPago[]>([]);
+  const [liquidacion, setLiquidacion] = useState<ResultadoLiquidacion | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
@@ -29,6 +31,11 @@ export default function CreditoDetail() {
       .get<Prestamo>(`/prestamos/${id}`)
       .then(({ data }) => setPrestamo(data))
       .catch((err) => setError(mensajeError(err)));
+
+    api
+      .get<{ prestamo: Prestamo; liquidacion: ResultadoLiquidacion }>(`/prestamos/${id}/liquidacion`)
+      .then(({ data }) => setLiquidacion(data.liquidacion))
+      .catch(() => {});
 
     api
       .get<PrestamoPago[]>(`/prestamos/${id}/pagos`)
@@ -106,23 +113,43 @@ export default function CreditoDetail() {
           )}
 
           {puedeAprobar && prestamo.estado === "APROBADO" && (
-            <button
-              className="btn"
-              onClick={() => cambiarEstado("DESEMBOLSADO")}
-              disabled={procesando}
-            >
-              💵 Desembolsar crédito
-            </button>
+            <>
+              <button
+                className="btn"
+                style={{ background: "#059669", borderColor: "#059669", fontWeight: 700 }}
+                onClick={() => cambiarEstado("DESEMBOLSADO")}
+                disabled={procesando}
+              >
+                💵 Desembolsar crédito
+              </button>
+              <button
+                className="btn danger"
+                onClick={() => cambiarEstado("RECHAZADO")}
+                disabled={procesando}
+                style={{ padding: "0.4rem 0.8rem", fontSize: "0.85rem" }}
+              >
+                ✕ Anular / Rechazar
+              </button>
+            </>
           )}
 
           {puedeAprobar && prestamo.estado === "DESEMBOLSADO" && (
-            <button
-              className="btn secondary"
-              onClick={() => cambiarEstado("CANCELADO")}
-              disabled={procesando}
-            >
-              Finalizar / Pagado
-            </button>
+            <>
+              <Link
+                to="/caja-auxiliar"
+                className="btn"
+                style={{ background: "#10b981", borderColor: "#10b981", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
+              >
+                💰 Cobrar Cuota en Caja
+              </Link>
+              <button
+                className="btn secondary"
+                onClick={() => cambiarEstado("CANCELADO")}
+                disabled={procesando}
+              >
+                Finalizar / Liquidar
+              </button>
+            </>
           )}
 
           {puedeAprobar && prestamo.estado === "SOLICITUD" && (
@@ -185,6 +212,99 @@ export default function CreditoDetail() {
           </span>
         </div>
       </div>
+
+      {/* TARJETA OFICIAL DE LIQUIDACIÓN AL DÍA DE HOY (DÍAS EXACTOS / 365 Y MORA TRAS 4 DÍAS DE GRACIA) */}
+      {liquidacion && prestamo.estado !== "CANCELADO" && (
+        <div
+          className="card"
+          style={{
+            background: "rgba(16, 185, 129, 0.05)",
+            border: "1px solid rgba(16, 185, 129, 0.35)",
+            borderRadius: "10px",
+            padding: "1rem 1.25rem",
+            marginBottom: "1.5rem",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: "1.02rem", color: "#065f46" }}>
+                ⚡ Liquidación Financiera en Tiempo Real al Día de Hoy ({liquidacion.fechaLiquidacion})
+              </h3>
+              <p style={{ margin: "0.15rem 0 0", fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+                Cálculo oficial con días exactos transcurridos desde el último pago ({liquidacion.fechaUltimoPago}), base 365 días y mora tras 4 días de gracia.
+              </p>
+            </div>
+            <Link
+              to="/caja-auxiliar"
+              className="btn"
+              style={{ background: "#059669", borderColor: "#059669", fontSize: "0.82rem", padding: "0.3rem 0.75rem", fontWeight: 700 }}
+            >
+              💵 Cobrar Cuota en Caja
+            </Link>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+              gap: "0.75rem",
+            }}
+          >
+            <div style={{ background: "var(--paper)", padding: "0.6rem 0.8rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+              <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)", display: "block" }}>Días transcurridos</span>
+              <strong style={{ fontSize: "1.1rem", color: "var(--ink)" }}>{liquidacion.diasTranscurridos} días</strong>
+              <span style={{ fontSize: "0.7rem", color: "var(--ink-soft)", display: "block" }}>
+                {liquidacion.diasAtraso > 0 ? `${liquidacion.diasAtraso} días de atraso` : "Al día"}
+              </span>
+            </div>
+
+            <div style={{ background: "var(--paper)", padding: "0.6rem 0.8rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+              <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)", display: "block" }}>Interés diario ({liquidacion.tasaInteresAnual}% anual)</span>
+              <strong style={{ fontSize: "1.1rem", color: "#d97706" }}>{formatoQ(liquidacion.interesDiario)} / día</strong>
+              <span style={{ fontSize: "0.7rem", color: "var(--ink-soft)", display: "block" }}>
+                ({formatoQ(liquidacion.saldoCapital)} × 24% / 365)
+              </span>
+            </div>
+
+            <div style={{ background: "var(--paper)", padding: "0.6rem 0.8rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+              <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)", display: "block" }}>Interés acumulado hoy ({liquidacion.diasTranscurridos}d)</span>
+              <strong style={{ fontSize: "1.1rem", color: "#d97706" }}>{formatoQ(liquidacion.interesDevengado)}</strong>
+              <span style={{ fontSize: "0.7rem", color: "var(--ink-soft)", display: "block" }}>
+                {formatoQ(liquidacion.interesDiario)} × {liquidacion.diasTranscurridos}d
+              </span>
+            </div>
+
+            <div
+              style={{
+                background: liquidacion.estaEnMora ? "rgba(220, 38, 38, 0.08)" : "var(--paper)",
+                border: liquidacion.estaEnMora ? "1px solid #ef4444" : "1px solid var(--line)",
+                padding: "0.6rem 0.8rem",
+                borderRadius: "8px",
+              }}
+            >
+              <span style={{ fontSize: "0.74rem", color: liquidacion.estaEnMora ? "#b91c1c" : "var(--ink-soft)", display: "block" }}>
+                Recargo de mora
+              </span>
+              <strong style={{ fontSize: "1.1rem", color: liquidacion.estaEnMora ? "#b91c1c" : "var(--ink)" }}>
+                {formatoQ(liquidacion.moraFijaSugerida)}
+              </strong>
+              <span style={{ fontSize: "0.7rem", color: liquidacion.estaEnMora ? "#b91c1c" : "var(--ink-soft)", display: "block" }}>
+                {liquidacion.estaEnMora ? `> 4 días de gracia (Q25 × ${liquidacion.cuotasVencidas})` : "4 días gracia: Q 0.00"}
+              </span>
+            </div>
+
+            <div style={{ background: "rgba(16, 185, 129, 0.12)", padding: "0.6rem 0.8rem", borderRadius: "8px", border: "1px solid #10b981" }}>
+              <span style={{ fontSize: "0.74rem", color: "#065f46", display: "block", fontWeight: 700 }}>
+                Saldo Cancelación Total Hoy
+              </span>
+              <strong style={{ fontSize: "1.15rem", color: "#047857" }}>{formatoQ(liquidacion.saldoCancelacionTotal)}</strong>
+              <span style={{ fontSize: "0.7rem", color: "#065f46", display: "block" }}>
+                Capital + Interés {liquidacion.diasTranscurridos}d + Mora
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "1.5rem", marginBottom: "1.5rem" }}>
         <div className="card">

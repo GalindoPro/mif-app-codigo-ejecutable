@@ -103,7 +103,7 @@ export default function Layout() {
         </div>
 
         <nav className="nav">
-          {/* CAJERO: Ventanilla, Caja Chica y Consulta de Socios */}
+          {/* CAJERO: Ventanilla, Caja Chica, Consulta de Socios y Cobros */}
           {usuario?.rol === "CAJERO" && (
             <>
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.5rem 0 0.2rem 0.5rem" }}>
@@ -115,13 +115,19 @@ export default function Layout() {
               <NavLink to="/caja-chica" className={cls}>
                 📥 Caja chica
               </NavLink>
+              <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.75rem 0 0.2rem 0.5rem" }}>
+                Consultas y Cobros
+              </div>
               <NavLink to="/socios" className={cls}>
                 👥 Consultar Socios
+              </NavLink>
+              <NavLink to="/creditos" className={cls}>
+                📄 Cobro de Créditos
               </NavLink>
             </>
           )}
 
-          {/* PROMOTOR: Cartera de Préstamos, Socios en campo, Solicitudes y Apertura de Ahorros */}
+          {/* PROMOTOR: Cartera de Préstamos, Socios en campo, Solicitudes y Ahorros */}
           {usuario?.rol === "PROMOTOR" && (
             <>
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.5rem 0 0.2rem 0.5rem" }}>
@@ -137,30 +143,32 @@ export default function Layout() {
                 📄 Créditos & Simulador
               </NavLink>
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.75rem 0 0.2rem 0.5rem" }}>
-                Ahorros
+                Captaciones
               </div>
-              {TIPOS_AHORRO.map((t) => (
-                <NavLink key={t.slug} to={`/ahorros/${t.slug}`} className={cls}>
-                  {t.titulo}
-                </NavLink>
-              ))}
+              <NavLink to="/ahorros/corriente" className={cls}>
+                💰 Cuentas de Ahorro
+              </NavLink>
+              <NavLink to="/ahorros/plazo-fijo" className={cls}>
+                📈 Inversiones Plazo Fijo
+              </NavLink>
             </>
           )}
 
-          {/* SUPERVISOR: Tablero con analítica de servicios, Libro de Arqueos para Comisión de Vigilancia, Aprobación de Créditos y Auditoría */}
+          {/* SUPERVISOR (JEFE DE AGENCIA): Supervisión ejecutiva, Aprobación de créditos, Arqueos y Padrón */}
           {usuario?.rol === "SUPERVISOR" && (
             <>
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.5rem 0 0.2rem 0.5rem" }}>
                 Supervisión y Control
               </div>
               <NavLink to="/tablero" className={cls}>
-                📊 Tablero & Servicios
+                📊 Tablero & Analítica
               </NavLink>
               <NavLink to="/arqueos/mensual" className={cls}>
                 📑 Libro Mensual Arqueos
               </NavLink>
+
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.75rem 0 0.2rem 0.5rem" }}>
-                Cartera y Cajas
+                Cartera y Créditos
               </div>
               <NavLink to="/creditos" className={cls}>
                 📄 Bandeja de Créditos
@@ -169,26 +177,28 @@ export default function Layout() {
                 📂 Kardex Cartera
               </NavLink>
               <NavLink to="/auxiliar-caja" className={cls}>
-                💵 Historial de Cajas
+                💵 Arqueos e Historial de Caja
               </NavLink>
+
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.75rem 0 0.2rem 0.5rem" }}>
-                Padrón y Ahorros
+                Padrón y Captaciones
               </div>
               <NavLink to="/socios" className={cls}>
-                👥 Socios
+                👥 Padrón de Socios
               </NavLink>
               <NavLink to="/aportaciones" className={cls}>
-                🏛️ Aportaciones
+                🏛️ Aportaciones de Capital
               </NavLink>
-              {TIPOS_AHORRO.map((t) => (
-                <NavLink key={t.slug} to={`/ahorros/${t.slug}`} className={cls}>
-                  {t.titulo}
-                </NavLink>
-              ))}
+              <NavLink to="/ahorros/corriente" className={cls}>
+                💰 Cuentas de Ahorro
+              </NavLink>
+              <NavLink to="/ahorros/plazo-fijo" className={cls}>
+                📈 Inversiones Plazo Fijo
+              </NavLink>
             </>
           )}
 
-          {/* ADMIN y GERENCIA: Acceso total */}
+          {/* ADMIN y GERENCIA: Acceso total de auditoría y configuración */}
           {(usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA") && (
             <>
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.2rem 0 0.2rem 0.5rem" }}>
@@ -200,6 +210,7 @@ export default function Layout() {
               <NavLink to="/arqueos/mensual" className={cls}>
                 📑 Libro Mensual Arqueos
               </NavLink>
+
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.6rem 0 0.2rem 0.5rem" }}>
                 Operaciones
               </div>
@@ -215,8 +226,9 @@ export default function Layout() {
               <NavLink to="/promotor/cartera" className={cls}>
                 📂 Kardex Cartera
               </NavLink>
+
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.6rem 0 0.2rem 0.5rem" }}>
-                Socios y Ahorro
+                Socios y Captaciones
               </div>
               <NavLink to="/socios" className={cls}>
                 👥 Socios
@@ -229,6 +241,7 @@ export default function Layout() {
                   {t.titulo}
                 </NavLink>
               ))}
+
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.6rem 0 0.2rem 0.5rem" }}>
                 Administración
               </div>
@@ -242,68 +255,70 @@ export default function Layout() {
           )}
         </nav>
 
-        {/* Herramientas de Mantenimiento de Datos (Visible en todo el sistema) */}
-        <div
-          style={{
-            margin: "0.5rem 0.25rem 0.75rem",
-            padding: "0.55rem 0.5rem",
-            background: "rgba(2, 132, 199, 0.08)",
-            borderRadius: "8px",
-            border: "1px solid rgba(2, 132, 199, 0.25)",
-          }}
-        >
+        {/* Herramientas de Mantenimiento de Datos (Exclusivo para ADMIN / Sistemas) */}
+        {usuario?.rol === "ADMIN" && (
           <div
             style={{
-              fontSize: "0.68rem",
-              fontWeight: 700,
-              color: "#38bdf8",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              marginBottom: "0.4rem",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.3rem",
+              margin: "0.5rem 0.25rem 0.75rem",
+              padding: "0.55rem 0.5rem",
+              background: "rgba(2, 132, 199, 0.08)",
+              borderRadius: "8px",
+              border: "1px solid rgba(2, 132, 199, 0.25)",
             }}
           >
-            ⚙️ Control de Datos
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={handleRecargarGlobal}
-              disabled={recargando || reseteando}
+            <div
               style={{
-                fontSize: "0.72rem",
-                padding: "0.35rem 0.45rem",
-                width: "100%",
-                justifyContent: "center",
-                borderColor: "rgba(2, 132, 199, 0.4)",
+                fontSize: "0.68rem",
+                fontWeight: 700,
                 color: "#38bdf8",
-                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: "0.4rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.3rem",
               }}
-              title="Restaurar los 568 socios, 65 créditos y 692 plazos fijos de Excel"
             >
-              {recargando ? "⏳ Recargando..." : "📥 Recargar Excel"}
-            </button>
-            <button
-              type="button"
-              className="btn danger"
-              onClick={handleResetGlobal}
-              disabled={reseteando || recargando}
-              style={{
-                fontSize: "0.72rem",
-                padding: "0.35rem 0.45rem",
-                width: "100%",
-                justifyContent: "center",
-                fontWeight: 600,
-              }}
-              title="Borrar todos los datos y reiniciar el sistema limpio desde cero"
-            >
-              {reseteando ? "⏳ Reiniciando..." : "⚠️ Reiniciar a Cero"}
-            </button>
+              ⚙️ Control de Datos (Sistemas)
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={handleRecargarGlobal}
+                disabled={recargando || reseteando}
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "0.35rem 0.45rem",
+                  width: "100%",
+                  justifyContent: "center",
+                  borderColor: "rgba(2, 132, 199, 0.4)",
+                  color: "#38bdf8",
+                  fontWeight: 600,
+                }}
+                title="Restaurar los 568 socios, 65 créditos y 692 plazos fijos de Excel"
+              >
+                {recargando ? "⏳ Recargando..." : "📥 Recargar Excel"}
+              </button>
+              <button
+                type="button"
+                className="btn danger"
+                onClick={handleResetGlobal}
+                disabled={reseteando || recargando}
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "0.35rem 0.45rem",
+                  width: "100%",
+                  justifyContent: "center",
+                  fontWeight: 600,
+                }}
+                title="Borrar todos los datos y reiniciar el sistema limpio desde cero"
+              >
+                {reseteando ? "⏳ Reiniciando..." : "⚠️ Reiniciar a Cero"}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="sidebar-footer" style={{ padding: "0.75rem 0.5rem", background: "var(--mono-bg)", borderRadius: "8px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>

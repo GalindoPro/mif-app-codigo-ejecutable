@@ -1,8 +1,9 @@
 import { pool } from "../../db/pool";
 import { registrarAuditoria } from "../../utils/auditoria";
-import { badRequest, notFound, forbidden } from "../../utils/errors";
+import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
 import * as cuentasService from "../cuentas/service";
 import { calcularAmortizacion } from "./amortizacion";
+import { calcularLiquidacionCredito, distribuirMontoCobro } from "./liquidacion";
 import type { OpcionesSimulacion } from "./amortizacion";
 import type {
   EstadoPrestamo,
@@ -151,14 +152,55 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
     fechaInicio: data.fechaSolicitud,
   });
 
+  // Validaciones del Fiador si el crédito es FIDUCIARIO
+  if (data.tipo === "FIDUCIARIO" && data.dpiFiador && data.dpiFiador.trim()) {
+    const rawDpiFiador = data.dpiFiador.replace(/\D/g, "");
+    if (rawDpiFiador.length === 13) {
+      // 1. Verificar si coincide con el socio solicitante
+      const { rows: sRows } = await pool.query(`select dpi, nombres from socios where id = $1`, [data.socioId]);
+      if (sRows[0]?.dpi && sRows[0].dpi.replace(/\D/g, "") === rawDpiFiador) {
+        throw badRequest(`El socio solicitante (${sRows[0].nombres}) no puede ser su propio fiador.`);
+      }
+
+      // 2. Verificar si este fiador ya respalda un crédito activo
+      const { rows: dupFiador } = await pool.query(
+        `select p.codigo, s.nombres as socio_nombre, s.numero_asociado, p.estado
+         from prestamos p
+         join socios s on s.id = p.socio_id
+         where regexp_replace(coalesce(p.dpi_fiador, ''), '[^0-9]', '', 'g') = $1
+           and p.estado in ('SOLICITUD', 'APROBADO', 'DESEMBOLSADO')
+         limit 1`,
+        [rawDpiFiador],
+      );
+      if (dupFiador[0]) {
+        throw conflict(
+          `El fiador con DPI "${data.dpiFiador.trim()}" ya está respaldando el crédito ${dupFiador[0].codigo} (${dupFiador[0].estado}) del socio "${dupFiador[0].socio_nombre}" (${dupFiador[0].numero_asociado}). No se permiten fiadores duplicados en créditos activos.`,
+        );
+      }
+
+      // 3. Si el fiador es un socio de la cooperativa, verificar que no tenga créditos pendientes con mora
+      const { rows: socioFiador } = await pool.query(
+        `select id, nombres, numero_asociado from socios where regexp_replace(coalesce(dpi, ''), '[^0-9]', '', 'g') = $1 limit 1`,
+        [rawDpiFiador],
+      );
+      if (socioFiador[0]) {
+        const { rows: moraRows } = await pool.query(
+          `select codigo from prestamos where socio_id = $1 and estado = 'DESEMBOLSADO' and coalesce(saldo_capital, 0) > 0 limit 1`,
+          [socioFiador[0].id],
+        );
+      }
+    }
+  }
+
   const codigo = await siguienteCodigo(data.agenciaId);
+  const hoy = new Date().toISOString().slice(0, 10);
 
   const { rows } = await pool.query(
     `insert into prestamos (
        codigo, socio_id, agencia_id, promotor_id, tipo, estado,
        tipo_amortizacion, monto_solicitado, monto_aprobado, saldo_capital, tasa_interes_mensual,
-       plazo_meses, cuota_mensual, destino, garantia, ubicacion_garantia, nombre_fiador, dpi_fiador, telefono_fiador, documento_desembolso, observaciones, fecha_solicitud
-     ) values ($1, $2, $3, $4, $5, 'SOLICITUD', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+       plazo_meses, cuota_mensual, destino, garantia, ubicacion_garantia, nombre_fiador, dpi_fiador, telefono_fiador, documento_desembolso, observaciones, fecha_solicitud, fecha_aprobacion
+     ) values ($1, $2, $3, $4, $5, 'APROBADO', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
      returning *`,
     [
       codigo,
@@ -181,7 +223,8 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
       data.telefonoFiador ?? null,
       data.documentoDesembolso ?? null,
       data.observaciones ?? null,
-      data.fechaSolicitud || new Date().toISOString().slice(0, 10),
+      data.fechaSolicitud || hoy,
+      hoy,
     ],
   );
 
@@ -413,5 +456,204 @@ export async function obtenerKardexCartera(filtros: FiltrosKardexCartera) {
 
 export function simular(opciones: OpcionesSimulacion) {
   return calcularAmortizacion(opciones);
+}
+
+export async function obtenerLiquidacion(prestamoId: string, fechaLiquidacion?: string) {
+  const { rows: pRows } = await pool.query(
+    `select p.*, s.nombres as socio_nombres, s.numero_asociado, s.dpi as socio_dpi
+     from prestamos p
+     join socios s on s.id = p.socio_id
+     where p.id = $1`,
+    [prestamoId],
+  );
+  const prestamo = pRows[0];
+  if (!prestamo) throw notFound("Préstamo no encontrado");
+
+  // Buscar último pago registrado
+  const { rows: pagos } = await pool.query(
+    `select fecha from prestamo_pagos where prestamo_id = $1 order by fecha desc, created_at desc limit 1`,
+    [prestamoId],
+  );
+
+  const fechaUltimoPago =
+    pagos[0]?.fecha || prestamo.fecha_desembolso || prestamo.fecha_solicitud || prestamo.created_at;
+
+  const saldoCapital = Number(
+    prestamo.saldo_capital !== null && prestamo.saldo_capital !== undefined
+      ? prestamo.saldo_capital
+      : prestamo.monto_aprobado || prestamo.monto_solicitado,
+  );
+
+  const liquidacion = calcularLiquidacionCredito({
+    saldoCapital,
+    tasaInteresMensual: Number(prestamo.tasa_interes_mensual) || 2.0,
+    plazoMeses: Number(prestamo.plazo_meses) || 12,
+    montoOriginal: Number(prestamo.monto_aprobado || prestamo.monto_solicitado),
+    cuotaMensualEstimada: Number(prestamo.cuota_mensual) || 0,
+    fechaUltimoPago,
+    fechaLiquidacion: fechaLiquidacion || new Date().toISOString().slice(0, 10),
+    tipoAmortizacion: prestamo.tipo_amortizacion,
+  });
+
+  return {
+    prestamo,
+    liquidacion,
+  };
+}
+
+export async function verificarFiador(dpi: string, socioIdSolicitante?: string) {
+  const rawDpi = dpi.replace(/\D/g, "");
+  if (rawDpi.length !== 13) {
+    return { valido: false, mensaje: "El DPI del fiador debe contener 13 dígitos numéricos" };
+  }
+
+  // 1. Verificar si coincide con el socio solicitante
+  if (socioIdSolicitante) {
+    const { rows: socioRows } = await pool.query(`select id, nombres, dpi from socios where id = $1`, [socioIdSolicitante]);
+    if (socioRows[0] && socioRows[0].dpi) {
+      const socioDpiClean = socioRows[0].dpi.replace(/\D/g, "");
+      if (socioDpiClean === rawDpi) {
+        return {
+          valido: true,
+          disponible: false,
+          motivo: "SOCIO_MISMO",
+          mensaje: `El socio solicitante (${socioRows[0].nombres}) no puede ser su propio fiador.`,
+        };
+      }
+    }
+  }
+
+  // 2. Verificar si este fiador ya respalda un crédito activo
+  const { rows: prestamoRows } = await pool.query(
+    `select p.id, p.codigo, p.monto_solicitado, p.estado, s.nombres as socio_nombre, s.numero_asociado
+     from prestamos p
+     join socios s on s.id = p.socio_id
+     where regexp_replace(coalesce(p.dpi_fiador, ''), '[^0-9]', '', 'g') = $1
+       and p.estado in ('SOLICITUD', 'APROBADO', 'DESEMBOLSADO')
+     limit 1`,
+    [rawDpi],
+  );
+
+  if (prestamoRows[0]) {
+    return {
+      valido: true,
+      disponible: false,
+      motivo: "FIADOR_REPETIDO",
+      mensaje: `Este fiador ya respalda el crédito ${prestamoRows[0].codigo} (${prestamoRows[0].estado}) del socio ${prestamoRows[0].socio_nombre} (${prestamoRows[0].numero_asociado}). No se permiten fiadores duplicados en créditos activos.`,
+      prestamo: {
+        codigo: prestamoRows[0].codigo,
+        socioNombre: prestamoRows[0].socio_nombre,
+        numeroAsociado: prestamoRows[0].numero_asociado,
+        estado: prestamoRows[0].estado,
+      },
+    };
+  }
+
+  // 3. Verificar si el fiador es un socio registrado de la cooperativa
+  const { rows: socioFiador } = await pool.query(
+    `select id, nombres, numero_asociado from socios where regexp_replace(coalesce(dpi, ''), '[^0-9]', '', 'g') = $1 limit 1`,
+    [rawDpi],
+  );
+
+  if (socioFiador[0]) {
+    return {
+      valido: true,
+      disponible: true,
+      esSocio: true,
+      socio: {
+        id: socioFiador[0].id,
+        nombres: socioFiador[0].nombres,
+        numeroAsociado: socioFiador[0].numero_asociado,
+      },
+      mensaje: `✓ Fiador identificado: Socio ${socioFiador[0].nombres} (${socioFiador[0].numero_asociado}) — Al día y disponible.`,
+    };
+  }
+
+  return {
+    valido: true,
+    disponible: true,
+    esSocio: false,
+    mensaje: "✓ Fiador externo válido y disponible (no requiere aportación previa).",
+  };
+}
+
+export interface FiltrosFiadores {
+  agenciaId?: string | null;
+  q?: string;
+  tipoFiltro?: "TODOS" | "EXTERNOS" | "SOCIOS";
+}
+
+export async function listarFiadores(filtros: FiltrosFiadores) {
+  const valores: unknown[] = [];
+  const condiciones: string[] = [
+    `p.tipo = 'FIDUCIARIO'`,
+    `p.nombre_fiador is not null`,
+    `trim(p.nombre_fiador) != ''`,
+  ];
+
+  if (filtros.agenciaId) {
+    valores.push(filtros.agenciaId);
+    condiciones.push(`p.agencia_id = $${valores.length}`);
+  }
+
+  if (filtros.q) {
+    const qClean = filtros.q.replace(/\D/g, "");
+    valores.push(`%${filtros.q.toLowerCase()}%`);
+    const idx = valores.length;
+    if (qClean.length >= 3) {
+      valores.push(`%${qClean}%`);
+      const idxClean = valores.length;
+      condiciones.push(
+        `(lower(p.nombre_fiador) like $${idx} or p.dpi_fiador like $${idx} or regexp_replace(coalesce(p.dpi_fiador, ''), '[^0-9]', '', 'g') like $${idxClean} or lower(s.nombres) like $${idx} or lower(p.codigo) like $${idx})`,
+      );
+    } else {
+      condiciones.push(
+        `(lower(p.nombre_fiador) like $${idx} or p.dpi_fiador like $${idx} or lower(s.nombres) like $${idx} or lower(p.codigo) like $${idx})`,
+      );
+    }
+  }
+
+  const query = `
+    select distinct on (coalesce(nullif(regexp_replace(coalesce(p.dpi_fiador, ''), '[^0-9]', '', 'g'), ''), lower(trim(p.nombre_fiador))))
+      p.id as prestamo_id,
+      p.codigo as prestamo_codigo,
+      p.estado as prestamo_estado,
+      p.monto_solicitado,
+      p.monto_aprobado,
+      p.saldo_capital,
+      p.fecha_solicitud,
+      p.fecha_desembolso,
+      p.nombre_fiador,
+      p.dpi_fiador,
+      p.telefono_fiador,
+      p.ubicacion_garantia as lugar_fiador,
+      s.id as socio_id,
+      s.numero_asociado as socio_numero,
+      s.nombres as socio_nombre,
+      a.nombre as agencia_nombre,
+      u.nombre as promotor_nombre,
+      sf.id as socio_fiador_id,
+      sf.numero_asociado as socio_fiador_numero,
+      sf.nombres as socio_fiador_nombres,
+      case when sf.id is not null then true else false end as es_socio_activo
+    from prestamos p
+    join socios s on s.id = p.socio_id
+    join agencias a on a.id = p.agencia_id
+    left join usuarios u on u.id = p.promotor_id
+    left join socios sf on regexp_replace(coalesce(sf.dpi, ''), '[^0-9]', '', 'g') = regexp_replace(coalesce(p.dpi_fiador, ''), '[^0-9]', '', 'g') and coalesce(p.dpi_fiador, '') != ''
+    where ${condiciones.join(" and ")}
+    order by coalesce(nullif(regexp_replace(coalesce(p.dpi_fiador, ''), '[^0-9]', '', 'g'), ''), lower(trim(p.nombre_fiador))), p.created_at desc
+  `;
+
+  const { rows } = await pool.query(query, valores);
+
+  if (filtros.tipoFiltro === "EXTERNOS") {
+    return rows.filter((r) => !r.es_socio_activo);
+  }
+  if (filtros.tipoFiltro === "SOCIOS") {
+    return rows.filter((r) => r.es_socio_activo);
+  }
+
+  return rows;
 }
 

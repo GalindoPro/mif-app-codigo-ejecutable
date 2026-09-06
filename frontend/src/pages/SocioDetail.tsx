@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import type { Socio } from "../types";
-import { PARENTESCOS_BENEFICIARIO } from "../types";
+import { PARENTESCOS_BENEFICIARIO, formatoQ } from "../types";
 import {
   formatearDPI,
   formatearTelefono,
@@ -23,17 +23,19 @@ interface Cuenta {
 type SocioConCuentas = Socio & { cuentas: Cuenta[] };
 
 const TIPO_CUENTA_LABEL: Record<string, string> = {
-  APORTACION: "Aportación",
-  AHORRO_CORRIENTE: "Ahorro corriente",
-  AHORRO_PROGRAMADO: "Ahorro programado",
-  AHORRO_INFANTO_JUVENIL: "Ahorro infanto juvenil",
-  AHORRO_PLAZO_FIJO: "Ahorro a plazo fijo",
+  APORTACION: "Aportación Estatutaria",
+  AHORRO_CORRIENTE: "Ahorro Corriente",
+  AHORRO_PROGRAMADO: "Ahorro Programado",
+  AHORRO_INFANTO_JUVENIL: "Ahorro Infanto Juvenil",
+  AHORRO_SOBRE_PRESTAMO: "Ahorro sobre Préstamo",
+  AHORRO_PLAZO_FIJO: "Ahorro a Plazo Fijo",
 };
 
 const TIPO_SLUG: Record<string, string> = {
   AHORRO_CORRIENTE: "corriente",
   AHORRO_PROGRAMADO: "programado",
   AHORRO_INFANTO_JUVENIL: "infanto-juvenil",
+  AHORRO_SOBRE_PRESTAMO: "sobre-prestamo",
   AHORRO_PLAZO_FIJO: "plazo-fijo",
 };
 
@@ -43,8 +45,15 @@ export default function SocioDetail() {
 
   const [socio, setSocio] = useState<SocioConCuentas | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
+
+  // Modal de Apertura de Aportación Inicial
+  const [mostrarModalAportacion, setMostrarModalAportacion] = useState(false);
+  const [montoApor, setMontoApor] = useState("100");
+  const [reciboApor, setReciboApor] = useState("");
+  const [abriendoApor, setAbriendoApor] = useState(false);
 
   const [form, setForm] = useState({
     nombres: "",
@@ -145,6 +154,8 @@ export default function SocioDetail() {
         telefonoBeneficiario: prepararTelefonoParaGuardar(form.telefonoBeneficiario),
       });
       setEditando(false);
+      setMensajeExito("Datos del socio actualizados correctamente.");
+      setTimeout(() => setMensajeExito(null), 4000);
       cargar();
     } catch (err) {
       setError(mensajeError(err));
@@ -163,8 +174,39 @@ export default function SocioDetail() {
     }
   }
 
+  async function handleAbrirAportacion(e: FormEvent) {
+    e.preventDefault();
+    if (!id) return;
+    const monto = Number(montoApor);
+    if (isNaN(monto) || monto < 100) {
+      setError("La aportación estatutaria mínima es de Q 100.00.");
+      return;
+    }
+    setAbriendoApor(true);
+    setError(null);
+    try {
+      const { data } = await api.post(`/socios/${id}/abrir-aportacion`, {
+        monto,
+        recibo: reciboApor.trim() || undefined,
+      });
+      setMostrarModalAportacion(false);
+      setMensajeExito(`¡Cuenta de Aportación ${data.numero_cuenta} creada con éxito con saldo de ${formatoQ(monto)}! El socio ya puede aperturar cuentas de ahorro y créditos.`);
+      setTimeout(() => setMensajeExito(null), 6000);
+      cargar();
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setAbriendoApor(false);
+    }
+  }
+
   if (error && !socio) return <div className="alert error">{error}</div>;
   if (!socio) return <p>Cargando…</p>;
+
+  const cuentaAportacion = socio.cuentas.find((c) => c.tipo === "APORTACION");
+  const tieneAportacion = Boolean(cuentaAportacion);
+  const saldoAportacion = cuentaAportacion ? Number(cuentaAportacion.saldo_actual) : 0;
+  const tieneAportacionMinima = saldoAportacion >= 100;
 
   return (
     <div>
@@ -175,10 +217,20 @@ export default function SocioDetail() {
           </button>
           <h1>{socio.nombres}</h1>
           <p>
-            <span className="mono">{socio.numero_asociado}</span> · {socio.agencia_nombre}
+            <span className="mono">{socio.numero_asociado}</span> · {socio.agencia_nombre} · {socio.cuentas.length} cuenta(s) registradas
           </p>
         </div>
-        <div style={{ display: "flex", gap: "0.6rem" }}>
+        <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", alignItems: "center" }}>
+          {!tieneAportacion && (
+            <button
+              type="button"
+              className="btn"
+              style={{ background: "#059669", borderColor: "#059669", fontWeight: 700 }}
+              onClick={() => setMostrarModalAportacion(true)}
+            >
+              ➕ Aperturar Aportación (Q 100)
+            </button>
+          )}
           <span className={`badge ${socio.estado === "ACTIVO" ? "activo" : "inactivo"}`}>
             {socio.estado === "ACTIVO" ? "Activo" : "Inactivo"}
           </span>
@@ -194,15 +246,119 @@ export default function SocioDetail() {
         </div>
       </div>
 
-      {error && <div className="alert error">{error}</div>}
+      {mensajeExito && <div className="alert success" style={{ marginBottom: "1rem" }}>{mensajeExito}</div>}
+      {error && <div className="alert error" style={{ marginBottom: "1rem" }}>{error}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem", alignItems: "start" }}>
+      {/* ALERTA: SOCIO CON 0 CUENTAS O SIN APORTACIÓN ESTATUTARIA */}
+      {!tieneAportacionMinima && (
+        <div
+          className="alert warning"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "1rem",
+            marginBottom: "1.25rem",
+            borderLeft: "4px solid #f59e0b",
+          }}
+        >
+          <div>
+            <strong style={{ fontSize: "0.95rem" }}>
+              ⚠️ Asociado sin Cuenta de Aportaciones Estatutaria ({socio.cuentas.length} cuentas registradas)
+            </strong>
+            <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem", color: "var(--ink-soft)" }}>
+              Por estatuto cooperativo, todo asociado debe contar con su <strong>Cuenta de Aportación Inicial (Mínimo Q 100.00)</strong> para poder abrir cuentas de Ahorro Corriente, Programado, Plazo Fijo o solicitar Créditos.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            style={{ background: "#059669", borderColor: "#059669", fontWeight: 700, fontSize: "0.88rem" }}
+            onClick={() => setMostrarModalAportacion(true)}
+          >
+            ➕ Aperturar Aportación Inicial (Q 100.00)
+          </button>
+        </div>
+      )}
+
+      {/* PANEL DE ACCIONES RÁPIDAS PARA ESTE SOCIO */}
+      <div
+        className="card"
+        style={{
+          marginBottom: "1.25rem",
+          background: "var(--paper-raised)",
+          border: "1px solid var(--line)",
+          padding: "0.85rem 1rem",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}>
+          <div>
+            <strong style={{ fontSize: "0.88rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <span>⚡</span> Acciones Rápidas para {socio.nombres.split(" ")[0]}
+            </strong>
+            <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>
+              Abre nuevas cuentas o solicitudes vinculadas automáticamente a este socio:
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: "0.45rem", flexWrap: "wrap" }}>
+            {!tieneAportacion && (
+              <button
+                type="button"
+                className="btn"
+                style={{ background: "#059669", borderColor: "#059669", fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+                onClick={() => setMostrarModalAportacion(true)}
+              >
+                + Aportación
+              </button>
+            )}
+            <Link
+              to={`/ahorros/corriente/nueva?socioId=${socio.id}`}
+              className="btn secondary"
+              style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+            >
+              + Ahorro Corriente
+            </Link>
+            <Link
+              to={`/ahorros/programado/nueva?socioId=${socio.id}`}
+              className="btn secondary"
+              style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+            >
+              + Ahorro Programado
+            </Link>
+            <Link
+              to={`/ahorros/infanto-juvenil/nueva?socioId=${socio.id}`}
+              className="btn secondary"
+              style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+            >
+              + Infanto Juvenil
+            </Link>
+            <Link
+              to={`/ahorros/plazo-fijo/nuevo?socioId=${socio.id}`}
+              className="btn secondary"
+              style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+            >
+              + Plazo Fijo
+            </Link>
+            <Link
+              to={`/creditos/nuevo?socioId=${socio.id}`}
+              className="btn"
+              style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+            >
+              + Solicitar Crédito
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "1.25rem", alignItems: "start" }}>
+        {/* DATOS GENERALES DEL SOCIO */}
         <div className="card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-            <h3 style={{ fontFamily: "inherit", fontSize: "1rem" }}>Datos generales</h3>
+            <h3 style={{ fontFamily: "inherit", fontSize: "1rem", margin: 0 }}>Datos generales</h3>
             {!editando && (
               <button className="btn secondary" onClick={() => setEditando(true)}>
-                Editar
+                ✏️ Editar Datos
               </button>
             )}
           </div>
@@ -348,7 +504,6 @@ export default function SocioDetail() {
                   onChange={(e) => setForm({ ...form, dpiBeneficiario: formatearDPI(e.target.value) })}
                   maxLength={15}
                   placeholder="xxxx-xxxxx-xxxx"
-                  style={{ fontFamily: "monospace", letterSpacing: "0.5px" }}
                 />
               </div>
               <div className="field">
@@ -388,15 +543,11 @@ export default function SocioDetail() {
                   />
                 </div>
               </div>
-              <div style={{ display: "flex", gap: "0.6rem" }}>
-                <button
-                  className="btn"
-                  type="submit"
-                  disabled={guardando || Boolean(dpiDuplicado) || verificandoDpi}
-                >
+              <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
+                <button type="submit" className="btn" disabled={guardando}>
                   {guardando ? "Guardando…" : "Guardar cambios"}
                 </button>
-                <button className="btn secondary" type="button" onClick={() => setEditando(false)}>
+                <button type="button" className="btn secondary" onClick={() => setEditando(false)}>
                   Cancelar
                 </button>
               </div>
@@ -463,52 +614,199 @@ export default function SocioDetail() {
           )}
         </div>
 
+        {/* CUENTAS DEL ASOCIADO */}
         <div className="card">
-          <h3 style={{ fontFamily: "inherit", fontSize: "1rem", marginBottom: "0.75rem" }}>Cuentas</h3>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+            <h3 style={{ fontFamily: "inherit", fontSize: "1rem", margin: 0 }}>
+              Cuentas Registradas ({socio.cuentas.length})
+            </h3>
+            {!tieneAportacion && (
+              <button
+                type="button"
+                className="btn secondary"
+                style={{ fontSize: "0.78rem", padding: "0.2rem 0.5rem", borderColor: "#059669", color: "#10b981" }}
+                onClick={() => setMostrarModalAportacion(true)}
+              >
+                + Aportación
+              </button>
+            )}
+          </div>
+
           {socio.cuentas.length === 0 ? (
-            <p style={{ color: "var(--ink-soft)", fontSize: "0.9rem" }}>
-              Este socio todavía no tiene cuentas registradas. La apertura de cuentas de ahorro y plazo fijo se
-              habilita en la fase 2.
-            </p>
+            <div style={{ textAlign: "center", padding: "1.5rem 0.5rem", color: "var(--ink-soft)" }}>
+              <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>📂</div>
+              <p style={{ margin: "0 0 0.75rem", fontSize: "0.88rem" }}>
+                Este socio todavía no tiene cuentas activas en el sistema.
+              </p>
+              <button
+                type="button"
+                className="btn"
+                style={{ background: "#059669", borderColor: "#059669", fontWeight: 700, fontSize: "0.82rem" }}
+                onClick={() => setMostrarModalAportacion(true)}
+              >
+                ➕ Aperturar Cuenta de Aportaciones (Q 100)
+              </button>
+            </div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Cuenta</th>
-                  <th>Tipo</th>
-                  <th>Saldo</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {socio.cuentas.map((c) => {
-                  const slug = TIPO_SLUG[c.tipo];
-                  return (
-                    <tr key={c.id}>
-                      <td className="mono">
-                        {slug ? (
-                          <Link to={`/ahorros/${slug}/${c.id}`}>{c.numero_cuenta}</Link>
-                        ) : (
-                          c.numero_cuenta
-                        )}
-                      </td>
-                      <td>{TIPO_CUENTA_LABEL[c.tipo] ?? c.tipo}</td>
-                      <td className="mono">Q {Number(c.saldo_actual).toLocaleString("es-GT", { minimumFractionDigits: 2 })}</td>
-                      <td>
-                        {slug && (
-                          <Link to={`/ahorros/${slug}/${c.id}`} style={{ fontSize: "0.85rem", textDecoration: "none" }}>
-                            Ver movimientos →
-                          </Link>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="table-wrap" style={{ border: "1px solid var(--line)" }}>
+              <table style={{ fontSize: "0.82rem", width: "100%", margin: 0 }}>
+                <thead>
+                  <tr style={{ background: "var(--paper-raised)" }}>
+                    <th style={{ padding: "4px 8px" }}>Cuenta</th>
+                    <th style={{ padding: "4px 8px" }}>Tipo</th>
+                    <th style={{ textAlign: "right", padding: "4px 8px" }}>Saldo</th>
+                    <th style={{ width: "90px", textAlign: "center", padding: "4px 8px" }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {socio.cuentas.map((c) => {
+                    const slug = TIPO_SLUG[c.tipo];
+                    const esApor = c.tipo === "APORTACION";
+                    return (
+                      <tr key={c.id}>
+                        <td className="mono" style={{ fontWeight: 600, padding: "4px 8px" }}>
+                          {slug ? (
+                            <Link to={`/ahorros/${slug}/${c.id}`}>{c.numero_cuenta}</Link>
+                          ) : (
+                            c.numero_cuenta
+                          )}
+                        </td>
+                        <td style={{ padding: "4px 8px" }}>
+                          <span
+                            className="badge"
+                            style={{
+                              background: esApor ? "rgba(5, 150, 105, 0.15)" : undefined,
+                              color: esApor ? "#059669" : undefined,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {TIPO_CUENTA_LABEL[c.tipo] ?? c.tipo}
+                          </span>
+                        </td>
+                        <td className="mono" style={{ textAlign: "right", fontWeight: 700, padding: "4px 8px" }}>
+                          {formatoQ(c.saldo_actual)}
+                        </td>
+                        <td style={{ textAlign: "center", padding: "4px 8px" }}>
+                          {slug ? (
+                            <Link to={`/ahorros/${slug}/${c.id}`} style={{ fontSize: "0.78rem", textDecoration: "none" }}>
+                              Ver →
+                            </Link>
+                          ) : (
+                            <Link to="/aportaciones" style={{ fontSize: "0.78rem", textDecoration: "none" }}>
+                              Ver →
+                            </Link>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>
+
+      {/* MODAL RÁPIDO DE APERTURA DE CUENTA DE APORTACIÓN */}
+      {mostrarModalAportacion && (
+        <div
+          className="caja-chica-modal-overlay"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.75)",
+            zIndex: 9999,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: "1rem",
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              width: "100%",
+              maxWidth: "500px",
+              background: "var(--paper)",
+              borderRadius: "10px",
+              boxShadow: "0 20px 40px -10px rgba(0, 0, 0, 0.5)",
+              border: "1px solid var(--line)",
+              padding: "1.25rem",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", borderBottom: "1px solid var(--line)", paddingBottom: "0.5rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <span style={{ fontSize: "1.25rem" }}>🏛️</span>
+                <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Aperturar Cuenta de Aportaciones</h3>
+              </div>
+              <button
+                type="button"
+                className="btn secondary"
+                style={{ padding: "0.2rem 0.5rem", fontSize: "0.85rem" }}
+                onClick={() => setMostrarModalAportacion(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", margin: "0 0 1rem" }}>
+              Asociado: <strong>{socio.nombres}</strong> (<span className="mono">{socio.numero_asociado}</span>) · Agencia: {socio.agencia_nombre}
+            </p>
+
+            <form onSubmit={handleAbrirAportacion}>
+              <div className="field">
+                <label htmlFor="modal-monto-apor">
+                  Monto de Aportación Inicial (Q) <span style={{ color: "#059669", fontWeight: 700 }}>* Mínimo Q 100.00</span>
+                </label>
+                <input
+                  id="modal-monto-apor"
+                  type="number"
+                  min="100"
+                  step="0.01"
+                  value={montoApor}
+                  onChange={(e) => setMontoApor(e.target.value)}
+                  required
+                  style={{ fontSize: "1rem", fontWeight: 700 }}
+                />
+                <span className="hint">Monto estatutario obligatorio para operar en la cooperativa.</span>
+              </div>
+
+              <div className="field">
+                <label htmlFor="modal-recibo-apor">No. de Recibo o Comprobante (Opcional)</label>
+                <input
+                  id="modal-recibo-apor"
+                  type="text"
+                  value={reciboApor}
+                  onChange={(e) => setReciboApor(e.target.value)}
+                  placeholder="Ej. REC-009842"
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1.25rem" }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => setMostrarModalAportacion(false)}
+                  disabled={abriendoApor}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn"
+                  style={{ background: "#059669", borderColor: "#059669", fontWeight: 700 }}
+                  disabled={abriendoApor}
+                >
+                  {abriendoApor ? "Creando cuenta…" : "✓ Confirmar y Crear Aportación"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <p style={{ marginTop: "1.5rem" }}>
         <Link to="/socios">← Volver al listado</Link>

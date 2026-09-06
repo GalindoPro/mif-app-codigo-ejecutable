@@ -45,6 +45,24 @@ export default function LibroArqueoMensual() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Campos Notariales / Estatutarios del Acta
+  const [añoStr, mesNum] = mes.split("-");
+  const [numeroActa, setNumeroActa] = useState(`CV-${mesNum}-${añoStr}`);
+  const [horaInicio, setHoraInicio] = useState("17:00");
+  const [horaFin, setHoraFin] = useState("18:15");
+  const [lugarMunicipio, setLugarMunicipio] = useState("San Gaspar Chajul");
+  const [nombrePresidente, setNombrePresidente] = useState("Jacinto Asicona Brito");
+  const [nombreSecretaria, setNombreSecretaria] = useState("Elena Matom Caba");
+  const [nombreVocal, setNombreVocal] = useState("Mateo Caba Laynez");
+  const [nombreCajero, setNombreCajero] = useState("Ana Elizabeth Pérez");
+  const [observaciones, setObservaciones] = useState(
+    "Durante la revisión y cotejo documental del presente período, las operaciones de caja se encontraron debidamente soportadas con sus comprobantes y boletas autorizadas. Los saldos en libros coincidieron con el efectivo contado, determinando que los registros de ingresos y egresos fueron llevados con exactitud y estricto apego a los estatutos cooperativos.",
+  );
+
+  useEffect(() => {
+    setNumeroActa(`CV-${mesNum}-${añoStr}`);
+  }, [mes, mesNum, añoStr]);
+
   useEffect(() => {
     api.get<Agencia[]>("/agencias").then(({ data }) => setAgencias(data));
   }, []);
@@ -57,7 +75,15 @@ export default function LibroArqueoMensual() {
       .get<ArqueoMensualResponse>("/caja-auxiliar/arqueos-mes", {
         params: { agenciaId, mes },
       })
-      .then(({ data }) => setDatos(data))
+      .then(({ data }) => {
+        setDatos(data);
+        if (data.dias.length > 0) {
+          const primerCajero = data.dias[0]?.cerrado_por_nombre || data.dias[0]?.abierto_por_nombre;
+          if (primerCajero && nombreCajero === "Ana Elizabeth Pérez") {
+            setNombreCajero(primerCajero);
+          }
+        }
+      })
       .catch((err) => setError(mensajeError(err)))
       .finally(() => setCargando(false));
   }
@@ -67,141 +93,263 @@ export default function LibroArqueoMensual() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agenciaId, mes]);
 
-  const agenciaNombre = agencias.find((a) => a.id === agenciaId)?.nombre ?? "Agencia";
+  const agenciaNombre = agencias.find((a) => a.id === agenciaId)?.nombre ?? "Agencia Chajul";
 
-  // Formato bonito del mes: e.g. "Agosto 2026"
-  const [añoStr, mesNum] = mes.split("-");
   const fechaMesObj = new Date(Number(añoStr), Number(mesNum) - 1, 1);
   const mesNombreLargo = fechaMesObj.toLocaleDateString("es-GT", { month: "long", year: "numeric" });
+  const ultimoDiaMes = new Date(Number(añoStr), Number(mesNum), 0).getDate();
+
+  function exportarCSV() {
+    if (!datos || datos.dias.length === 0) return;
+    const lineas: string[] = [];
+    lineas.push(`LIBRO DE ACTAS DE ARQUEO MENSUAL DE CAJA - COMISION DE VIGILANCIA`);
+    lineas.push(`COOPERATIVA INTEGRAL DE AHORRO Y CREDITO MAYA INVERSIONES FUTURAS R.L.`);
+    lineas.push(`Acta No.: ${numeroActa}`);
+    lineas.push(`Agencia: ${agenciaNombre}`);
+    lineas.push(`Periodo: ${mesNombreLargo}`);
+    lineas.push("");
+    lineas.push("RESUMEN GENERAL DEL MES");
+    lineas.push(`Dias Operados,${datos.resumen.totalDiasOperados}`);
+    lineas.push(`Dias Cuadrados Exactos,${datos.resumen.diasCuadrados}`);
+    lineas.push(`Dias con Diferencia,${datos.resumen.diasConDiferencia}`);
+    lineas.push(`Total Ingresos del Mes (Q),${datos.resumen.totalIngresosMes.toFixed(2)}`);
+    lineas.push(`Total Egresos del Mes (Q),${datos.resumen.totalEgresosMes.toFixed(2)}`);
+    lineas.push(`Diferencia Neta (Q),${(datos.resumen.totalSobrante - datos.resumen.totalFaltante).toFixed(2)}`);
+    lineas.push("");
+    lineas.push("SABANA DE CIERRES DIARIOS");
+    lineas.push("Fecha,Cajero / Operador,Saldo Inicial (Q),Ingresos (Q),Egresos (Q),Saldo Libro (Q),Efectivo Contado (Q),Diferencia (Q),Resultado");
+    datos.dias.forEach((d) => {
+      const fechaStr = new Date(d.fecha).toLocaleDateString("es-GT");
+      const cajero = `"${(d.cerrado_por_nombre || d.abierto_por_nombre || "").replace(/"/g, '""')}"`;
+      const esperado = Number(d.saldo_final ?? d.saldo_inicial);
+      const contado = Number(d.total_contado || esperado);
+      const dif = Number(d.diferencia || 0);
+      const res = dif === 0 ? "CUADRADO" : dif > 0 ? "SOBRANTE" : "FALTANTE";
+      lineas.push(
+        `${fechaStr},${cajero},${d.saldo_inicial.toFixed(2)},${d.total_ingresos.toFixed(2)},${d.total_egresos.toFixed(2)},${esperado.toFixed(2)},${contado.toFixed(2)},${dif.toFixed(2)},${res}`,
+      );
+    });
+    lineas.push("");
+    lineas.push(`Observaciones: "${observaciones.replace(/"/g, '""')}"`);
+
+    const blob = new Blob(["\uFEFF" + lineas.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `acta_arqueo_mensual_${numeroActa}_${agenciaNombre}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div>
-      <div className="page-head no-print">
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <h1>📑 Libro Mensual de Arqueos de Caja</h1>
-            <span className="badge" style={{ background: "#fef3c7", color: "#92400e", fontWeight: 700 }}>
-              Auditoría Comisión de Vigilancia
-            </span>
+      {/* ========================================================================= */}
+      {/* PANEL DE CONFIGURACIÓN Y CONTROLES (NO PRINT)                             */}
+      {/* ========================================================================= */}
+      <div className="no-print">
+        <div className="page-head">
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span style={{ fontSize: "1.5rem" }}>📑</span>
+              <h1>Libro de Actas de Arqueo Mensual de Caja</h1>
+              <span className="badge" style={{ background: "#fef3c7", color: "#92400e", fontWeight: 700 }}>
+                Comisión de Vigilancia
+              </span>
+            </div>
+            <p>
+              Emisión de actas oficiales con formato estatutario notarial para la Comisión de Vigilancia y Auditoría Interna.
+            </p>
           </div>
-          <p>
-            Consolidado mensual de cierres y arqueos de caja para revisión y firma de la Comisión de Vigilancia.
-          </p>
+
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <label htmlFor="mes-picker" style={{ fontSize: "0.85rem", fontWeight: 600 }}>
+                Mes:
+              </label>
+              <input
+                id="mes-picker"
+                type="month"
+                value={mes}
+                onChange={(e) => setMes(e.target.value)}
+                style={{ padding: "0.35rem 0.5rem", borderRadius: "6px" }}
+              />
+            </div>
+
+            {puedeElegirAgencia && (
+              <select value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} style={{ maxWidth: 180 }}>
+                {agencias.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nombre}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={exportarCSV}
+              disabled={!datos || datos.dias.length === 0}
+            >
+              📥 Excel (CSV)
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => window.print()}
+              disabled={!datos || datos.dias.length === 0}
+            >
+              🖨️ Imprimir Acta Oficial
+            </button>
+          </div>
         </div>
 
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            <label htmlFor="mes-picker" style={{ fontSize: "0.85rem", fontWeight: 600 }}>
-              Mes:
+        {error && <div className="alert error">{error}</div>}
+
+        {/* Panel de Datos Editables del Acta (Opciones de Personalización) */}
+        <div className="card" style={{ marginBottom: "1.2rem", background: "var(--paper-raised)" }}>
+          <h3 style={{ margin: "0 0 0.75rem", fontSize: "0.95rem", color: "var(--accent)" }}>
+            ⚙️ Datos Oficiales del Acta Notarial
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem" }}>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label style={{ fontSize: "0.75rem" }}>No. de Acta</label>
+              <input
+                type="text"
+                value={numeroActa}
+                onChange={(e) => setNumeroActa(e.target.value)}
+                placeholder="CV-09-2026"
+                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
+              />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label style={{ fontSize: "0.75rem" }}>Municipio / Lugar</label>
+              <input
+                type="text"
+                value={lugarMunicipio}
+                onChange={(e) => setLugarMunicipio(e.target.value)}
+                placeholder="San Gaspar Chajul, Quiché"
+                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
+              />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label style={{ fontSize: "0.75rem" }}>Hora Inicio</label>
+              <input
+                type="time"
+                value={horaInicio}
+                onChange={(e) => setHoraInicio(e.target.value)}
+                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
+              />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label style={{ fontSize: "0.75rem" }}>Hora Cierre</label>
+              <input
+                type="time"
+                value={horaFin}
+                onChange={(e) => setHoraFin(e.target.value)}
+                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
+              />
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: "0.75rem",
+              marginTop: "0.75rem",
+            }}
+          >
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label style={{ fontSize: "0.75rem" }}>Presidente (Comisión Vigilancia)</label>
+              <input
+                type="text"
+                value={nombrePresidente}
+                onChange={(e) => setNombrePresidente(e.target.value)}
+                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
+              />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label style={{ fontSize: "0.75rem" }}>Secretaria (Comisión Vigilancia)</label>
+              <input
+                type="text"
+                value={nombreSecretaria}
+                onChange={(e) => setNombreSecretaria(e.target.value)}
+                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
+              />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label style={{ fontSize: "0.75rem" }}>Vocal I (Comisión Vigilancia)</label>
+              <input
+                type="text"
+                value={nombreVocal}
+                onChange={(e) => setNombreVocal(e.target.value)}
+                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
+              />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label style={{ fontSize: "0.75rem" }}>Receptor Pagador (Cajero)</label>
+              <input
+                type="text"
+                value={nombreCajero}
+                onChange={(e) => setNombreCajero(e.target.value)}
+                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
+              />
+            </div>
+          </div>
+
+          <div className="field" style={{ marginTop: "0.75rem", marginBottom: 0 }}>
+            <label style={{ fontSize: "0.75rem" }}>
+              <strong>Observaciones / Hallazgos de Auditoría</strong> (Se imprime en el Punto Tercero del Acta)
             </label>
-            <input
-              id="mes-picker"
-              type="month"
-              value={mes}
-              onChange={(e) => setMes(e.target.value)}
-              style={{ padding: "0.35rem 0.5rem", borderRadius: "6px" }}
+            <textarea
+              rows={2}
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              style={{ fontSize: "0.82rem", width: "100%", padding: "0.4rem" }}
             />
           </div>
-
-          {puedeElegirAgencia && (
-            <select value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} style={{ maxWidth: 200 }}>
-              {agencias.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.nombre}
-                </option>
-              ))}
-            </select>
-          )}
-
-          <button className="btn" onClick={() => window.print()} disabled={!datos || datos.dias.length === 0}>
-            🖨️ Imprimir Acta Mensual Consolidada
-          </button>
         </div>
       </div>
 
-      {error && <div className="alert error no-print">{error}</div>}
-
-      {/* Encabezado Oficial Imprimible */}
-      <div className="print-container" style={{ display: "none" }}>
-        <div style={{ textAlign: "center", borderBottom: "2px solid #0f172a", paddingBottom: "0.75rem", marginBottom: "1rem" }}>
-          <h2 style={{ margin: 0, fontSize: "1.1rem", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-            COOPERATIVA INTEGRAL DE AHORRO Y CRÉDITO
-          </h2>
-          <h3 style={{ margin: "0.2rem 0", fontSize: "1.3rem", color: "#047857", fontWeight: 800 }}>
-            "MAYA INVERSIONES FUTURAS", R.L.
-          </h3>
-          <h4 style={{ margin: "0.3rem 0 0.1rem", fontSize: "1rem", textDecoration: "underline" }}>
-            LIBRO DE ACTAS DE ARQUEO MENSUAL DE CAJA
-          </h4>
-          <p style={{ margin: 0, fontSize: "0.88rem", color: "#334155" }}>
-            COMISIÓN DE VIGILANCIA · AGENCIA: <strong>{agenciaNombre.toUpperCase()}</strong>
-          </p>
-          <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "#475569" }}>
-            Período de Auditoría: <strong style={{ textTransform: "capitalize" }}>{mesNombreLargo}</strong> · Cifras expresadas en Quetzales (Q)
-          </p>
-        </div>
-      </div>
-
-      {/* Métricas del Mes */}
-      {datos && (
-        <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", marginBottom: "1.5rem" }}>
-          <div className="stat-card">
-            <span className="label">Días operados en el mes</span>
-            <span className="value">{datos.resumen.totalDiasOperados}</span>
-            <span className="sub">Cierres diarios registrados</span>
+      {/* ========================================================================= */}
+      {/* ACTA OFICIAL NOTARIAL / ESTATUTARIA (PANTALLA E IMPRESIÓN)                */}
+      {/* ========================================================================= */}
+      <div
+        className="card"
+        style={{
+          background: "var(--paper)",
+          border: "1px solid var(--line)",
+          padding: "1.5rem",
+          maxWidth: "1050px",
+          margin: "0 auto",
+        }}
+      >
+        {/* Encabezado Institucional */}
+        <div
+          style={{
+            textAlign: "center",
+            borderBottom: "2px solid #0f172a",
+            paddingBottom: "0.6rem",
+            marginBottom: "0.8rem",
+          }}
+        >
+          <div style={{ fontSize: "1rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em" }}>
+            COOPERATIVA INTEGRAL DE AHORRO Y CRÉDITO &quot;MAYA INVERSIONES FUTURAS&quot;, R.L.
           </div>
-          <div className="stat-card accent">
-            <span className="label">Días cuadrados exactos</span>
-            <span className="value" style={{ color: "#16a34a" }}>
-              {datos.resumen.diasCuadrados} / {datos.resumen.totalDiasOperados}
-            </span>
-            <span className="sub">
-              {datos.resumen.totalDiasOperados > 0
-                ? `${Math.round((datos.resumen.diasCuadrados / datos.resumen.totalDiasOperados) * 100)}% de efectividad`
-                : "Sin movimientos"}
-            </span>
+          <div style={{ fontSize: "1.15rem", color: "#047857", fontWeight: 800, margin: "0.15rem 0" }}>
+            COMISIÓN DE VIGILANCIA · LIBRO DE ACTAS DE ARQUEO MENSUAL
           </div>
-          <div className="stat-card">
-            <span className="label">Total ingresos del mes</span>
-            <span className="value" style={{ color: "#16a34a" }}>
-              {formatoQ(datos.resumen.totalIngresosMes)}
-            </span>
-            <span className="sub">Depósitos, cuotas y cobros</span>
+          <div style={{ fontSize: "0.92rem", fontWeight: 700, textDecoration: "underline", color: "#0f172a" }}>
+            ACTA NÚMERO: {numeroActa}
           </div>
-          <div className="stat-card">
-            <span className="label">Total egresos del mes</span>
-            <span className="value" style={{ color: "#dc2626" }}>
-              {formatoQ(datos.resumen.totalEgresosMes)}
-            </span>
-            <span className="sub">Retiros y desembolsos</span>
-          </div>
-          <div className={`stat-card ${datos.resumen.diasConDiferencia > 0 ? "danger" : ""}`}>
-            <span className="label">Diferencias de arqueo</span>
-            <span className="value" style={{ color: datos.resumen.diasConDiferencia === 0 ? "#16a34a" : "#dc2626" }}>
-              {datos.resumen.diasConDiferencia === 0
-                ? "Cuadrado (Q 0.00)"
-                : `${datos.resumen.diasConDiferencia} día(s) con diferencia`}
-            </span>
-            <span className="sub">
-              {datos.resumen.totalSobrante > 0 ? `Sobrante: ${formatoQ(datos.resumen.totalSobrante)} ` : ""}
-              {datos.resumen.totalFaltante > 0 ? `Faltante: ${formatoQ(datos.resumen.totalFaltante)}` : ""}
-            </span>
+          <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", marginTop: "2px" }}>
+            Agencia: <strong>{agenciaNombre.toUpperCase()}</strong> · Período de Auditoría:{" "}
+            <strong style={{ textTransform: "capitalize" }}>{mesNombreLargo}</strong> · Cifras en Quetzales (Q)
           </div>
         </div>
-      )}
 
-      {/* Sábana de Días de Caja */}
-      <div className="card" style={{ marginBottom: "1.5rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-          <h2 style={{ margin: 0, fontSize: "1.1rem" }}>
-            Sábana de Cierres Diarios · <span style={{ textTransform: "capitalize" }}>{mesNombreLargo}</span>
-          </h2>
-          <span className="sub" style={{ margin: 0 }}>
-            {datos?.dias.length ?? 0} registros encontrados
-          </span>
-        </div>
-
-        {cargando && <p>Cargando arqueos del mes…</p>}
+        {cargando && <p style={{ textAlign: "center", padding: "1rem" }}>Cargando arqueos del mes…</p>}
 
         {!cargando && (!datos || datos.dias.length === 0) && (
           <div className="alert info">
@@ -209,131 +357,275 @@ export default function LibroArqueoMensual() {
           </div>
         )}
 
-        {datos && datos.dias.length > 0 && (
-          <div className="table-wrap">
-            <table style={{ fontSize: "0.85rem" }}>
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Operador (Cajero)</th>
-                  <th style={{ textAlign: "right" }}>Saldo Inicial</th>
-                  <th style={{ textAlign: "right" }}>Total Ingresos</th>
-                  <th style={{ textAlign: "right" }}>Total Egresos</th>
-                  <th style={{ textAlign: "right" }}>Saldo Libro</th>
-                  <th style={{ textAlign: "right" }}>Efectivo Contado</th>
-                  <th style={{ textAlign: "right" }}>Diferencia</th>
-                  <th style={{ textAlign: "center" }}>Resultado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {datos.dias.map((d) => {
-                  const dif = Number(d.diferencia || 0);
-                  const contado = Number(d.total_contado || (d.saldo_final ?? d.saldo_inicial));
-                  const esperado = Number(d.saldo_final ?? d.saldo_inicial);
-                  return (
-                    <tr key={d.id}>
-                      <td className="mono" style={{ fontWeight: 600 }}>
-                        {new Date(d.fecha).toLocaleDateString("es-GT", { weekday: "short", day: "2-digit", month: "2-digit" })}
-                      </td>
-                      <td>{d.cerrado_por_nombre || d.abierto_por_nombre || "Cajero de Ventanilla"}</td>
-                      <td className="mono" style={{ textAlign: "right" }}>{formatoQ(d.saldo_inicial)}</td>
-                      <td className="mono" style={{ textAlign: "right", color: "#16a34a" }}>{formatoQ(d.total_ingresos)}</td>
-                      <td className="mono" style={{ textAlign: "right", color: "#dc2626" }}>{formatoQ(d.total_egresos)}</td>
-                      <td className="mono" style={{ textAlign: "right", fontWeight: 700 }}>{formatoQ(esperado)}</td>
-                      <td className="mono" style={{ textAlign: "right" }}>{formatoQ(contado)}</td>
-                      <td
-                        className="mono"
-                        style={{
-                          textAlign: "right",
-                          fontWeight: 700,
-                          color: dif === 0 ? "#16a34a" : (dif > 0 ? "#2563eb" : "#dc2626"),
-                        }}
-                      >
-                        {dif === 0 ? "Q 0.00" : (dif > 0 ? `+${formatoQ(dif)}` : `-${formatoQ(Math.abs(dif))}`)}
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <span
-                          className="badge"
-                          style={{
-                            background: dif === 0 ? "#ecfdf5" : "#fef2f2",
-                            color: dif === 0 ? "#065f46" : "#991b1b",
-                            fontSize: "0.75rem",
-                            padding: "0.2rem 0.5rem",
-                          }}
-                        >
-                          {dif === 0 ? "✓ Cuadrado" : (dif > 0 ? "Sobrante" : "Faltante")}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr style={{ background: "#f8fafc", fontWeight: 800, borderTop: "2px solid #0f172a" }}>
-                  <td colSpan={2}>TOTALES DEL MES:</td>
-                  <td>—</td>
-                  <td className="mono" style={{ textAlign: "right", color: "#16a34a" }}>
-                    {formatoQ(datos.resumen.totalIngresosMes)}
-                  </td>
-                  <td className="mono" style={{ textAlign: "right", color: "#dc2626" }}>
-                    {formatoQ(datos.resumen.totalEgresosMes)}
-                  </td>
-                  <td colSpan={2}></td>
-                  <td
+        {datos && (
+          <div style={{ fontSize: "0.82rem", lineHeight: 1.5, color: "var(--ink)" }}>
+            {/* PUNTO PRIMERO */}
+            <div style={{ marginBottom: "0.75rem", textAlign: "justify" }}>
+              <strong style={{ textDecoration: "underline" }}>PUNTO PRIMERO (APERTURA Y QUÓRUM):</strong> En el municipio
+              de {lugarMunicipio}, departamento de Quiché, siendo las {horaInicio} horas del día {ultimoDiaMes} del mes
+              de {mesNombreLargo}, reunidos en las oficinas de la Agencia <strong>{agenciaNombre}</strong> de la{" "}
+              <strong>Cooperativa Integral de Ahorro y Crédito &quot;Maya Inversiones Futuras&quot;, R.L.</strong>, se
+              constituyen los miembros de la Comisión de Vigilancia: <strong>{nombrePresidente}</strong> (Presidente),{" "}
+              <strong>{nombreSecretaria}</strong> (Secretaria) y <strong>{nombreVocal}</strong> (Vocal I), en presencia del
+              Receptor Pagador <strong>{nombreCajero}</strong>, con el propósito de celebrar la sesión ordinaria de
+              verificación, cotejo y cierre mensual del libro auxiliar de caja.
+            </div>
+
+            {/* PUNTO SEGUNDO */}
+            <div style={{ marginBottom: "0.5rem" }}>
+              <div style={{ textAlign: "justify", marginBottom: "0.4rem" }}>
+                <strong style={{ textDecoration: "underline" }}>PUNTO SEGUNDO (REVISIÓN DE OPERACIONES Y SÁBANA DE CIERRES):</strong>{" "}
+                La Comisión de Vigilancia procedió a la revisión minuciosa y cotejo diario de los comprobantes de ingreso y egreso
+                generados durante el mes, arrojando el siguiente resumen consolidado:
+              </div>
+
+              {/* Cintillo de Cifras Clave */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(5, 1fr)",
+                  gap: "0.35rem",
+                  marginBottom: "0.5rem",
+                  background: "var(--paper-raised)",
+                  padding: "0.35rem 0.5rem",
+                  borderRadius: "5px",
+                  border: "1px solid var(--line)",
+                  fontSize: "0.72rem",
+                }}
+              >
+                <div>
+                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                    Días Operados
+                  </span>
+                  <strong className="mono" style={{ fontSize: "0.9rem" }}>
+                    {datos.resumen.totalDiasOperados} días
+                  </strong>
+                </div>
+
+                <div>
+                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                    Efectividad de Cuadre
+                  </span>
+                  <strong className="mono" style={{ fontSize: "0.9rem", color: "#16a34a" }}>
+                    {datos.resumen.diasCuadrados} / {datos.resumen.totalDiasOperados} (
+                    {datos.resumen.totalDiasOperados > 0
+                      ? Math.round((datos.resumen.diasCuadrados / datos.resumen.totalDiasOperados) * 100)
+                      : 100}
+                    %)
+                  </strong>
+                </div>
+
+                <div>
+                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                    Total Ingresos del Mes
+                  </span>
+                  <strong className="mono" style={{ fontSize: "0.9rem", color: "#16a34a" }}>
+                    + {formatoQ(datos.resumen.totalIngresosMes)}
+                  </strong>
+                </div>
+
+                <div>
+                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                    Total Egresos del Mes
+                  </span>
+                  <strong className="mono" style={{ fontSize: "0.9rem", color: "#dc2626" }}>
+                    − {formatoQ(datos.resumen.totalEgresosMes)}
+                  </strong>
+                </div>
+
+                <div
+                  style={{
+                    background: datos.resumen.diasConDiferencia === 0 ? "rgba(22, 163, 74, 0.1)" : "rgba(220, 38, 38, 0.1)",
+                    padding: "2px 4px",
+                    borderRadius: "4px",
+                  }}
+                >
+                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                    Diferencia de Caja
+                  </span>
+                  <strong
                     className="mono"
                     style={{
-                      textAlign: "right",
+                      fontSize: "0.9rem",
                       color: datos.resumen.diasConDiferencia === 0 ? "#16a34a" : "#dc2626",
                     }}
                   >
                     {datos.resumen.diasConDiferencia === 0
-                      ? "Q 0.00"
-                      : (datos.resumen.totalSobrante > 0 ? `+${formatoQ(datos.resumen.totalSobrante)}` : `-${formatoQ(datos.resumen.totalFaltante)}`)}
-                  </td>
-                  <td style={{ textAlign: "center" }}>
-                    {datos.resumen.diasConDiferencia === 0 ? "✓ CONFORME" : "REVISADO"}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+                      ? "Cuadrado (Q 0.00)"
+                      : `${datos.resumen.diasConDiferencia} día(s)`}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Sábana de Cierres Diarios */}
+              {datos.dias.length > 0 && (
+                <div className="table-wrap" style={{ border: "1px solid var(--line)" }}>
+                  <table style={{ fontSize: "0.75rem", width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ background: "var(--paper-raised)" }}>
+                        <th style={{ width: "70px", padding: "2px 4px" }}>Fecha</th>
+                        <th style={{ padding: "2px 4px" }}>Cajero / Operador</th>
+                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Saldo Inicial</th>
+                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Ingresos (+)</th>
+                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Egresos (−)</th>
+                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Saldo Libro</th>
+                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Contado</th>
+                        <th style={{ width: "75px", textAlign: "right", padding: "2px 4px" }}>Diferencia</th>
+                        <th style={{ width: "75px", textAlign: "center", padding: "2px 4px" }}>Resultado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {datos.dias.map((d) => {
+                        const dif = Number(d.diferencia || 0);
+                        const esperado = Number(d.saldo_final ?? d.saldo_inicial);
+                        const contado = Number(d.total_contado || esperado);
+                        return (
+                          <tr key={d.id}>
+                            <td className="mono" style={{ fontWeight: 600, padding: "2px 4px" }}>
+                              {new Date(d.fecha).toLocaleDateString("es-GT", {
+                                weekday: "short",
+                                day: "2-digit",
+                                month: "2-digit",
+                              })}
+                            </td>
+                            <td style={{ padding: "2px 4px" }}>
+                              {d.cerrado_por_nombre || d.abierto_por_nombre || nombreCajero}
+                            </td>
+                            <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
+                              {formatoQ(d.saldo_inicial)}
+                            </td>
+                            <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "2px 4px" }}>
+                              {formatoQ(d.total_ingresos)}
+                            </td>
+                            <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "2px 4px" }}>
+                              {formatoQ(d.total_egresos)}
+                            </td>
+                            <td className="mono" style={{ textAlign: "right", fontWeight: 700, padding: "2px 4px" }}>
+                              {formatoQ(esperado)}
+                            </td>
+                            <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
+                              {formatoQ(contado)}
+                            </td>
+                            <td
+                              className="mono"
+                              style={{
+                                textAlign: "right",
+                                fontWeight: 700,
+                                color: dif === 0 ? "#16a34a" : dif > 0 ? "#2563eb" : "#dc2626",
+                                padding: "2px 4px",
+                              }}
+                            >
+                              {dif === 0 ? "Q 0.00" : dif > 0 ? `+${formatoQ(dif)}` : `-${formatoQ(Math.abs(dif))}`}
+                            </td>
+                            <td style={{ textAlign: "center", padding: "2px 4px" }}>
+                              <span
+                                style={{
+                                  color: dif === 0 ? "#16a34a" : "#dc2626",
+                                  fontWeight: 700,
+                                  fontSize: "0.72rem",
+                                }}
+                              >
+                                {dif === 0 ? "✓ Cuadrado" : dif > 0 ? "Sobrante" : "Faltante"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ background: "rgba(0,0,0,0.04)", fontWeight: 800, borderTop: "2px solid #0f172a" }}>
+                        <td colSpan={2} style={{ padding: "3px 4px" }}>
+                          TOTALES DEL MES:
+                        </td>
+                        <td style={{ padding: "3px 4px" }}>—</td>
+                        <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "3px 4px" }}>
+                          {formatoQ(datos.resumen.totalIngresosMes)}
+                        </td>
+                        <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "3px 4px" }}>
+                          {formatoQ(datos.resumen.totalEgresosMes)}
+                        </td>
+                        <td colSpan={2} style={{ padding: "3px 4px" }}></td>
+                        <td
+                          className="mono"
+                          style={{
+                            textAlign: "right",
+                            color: datos.resumen.diasConDiferencia === 0 ? "#16a34a" : "#dc2626",
+                            padding: "3px 4px",
+                          }}
+                        >
+                          {datos.resumen.diasConDiferencia === 0
+                            ? "Q 0.00"
+                            : datos.resumen.totalSobrante > 0
+                            ? `+${formatoQ(datos.resumen.totalSobrante)}`
+                            : `-${formatoQ(datos.resumen.totalFaltante)}`}
+                        </td>
+                        <td style={{ textAlign: "center", padding: "3px 4px" }}>
+                          {datos.resumen.diasConDiferencia === 0 ? "✓ CONFORME" : "REVISADO"}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* PUNTO TERCERO */}
+            <div style={{ marginTop: "0.6rem", marginBottom: "0.6rem", textAlign: "justify" }}>
+              <strong style={{ textDecoration: "underline" }}>PUNTO TERCERO (HALLAZGOS Y DICTAMEN DE AUDITORÍA):</strong>{" "}
+              {observaciones}
+            </div>
+
+            {/* PUNTO CUARTO */}
+            <div style={{ marginBottom: "1rem", textAlign: "justify" }}>
+              <strong style={{ textDecoration: "underline" }}>PUNTO CUARTO (CIERRE Y RATIFICACIÓN):</strong> No habiendo
+              más que hacer constar, se da por finalizada la presente sesión de arqueo mensual a las {horaFin} horas en el
+              mismo lugar y fecha de su inicio, leída íntegramente la presente acta y enterados de su contenido, objeto y
+              validez legal, la aceptamos, ratificamos y firmamos de entera conformidad.
+            </div>
+
+            {/* BLOQUE DE FIRMAS OFICIALES (4 FIRMAS CON NOMBRES REALES) */}
+            <div
+              style={{
+                marginTop: "1.5rem",
+                paddingTop: "0.6rem",
+                borderTop: "1px dashed var(--line)",
+                display: "grid",
+                gridTemplateColumns: "repeat(4, 1fr)",
+                gap: "1.5rem 1rem",
+                textAlign: "center",
+                pageBreakInside: "avoid",
+              }}
+            >
+              <div>
+                <div style={{ borderBottom: "1px solid #000", height: "28px", marginBottom: "0.2rem" }} />
+                <div style={{ fontWeight: 700, fontSize: "0.78rem" }}>{nombrePresidente}</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--ink-soft)" }}>Presidente</div>
+                <div style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Comisión de Vigilancia</div>
+              </div>
+
+              <div>
+                <div style={{ borderBottom: "1px solid #000", height: "28px", marginBottom: "0.2rem" }} />
+                <div style={{ fontWeight: 700, fontSize: "0.78rem" }}>{nombreSecretaria}</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--ink-soft)" }}>Secretaria</div>
+                <div style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Comisión de Vigilancia</div>
+              </div>
+
+              <div>
+                <div style={{ borderBottom: "1px solid #000", height: "28px", marginBottom: "0.2rem" }} />
+                <div style={{ fontWeight: 700, fontSize: "0.78rem" }}>{nombreVocal}</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--ink-soft)" }}>Vocal I</div>
+                <div style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Comisión de Vigilancia</div>
+              </div>
+
+              <div>
+                <div style={{ borderBottom: "1px solid #000", height: "28px", marginBottom: "0.2rem" }} />
+                <div style={{ fontWeight: 700, fontSize: "0.78rem" }}>{nombreCajero}</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--ink-soft)" }}>Receptor Pagador</div>
+                <div style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Cajero de Ventanilla</div>
+              </div>
+            </div>
           </div>
         )}
-
-        {/* Declaración Legal para la Comisión de Vigilancia */}
-        <div style={{ marginTop: "1.75rem", borderTop: "1px solid #cbd5e1", paddingTop: "1rem", fontSize: "0.8rem", color: "#334155", lineHeight: 1.45, textAlign: "justify" }}>
-          Los miembros de la <strong>Comisión de Vigilancia</strong> abajo firmantes, en cumplimiento a los estatutos de la <strong>Cooperativa Integral de Ahorro y Crédito "Maya Inversiones Futuras", R.L.</strong>, hacemos constar que hemos procedido a la revisión, cotejo documental y verificación física de los libros auxiliares de caja y actas de arqueo correspondientes al mes de <strong style={{ textTransform: "capitalize" }}>{mesNombreLargo}</strong> de la agencia <strong>{agenciaNombre}</strong>, determinando que los registros de ingresos, egresos y saldos fueron llevados de conformidad.
-        </div>
-
-        {/* Firmas de la Comisión de Vigilancia */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "2rem 1.5rem", marginTop: "2.5rem" }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ borderTop: "1px solid #0f172a", paddingTop: "0.3rem", fontSize: "0.82rem", fontWeight: 700 }}>
-              Presidente
-            </div>
-            <div style={{ fontSize: "0.72rem", color: "#64748b" }}>Comisión de Vigilancia</div>
-          </div>
-
-          <div style={{ textAlign: "center" }}>
-            <div style={{ borderTop: "1px solid #0f172a", paddingTop: "0.3rem", fontSize: "0.82rem", fontWeight: 700 }}>
-              Secretaria
-            </div>
-            <div style={{ fontSize: "0.72rem", color: "#64748b" }}>Comisión de Vigilancia</div>
-          </div>
-
-          <div style={{ textAlign: "center" }}>
-            <div style={{ borderTop: "1px solid #0f172a", paddingTop: "0.3rem", fontSize: "0.82rem", fontWeight: 700 }}>
-              Vocal I
-            </div>
-            <div style={{ fontSize: "0.72rem", color: "#64748b" }}>Comisión de Vigilancia</div>
-          </div>
-
-          <div style={{ textAlign: "center" }}>
-            <div style={{ borderTop: "1px solid #0f172a", paddingTop: "0.3rem", fontSize: "0.82rem", fontWeight: 700 }}>
-              Receptor Pagador
-            </div>
-            <div style={{ fontSize: "0.72rem", color: "#64748b" }}>Cajero de Ventanilla</div>
-          </div>
-        </div>
       </div>
     </div>
   );

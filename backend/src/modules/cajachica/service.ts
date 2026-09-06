@@ -161,3 +161,134 @@ export async function reponerFondo(data: DatosReposicionCajaChica, usuarioId: st
   return comprobante;
 }
 
+export interface ParamsReporteCajaChica {
+  agenciaId: string;
+  fechaInicio?: string;
+  fechaFin?: string;
+  categoria?: string;
+}
+
+export async function generarReporte(params: ParamsReporteCajaChica) {
+  const { agenciaId, fechaInicio, fechaFin, categoria } = params;
+
+  // 1. Obtener datos de la agencia
+  const { rows: agRows } = await pool.query(
+    `select id, codigo, nombre from agencias where id = $1`,
+    [agenciaId],
+  );
+  const agencia = agRows[0] || { id: agenciaId, codigo: "AG", nombre: "Agencia" };
+
+  // 2. Obtener última reposición (último INGRESO registrado en la agencia)
+  const { rows: lastRepoRows } = await pool.query(
+    `select fecha, numero_documento, monto, descripcion, created_at
+     from caja_chica_comprobantes
+     where agencia_id = $1 and tipo = 'INGRESO'
+     order by fecha desc, created_at desc
+     limit 1`,
+    [agenciaId],
+  );
+  const ultimaReposicion = lastRepoRows[0]
+    ? {
+        fecha: lastRepoRows[0].fecha,
+        numeroDocumento: lastRepoRows[0].numero_documento,
+        monto: Number(lastRepoRows[0].monto),
+        descripcion: lastRepoRows[0].descripcion,
+      }
+    : null;
+
+  // 3. Saldo acumulado histórico total de la agencia
+  const { rows: balanceGlobal } = await pool.query(
+    `select
+       coalesce(sum(case when tipo = 'INGRESO' then monto else 0 end), 0) as total_ingresos_global,
+       coalesce(sum(case when tipo = 'EGRESO' then monto else 0 end), 0) as total_egresos_global
+     from caja_chica_comprobantes
+     where agencia_id = $1`,
+    [agenciaId],
+  );
+  const saldoDisponibleActual =
+    Number(balanceGlobal[0].total_ingresos_global) - Number(balanceGlobal[0].total_egresos_global);
+
+  // 4. Saldo anterior a fechaInicio (si se especifica fechaInicio)
+  let saldoAnterior = 0;
+  if (fechaInicio) {
+    const { rows: anteriorRows } = await pool.query(
+      `select
+         coalesce(sum(case when tipo = 'INGRESO' then monto else 0 end), 0)
+         - coalesce(sum(case when tipo = 'EGRESO' then monto else 0 end), 0) as saldo_anterior
+       from caja_chica_comprobantes
+       where agencia_id = $1 and fecha < $2`,
+      [agenciaId, fechaInicio],
+    );
+    saldoAnterior = Number(anteriorRows[0].saldo_anterior);
+  }
+
+  // 5. Filtros para el período
+  const condiciones: string[] = [`c.agencia_id = $1`];
+  const valores: unknown[] = [agenciaId];
+
+  if (fechaInicio) {
+    valores.push(fechaInicio);
+    condiciones.push(`c.fecha >= $${valores.length}`);
+  }
+  if (fechaFin) {
+    valores.push(fechaFin);
+    condiciones.push(`c.fecha <= $${valores.length}`);
+  }
+  if (categoria) {
+    valores.push(categoria);
+    condiciones.push(`c.categoria = $${valores.length}`);
+  }
+
+  const wherePeriodo = `where ${condiciones.join(" and ")}`;
+
+  // 6. Consultar comprobantes del período con usuario
+  const { rows: comprobantes } = await pool.query(
+    `select c.*, u.nombre as usuario_nombre
+     from caja_chica_comprobantes c join usuarios u on u.id = c.usuario_id
+     ${wherePeriodo}
+     order by c.fecha asc, c.created_at asc`,
+    valores,
+  );
+
+  // 7. Agrupar egresos por categoría en el período
+  const { rows: porCatRows } = await pool.query(
+    `select coalesce(c.categoria::text, 'SIN_CATEGORIA') as categoria, sum(c.monto)::numeric as total, count(*)::int as cantidad
+     from caja_chica_comprobantes c
+     ${wherePeriodo} and c.tipo = 'EGRESO'
+     group by c.categoria
+     order by total desc`,
+    valores,
+  );
+
+  // Separar ingresos y egresos
+  const egresos = comprobantes.filter((c) => c.tipo === "EGRESO");
+  const ingresos = comprobantes.filter((c) => c.tipo === "INGRESO");
+
+  const totalEgresosPeriodo = egresos.reduce((acc, c) => acc + Number(c.monto), 0);
+  const totalIngresosPeriodo = ingresos.reduce((acc, c) => acc + Number(c.monto), 0);
+  const saldoFinalPeriodo = fechaInicio
+    ? saldoAnterior + totalIngresosPeriodo - totalEgresosPeriodo
+    : saldoDisponibleActual;
+
+  return {
+    agencia,
+    fechaInicio: fechaInicio || null,
+    fechaFin: fechaFin || null,
+    categoriaFiltro: categoria || null,
+    ultimaReposicion,
+    saldoAnterior,
+    totalIngresosPeriodo,
+    totalEgresosPeriodo,
+    saldoFinalPeriodo,
+    saldoDisponibleActual,
+    egresos,
+    ingresos,
+    totalesPorCategoria: porCatRows.map((r) => ({
+      categoria: r.categoria,
+      total: Number(r.total),
+      cantidad: Number(r.cantidad),
+      porcentaje: totalEgresosPeriodo > 0 ? (Number(r.total) / totalEgresosPeriodo) * 100 : 0,
+    })),
+  };
+}
+

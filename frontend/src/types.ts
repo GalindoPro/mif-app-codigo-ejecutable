@@ -54,6 +54,15 @@ export const PARENTESCOS_BENEFICIARIO = [
   "Otro",
 ] as const;
 
+export const PARENTESCOS_BENEFICIARIO_MENOR = [
+  "Hijo(a)",
+  "Nieto(a)",
+  "Hermano(a)",
+  "Sobrino(a)",
+  "Primo(a)",
+  "Otro",
+] as const;
+
 export interface AportacionSocio {
   socio_id: string;
   numero_asociado: string;
@@ -228,6 +237,36 @@ export interface ListaCajaChica {
   totalIngresos: number;
   totalEgresos: number;
   totalesPorCategoria: TotalPorCategoria[];
+}
+
+export interface ReporteCajaChicaTotalCat {
+  categoria: string;
+  total: number;
+  cantidad: number;
+  porcentaje: number;
+}
+
+export interface ReporteCajaChicaUltimaRepo {
+  fecha: string;
+  numeroDocumento: string;
+  monto: number;
+  descripcion: string;
+}
+
+export interface ReporteCajaChica {
+  agencia: { id: string; codigo: string; nombre: string };
+  fechaInicio: string | null;
+  fechaFin: string | null;
+  categoriaFiltro: string | null;
+  ultimaReposicion: ReporteCajaChicaUltimaRepo | null;
+  saldoAnterior: number;
+  totalIngresosPeriodo: number;
+  totalEgresosPeriodo: number;
+  saldoFinalPeriodo: number;
+  saldoDisponibleActual: number;
+  egresos: CajaChicaComprobante[];
+  ingresos: CajaChicaComprobante[];
+  totalesPorCategoria: ReporteCajaChicaTotalCat[];
 }
 
 export interface ResumenCuentas {
@@ -511,6 +550,30 @@ export interface Prestamo {
   fecha_vencimiento?: string | null;
   created_at: string;
   amortizacion?: ResultadoSimulacion;
+}
+
+export interface FiadorItem {
+  prestamo_id: string;
+  prestamo_codigo: string;
+  prestamo_estado: EstadoPrestamo;
+  monto_solicitado: number;
+  monto_aprobado: number | null;
+  saldo_capital: number | null;
+  fecha_solicitud: string;
+  fecha_desembolso: string | null;
+  nombre_fiador: string;
+  dpi_fiador: string | null;
+  telefono_fiador: string | null;
+  lugar_fiador: string | null;
+  socio_id: string;
+  socio_numero: string;
+  socio_nombre: string;
+  agencia_nombre: string;
+  promotor_nombre: string | null;
+  socio_fiador_id: string | null;
+  socio_fiador_numero: string | null;
+  socio_fiador_nombres: string | null;
+  es_socio_activo: boolean;
 }
 
 export interface PrestamoPago {

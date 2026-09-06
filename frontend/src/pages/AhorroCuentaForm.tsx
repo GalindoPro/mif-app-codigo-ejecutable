@@ -24,11 +24,26 @@ export default function AhorroCuentaForm() {
   const [guardando, setGuardando] = useState(false);
   const [cuentaExistente, setCuentaExistente] = useState<{ id: string; numero_cuenta: string } | null>(null);
   const [saldoAportacion, setSaldoAportacion] = useState<number | null>(null);
+  const [creandoAportacionRapida, setCreandoAportacionRapida] = useState(false);
   const [prestamosSocio, setPrestamosSocio] = useState<Prestamo[]>([]);
   const [prestamoSeleccionadoId, setPrestamoSeleccionadoId] = useState<string>("");
 
   const esProgramadoOInfanto =
     config?.tipo === "AHORRO_PROGRAMADO" || config?.tipo === "AHORRO_INFANTO_JUVENIL";
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sId = params.get("socioId");
+    if (sId && !socio) {
+      api
+        .get<Socio>(`/socios/${sId}`)
+        .then(({ data }) => {
+          setSocio(data);
+          if (data.agencia_id) setAgenciaId(data.agencia_id);
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     if (puedeElegirAgencia) api.get<Agencia[]>("/agencias").then(({ data }) => setAgencias(data));
@@ -75,6 +90,20 @@ export default function AhorroCuentaForm() {
         .catch(() => setPrestamosSocio([]));
     }
   }, [socio, config]);
+
+  async function handleAperturarAportacionRapida() {
+    if (!socio) return;
+    setCreandoAportacionRapida(true);
+    setError(null);
+    try {
+      await api.post(`/socios/${socio.id}/abrir-aportacion`, { monto: 100 });
+      setSaldoAportacion(100);
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setCreandoAportacionRapida(false);
+    }
+  }
 
   if (!config) return <div className="alert error">Tipo de ahorro no reconocido.</div>;
 
@@ -123,6 +152,37 @@ export default function AhorroCuentaForm() {
       </div>
 
       {error && <div className="alert error">{error}</div>}
+
+      {socio && saldoAportacion !== null && saldoAportacion < 100 && (
+        <div
+          className="alert warning"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "0.75rem",
+            marginBottom: "1rem",
+            borderLeft: "4px solid #f59e0b",
+          }}
+        >
+          <div>
+            <strong>⚠️ Este asociado no cuenta con Aportación Inicial estatutaria (Q {saldoAportacion.toFixed(2)})</strong>
+            <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--ink-soft)" }}>
+              Para habilitar la apertura de su {config.titulo}, es obligatorio registrar su Aportación Estatutaria mínima de Q 100.00.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            style={{ background: "#059669", borderColor: "#059669", fontWeight: 700, fontSize: "0.85rem" }}
+            onClick={handleAperturarAportacionRapida}
+            disabled={creandoAportacionRapida}
+          >
+            {creandoAportacionRapida ? "Aperturando…" : "➕ Aperturar Aportación (Q 100) Ahora"}
+          </button>
+        </div>
+      )}
 
       <form className="card" onSubmit={onSubmit} style={{ maxWidth: 560 }}>
         {puedeElegirAgencia && (

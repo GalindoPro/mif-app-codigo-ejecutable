@@ -4,6 +4,7 @@ import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import BuscadorSocio from "../components/BuscadorSocio";
 import BuscadorCuenta from "../components/BuscadorCuenta";
+import ReciboCobroCreditoModal, { type DatosReciboCobro } from "../components/ReciboCobroCreditoModal";
 import {
   CATEGORIAS_AUXILIAR,
   CATEGORIA_AUXILIAR_KEYS,
@@ -11,6 +12,8 @@ import {
   formatoQ,
   labelDenominacion,
 } from "../types";
+import type { ResultadoLiquidacion } from "../lib/liquidacionCredito";
+import { distribuirMontoCobro } from "../lib/liquidacionCredito";
 import type {
   Agencia,
   CajaCategoria,
@@ -368,7 +371,7 @@ function CajaAbierta({
       )}
 
       {mostrarCobroCredito && (
-        <CobroCreditoForm
+        <CobroCreditoVentanilla
           agenciaId={agenciaId}
           diaId={detalle.dia.id}
           onCobrado={() => {
@@ -782,7 +785,7 @@ function DenominacionRow({
   );
 }
 
-function CobroCreditoForm({
+function CobroCreditoVentanilla({
   agenciaId,
   diaId,
   onCobrado,
@@ -796,9 +799,17 @@ function CobroCreditoForm({
   const [prestamo, setPrestamo] = useState<Prestamo | null>(null);
   const [cargandoPrestamos, setCargandoPrestamos] = useState(false);
 
+  const { usuario } = useAuth();
+  const [reciboModal, setReciboModal] = useState<DatosReciboCobro | null>(null);
+
+  const [liquidacion, setLiquidacion] = useState<ResultadoLiquidacion | null>(null);
+  const [cargandoLiquidacion, setCargandoLiquidacion] = useState(false);
+
+  const [montoEntregadoInput, setMontoEntregadoInput] = useState("");
   const [abonoCapital, setAbonoCapital] = useState("");
   const [interes, setInteres] = useState("");
   const [mora, setMora] = useState("0");
+  const [ahorroSobrePrestamo, setAhorroSobrePrestamo] = useState("0");
   const [docNo, setDocNo] = useState("");
 
   const [cuentasDebito, setCuentasDebito] = useState<Cuenta[]>([]);
@@ -808,27 +819,44 @@ function CobroCreditoForm({
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function seleccionarPrestamo(p: Prestamo) {
+  async function cargarLiquidacion(p: Prestamo) {
     setPrestamo(p);
-    const saldo = Number(
-      p.saldo_capital !== null && p.saldo_capital !== undefined
-        ? p.saldo_capital
-        : p.monto_aprobado || p.monto_solicitado,
-    );
-    const tasa = Number(p.tasa_interes_mensual) / 100;
-    const interesMes = Math.round(saldo * tasa * 100) / 100;
-    const cuotaTotal = Number(p.cuota_mensual);
-    const capitalMes = Math.max(0, Math.min(saldo, Math.round((cuotaTotal - interesMes) * 100) / 100));
+    setCargandoLiquidacion(true);
+    try {
+      const { data } = await api.get<{ prestamo: Prestamo; liquidacion: ResultadoLiquidacion }>(
+        `/prestamos/${p.id}/liquidacion`,
+      );
+      setLiquidacion(data.liquidacion);
+      setAbonoCapital(String(data.liquidacion.cuotaCapitalSugerida));
+      setInteres(String(data.liquidacion.interesDevengado));
+      setMora(String(data.liquidacion.moraFijaSugerida));
+      setMontoEntregadoInput(String(data.liquidacion.pagoMinimoSugerido));
+    } catch {
+      const saldo = Number(
+        p.saldo_capital !== null && p.saldo_capital !== undefined
+          ? p.saldo_capital
+          : p.monto_aprobado || p.monto_solicitado,
+      );
+      const tasa = Number(p.tasa_interes_mensual || 2.0) / 100;
+      const interesMes = Math.round(saldo * tasa * 100) / 100;
+      const cuotaTotal = Number(p.cuota_mensual);
+      const capitalMes = Math.max(0, Math.min(saldo, Math.round((cuotaTotal - interesMes) * 100) / 100));
 
-    setAbonoCapital(String(capitalMes));
-    setInteres(String(interesMes));
-    setMora("0");
+      setAbonoCapital(String(capitalMes));
+      setInteres(String(interesMes));
+      setMora("0");
+      setMontoEntregadoInput(String(capitalMes + interesMes));
+      setLiquidacion(null);
+    } finally {
+      setCargandoLiquidacion(false);
+    }
   }
 
   useEffect(() => {
     if (!socio) {
       setPrestamos([]);
       setPrestamo(null);
+      setLiquidacion(null);
       setCuentasDebito([]);
       setUsarDebitoAhorro(false);
       setCuentaDebitoSeleccionada("");
@@ -841,28 +869,51 @@ function CobroCreditoForm({
         const activos = data.filter((p) => p.estado === "DESEMBOLSADO" || p.estado === "APROBADO");
         setPrestamos(activos);
         if (activos[0]) {
-          seleccionarPrestamo(activos[0]);
+          cargarLiquidacion(activos[0]);
         } else {
           setPrestamo(null);
+          setLiquidacion(null);
         }
       })
       .catch((err) => setError(mensajeError(err)))
       .finally(() => setCargandoPrestamos(false));
 
-    // Cargar cuentas del socio para verificar si tiene Ahorro sobre Préstamo u otras cuentas con saldo
+    // Cargar cuentas del socio para verificar si tiene Ahorro sobre Préstamo u otras cuentas de ahorro disponibles
     api
       .get<{ cuentas?: Cuenta[] }>(`/socios/${socio.id}`)
       .then(({ data }) => {
+        // La Aportación Estatutaria es capital social institucional y NUNCA se debita para pagar cuotas de créditos.
         const activas = (data.cuentas || []).filter(
-          (c) => c.estado === "ACTIVA" && Number(c.saldo_actual) > 0,
+          (c) => c.estado === "ACTIVA" && Number(c.saldo_actual) > 0 && (c.tipo as string) !== "APORTACION_ESTATUTARIA",
         );
         setCuentasDebito(activas);
         const asp = activas.find((c) => c.tipo === "AHORRO_SOBRE_PRESTAMO");
         if (asp) setCuentaDebitoSeleccionada(asp.id);
         else if (activas[0]) setCuentaDebitoSeleccionada(activas[0].id);
+        else setCuentaDebitoSeleccionada("");
       })
       .catch(() => setCuentasDebito([]));
   }, [socio]);
+
+  function handleMontoEntregadoChange(val: string) {
+    setMontoEntregadoInput(val);
+    const num = Number(val) || 0;
+    if (!prestamo) return;
+
+    const saldo = Number(
+      prestamo.saldo_capital !== null && prestamo.saldo_capital !== undefined
+        ? prestamo.saldo_capital
+        : prestamo.monto_aprobado || prestamo.monto_solicitado,
+    );
+
+    const moraReq = liquidacion?.moraFijaSugerida ?? Number(mora) ?? 0;
+    const intReq = liquidacion?.interesDevengado ?? Number(interes) ?? 0;
+
+    const dist = distribuirMontoCobro(num, moraReq, intReq, saldo);
+    setMora(String(dist.pagoMora));
+    setInteres(String(dist.pagoInteres));
+    setAbonoCapital(String(dist.pagoCapital));
+  }
 
   const saldoActual = prestamo
     ? Number(
@@ -874,8 +925,13 @@ function CobroCreditoForm({
   const capNum = Number(abonoCapital) || 0;
   const intNum = Number(interes) || 0;
   const morNum = Number(mora) || 0;
-  const totalCobro = capNum + intNum + morNum;
+  const aspNum = Number(ahorroSobrePrestamo) || 0;
+  const totalCobro = capNum + intNum + morNum + aspNum;
   const saldoNuevo = Math.max(0, Math.round((saldoActual - capNum) * 100) / 100);
+
+  const esExcedenteCapital =
+    liquidacion && capNum > liquidacion.cuotaCapitalSugerida && capNum <= saldoActual;
+  const excedenteMonto = liquidacion ? Math.round((capNum - liquidacion.cuotaCapitalSugerida) * 100) / 100 : 0;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -893,24 +949,58 @@ function CobroCreditoForm({
     setError(null);
     setGuardando(true);
     try {
-      await api.post(`/caja-auxiliar/${diaId}/cobro-credito`, {
+      const { data } = await api.post<{
+        pago: { numero_recibo?: string };
+        cajaMovimiento: { contador?: number };
+        saldoCapitalRestante?: number;
+        ahorroSobrePrestamoAcreditado?: number;
+        cuentaAsp?: { id: string; numero_cuenta: string };
+      }>(`/caja-auxiliar/${diaId}/cobro-credito`, {
         prestamoId: prestamo.id,
         socioId: socio.id,
         abonoCapital: capNum,
         interes: intNum,
         mora: morNum,
+        ahorroSobrePrestamo: aspNum,
         docNo: docNo || undefined,
         cuentaDebitoId: usarDebitoAhorro && cuentaDebitoSeleccionada ? cuentaDebitoSeleccionada : undefined,
       });
-      onCobrado();
+
+      const aspPrev = cuentasDebito.find((c) => c.tipo === "AHORRO_SOBRE_PRESTAMO")?.saldo_actual;
+      const saldoAspTotal = (Number(aspPrev) || 0) + aspNum;
+
+      setReciboModal({
+        numeroRecibo: docNo || data.pago?.numero_recibo || String(data.cajaMovimiento?.contador || "—"),
+        fecha: new Date().toLocaleDateString("es-GT"),
+        hora: new Date().toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" }),
+        socioNombre: socio.nombres,
+        socioNumero: socio.numero_asociado,
+        socioDpi: socio.dpi,
+        socioTelefono: socio.telefono,
+        creditoCodigo: prestamo.codigo,
+        creditoTipo: prestamo.tipo,
+        agenciaNombre: prestamo.agencia_nombre || "Agencia MIF COOP",
+        saldoCapitalAnterior: saldoActual,
+        abonoCapital: capNum,
+        interes: intNum,
+        mora: morNum,
+        ahorroSobrePrestamo: aspNum,
+        totalPagado: totalCobro,
+        saldoCapitalRestante: data.saldoCapitalRestante ?? saldoNuevo,
+        cuentaAspNumero: data.cuentaAsp?.numero_cuenta,
+        saldoAspAcumulado: aspNum > 0 ? saldoAspTotal : undefined,
+        cajeroNombre: usuario?.nombre || "Cajero en Turno",
+        formaPago: usarDebitoAhorro ? "DÉBITO DE CUENTA" : "EFECTIVO",
+      });
     } catch (err) {
       setError(mensajeError(err));
+    } finally {
       setGuardando(false);
     }
   }
 
   return (
-    <form className="card" onSubmit={onSubmit} style={{ maxWidth: 680, marginBottom: "1.5rem", border: "2px solid #059669" }}>
+    <form className="card" onSubmit={onSubmit} style={{ maxWidth: 740, marginBottom: "1.5rem", border: "2px solid #059669" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
         <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#065f46" }}>💵 Cobro de Cuota de Crédito en Ventanilla</h2>
         <span className="badge" style={{ background: "#ecfdf5", color: "#065f46", fontWeight: 700 }}>
@@ -918,7 +1008,7 @@ function CobroCreditoForm({
         </span>
       </div>
       <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", margin: "0 0 1rem" }}>
-        Desglose automático de abono a capital e interés según la amortización oficial del préstamo.
+        Liquidación automática de intereses diarios exactos (base 365 días), mora fija de Q 25 tras 4 días de gracia y distribución de excedentes directo a Capital.
       </p>
 
       {error && <div className="alert error">{error}</div>}
@@ -943,7 +1033,7 @@ function CobroCreditoForm({
             value={prestamo?.id ?? ""}
             onChange={(e) => {
               const p = prestamos.find((x) => x.id === e.target.value);
-              if (p) seleccionarPrestamo(p);
+              if (p) cargarLiquidacion(p);
             }}
           >
             {prestamos.map((p) => (
@@ -957,32 +1047,150 @@ function CobroCreditoForm({
 
       {prestamo && (
         <>
+          {/* PANEL DE LIQUIDACIÓN EN VIVO (DÍAS TRANSCURRIDOS, INTERÉS DIARIO Y MORA) */}
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-              gap: "0.5rem",
-              background: "var(--paper-raised)",
-              padding: "0.75rem",
+              background: "rgba(16, 185, 129, 0.06)",
+              border: "1px solid rgba(16, 185, 129, 0.3)",
               borderRadius: "8px",
+              padding: "0.85rem",
               marginBottom: "1rem",
-              fontSize: "0.85rem",
             }}
           >
-            <div>
-              <span style={{ color: "var(--ink-soft)" }}>Crédito:</span> <strong>{prestamo.codigo}</strong>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
+              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#065f46", textTransform: "uppercase" }}>
+                ⚡ Liquidación al Día de Hoy ({liquidacion ? liquidacion.fechaLiquidacion : "Hoy"})
+              </span>
+              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+                {cargandoLiquidacion ? "Calculando días…" : `Último pago: ${liquidacion?.fechaUltimoPago ?? "—"}`}
+              </span>
             </div>
-            <div>
-              <span style={{ color: "var(--ink-soft)" }}>Tipo:</span> <strong>{prestamo.tipo}</strong>
-            </div>
-            <div>
-              <span style={{ color: "var(--ink-soft)" }}>Cuota pactada:</span> <strong>{formatoQ(prestamo.cuota_mensual)}</strong>
-            </div>
-            <div>
-              <span style={{ color: "var(--ink-soft)" }}>Saldo deudor:</span>{" "}
-              <strong style={{ color: "var(--accent)" }}>{formatoQ(saldoActual)}</strong>
-            </div>
+
+            {liquidacion ? (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                  gap: "0.6rem",
+                  fontSize: "0.82rem",
+                }}
+              >
+                <div style={{ background: "var(--paper)", padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
+                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.72rem" }}>Días transcurridos</span>
+                  <strong style={{ fontSize: "0.95rem", color: "var(--ink)" }}>{liquidacion.diasTranscurridos} días</strong>
+                  <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)", display: "block" }}>
+                    {liquidacion.diasAtraso > 0 ? `${liquidacion.diasAtraso} días de atraso` : "Al día"}
+                  </span>
+                </div>
+
+                <div style={{ background: "var(--paper)", padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
+                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.72rem" }}>Interés diario ({liquidacion.tasaInteresAnual}% anual)</span>
+                  <strong style={{ fontSize: "0.95rem", color: "#d97706" }}>{formatoQ(liquidacion.interesDiario)} / día</strong>
+                  <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)", display: "block" }}>
+                    ({formatoQ(saldoActual)} × 24% / 365)
+                  </span>
+                </div>
+
+                <div style={{ background: "var(--paper)", padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
+                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.72rem" }}>Interés acumulado ({liquidacion.diasTranscurridos}d)</span>
+                  <strong style={{ fontSize: "0.95rem", color: "#d97706" }}>{formatoQ(liquidacion.interesDevengado)}</strong>
+                  <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)", display: "block" }}>
+                    {formatoQ(liquidacion.interesDiario)} × {liquidacion.diasTranscurridos}d
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    background: liquidacion.estaEnMora ? "rgba(220, 38, 38, 0.08)" : "var(--paper)",
+                    border: liquidacion.estaEnMora ? "1px solid #ef4444" : "1px solid var(--line)",
+                    padding: "0.5rem",
+                    borderRadius: "6px",
+                  }}
+                >
+                  <span style={{ color: liquidacion.estaEnMora ? "#b91c1c" : "var(--ink-soft)", display: "block", fontSize: "0.72rem" }}>
+                    Recargo por mora
+                  </span>
+                  <strong style={{ fontSize: "0.95rem", color: liquidacion.estaEnMora ? "#b91c1c" : "var(--ink)" }}>
+                    {formatoQ(liquidacion.moraFijaSugerida)}
+                  </strong>
+                  <span style={{ fontSize: "0.68rem", color: liquidacion.estaEnMora ? "#b91c1c" : "var(--ink-soft)", display: "block" }}>
+                    {liquidacion.estaEnMora ? `> 4 días gracia (Q25 × ${liquidacion.cuotasVencidas})` : "4 días gracia: Q 0.00"}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
+            {/* BOTONES DE PRECARGA RÁPIDA */}
+            {liquidacion && (
+              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem" }}
+                  onClick={() => handleMontoEntregadoChange(String(liquidacion.pagoMinimoSugerido))}
+                >
+                  💵 Pagar Cuota Mínima Sugerida ({formatoQ(liquidacion.pagoMinimoSugerido)})
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem", borderColor: "#10b981", color: "#10b981" }}
+                  onClick={() => handleMontoEntregadoChange(String(liquidacion.saldoCancelacionTotal))}
+                >
+                  🏁 Liquidar / Cancelar Total ({formatoQ(liquidacion.saldoCancelacionTotal)})
+                </button>
+              </div>
+            )}
           </div>
+
+          {/* CAMPO: MONTO ENTREGADO POR EL SOCIO */}
+          <div
+            style={{
+              background: "var(--paper-raised)",
+              padding: "0.85rem",
+              borderRadius: "8px",
+              border: "1px solid var(--accent)",
+              marginBottom: "1rem",
+            }}
+          >
+            <label htmlFor="monto-entregado" style={{ fontWeight: 700, fontSize: "0.92rem", display: "block", marginBottom: "0.3rem" }}>
+              💵 Monto Total Entregado por el Socio (Q)
+            </label>
+            <input
+              id="monto-entregado"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Ingresa la cantidad que el socio va a pagar…"
+              value={montoEntregadoInput}
+              onChange={(e) => handleMontoEntregadoChange(e.target.value)}
+              style={{ fontSize: "1.15rem", fontWeight: 700, width: "100%", padding: "0.55rem" }}
+            />
+            <span className="hint" style={{ marginTop: "0.3rem", display: "block" }}>
+              Si el socio paga más de la cuota mínima, el excedente se aplicará automáticamente directo a amortizar el Capital.
+            </span>
+          </div>
+
+          {/* AVISO DE ABONO EXTRAORDINARIO A CAPITAL */}
+          {esExcedenteCapital && (
+            <div
+              className="alert success"
+              style={{
+                marginBottom: "1rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                fontSize: "0.86rem",
+                fontWeight: 600,
+              }}
+            >
+              <span>⚡</span>
+              <div>
+                <strong>Abono Extraordinario a Capital:</strong> De los {formatoQ(totalCobro)} entregados,{" "}
+                <strong>{formatoQ(excedenteMonto)}</strong> corresponden a excedente y se van <u>DIRECTAMENTE</u> a reducir el Saldo Deudor a <strong>{formatoQ(saldoNuevo)}</strong>.
+              </div>
+            </div>
+          )}
 
           <div className="form-grid">
             <div className="field">
@@ -996,7 +1204,7 @@ function CobroCreditoForm({
                 onChange={(e) => setAbonoCapital(e.target.value)}
                 required
               />
-              <span className="hint">Reduce el saldo deudor del préstamo</span>
+              <span className="hint">Amortización directa al capital</span>
             </div>
 
             <div className="field">
@@ -1010,7 +1218,22 @@ function CobroCreditoForm({
                 onChange={(e) => setInteres(e.target.value)}
                 required
               />
-              <span className="hint">Al 2.0% mensual pactado</span>
+              <span className="hint">Interés devengado por días de uso</span>
+            </div>
+
+            <div className="field">
+              <label htmlFor="abono-asp" style={{ color: "#0369a1", fontWeight: 700 }}>
+                🛡️ Ahorro sobre Préstamo (Q)
+              </label>
+              <input
+                id="abono-asp"
+                type="number"
+                step="0.01"
+                min="0"
+                value={ahorroSobrePrestamo}
+                onChange={(e) => setAhorroSobrePrestamo(e.target.value)}
+              />
+              <span className="hint" style={{ color: "#0284c7" }}>Se deposita a su cuenta de garantía</span>
             </div>
 
             <div className="field">
@@ -1023,9 +1246,10 @@ function CobroCreditoForm({
                 value={mora}
                 onChange={(e) => setMora(e.target.value)}
               />
+              <span className="hint">Q25 tras 4 días de gracia</span>
             </div>
 
-            <div className="field">
+            <div className="field" style={{ gridColumn: "1 / -1" }}>
               <label htmlFor="doc-no-recibo">No. de Recibo Oficial</label>
               <input
                 id="doc-no-recibo"
@@ -1034,7 +1258,7 @@ function CobroCreditoForm({
                 onChange={(e) => setDocNo(e.target.value)}
                 required
               />
-              <span className="hint">Número impreso en el recibo entregado</span>
+              <span className="hint">Número impreso en el recibo entregado al socio</span>
             </div>
           </div>
 
@@ -1054,7 +1278,7 @@ function CobroCreditoForm({
           >
             <div>
               <div style={{ fontSize: "0.82rem", color: "#166534" }}>
-                Saldo deudor tras el pago: <strong>{formatoQ(saldoNuevo)}</strong>
+                Saldo capital restante tras el pago: <strong>{formatoQ(saldoNuevo)}</strong>
                 {saldoNuevo === 0 && (
                   <span style={{ marginLeft: "0.5rem", color: "#15803d", fontWeight: 700 }}>
                     🎉 ¡Crédito Liquidado al 100%!
@@ -1063,7 +1287,7 @@ function CobroCreditoForm({
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <span style={{ fontSize: "0.82rem", color: "#166534" }}>Total del cobro: </span>
+              <span style={{ fontSize: "0.82rem", color: "#166534" }}>Total a ingresar a caja: </span>
               <strong style={{ fontSize: "1.25rem", color: "#166534" }}>{formatoQ(totalCobro)}</strong>
             </div>
           </div>
@@ -1122,17 +1346,28 @@ function CobroCreditoForm({
               style={{
                 background: usarDebitoAhorro ? "#d97706" : "#059669",
                 borderColor: usarDebitoAhorro ? "#d97706" : "#059669",
+                fontWeight: 700,
               }}
               disabled={guardando || totalCobro <= 0 || (usarDebitoAhorro && (!cuentaDebitoSeleccionada || cuentasDebito.length === 0))}
             >
               {guardando
                 ? "Registrando cobro…"
                 : usarDebitoAhorro
-                ? `🛡️ Cobrar con débito de ahorro ${formatoQ(totalCobro)}`
-                : `💵 Registrar cobro de ${formatoQ(totalCobro)}`}
+                ? `🛡️ Cobrar con Débito de Ahorro ${formatoQ(totalCobro)}`
+                : `💵 Registrar Cobro de ${formatoQ(totalCobro)} en Caja`}
             </button>
           </div>
         </>
+      )}
+
+      {reciboModal && (
+        <ReciboCobroCreditoModal
+          datos={reciboModal}
+          onClose={() => {
+            setReciboModal(null);
+            onCobrado();
+          }}
+        />
       )}
     </form>
   );
@@ -1168,8 +1403,18 @@ function DesembolsoCreditoForm({
       .finally(() => setCargando(false));
   }, [agenciaId]);
 
+  const [retencionAspOpcion, setRetencionAspOpcion] = useState<"0" | "5" | "10" | "custom">("5");
+  const [retencionAspMontoInput, setRetencionAspMontoInput] = useState<string>("");
+
   const montoAprobado = prestamo ? Number(prestamo.monto_aprobado || prestamo.monto_solicitado) : 0;
-  const saldoInsuficiente = montoAprobado > saldoCajaActual;
+  
+  let montoAspRetenido = 0;
+  if (retencionAspOpcion === "5") montoAspRetenido = Math.round(montoAprobado * 0.05 * 100) / 100;
+  else if (retencionAspOpcion === "10") montoAspRetenido = Math.round(montoAprobado * 0.10 * 100) / 100;
+  else if (retencionAspOpcion === "custom") montoAspRetenido = Math.max(0, Math.min(montoAprobado, Number(retencionAspMontoInput) || 0));
+
+  const efectivoNetoAEntregar = Math.max(0, Math.round((montoAprobado - montoAspRetenido) * 100) / 100);
+  const saldoInsuficiente = efectivoNetoAEntregar > saldoCajaActual;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -1184,6 +1429,7 @@ function DesembolsoCreditoForm({
       await api.post(`/caja-auxiliar/${diaId}/desembolso-credito`, {
         prestamoId: prestamo.id,
         docNo: docNo || undefined,
+        montoAhorroSobrePrestamo: montoAspRetenido,
       });
       onDesembolsado();
     } catch (err) {
@@ -1201,7 +1447,7 @@ function DesembolsoCreditoForm({
         </span>
       </div>
       <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", margin: "0 0 1rem" }}>
-        Entrega física de efectivo al socio por crédito aprobado. Reduce el efectivo de caja y activa el préstamo.
+        Entrega física de efectivo al socio por crédito aprobado. Reduce el efectivo de caja, acredita el Ahorro sobre Préstamo y activa el préstamo.
       </p>
 
       {error && <div className="alert error">{error}</div>}
@@ -1264,16 +1510,79 @@ function DesembolsoCreditoForm({
                 </div>
               </div>
 
+              {/* SECCIÓN DE RETENCIÓN DE AHORRO SOBRE PRÉSTAMO */}
+              <div
+                style={{
+                  background: "rgba(14, 165, 233, 0.08)",
+                  border: "1px solid rgba(14, 165, 233, 0.35)",
+                  borderRadius: "8px",
+                  padding: "0.85rem 1rem",
+                  marginBottom: "1rem",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                  <label style={{ fontWeight: 700, color: "var(--ink)", margin: 0, fontSize: "0.9rem" }}>
+                    🛡️ Retención de Ahorro sobre Préstamo (Garantía Institucional)
+                  </label>
+                  <span className="badge" style={{ background: "#e0f2fe", color: "#0369a1", fontWeight: 700, fontSize: "0.75rem" }}>
+                    {montoAspRetenido > 0 ? `+ ${formatoQ(montoAspRetenido)} a su cuenta` : "Sin retención"}
+                  </span>
+                </div>
+                <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", margin: "0 0 0.6rem" }}>
+                  Se acreditará automáticamente a la cuenta de <strong>Ahorro sobre Préstamo</strong> del socio como respaldo de garantía.
+                </p>
+
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+                  {[
+                    { id: "5", label: `5% (${formatoQ(montoAprobado * 0.05)})` },
+                    { id: "10", label: `10% (${formatoQ(montoAprobado * 0.10)})` },
+                    { id: "custom", label: "Monto personalizado (Q)" },
+                    { id: "0", label: "0% (Sin retención)" },
+                  ].map((op) => (
+                    <button
+                      key={op.id}
+                      type="button"
+                      className={`btn ${retencionAspOpcion === op.id ? "" : "secondary"}`}
+                      style={{
+                        padding: "0.3rem 0.65rem",
+                        fontSize: "0.8rem",
+                        fontWeight: retencionAspOpcion === op.id ? 700 : 500,
+                        background: retencionAspOpcion === op.id ? "#0284c7" : undefined,
+                        borderColor: retencionAspOpcion === op.id ? "#0284c7" : undefined,
+                      }}
+                      onClick={() => setRetencionAspOpcion(op.id as any)}
+                    >
+                      {op.label}
+                    </button>
+                  ))}
+                </div>
+
+                {retencionAspOpcion === "custom" && (
+                  <div style={{ marginTop: "0.6rem", maxWidth: "250px" }}>
+                    <label style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>Monto en Quetzales a retener:</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={montoAprobado}
+                      step="0.01"
+                      placeholder="Ej. 250.00"
+                      value={retencionAspMontoInput}
+                      onChange={(e) => setRetencionAspMontoInput(e.target.value)}
+                      style={{ padding: "0.4rem", borderRadius: "6px" }}
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="form-grid">
                 <div className="field">
-                  <label>Monto a entregar en efectivo</label>
+                  <label>Monto total del préstamo aprobado</label>
                   <input
                     type="text"
                     value={formatoQ(montoAprobado)}
                     disabled
-                    style={{ fontWeight: 700, fontSize: "1.1rem" }}
+                    style={{ fontWeight: 700, fontSize: "1.05rem" }}
                   />
-                  <span className="hint">Monto aprobado por el comité / supervisor</span>
                 </div>
 
                 <div className="field">
@@ -1291,7 +1600,7 @@ function DesembolsoCreditoForm({
 
               {saldoInsuficiente ? (
                 <div className="alert error" style={{ marginTop: "0.75rem" }}>
-                  ⚠️ Saldo insuficiente en caja: Se requieren {formatoQ(montoAprobado)}, pero la caja física solo tiene {formatoQ(saldoCajaActual)}. Ingrese fondos antes de desembolsar.
+                  ⚠️ Saldo insuficiente en caja: Se requieren {formatoQ(efectivoNetoAEntregar)} en efectivo neto, pero la caja física solo tiene {formatoQ(saldoCajaActual)}. Ingrese fondos antes de desembolsar.
                 </div>
               ) : (
                 <div
@@ -1299,7 +1608,7 @@ function DesembolsoCreditoForm({
                     background: "#eff6ff",
                     border: "1px solid #bfdbfe",
                     borderRadius: "8px",
-                    padding: "0.8rem",
+                    padding: "0.85rem",
                     marginTop: "0.5rem",
                     display: "flex",
                     justifyContent: "space-between",
@@ -1309,12 +1618,19 @@ function DesembolsoCreditoForm({
                   }}
                 >
                   <div style={{ fontSize: "0.82rem", color: "#1e40af" }}>
-                    Saldo de caja tras la entrega:{" "}
-                    <strong>{formatoQ(saldoCajaActual - montoAprobado)}</strong>
+                    <div>Monto Aprobado: <strong>{formatoQ(montoAprobado)}</strong></div>
+                    {montoAspRetenido > 0 && (
+                      <div style={{ color: "#0369a1" }}>
+                        🛡️ Ahorro Retenido: <strong>- {formatoQ(montoAspRetenido)}</strong>
+                      </div>
+                    )}
+                    <div>Saldo en caja tras entrega: <strong>{formatoQ(saldoCajaActual - efectivoNetoAEntregar)}</strong></div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <span style={{ fontSize: "0.82rem", color: "#1e40af" }}>Total a entregar: </span>
-                    <strong style={{ fontSize: "1.25rem", color: "#1e40af" }}>{formatoQ(montoAprobado)}</strong>
+                    <span style={{ fontSize: "0.82rem", color: "#1e40af" }}>Efectivo neto a entregar al socio: </span>
+                    <div style={{ fontSize: "1.35rem", fontWeight: 800, color: "#1e40af" }}>
+                      {formatoQ(efectivoNetoAEntregar)}
+                    </div>
                   </div>
                 </div>
               )}
@@ -1323,10 +1639,10 @@ function DesembolsoCreditoForm({
                 <button
                   type="submit"
                   className="btn"
-                  style={{ background: "#2563eb", borderColor: "#2563eb" }}
+                  style={{ background: "#2563eb", borderColor: "#2563eb", fontWeight: 700 }}
                   disabled={guardando || saldoInsuficiente}
                 >
-                  {guardando ? "Desembolsando…" : `📤 Entregar ${formatoQ(montoAprobado)} en efectivo`}
+                  {guardando ? "Desembolsando…" : `📤 Desembolsar y Entregar ${formatoQ(efectivoNetoAEntregar)}`}
                 </button>
               </div>
             </>

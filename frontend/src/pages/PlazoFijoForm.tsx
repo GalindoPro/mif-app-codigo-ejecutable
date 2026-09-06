@@ -49,6 +49,21 @@ export default function PlazoFijoForm() {
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [saldoAportacion, setSaldoAportacion] = useState<number | null>(null);
+  const [creandoAportacionRapida, setCreandoAportacionRapida] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sId = params.get("socioId");
+    if (sId && !socio) {
+      api
+        .get<Socio>(`/socios/${sId}`)
+        .then(({ data }) => {
+          setSocio(data);
+          if (data.agencia_id) setAgenciaId(data.agencia_id);
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     if (puedeElegirAgencia) {
@@ -69,6 +84,20 @@ export default function PlazoFijoForm() {
       })
       .catch(() => setSaldoAportacion(null));
   }, [socio]);
+
+  async function handleAperturarAportacionRapida() {
+    if (!socio) return;
+    setCreandoAportacionRapida(true);
+    setError(null);
+    try {
+      await api.post(`/socios/${socio.id}/abrir-aportacion`, { monto: 100 });
+      setSaldoAportacion(100);
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setCreandoAportacionRapida(false);
+    }
+  }
 
   useEffect(() => {
     if (!agenciaId) return;
@@ -112,7 +141,7 @@ export default function PlazoFijoForm() {
     }
     if (saldoAportacion !== null && saldoAportacion < 100) {
       setError(
-        `Regla de la cooperativa: El socio debe contar con una aportación mínima de Q 100.00 para constituir contratos a plazo fijo (saldo actual: Q ${saldoAportacion.toFixed(2)}).`
+        `Regla de la cooperativa: El socio debe tener un saldo de aportaciones de al menos Q 100.00 para poder abrir un certificado a plazo fijo (saldo actual: Q ${saldoAportacion.toFixed(2)}).`
       );
       return;
     }
@@ -190,11 +219,26 @@ export default function PlazoFijoForm() {
                     border: "1px solid rgba(239, 68, 68, 0.3)",
                     fontSize: "0.86rem",
                     lineHeight: 1.45,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "0.5rem",
                   }}
                 >
-                  ⚠️ <strong>Aportación estatutaria insuficiente:</strong> El socio tiene un saldo de aportaciones de{" "}
-                  <strong>Q {saldoAportacion.toFixed(2)}</strong>. La regla de la cooperativa exige tener al menos{" "}
-                  <strong>Q 100.00</strong> en aportaciones para constituir certificados a plazo fijo.
+                  <div>
+                    ⚠️ <strong>Aportación estatutaria insuficiente:</strong> Saldo de aportaciones:{" "}
+                    <strong>Q {saldoAportacion.toFixed(2)}</strong> (Mínimo estatutario: Q 100.00).
+                  </div>
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{ background: "#059669", borderColor: "#059669", fontWeight: 700, fontSize: "0.8rem", padding: "0.25rem 0.6rem" }}
+                    onClick={handleAperturarAportacionRapida}
+                    disabled={creandoAportacionRapida}
+                  >
+                    {creandoAportacionRapida ? "Aperturando…" : "➕ Aperturar Aportación (Q 100) Ahora"}
+                  </button>
                 </div>
               ) : (
                 <div
