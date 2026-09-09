@@ -978,10 +978,18 @@ function CobroCreditoVentanilla({
         `/prestamos/${p.id}/liquidacion`,
       );
       setLiquidacion(data.liquidacion);
-      setAbonoCapital(String(data.liquidacion.cuotaCapitalSugerida));
-      setInteres(String(data.liquidacion.interesDevengado));
+      const capSugerido = data.liquidacion.cuotaCapitalBase || data.liquidacion.cuotaCapitalSugerida;
+      const intSugerido = data.liquidacion.estaEnMora || data.liquidacion.cuotasVencidas > 0
+        ? data.liquidacion.interesDevengado
+        : (data.liquidacion.interesMesCompleto || data.liquidacion.interesDevengado);
+      const totalSugerido = data.liquidacion.estaEnMora || data.liquidacion.cuotasVencidas > 0
+        ? data.liquidacion.pagoMinimoSugerido
+        : (data.liquidacion.cuotaProgramadaOficial || data.liquidacion.pagoMinimoSugerido);
+
+      setAbonoCapital(String(capSugerido));
+      setInteres(String(intSugerido));
       setMora(String(data.liquidacion.moraFijaSugerida));
-      setMontoEntregadoInput(String(data.liquidacion.pagoMinimoSugerido));
+      setMontoEntregadoInput(String(totalSugerido));
     } catch {
       const saldo = Number(
         p.saldo_capital !== null && p.saldo_capital !== undefined
@@ -1363,48 +1371,66 @@ function CobroCreditoVentanilla({
               </div>
             ) : null}
 
-            {/* BOTONES DE PRECARGA RÁPIDA (CON OPCIÓN DE PONERSE AL DÍA O PAGAR 1 CUOTA) */}
+            {/* BOTONES DE PRECARGA RÁPIDA (CUOTA OFICIAL DE TABLA, LIQUIDACIÓN A HOY O CANCELACIÓN) */}
             {liquidacion && (
               <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem", flexWrap: "wrap" }}>
-                {liquidacion.cuotasVencidas > 1 ? (
-                  <>
-                    <button
-                      type="button"
-                      className="btn secondary"
-                      style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem", borderColor: "#ef4444", color: "#b91c1c", fontWeight: 700 }}
-                      onClick={() => handleMontoEntregadoChange(String(liquidacion.pagoMinimoSugerido))}
-                    >
-                      ⚡ Ponerse al Día ({liquidacion.cuotasVencidas} cuotas: {formatoQ(liquidacion.pagoMinimoSugerido)})
-                    </button>
-                    <button
-                      type="button"
-                      className="btn secondary"
-                      style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem" }}
-                      onClick={() => {
-                        const cap1 = Math.round(((Number(prestamo.monto_aprobado || prestamo.monto_solicitado) / (Number(prestamo.plazo_meses) || 12))) * 100) / 100;
-                        const tot1 = Math.round((cap1 + liquidacion.interesDevengado + liquidacion.moraFijaSugerida) * 100) / 100;
-                        handleMontoEntregadoChange(String(tot1));
-                      }}
-                    >
-                      💵 Pagar solo 1 cuota ({formatoQ(Math.round(((Number(prestamo.monto_aprobado || prestamo.monto_solicitado) / (Number(prestamo.plazo_meses) || 12)) + liquidacion.interesDevengado + liquidacion.moraFijaSugerida) * 100) / 100)})
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn secondary"
-                    style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem" }}
-                    onClick={() => handleMontoEntregadoChange(String(liquidacion.pagoMinimoSugerido))}
-                  >
-                    💵 Pagar Cuota Mínima Sugerida ({formatoQ(liquidacion.pagoMinimoSugerido)})
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{
+                    fontSize: "0.78rem",
+                    padding: "0.3rem 0.65rem",
+                    background: "rgba(16, 185, 129, 0.12)",
+                    border: "1.5px solid #059669",
+                    color: "#065f46",
+                    fontWeight: 700,
+                  }}
+                  onClick={() => {
+                    const cap = liquidacion.cuotaCapitalBase || liquidacion.cuotaCapitalSugerida;
+                    const int = liquidacion.interesMesCompleto || liquidacion.interesDevengado;
+                    const mor = liquidacion.moraFijaSugerida || 0;
+                    const tot = Math.round((cap + int + mor) * 100) / 100;
+                    setAbonoCapital(String(cap));
+                    setInteres(String(int));
+                    setMora(String(mor));
+                    setMontoEntregadoInput(String(tot));
+                  }}
+                >
+                  📅 Cuota Oficial de la Tabla ({formatoQ(liquidacion.cuotaProgramadaOficial || (liquidacion.cuotaCapitalBase ? liquidacion.cuotaCapitalBase + (liquidacion.interesMesCompleto || 0) : liquidacion.pagoMinimoSugerido))})
+                </button>
 
                 <button
                   type="button"
                   className="btn secondary"
-                  style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem", borderColor: "#10b981", color: "#10b981" }}
-                  onClick={() => handleMontoEntregadoChange(String(liquidacion.saldoCancelacionTotal))}
+                  style={{ fontSize: "0.76rem", padding: "0.3rem 0.65rem" }}
+                  onClick={() => {
+                    const cap = liquidacion.cuotaCapitalSugerida;
+                    const int = liquidacion.interesDevengado;
+                    const mor = liquidacion.moraFijaSugerida;
+                    const tot = Math.round((cap + int + mor) * 100) / 100;
+                    setAbonoCapital(String(cap));
+                    setInteres(String(int));
+                    setMora(String(mor));
+                    setMontoEntregadoInput(String(tot));
+                  }}
+                >
+                  ⚡ Liquidación a Hoy ({liquidacion.diasTranscurridos}d: {formatoQ(Math.round((liquidacion.cuotaCapitalSugerida + liquidacion.interesDevengado + liquidacion.moraFijaSugerida) * 100) / 100)})
+                </button>
+
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ fontSize: "0.76rem", padding: "0.3rem 0.65rem", borderColor: "#10b981", color: "#10b981", fontWeight: 700 }}
+                  onClick={() => {
+                    const cap = saldoActual;
+                    const int = liquidacion.interesDevengado;
+                    const mor = liquidacion.moraFijaSugerida;
+                    const tot = Math.round((cap + int + mor) * 100) / 100;
+                    setAbonoCapital(String(cap));
+                    setInteres(String(int));
+                    setMora(String(mor));
+                    setMontoEntregadoInput(String(tot));
+                  }}
                 >
                   🏁 Liquidar / Cancelar Total ({formatoQ(liquidacion.saldoCancelacionTotal)})
                 </button>

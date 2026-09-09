@@ -1,4 +1,6 @@
+import { PoolClient } from "pg";
 import { pool } from "../../db/pool";
+import { withTransaction } from "../../db/transaction";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
 
@@ -136,77 +138,79 @@ export interface DatosCuenta {
 }
 
 export async function crear(data: DatosCuenta, usuarioId: string) {
-  const { rows: aporRows } = await pool.query(
-    `select coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_aportacion
-     from cuentas c
-     left join saldos_cuenta sc on sc.cuenta_id = c.id
-     where c.socio_id = $1 and c.tipo = 'APORTACION' and c.estado = 'ACTIVA'
-     limit 1`,
-    [data.socioId],
-  );
-  const saldoApor = aporRows[0] ? Number(aporRows[0].saldo_aportacion) : 0;
-  if (saldoApor < 100) {
-    throw badRequest(
-      `Regla de la cooperativa: El asociado debe tener una aportación mínima de Q 100.00 para poder abrir cuentas de ahorro infantil, corriente, programado o sobre préstamo (saldo actual de aportaciones: Q ${saldoApor.toFixed(2)}).`,
+  return withTransaction(async (client) => {
+    const { rows: aporRows } = await client.query(
+      `select coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_aportacion
+       from cuentas c
+       left join saldos_cuenta sc on sc.cuenta_id = c.id
+       where c.socio_id = $1 and c.tipo = 'APORTACION' and c.estado = 'ACTIVA'
+       limit 1`,
+      [data.socioId],
     );
-  }
-
-  // Verificación de cuenta existente
-  if (data.tipo === "AHORRO_SOBRE_PRESTAMO" && data.prestamoId) {
-    const { rows: existente } = await pool.query(
-      `select numero_cuenta from cuentas where socio_id = $1 and tipo = $2 and prestamo_id = $3 and estado = 'ACTIVA'`,
-      [data.socioId, data.tipo, data.prestamoId],
-    );
-    if (existente[0]) {
-      throw conflict(
-        `El socio ya tiene una cuenta de Ahorro sobre Préstamo activa vinculada a este crédito (${existente[0].numero_cuenta}).`,
+    const saldoApor = aporRows[0] ? Number(aporRows[0].saldo_aportacion) : 0;
+    if (saldoApor < 100) {
+      throw badRequest(
+        `Regla de la cooperativa: El asociado debe tener una aportación mínima de Q 100.00 para poder abrir cuentas de ahorro infantil, corriente, programado o sobre préstamo (saldo actual de aportaciones: Q ${saldoApor.toFixed(2)}).`,
       );
     }
-  } else {
-    const { rows: existente } = await pool.query(
-      `select numero_cuenta from cuentas where socio_id = $1 and tipo = $2 and estado = 'ACTIVA'`,
-      [data.socioId, data.tipo],
+
+    // Verificación de cuenta existente
+    if (data.tipo === "AHORRO_SOBRE_PRESTAMO" && data.prestamoId) {
+      const { rows: existente } = await client.query(
+        `select numero_cuenta from cuentas where socio_id = $1 and tipo = $2 and prestamo_id = $3 and estado = 'ACTIVA'`,
+        [data.socioId, data.tipo, data.prestamoId],
+      );
+      if (existente[0]) {
+        throw conflict(
+          `El socio ya tiene una cuenta de Ahorro sobre Préstamo activa vinculada a este crédito (${existente[0].numero_cuenta}).`,
+        );
+      }
+    } else {
+      const { rows: existente } = await client.query(
+        `select numero_cuenta from cuentas where socio_id = $1 and tipo = $2 and estado = 'ACTIVA'`,
+        [data.socioId, data.tipo],
+      );
+      if (existente[0]) {
+        throw conflict(
+          `El socio ya tiene una cuenta activa de este tipo (${existente[0].numero_cuenta}). Cada socio solo puede tener una cuenta por tipo de ahorro.`,
+        );
+      }
+    }
+
+    const { rows: cuentaRepetida } = await client.query(
+      `select c.numero_cuenta, s.nombres as socio_nombres
+       from cuentas c
+       join socios s on s.id = c.socio_id
+       where lower(trim(c.numero_cuenta)) = lower(trim($1))
+       limit 1`,
+      [data.numeroCuenta],
     );
-    if (existente[0]) {
+    if (cuentaRepetida[0]) {
       throw conflict(
-        `El socio ya tiene una cuenta activa de este tipo (${existente[0].numero_cuenta}). Cada socio solo puede tener una cuenta por tipo de ahorro.`,
+        `El número de cuenta "${data.numeroCuenta}" ya existe y pertenece al socio "${cuentaRepetida[0].socio_nombres}". No se permiten números de cuenta duplicados.`,
       );
     }
-  }
 
-  const { rows: cuentaRepetida } = await pool.query(
-    `select c.numero_cuenta, s.nombres as socio_nombres
-     from cuentas c
-     join socios s on s.id = c.socio_id
-     where lower(trim(c.numero_cuenta)) = lower(trim($1))
-     limit 1`,
-    [data.numeroCuenta],
-  );
-  if (cuentaRepetida[0]) {
-    throw conflict(
-      `El número de cuenta "${data.numeroCuenta}" ya existe y pertenece al socio "${cuentaRepetida[0].socio_nombres}". No se permiten números de cuenta duplicados.`,
+    const { rows } = await client.query(
+      `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, cuota_pactada, observaciones_apertura, prestamo_id, creado_por_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       returning *`,
+      [
+        data.numeroCuenta,
+        data.tipo,
+        data.socioId,
+        data.agenciaId,
+        data.saldoInicial ?? 0,
+        data.cuotaPactada ?? null,
+        data.observacionesApertura ?? null,
+        data.prestamoId ?? null,
+        usuarioId,
+      ],
     );
-  }
-
-  const { rows } = await pool.query(
-    `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, cuota_pactada, observaciones_apertura, prestamo_id, creado_por_id)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-     returning *`,
-    [
-      data.numeroCuenta,
-      data.tipo,
-      data.socioId,
-      data.agenciaId,
-      data.saldoInicial ?? 0,
-      data.cuotaPactada ?? null,
-      data.observacionesApertura ?? null,
-      data.prestamoId ?? null,
-      usuarioId,
-    ],
-  );
-  const cuenta = rows[0];
-  await registrarAuditoria({ entidad: "Cuenta", entidadId: cuenta.id, accion: "CREAR", usuarioId, datosNuevos: cuenta });
-  return cuenta;
+    const cuenta = rows[0];
+    await registrarAuditoria({ entidad: "Cuenta", entidadId: cuenta.id, accion: "CREAR", usuarioId, datosNuevos: cuenta });
+    return cuenta;
+  });
 }
 
 export async function listarNovedadesCampo(agenciaId: string | null) {
@@ -236,19 +240,34 @@ export interface DatosMovimiento {
   descripcion?: string;
 }
 
-export async function registrarMovimiento(
+export async function registrarMovimientoConClient(
+  client: PoolClient,
   cuentaId: string,
   data: DatosMovimiento,
   usuarioId: string,
   agenciaVisible: string | null,
 ) {
-  const cuenta = await obtener(cuentaId, agenciaVisible);
+  const { rows: ctaRows } = await client.query(
+    `select c.*, s.nombres as socio_nombres, s.numero_asociado, a.nombre as agencia_nombre,
+            p.codigo as prestamo_codigo, p.estado as prestamo_estado, p.saldo_capital as prestamo_saldo_capital,
+            coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
+     from cuentas c
+     join socios s on s.id = c.socio_id
+     join agencias a on a.id = c.agencia_id
+     left join prestamos p on p.id = c.prestamo_id
+     left join saldos_cuenta sc on sc.cuenta_id = c.id
+     where c.id = $1`,
+    [cuentaId],
+  );
+  const cuenta = ctaRows[0];
+  if (!cuenta) throw notFound("Cuenta no encontrada");
+  if (agenciaVisible && cuenta.agencia_id !== agenciaVisible) throw forbidden("Esa cuenta pertenece a otra agencia");
   if (cuenta.estado !== "ACTIVA") throw badRequest("Esta cuenta está cerrada; no se pueden registrar movimientos");
 
   if (data.tipo === "RETIRO") {
     // REGLA CRÍTICA: Ahorro sobre Préstamo no se toca hasta que termine el pago del crédito
     if (cuenta.tipo === "AHORRO_SOBRE_PRESTAMO") {
-      const { rows: prestamosActivos } = await pool.query(
+      const { rows: prestamosActivos } = await client.query(
         `select codigo, estado, saldo_capital
          from prestamos
          where (id = $1 or (socio_id = $2 and estado in ('SOLICITUD', 'APROBADO', 'DESEMBOLSADO')))
@@ -275,7 +294,7 @@ export async function registrarMovimiento(
     const recibo = data.numeroRecibo.trim();
 
     // 1. Checar en movimientos de cuentas
-    const { rows: repetidoMov } = await pool.query(
+    const { rows: repetidoMov } = await client.query(
       `select m.fecha, m.numero_recibo, c.numero_cuenta, s.nombres as socio_nombres
        from movimientos m
        join cuentas c on c.id = m.cuenta_id
@@ -292,7 +311,7 @@ export async function registrarMovimiento(
     }
 
     // 2. Checar en auxiliar de caja
-    const { rows: repetidoAux } = await pool.query(
+    const { rows: repetidoAux } = await client.query(
       `select fecha, doc_no, beneficiario, descripcion
        from caja_movimientos_auxiliar
        where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
@@ -309,7 +328,7 @@ export async function registrarMovimiento(
 
   const clienteMovimientoId = `srv-${cuentaId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const { rows } = await pool.query(
+  const { rows } = await client.query(
     `insert into movimientos (cuenta_id, tipo, monto, fecha, numero_recibo, descripcion, usuario_id, cliente_movimiento_id)
      values ($1,$2,$3,$4,$5,$6,$7,$8)
      returning *`,
@@ -323,5 +342,16 @@ export async function registrarMovimiento(
     usuarioId,
     datosNuevos: movimiento,
   });
-  return movimiento;
+  return { ...movimiento, cuenta_socio_id: cuenta.socio_id, cuenta_socio_nombres: cuenta.socio_nombres, cuenta_numero: cuenta.numero_cuenta };
+}
+
+export async function registrarMovimiento(
+  cuentaId: string,
+  data: DatosMovimiento,
+  usuarioId: string,
+  agenciaVisible: string | null,
+) {
+  return withTransaction(async (client) => {
+    return registrarMovimientoConClient(client, cuentaId, data, usuarioId, agenciaVisible);
+  });
 }

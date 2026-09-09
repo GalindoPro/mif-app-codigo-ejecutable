@@ -1,4 +1,6 @@
+import { PoolClient } from "pg";
 import { pool } from "../../db/pool";
+import { withTransaction } from "../../db/transaction";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
 import * as cuentasService from "../cuentas/service";
@@ -71,52 +73,53 @@ export async function historialDias(agenciaId: string, agenciaVisible: string | 
   return rows;
 }
 
-
 export async function abrirDia(agenciaId: string, usuarioId: string, agenciaVisible: string | null, saldoInicialManual?: number) {
   checarAgencia(agenciaId, agenciaVisible);
   const fecha = hoyISO();
 
-  const { rows: abiertos } = await pool.query(
-    `select * from caja_dias where agencia_id = $1 and estado = 'ABIERTO' order by fecha desc limit 1`,
-    [agenciaId],
-  );
-  if (abiertos[0]) {
-    const fechaAbierto = new Date(abiertos[0].fecha).toISOString().slice(0, 10);
-    if (fechaAbierto === fecha) return abiertos[0];
-    throw conflict(`Todavía tienes la caja del ${fechaAbierto} sin cerrar. Ciérrala antes de abrir la de hoy.`);
-  }
-
-  const { rows: existeHoy } = await pool.query(
-    `select * from caja_dias where agencia_id = $1 and fecha = $2`,
-    [agenciaId, fecha],
-  );
-  if (existeHoy[0]) throw conflict("La caja de hoy ya fue cerrada; no se puede volver a abrir.");
-
-  const { rows: ultimos } = await pool.query(
-    `select * from caja_dias where agencia_id = $1 order by fecha desc limit 1`,
-    [agenciaId],
-  );
-  const ultimo = ultimos[0] ?? null;
-
-  let saldoInicial: number;
-  if (ultimo) {
-    saldoInicial = Number(ultimo.saldo_final);
-  } else {
-    if (saldoInicialManual === undefined || saldoInicialManual === null) {
-      throw badRequest("Es la primera vez que se abre la caja de esta agencia; indica el saldo inicial.");
+  return withTransaction(async (client) => {
+    const { rows: abiertos } = await client.query(
+      `select * from caja_dias where agencia_id = $1 and estado = 'ABIERTO' order by fecha desc limit 1`,
+      [agenciaId],
+    );
+    if (abiertos[0]) {
+      const fechaAbierto = new Date(abiertos[0].fecha).toISOString().slice(0, 10);
+      if (fechaAbierto === fecha) return abiertos[0];
+      throw conflict(`Todavía tienes la caja del ${fechaAbierto} sin cerrar. Ciérrala antes de abrir la de hoy.`);
     }
-    saldoInicial = saldoInicialManual;
-  }
 
-  const { rows } = await pool.query(
-    `insert into caja_dias (agencia_id, fecha, saldo_inicial, estado, abierto_por)
-     values ($1,$2,$3,'ABIERTO',$4)
-     returning *`,
-    [agenciaId, fecha, saldoInicial, usuarioId],
-  );
-  const dia = rows[0];
-  await registrarAuditoria({ entidad: "CajaDia", entidadId: dia.id, accion: "CREAR", usuarioId, datosNuevos: dia });
-  return dia;
+    const { rows: existeHoy } = await client.query(
+      `select * from caja_dias where agencia_id = $1 and fecha = $2`,
+      [agenciaId, fecha],
+    );
+    if (existeHoy[0]) throw conflict("La caja de hoy ya fue cerrada; no se puede volver a abrir.");
+
+    const { rows: ultimos } = await client.query(
+      `select * from caja_dias where agencia_id = $1 order by fecha desc limit 1`,
+      [agenciaId],
+    );
+    const ultimo = ultimos[0] ?? null;
+
+    let saldoInicial: number;
+    if (ultimo) {
+      saldoInicial = Number(ultimo.saldo_final);
+    } else {
+      if (saldoInicialManual === undefined || saldoInicialManual === null) {
+        throw badRequest("Es la primera vez que se abre la caja de esta agencia; indica el saldo inicial.");
+      }
+      saldoInicial = saldoInicialManual;
+    }
+
+    const { rows } = await client.query(
+      `insert into caja_dias (agencia_id, fecha, saldo_inicial, estado, abierto_por)
+       values ($1,$2,$3,'ABIERTO',$4)
+       returning *`,
+      [agenciaId, fecha, saldoInicial, usuarioId],
+    );
+    const dia = rows[0];
+    await registrarAuditoria({ entidad: "CajaDia", entidadId: dia.id, accion: "CREAR", usuarioId, datosNuevos: dia });
+    return dia;
+  });
 }
 
 async function obtenerDiaCrudo(id: string, agenciaVisible: string | null) {
@@ -167,168 +170,180 @@ export async function crearMovimiento(
   usuarioId: string,
   agenciaVisible: string | null,
 ) {
-  const dia = await obtenerDiaCrudo(diaId, agenciaVisible);
-  if (dia.estado !== "ABIERTO") throw conflict("La caja de este día ya está cerrada; no se pueden agregar movimientos.");
+  return withTransaction(async (client) => {
+    const { rows: diaRows } = await client.query(`select * from caja_dias where id = $1`, [diaId]);
+    const dia = diaRows[0];
+    if (!dia) throw notFound("Día de caja no encontrado");
+    checarAgencia(dia.agencia_id, agenciaVisible);
+    if (dia.estado !== "ABIERTO") throw conflict("La caja de este día ya está cerrada; no se pueden agregar movimientos.");
 
-  const info = CATEGORIAS[data.categoria];
-  if (!info) throw badRequest("Categoría de movimiento no reconocida");
-  if (!data.monto || data.monto <= 0) throw badRequest("El monto debe ser mayor a cero");
+    const info = CATEGORIAS[data.categoria];
+    if (!info) throw badRequest("Categoría de movimiento no reconocida");
+    if (!data.monto || data.monto <= 0) throw badRequest("El monto debe ser mayor a cero");
 
-  // Validación de número de documento / recibo anti-duplicados
-  if (data.docNo && data.docNo.trim()) {
-    const doc = data.docNo.trim();
-    // 1. Checar en caja_movimientos_auxiliar
-    const { rows: repetidoAux } = await pool.query(
-      `select fecha, doc_no, beneficiario, descripcion
-       from caja_movimientos_auxiliar
-       where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
-       limit 1`,
-      [dia.agencia_id, doc],
-    );
-    if (repetidoAux[0]) {
-      const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
-      throw conflict(
-        `El número de documento/recibo "${doc}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten documentos duplicados.`,
-      );
-    }
-
-    // 2. Checar en prestamo_pagos
-    const { rows: repetidoPago } = await pool.query(
-      `select pp.fecha, pp.numero_recibo, p.codigo, s.nombres as socio_nombres
-       from prestamo_pagos pp
-       join prestamos p on p.id = pp.prestamo_id
-       join socios s on s.id = pp.socio_id
-       where pp.agencia_id = $1 and lower(trim(pp.numero_recibo)) = lower($2)
-       limit 1`,
-      [dia.agencia_id, doc],
-    );
-    if (repetidoPago[0]) {
-      const fechaStr = new Date(repetidoPago[0].fecha).toLocaleDateString("es-GT");
-      throw conflict(
-        `El número de recibo "${doc}" ya fue registrado el ${fechaStr} en el crédito ${repetidoPago[0].codigo} (${repetidoPago[0].socio_nombres}). No se permiten recibos duplicados.`,
-      );
-    }
-
-    // 3. Checar en movimientos de cuentas (si no requiereCuenta, pues requiereCuenta se valida en cuentasService)
-    if (!info.requiereCuenta) {
-      const { rows: repetidoMov } = await pool.query(
-        `select m.fecha, m.numero_recibo, c.numero_cuenta, s.nombres as socio_nombres
-         from movimientos m
-         join cuentas c on c.id = m.cuenta_id
-         join socios s on s.id = c.socio_id
-         where c.agencia_id = $1 and lower(trim(m.numero_recibo)) = lower($2)
+    // Validación de número de documento / recibo anti-duplicados
+    if (data.docNo && data.docNo.trim()) {
+      const doc = data.docNo.trim();
+      // 1. Checar en caja_movimientos_auxiliar
+      const { rows: repetidoAux } = await client.query(
+        `select fecha, doc_no, beneficiario, descripcion
+         from caja_movimientos_auxiliar
+         where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
          limit 1`,
         [dia.agencia_id, doc],
       );
-      if (repetidoMov[0]) {
-        const fechaStr = new Date(repetidoMov[0].fecha).toLocaleDateString("es-GT");
+      if (repetidoAux[0]) {
+        const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
         throw conflict(
-          `El número de recibo "${doc}" ya fue registrado el ${fechaStr} en la cuenta ${repetidoMov[0].numero_cuenta} (${repetidoMov[0].socio_nombres}). No se permiten recibos duplicados.`,
+          `El número de documento/recibo "${doc}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten documentos duplicados.`,
         );
       }
+
+      // 2. Checar en prestamo_pagos
+      const { rows: repetidoPago } = await client.query(
+        `select pp.fecha, pp.numero_recibo, p.codigo, s.nombres as socio_nombres
+         from prestamo_pagos pp
+         join prestamos p on p.id = pp.prestamo_id
+         join socios s on s.id = pp.socio_id
+         where pp.agencia_id = $1 and lower(trim(pp.numero_recibo)) = lower($2)
+         limit 1`,
+        [dia.agencia_id, doc],
+      );
+      if (repetidoPago[0]) {
+        const fechaStr = new Date(repetidoPago[0].fecha).toLocaleDateString("es-GT");
+        throw conflict(
+          `El número de recibo "${doc}" ya fue registrado el ${fechaStr} en el crédito ${repetidoPago[0].codigo} (${repetidoPago[0].socio_nombres}). No se permiten recibos duplicados.`,
+        );
+      }
+
+      // 3. Checar en movimientos de cuentas (si no requiereCuenta, pues requiereCuenta se valida en cuentasService)
+      if (!info.requiereCuenta) {
+        const { rows: repetidoMov } = await client.query(
+          `select m.fecha, m.numero_recibo, c.numero_cuenta, s.nombres as socio_nombres
+           from movimientos m
+           join cuentas c on c.id = m.cuenta_id
+           join socios s on s.id = c.socio_id
+           where c.agencia_id = $1 and lower(trim(m.numero_recibo)) = lower($2)
+           limit 1`,
+          [dia.agencia_id, doc],
+        );
+        if (repetidoMov[0]) {
+          const fechaStr = new Date(repetidoMov[0].fecha).toLocaleDateString("es-GT");
+          throw conflict(
+            `El número de recibo "${doc}" ya fue registrado el ${fechaStr} en la cuenta ${repetidoMov[0].numero_cuenta} (${repetidoMov[0].socio_nombres}). No se permiten recibos duplicados.`,
+          );
+        }
+      }
     }
-  }
 
-  const { rows: contadorRows } = await pool.query(
-    `select count(*)::int as total from caja_movimientos_auxiliar
-     where agencia_id = $1 and categoria::text = any($2::text[])`,
-    [dia.agencia_id, categoriasDelGrupo(info.grupoContador)],
-  );
-  const contador = contadorRows[0].total + 1;
+    const { rows: contadorRows } = await client.query(
+      `select count(*)::int as total from caja_movimientos_auxiliar
+       where agencia_id = $1 and categoria::text = any($2::text[])`,
+      [dia.agencia_id, categoriasDelGrupo(info.grupoContador)],
+    );
+    const contador = contadorRows[0].total + 1;
 
-  let socioId: string | null = data.socioId ?? null;
-  let cuentaId: string | null = null;
-  let movimientoId: string | null = null;
-  let ingresoComifId: string | null = null;
-  let referencia: string | null = data.referenciaAut ?? null;
-  let beneficiario = data.beneficiario?.trim() ?? "";
+    let socioId: string | null = data.socioId ?? null;
+    let cuentaId: string | null = null;
+    let movimientoId: string | null = null;
+    let ingresoComifId: string | null = null;
+    let referencia: string | null = data.referenciaAut ?? null;
+    let beneficiario = data.beneficiario?.trim() ?? "";
 
-  if (info.requiereCuenta) {
-    if (!data.cuentaId) throw badRequest("Selecciona la cuenta del socio");
-    const cuenta = await cuentasService.obtener(data.cuentaId, agenciaVisible);
-    if (cuenta.tipo !== info.requiereCuenta) throw badRequest("La cuenta seleccionada no corresponde a este tipo de ahorro");
+    if (info.requiereCuenta) {
+      if (!data.cuentaId) throw badRequest("Selecciona la cuenta del socio");
+      const { rows: ctaRows } = await client.query(
+        `select c.*, s.nombres as socio_nombres, s.id as socio_id from cuentas c join socios s on s.id = c.socio_id where c.id = $1`,
+        [data.cuentaId],
+      );
+      const cuenta = ctaRows[0];
+      if (!cuenta) throw notFound("Cuenta no encontrada");
+      if (agenciaVisible && cuenta.agencia_id !== agenciaVisible) throw forbidden("Esa cuenta pertenece a otra agencia");
+      if (cuenta.tipo !== info.requiereCuenta) throw badRequest("La cuenta seleccionada no corresponde a este tipo de ahorro");
 
-    const movimiento = await cuentasService.registrarMovimiento(
-      data.cuentaId,
-      {
-        tipo: info.movimientoTipo!,
-        monto: data.monto,
-        fecha: new Date(dia.fecha).toISOString().slice(0, 10),
-        numeroRecibo: data.docNo,
-        descripcion: info.descripcion,
-      },
+      const movimiento = await cuentasService.registrarMovimientoConClient(
+        client,
+        data.cuentaId,
+        {
+          tipo: info.movimientoTipo!,
+          monto: data.monto,
+          fecha: new Date(dia.fecha).toISOString().slice(0, 10),
+          numeroRecibo: data.docNo,
+          descripcion: info.descripcion,
+        },
+        usuarioId,
+        agenciaVisible,
+      );
+
+      cuentaId = data.cuentaId;
+      movimientoId = movimiento.id;
+      socioId = cuenta.socio_id;
+      beneficiario = cuenta.socio_nombres;
+      referencia = `${cuenta.numero_cuenta}-${info.tipo === "INGRESO" ? "IN" : "EN"}`;
+    } else if (info.ingresosComifCategoria) {
+      if (!beneficiario) throw badRequest("Indica el nombre del socio o beneficiario");
+      const { rows } = await client.query(
+        `insert into ingresos_comif (agencia_id, fecha, numero_documento, nombre_socio, categoria, monto, usuario_id)
+         values ($1,$2,$3,$4,$5,$6,$7)
+         returning id`,
+        [dia.agencia_id, dia.fecha, data.docNo ?? null, beneficiario, info.ingresosComifCategoria, data.monto, usuarioId],
+      );
+      ingresoComifId = rows[0].id;
+    } else {
+      if (!beneficiario) throw badRequest("Indica el beneficiario");
+    }
+
+    const { rows: ultimoMovRows } = await client.query(
+      `select saldo_acumulado from caja_movimientos_auxiliar where caja_dia_id = $1 order by created_at desc limit 1`,
+      [diaId],
+    );
+    const saldoPrevio = ultimoMovRows[0] ? Number(ultimoMovRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
+    const saldoAcumulado = info.tipo === "INGRESO" ? saldoPrevio + data.monto : saldoPrevio - data.monto;
+
+    if (info.tipo === "EGRESO" && saldoAcumulado < 0) {
+      throw conflict(
+        `Este egreso (Q ${data.monto.toFixed(2)}) dejaría la caja en negativo (saldo disponible: Q ${saldoPrevio.toFixed(2)})`,
+      );
+    }
+
+    const { rows } = await client.query(
+      `insert into caja_movimientos_auxiliar
+         (caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador, referencia,
+          socio_id, cuenta_id, movimiento_id, ingreso_comif_id, beneficiario, descripcion, doc_no,
+          monto, saldo_acumulado, usuario_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+       returning *`,
+      [
+        diaId,
+        dia.agencia_id,
+        dia.fecha,
+        info.seccion,
+        data.categoria,
+        info.tipo,
+        contador,
+        referencia,
+        socioId,
+        cuentaId,
+        movimientoId,
+        ingresoComifId,
+        beneficiario,
+        info.descripcion,
+        data.docNo ?? null,
+        data.monto,
+        saldoAcumulado,
+        usuarioId,
+      ],
+    );
+    const registro = rows[0];
+    await registrarAuditoria({
+      entidad: "CajaMovimientoAuxiliar",
+      entidadId: registro.id,
+      accion: "CREAR",
       usuarioId,
-      agenciaVisible,
-    );
-
-    cuentaId = data.cuentaId;
-    movimientoId = movimiento.id;
-    socioId = cuenta.socio_id;
-    beneficiario = cuenta.socio_nombres;
-    referencia = `${cuenta.numero_cuenta}-${info.tipo === "INGRESO" ? "IN" : "EN"}`;
-  } else if (info.ingresosComifCategoria) {
-    if (!beneficiario) throw badRequest("Indica el nombre del socio o beneficiario");
-    const { rows } = await pool.query(
-      `insert into ingresos_comif (agencia_id, fecha, numero_documento, nombre_socio, categoria, monto, usuario_id)
-       values ($1,$2,$3,$4,$5,$6,$7)
-       returning id`,
-      [dia.agencia_id, dia.fecha, data.docNo ?? null, beneficiario, info.ingresosComifCategoria, data.monto, usuarioId],
-    );
-    ingresoComifId = rows[0].id;
-  } else {
-    if (!beneficiario) throw badRequest("Indica el beneficiario");
-  }
-
-  const { rows: ultimoMovRows } = await pool.query(
-    `select saldo_acumulado from caja_movimientos_auxiliar where caja_dia_id = $1 order by created_at desc limit 1`,
-    [diaId],
-  );
-  const saldoPrevio = ultimoMovRows[0] ? Number(ultimoMovRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
-  const saldoAcumulado = info.tipo === "INGRESO" ? saldoPrevio + data.monto : saldoPrevio - data.monto;
-
-  if (info.tipo === "EGRESO" && saldoAcumulado < 0) {
-    throw conflict(
-      `Este egreso (Q ${data.monto.toFixed(2)}) dejaría la caja en negativo (saldo disponible: Q ${saldoPrevio.toFixed(2)})`,
-    );
-  }
-
-  const { rows } = await pool.query(
-    `insert into caja_movimientos_auxiliar
-       (caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador, referencia,
-        socio_id, cuenta_id, movimiento_id, ingreso_comif_id, beneficiario, descripcion, doc_no,
-        monto, saldo_acumulado, usuario_id)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
-     returning *`,
-    [
-      diaId,
-      dia.agencia_id,
-      dia.fecha,
-      info.seccion,
-      data.categoria,
-      info.tipo,
-      contador,
-      referencia,
-      socioId,
-      cuentaId,
-      movimientoId,
-      ingresoComifId,
-      beneficiario,
-      info.descripcion,
-      data.docNo ?? null,
-      data.monto,
-      saldoAcumulado,
-      usuarioId,
-    ],
-  );
-  const registro = rows[0];
-  await registrarAuditoria({
-    entidad: "CajaMovimientoAuxiliar",
-    entidadId: registro.id,
-    accion: "CREAR",
-    usuarioId,
-    datosNuevos: registro,
+      datosNuevos: registro,
+    });
+    return registro;
   });
-  return registro;
 }
 
 export interface ItemConteo {
@@ -337,32 +352,33 @@ export interface ItemConteo {
 }
 
 export async function cerrarDia(diaId: string, conteo: ItemConteo[], usuarioId: string, agenciaVisible: string | null) {
-  const dia = await obtenerDiaCrudo(diaId, agenciaVisible);
-  if (dia.estado !== "ABIERTO") throw conflict("Esta caja ya está cerrada");
+  return withTransaction(async (client) => {
+    const { rows: diaRows } = await client.query(`select * from caja_dias where id = $1`, [diaId]);
+    const dia = diaRows[0];
+    if (!dia) throw notFound("Día de caja no encontrado");
+    checarAgencia(dia.agencia_id, agenciaVisible);
+    if (dia.estado !== "ABIERTO") throw conflict("Esta caja ya está cerrada");
 
-  const denominacionesFaltantes = DENOMINACIONES.filter((d) => !conteo.some((c) => Math.abs(c.valor - d) < 0.001));
-  if (denominacionesFaltantes.length) {
-    throw badRequest(`Falta el conteo de: Q${denominacionesFaltantes.join(", Q")}`);
-  }
+    const denominacionesFaltantes = DENOMINACIONES.filter((d) => !conteo.some((c) => Math.abs(c.valor - d) < 0.001));
+    if (denominacionesFaltantes.length) {
+      throw badRequest(`Falta el conteo de: Q${denominacionesFaltantes.join(", Q")}`);
+    }
 
-  const { rows: ultimoMovRows } = await pool.query(
-    `select saldo_acumulado from caja_movimientos_auxiliar where caja_dia_id = $1 order by created_at desc limit 1`,
-    [diaId],
-  );
-  const saldoFinal = ultimoMovRows[0] ? Number(ultimoMovRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
-
-  const totalContado = conteo.reduce((acc, c) => acc + c.valor * c.cantidad, 0);
-  const diferencia = Math.round((totalContado - saldoFinal) * 100) / 100;
-
-  if (Math.abs(diferencia) > 0.01) {
-    throw conflict(
-      `La caja no cuadra: contado Q ${totalContado.toFixed(2)} vs. saldo esperado Q ${saldoFinal.toFixed(2)} (diferencia Q ${diferencia.toFixed(2)}). Revisa el conteo o los movimientos antes de cerrar.`,
+    const { rows: ultimoMovRows } = await client.query(
+      `select saldo_acumulado from caja_movimientos_auxiliar where caja_dia_id = $1 order by created_at desc limit 1`,
+      [diaId],
     );
-  }
+    const saldoFinal = ultimoMovRows[0] ? Number(ultimoMovRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
 
-  const client = await pool.connect();
-  try {
-    await client.query("begin");
+    const totalContado = conteo.reduce((acc, c) => acc + c.valor * c.cantidad, 0);
+    const diferencia = Math.round((totalContado - saldoFinal) * 100) / 100;
+
+    if (Math.abs(diferencia) > 0.01) {
+      throw conflict(
+        `La caja no cuadra: contado Q ${totalContado.toFixed(2)} vs. saldo esperado Q ${saldoFinal.toFixed(2)} (diferencia Q ${diferencia.toFixed(2)}). Revisa el conteo o los movimientos antes de cerrar.`,
+      );
+    }
+
     await client.query(
       `insert into caja_arqueos (caja_dia_id, detalle, total_contado, diferencia, usuario_id)
        values ($1,$2,$3,$4,$5)`,
@@ -374,7 +390,6 @@ export async function cerrarDia(diaId: string, conteo: ItemConteo[], usuarioId: 
        returning *`,
       [diaId, saldoFinal, usuarioId],
     );
-    await client.query("commit");
     const diaActualizado = rows[0];
     await registrarAuditoria({
       entidad: "CajaDia",
@@ -384,12 +399,7 @@ export async function cerrarDia(diaId: string, conteo: ItemConteo[], usuarioId: 
       datosNuevos: diaActualizado,
     });
     return diaActualizado;
-  } catch (err) {
-    await client.query("rollback");
-    throw err;
-  } finally {
-    client.release();
-  }
+  });
 }
 
 export async function beneficiariosFrecuentes(agenciaId: string, q: string, agenciaVisible: string | null) {
@@ -422,98 +432,105 @@ export async function cobrarCuotaCredito(
   usuarioId: string,
   agenciaVisible: string | null,
 ) {
-  const dia = await obtenerDiaCrudo(diaId, agenciaVisible);
-  if (dia.estado !== "ABIERTO") {
-    throw conflict("La caja de este día ya está cerrada; no se pueden registrar cobros.");
-  }
+  return withTransaction(async (client) => {
+    const { rows: diaRows } = await client.query(`select * from caja_dias where id = $1`, [diaId]);
+    const dia = diaRows[0];
+    if (!dia) throw notFound("Día de caja no encontrado");
+    checarAgencia(dia.agencia_id, agenciaVisible);
+    if (dia.estado !== "ABIERTO") {
+      throw conflict("La caja de este día ya está cerrada; no se pueden registrar cobros.");
+    }
 
-  const { rows: prestamoRows } = await pool.query(
-    `select p.*, s.nombres as socio_nombres, s.numero_asociado
-     from prestamos p
-     join socios s on s.id = p.socio_id
-     where p.id = $1`,
-    [data.prestamoId],
-  );
-  const prestamo = prestamoRows[0];
-  if (!prestamo) throw notFound("Préstamo no encontrado");
-  if (agenciaVisible && prestamo.agencia_id !== agenciaVisible) {
-    throw forbidden("Ese préstamo pertenece a otra agencia");
-  }
-  if (prestamo.estado !== "DESEMBOLSADO" && prestamo.estado !== "APROBADO") {
-    throw badRequest(`El préstamo no está activo para cobro (estado actual: ${prestamo.estado})`);
-  }
-
-  const abonoCapital = Number(data.abonoCapital) || 0;
-  const interes = Number(data.interes) || 0;
-  const mora = Number(data.mora) || 0;
-  const ahorroSobrePrestamo = Number(data.ahorroSobrePrestamo) || 0;
-  const totalCobro = Math.round((abonoCapital + interes + mora + ahorroSobrePrestamo) * 100) / 100;
-
-  if (totalCobro <= 0) {
-    throw badRequest("El monto total a cobrar debe ser mayor a cero");
-  }
-
-  const saldoActualCapital = Number(
-    prestamo.saldo_capital !== null && prestamo.saldo_capital !== undefined
-      ? prestamo.saldo_capital
-      : prestamo.monto_aprobado || prestamo.monto_solicitado,
-  );
-  const nuevoSaldoCapital = Math.max(0, Math.round((saldoActualCapital - abonoCapital) * 100) / 100);
-  const nuevoEstadoPrestamo = nuevoSaldoCapital === 0 ? "CANCELADO" : prestamo.estado;
-
-  // Validación de número de recibo anti-duplicados
-  if (data.docNo && data.docNo.trim()) {
-    const doc = data.docNo.trim();
-    const { rows: repetidoPago } = await pool.query(
-      `select pp.fecha, pp.numero_recibo, p.codigo, s.nombres as socio_nombres
-       from prestamo_pagos pp
-       join prestamos p on p.id = pp.prestamo_id
-       join socios s on s.id = pp.socio_id
-       where pp.agencia_id = $1 and lower(trim(pp.numero_recibo)) = lower($2)
-       limit 1`,
-      [dia.agencia_id, doc],
+    const { rows: prestamoRows } = await client.query(
+      `select p.*, s.nombres as socio_nombres, s.numero_asociado
+       from prestamos p
+       join socios s on s.id = p.socio_id
+       where p.id = $1`,
+      [data.prestamoId],
     );
-    if (repetidoPago[0]) {
-      const fechaStr = new Date(repetidoPago[0].fecha).toLocaleDateString("es-GT");
-      throw conflict(
-        `El número de recibo "${doc}" ya fue registrado el ${fechaStr} en el crédito ${repetidoPago[0].codigo} (${repetidoPago[0].socio_nombres}). No se permiten recibos duplicados.`,
+    const prestamo = prestamoRows[0];
+    if (!prestamo) throw notFound("Préstamo no encontrado");
+    if (agenciaVisible && prestamo.agencia_id !== agenciaVisible) {
+      throw forbidden("Ese préstamo pertenece a otra agencia");
+    }
+    if (prestamo.estado !== "DESEMBOLSADO" && prestamo.estado !== "APROBADO") {
+      throw badRequest(`El préstamo no está activo para cobro (estado actual: ${prestamo.estado})`);
+    }
+
+    const abonoCapital = Number(data.abonoCapital) || 0;
+    const interes = Number(data.interes) || 0;
+    const mora = Number(data.mora) || 0;
+    const ahorroSobrePrestamo = Number(data.ahorroSobrePrestamo) || 0;
+    const totalCobro = Math.round((abonoCapital + interes + mora + ahorroSobrePrestamo) * 100) / 100;
+
+    if (totalCobro <= 0) {
+      throw badRequest("El monto total a cobrar debe ser mayor a cero");
+    }
+
+    const saldoActualCapital = Number(
+      prestamo.saldo_capital !== null && prestamo.saldo_capital !== undefined
+        ? prestamo.saldo_capital
+        : prestamo.monto_aprobado || prestamo.monto_solicitado,
+    );
+
+    if (abonoCapital > saldoActualCapital) {
+      throw badRequest(
+        `El abono a capital (Q ${abonoCapital.toFixed(2)}) no puede ser mayor al saldo pendiente de capital (Q ${saldoActualCapital.toFixed(2)}).`,
       );
     }
 
-    const { rows: repetidoAux } = await pool.query(
-      `select fecha, doc_no, beneficiario, descripcion
-       from caja_movimientos_auxiliar
-       where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
-       limit 1`,
-      [dia.agencia_id, doc],
-    );
-    if (repetidoAux[0]) {
-      const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
-      throw conflict(
-        `El número de recibo/documento "${doc}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten documentos duplicados.`,
-      );
-    }
+    const nuevoSaldoCapital = Math.max(0, Math.round((saldoActualCapital - abonoCapital) * 100) / 100);
+    const nuevoEstadoPrestamo = nuevoSaldoCapital === 0 ? "CANCELADO" : prestamo.estado;
 
-    const { rows: repetidoMov } = await pool.query(
-      `select m.fecha, m.numero_recibo, c.numero_cuenta, s.nombres as socio_nombres
-       from movimientos m
-       join cuentas c on c.id = m.cuenta_id
-       join socios s on s.id = c.socio_id
-       where c.agencia_id = $1 and lower(trim(m.numero_recibo)) = lower($2)
-       limit 1`,
-      [dia.agencia_id, doc],
-    );
-    if (repetidoMov[0]) {
-      const fechaStr = new Date(repetidoMov[0].fecha).toLocaleDateString("es-GT");
-      throw conflict(
-        `El número de recibo "${doc}" ya fue registrado el ${fechaStr} en la cuenta ${repetidoMov[0].numero_cuenta} (${repetidoMov[0].socio_nombres}). No se permiten recibos duplicados.`,
+    // Validación de número de recibo anti-duplicados
+    if (data.docNo && data.docNo.trim()) {
+      const doc = data.docNo.trim();
+      const { rows: repetidoPago } = await client.query(
+        `select pp.fecha, pp.numero_recibo, p.codigo, s.nombres as socio_nombres
+         from prestamo_pagos pp
+         join prestamos p on p.id = pp.prestamo_id
+         join socios s on s.id = pp.socio_id
+         where pp.agencia_id = $1 and lower(trim(pp.numero_recibo)) = lower($2)
+         limit 1`,
+        [dia.agencia_id, doc],
       );
-    }
-  }
+      if (repetidoPago[0]) {
+        const fechaStr = new Date(repetidoPago[0].fecha).toLocaleDateString("es-GT");
+        throw conflict(
+          `El número de recibo "${doc}" ya fue registrado el ${fechaStr} en el crédito ${repetidoPago[0].codigo} (${repetidoPago[0].socio_nombres}). No se permiten recibos duplicados.`,
+        );
+      }
 
-  const client = await pool.connect();
-  try {
-    await client.query("begin");
+      const { rows: repetidoAux } = await client.query(
+        `select fecha, doc_no, beneficiario, descripcion
+         from caja_movimientos_auxiliar
+         where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
+         limit 1`,
+        [dia.agencia_id, doc],
+      );
+      if (repetidoAux[0]) {
+        const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
+        throw conflict(
+          `El número de recibo/documento "${doc}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten documentos duplicados.`,
+        );
+      }
+
+      const { rows: repetidoMov } = await client.query(
+        `select m.fecha, m.numero_recibo, c.numero_cuenta, s.nombres as socio_nombres
+         from movimientos m
+         join cuentas c on c.id = m.cuenta_id
+         join socios s on s.id = c.socio_id
+         where c.agencia_id = $1 and lower(trim(m.numero_recibo)) = lower($2)
+         limit 1`,
+        [dia.agencia_id, doc],
+      );
+      if (repetidoMov[0]) {
+        const fechaStr = new Date(repetidoMov[0].fecha).toLocaleDateString("es-GT");
+        throw conflict(
+          `El número de recibo "${doc}" ya fue registrado el ${fechaStr} en la cuenta ${repetidoMov[0].numero_cuenta} (${repetidoMov[0].socio_nombres}). No se permiten recibos duplicados.`,
+        );
+      }
+    }
 
     // 1. Contador correlativo para categoría prestamo
     const categoriaPrestamo =
@@ -700,8 +717,6 @@ export async function cobrarCuotaCredito(
       ],
     );
 
-    await client.query("commit");
-
     await registrarAuditoria({
       entidad: "PrestamoPago",
       entidadId: pagoRows[0].id,
@@ -725,12 +740,7 @@ export async function cobrarCuotaCredito(
       cuentaAsp: cuentaAspInfo,
       prestamoCancelado: nuevoEstadoPrestamo === "CANCELADO",
     };
-  } catch (err) {
-    await client.query("rollback");
-    throw err;
-  } finally {
-    client.release();
-  }
+  });
 }
 
 export interface DatosDesembolsoCredito {
@@ -746,71 +756,79 @@ export async function desembolsarCredito(
   usuarioId: string,
   agenciaVisible: string | null,
 ) {
-  const dia = await obtenerDiaCrudo(diaId, agenciaVisible);
-  if (dia.estado !== "ABIERTO") {
-    throw conflict("La caja de este día ya está cerrada; no se pueden realizar desembolsos.");
-  }
+  return withTransaction(async (client) => {
+    const { rows: diaRows } = await client.query(`select * from caja_dias where id = $1`, [diaId]);
+    const dia = diaRows[0];
+    if (!dia) throw notFound("Día de caja no encontrado");
+    checarAgencia(dia.agencia_id, agenciaVisible);
+    if (dia.estado !== "ABIERTO") {
+      throw conflict("La caja de este día ya está cerrada; no se pueden realizar desembolsos.");
+    }
 
-  const { rows: prestamoRows } = await pool.query(
-    `select p.*, s.nombres as socio_nombres, s.numero_asociado
-     from prestamos p
-     join socios s on s.id = p.socio_id
-     where p.id = $1`,
-    [data.prestamoId],
-  );
-  const prestamo = prestamoRows[0];
-  if (!prestamo) throw notFound("Préstamo no encontrado");
-  if (agenciaVisible && prestamo.agencia_id !== agenciaVisible) {
-    throw forbidden("Ese préstamo pertenece a otra agencia");
-  }
-  if (prestamo.estado !== "APROBADO") {
-    throw badRequest(
-      `El préstamo debe estar en estado APROBADO para ser desembolsado en caja (estado actual: ${prestamo.estado})`,
+    const { rows: prestamoRows } = await client.query(
+      `select p.*, s.nombres as socio_nombres, s.numero_asociado
+       from prestamos p
+       join socios s on s.id = p.socio_id
+       where p.id = $1`,
+      [data.prestamoId],
     );
-  }
+    const prestamo = prestamoRows[0];
+    if (!prestamo) throw notFound("Préstamo no encontrado");
+    if (agenciaVisible && prestamo.agencia_id !== agenciaVisible) {
+      throw forbidden("Ese préstamo pertenece a otra agencia");
+    }
 
-  const montoDesembolso = Number(prestamo.monto_aprobado || prestamo.monto_solicitado);
-  if (montoDesembolso <= 0) {
-    throw badRequest("El monto aprobado debe ser mayor a cero");
-  }
-
-  const montoAsp = Math.max(0, Math.min(montoDesembolso, Math.round((Number(data.montoAhorroSobrePrestamo) || 0) * 100) / 100));
-  const efectivoNetoRequerido = Math.round((montoDesembolso - montoAsp) * 100) / 100;
-
-  // Validar si hay saldo suficiente en la caja física para el efectivo neto a entregar
-  const { rows: ultimoMovRows } = await pool.query(
-    `select saldo_acumulado from caja_movimientos_auxiliar where caja_dia_id = $1 order by created_at desc limit 1`,
-    [diaId],
-  );
-  const saldoPrevio = ultimoMovRows[0] ? Number(ultimoMovRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
-
-  if (efectivoNetoRequerido > saldoPrevio) {
-    throw conflict(
-      `Saldo insuficiente en la caja física: Se requieren Q ${efectivoNetoRequerido.toFixed(2)} en efectivo pero el saldo actual en caja es de Q ${saldoPrevio.toFixed(2)}. Ingrese fondos o reduzca la entrega.`,
-    );
-  }
-
-  // Validación de docNo anti-duplicados
-  if (data.docNo && data.docNo.trim()) {
-    const doc = data.docNo.trim();
-    const { rows: repetidoAux } = await pool.query(
-      `select fecha, doc_no, beneficiario, descripcion
-       from caja_movimientos_auxiliar
-       where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
-       limit 1`,
-      [dia.agencia_id, doc],
-    );
-    if (repetidoAux[0]) {
-      const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
-      throw conflict(
-        `El número de comprobante/recibo "${doc}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten documentos duplicados.`,
+    // Regla de Oro: Préstamos migrados no se desembolsan en efectivo de caja
+    if (prestamo.es_migracion) {
+      throw badRequest(
+        `El crédito ${prestamo.codigo} es una migración histórica preexistente (ya desembolsado con anterioridad). No requiere ni permite desembolso físico en la caja de ventanilla.`,
       );
     }
-  }
 
-  const client = await pool.connect();
-  try {
-    await client.query("begin");
+    if (prestamo.estado !== "APROBADO") {
+      throw badRequest(
+        `El préstamo debe estar en estado APROBADO para ser desembolsado en caja (estado actual: ${prestamo.estado})`,
+      );
+    }
+
+    const montoDesembolso = Number(prestamo.monto_aprobado || prestamo.monto_solicitado);
+    if (montoDesembolso <= 0) {
+      throw badRequest("El monto aprobado debe ser mayor a cero");
+    }
+
+    const montoAsp = Math.max(0, Math.min(montoDesembolso, Math.round((Number(data.montoAhorroSobrePrestamo) || 0) * 100) / 100));
+    const efectivoNetoRequerido = Math.round((montoDesembolso - montoAsp) * 100) / 100;
+
+    // Validar si hay saldo suficiente en la caja física para el efectivo neto a entregar
+    const { rows: ultimoMovRows } = await client.query(
+      `select saldo_acumulado from caja_movimientos_auxiliar where caja_dia_id = $1 order by created_at desc limit 1`,
+      [diaId],
+    );
+    const saldoPrevio = ultimoMovRows[0] ? Number(ultimoMovRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
+
+    if (efectivoNetoRequerido > saldoPrevio) {
+      throw conflict(
+        `Saldo insuficiente en la caja física: Se requieren Q ${efectivoNetoRequerido.toFixed(2)} en efectivo pero el saldo actual en caja es de Q ${saldoPrevio.toFixed(2)}. Ingrese fondos o reduzca la entrega.`,
+      );
+    }
+
+    // Validación de docNo anti-duplicados
+    if (data.docNo && data.docNo.trim()) {
+      const doc = data.docNo.trim();
+      const { rows: repetidoAux } = await client.query(
+        `select fecha, doc_no, beneficiario, descripcion
+         from caja_movimientos_auxiliar
+         where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
+         limit 1`,
+        [dia.agencia_id, doc],
+      );
+      if (repetidoAux[0]) {
+        const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
+        throw conflict(
+          `El número de comprobante/recibo "${doc}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten documentos duplicados.`,
+        );
+      }
+    }
 
     // 1. Contador de colocación
     const info = CATEGORIAS.COLOCACION_PRESTAMO;
@@ -940,8 +958,6 @@ export async function desembolsarCredito(
       [origenFondosFinal, dia.fecha, montoDesembolso, prestamo.id],
     );
 
-    await client.query("commit");
-
     await registrarAuditoria({
       entidad: "Prestamo",
       entidadId: prestamo.id,
@@ -959,16 +975,11 @@ export async function desembolsarCredito(
     return {
       prestamo: prestamoActualizadoRows[0],
       cajaMovimiento: cajaMov,
-      saldoCajaRestante: saldoAcumulado,
-      montoAhorroSobrePrestamo: montoAsp,
+      efectivoNetoEntregado: efectivoNetoRequerido,
+      ahorroSobrePrestamoRetenido: montoAsp,
       cuentaAsp: cuentaAspInfo,
     };
-  } catch (err) {
-    await client.query("rollback");
-    throw err;
-  } finally {
-    client.release();
-  }
+  });
 }
 
 export interface DatosLiquidarPlazoFijoVentanilla {
@@ -983,82 +994,82 @@ export async function liquidarPlazoFijo(
   usuarioId: string,
   agenciaVisible: string | null,
 ) {
-  const dia = await obtenerDiaCrudo(diaId, agenciaVisible);
-  if (dia.estado !== "ABIERTO") {
-    throw conflict("La caja de este día ya está cerrada. No se pueden registrar liquidaciones.");
-  }
+  return withTransaction(async (client) => {
+    const { rows: diaRows } = await client.query(`select * from caja_dias where id = $1`, [diaId]);
+    const dia = diaRows[0];
+    if (!dia) throw notFound("Día de caja no encontrado");
+    checarAgencia(dia.agencia_id, agenciaVisible);
+    if (dia.estado !== "ABIERTO") {
+      throw conflict("La caja de este día ya está cerrada. No se pueden registrar liquidaciones.");
+    }
 
-  if (!data.reciboRetiro || !data.reciboRetiro.trim()) {
-    throw badRequest("El número de recibo de egreso (RE. No.) es obligatorio para liquidar el plazo fijo.");
-  }
-  const recibo = data.reciboRetiro.trim();
+    if (!data.reciboRetiro || !data.reciboRetiro.trim()) {
+      throw badRequest("El número de recibo de egreso (RE. No.) es obligatorio para liquidar el plazo fijo.");
+    }
+    const recibo = data.reciboRetiro.trim();
 
-  // Obtener contrato
-  const { rows: contratoRows } = await pool.query(
-    `select pf.*, c.numero_cuenta, c.agencia_id, s.nombres as socio_nombres, s.id as socio_id, s.numero_asociado
-     from plazo_fijo_contratos pf
-     join cuentas c on c.id = pf.cuenta_id
-     join socios s on s.id = c.socio_id
-     where pf.id = $1`,
-    [data.contratoId],
-  );
-  const contrato = contratoRows[0];
-  if (!contrato) throw notFound("Contrato de plazo fijo no encontrado");
-  if (contrato.agencia_id !== dia.agencia_id) {
-    throw forbidden("Ese contrato pertenece a otra agencia");
-  }
-  if (contrato.estado === "LIQUIDADO") {
-    throw conflict(`El certificado No. ${contrato.numero_certificacion} ya fue liquidado anteriormente.`);
-  }
-
-  const montoALiquidar = data.incluirIntereses
-    ? Number(contrato.saldo_liquido_a_pagar)
-    : Number(contrato.monto_deposito);
-
-  // Validar saldo suficiente en caja
-  const { rows: ultimoMovRows } = await pool.query(
-    `select saldo_acumulado from caja_movimientos_auxiliar where caja_dia_id = $1 order by created_at desc limit 1`,
-    [diaId],
-  );
-  const saldoPrevio = ultimoMovRows[0] ? Number(ultimoMovRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
-  if (montoALiquidar > saldoPrevio) {
-    throw conflict(
-      `Saldo insuficiente en la caja física: Se requieren Q ${montoALiquidar.toFixed(2)} para liquidar el certificado pero la caja solo tiene Q ${saldoPrevio.toFixed(2)}. Ingrese fondos antes de pagar.`,
+    // Obtener contrato
+    const { rows: contratoRows } = await client.query(
+      `select pf.*, c.numero_cuenta, c.agencia_id, s.nombres as socio_nombres, s.id as socio_id, s.numero_asociado
+       from plazo_fijo_contratos pf
+       join cuentas c on c.id = pf.cuenta_id
+       join socios s on s.id = c.socio_id
+       where pf.id = $1`,
+      [data.contratoId],
     );
-  }
+    const contrato = contratoRows[0];
+    if (!contrato) throw notFound("Contrato de plazo fijo no encontrado");
+    if (contrato.agencia_id !== dia.agencia_id) {
+      throw forbidden("Ese contrato pertenece a otra agencia");
+    }
+    if (contrato.estado === "LIQUIDADO") {
+      throw conflict(`El certificado No. ${contrato.numero_certificacion} ya fue liquidado anteriormente.`);
+    }
 
-  // Validación anti-duplicados del recibo de retiro
-  const { rows: repetidoAux } = await pool.query(
-    `select fecha, doc_no, beneficiario, descripcion
-     from caja_movimientos_auxiliar
-     where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
-     limit 1`,
-    [dia.agencia_id, recibo],
-  );
-  if (repetidoAux[0]) {
-    const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
-    throw conflict(
-      `El número de recibo de retiro "${recibo}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten recibos duplicados.`,
+    const montoALiquidar = data.incluirIntereses
+      ? Number(contrato.saldo_liquido_a_pagar)
+      : Number(contrato.monto_deposito);
+
+    // Validar saldo suficiente en caja
+    const { rows: ultimoMovRows } = await client.query(
+      `select saldo_acumulado from caja_movimientos_auxiliar where caja_dia_id = $1 order by created_at desc limit 1`,
+      [diaId],
     );
-  }
+    const saldoPrevio = ultimoMovRows[0] ? Number(ultimoMovRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
+    if (montoALiquidar > saldoPrevio) {
+      throw conflict(
+        `Saldo insuficiente en la caja física: Se requieren Q ${montoALiquidar.toFixed(2)} para liquidar el certificado pero la caja solo tiene Q ${saldoPrevio.toFixed(2)}. Ingrese fondos antes de pagar.`,
+      );
+    }
 
-  const { rows: repetidoPF } = await pool.query(
-    `select fecha_retiro, recibo_retiro, numero_certificacion
-     from plazo_fijo_contratos
-     where lower(trim(recibo_retiro)) = lower($1)
-     limit 1`,
-    [recibo],
-  );
-  if (repetidoPF[0]) {
-    const fechaStr = repetidoPF[0].fecha_retiro ? new Date(repetidoPF[0].fecha_retiro).toLocaleDateString("es-GT") : "";
-    throw conflict(
-      `El número de recibo "${recibo}" ya fue utilizado en la liquidación del certificado No. ${repetidoPF[0].numero_certificacion} el ${fechaStr}.`,
+    // Validación anti-duplicados del recibo de retiro
+    const { rows: repetidoAux } = await client.query(
+      `select fecha, doc_no, beneficiario, descripcion
+       from caja_movimientos_auxiliar
+       where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
+       limit 1`,
+      [dia.agencia_id, recibo],
     );
-  }
+    if (repetidoAux[0]) {
+      const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
+      throw conflict(
+        `El número de recibo de retiro "${recibo}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten recibos duplicados.`,
+      );
+    }
 
-  const client = await pool.connect();
-  try {
-    await client.query("begin");
+    const { rows: repetidoPF } = await client.query(
+      `select fecha_retiro, recibo_retiro, numero_certificacion
+       from plazo_fijo_contratos
+       where lower(trim(recibo_retiro)) = lower($1)
+       limit 1`,
+      [recibo],
+    );
+    if (repetidoPF[0]) {
+      const fechaStr = repetidoPF[0].fecha_retiro ? new Date(repetidoPF[0].fecha_retiro).toLocaleDateString("es-GT") : "";
+      throw conflict(
+        `El número de recibo "${recibo}" ya fue utilizado en la liquidación del certificado No. ${repetidoPF[0].numero_certificacion} el ${fechaStr}.`,
+      );
+    }
 
     const info = CATEGORIAS.RETIRO_PLAZO_FIJO;
     const { rows: contadorRows } = await client.query(
@@ -1124,8 +1135,6 @@ export async function liquidarPlazoFijo(
       ],
     );
 
-    await client.query("commit");
-
     await registrarAuditoria({
       entidad: "PlazoFijoContrato",
       entidadId: contrato.id,
@@ -1133,23 +1142,18 @@ export async function liquidarPlazoFijo(
       usuarioId,
       datosNuevos: {
         estado: "LIQUIDADO",
-        recibo_retiro: recibo,
-        monto_liquidado: montoALiquidar,
-        caja_movimiento_id: cajaMov.id,
+        montoLiquidado: montoALiquidar,
+        reciboRetiro: recibo,
+        cajaMovimientoId: cajaMov.id,
       },
     });
 
     return {
       contrato: pfActualizadoRows[0],
       cajaMovimiento: cajaMov,
-      saldoCajaRestante: saldoAcumulado,
+      montoLiquidado: montoALiquidar,
     };
-  } catch (err) {
-    await client.query("rollback");
-    throw err;
-  } finally {
-    client.release();
-  }
+  });
 }
 
 export async function analiticaServicios(

@@ -4,15 +4,20 @@ export interface ResultadoLiquidacion {
   tasaInteresAnual: number;
   fechaUltimoPago: string;
   fechaLiquidacion: string;
+  fechaProximaCuota?: string;
   diasTranscurridos: number;
+  diasMesCompleto?: number;
   interesDiario: number;
   interesDevengado: number;
+  interesMesCompleto?: number;
   diasGracia: number;
   diasAtraso: number;
   estaEnMora: boolean;
   cuotasVencidas: number;
   moraFijaSugerida: number;
+  cuotaCapitalBase?: number;
   cuotaCapitalSugerida: number;
+  cuotaProgramadaOficial?: number;
   pagoMinimoSugerido: number;
   saldoCancelacionTotal: number;
 }

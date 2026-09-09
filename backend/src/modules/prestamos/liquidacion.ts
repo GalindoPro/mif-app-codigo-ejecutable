@@ -15,15 +15,20 @@ export interface ResultadoLiquidacion {
   tasaInteresAnual: number;
   fechaUltimoPago: string;
   fechaLiquidacion: string;
+  fechaProximaCuota: string;
   diasTranscurridos: number;
+  diasMesCompleto: number;
   interesDiario: number;
   interesDevengado: number;
+  interesMesCompleto: number;
   diasGracia: number;
   diasAtraso: number;
   estaEnMora: boolean;
   cuotasVencidas: number;
   moraFijaSugerida: number;
+  cuotaCapitalBase: number;
   cuotaCapitalSugerida: number;
+  cuotaProgramadaOficial: number;
   pagoMinimoSugerido: number;
   saldoCancelacionTotal: number;
 }
@@ -97,12 +102,26 @@ export function calcularLiquidacionCredito(opciones: OpcionesLiquidacion): Resul
     }
   }
 
+  // 4. Cálculo de la cuota programada oficial de la tabla (mes completo según calendario)
+  const dProx = new Date(fechaUltimoPago + "T00:00:00");
+  dProx.setMonth(dProx.getMonth() + 1);
+  const fechaProximaCuota = dProx.toISOString().slice(0, 10);
+  const diffMesMs = dProx.getTime() - dUltimo.getTime();
+  const diasMesCompleto = Math.max(28, Math.round(diffMesMs / (1000 * 60 * 60 * 24)));
+
+  const interesMesCompleto = redondear2((saldoCapital * (tasaAnual / 100) / 365) * diasMesCompleto);
+  const cuotaProgramadaOficial = redondear2(cuotaCapitalBase + interesMesCompleto);
+
   // Cuota capital exigible sugerida (se acumulan las cuotas de capital de los meses vencidos)
   const multiplicadorCapital = Math.max(1, Math.floor(diasTranscurridos / 30));
   const cuotaCapitalSugerida = Math.min(saldoCapital, redondear2(cuotaCapitalBase * multiplicadorCapital));
 
-  // Pago mínimo sugerido (ponerse al día con cuotas vencidas + intereses + mora)
-  const pagoMinimoSugerido = redondear2(cuotaCapitalSugerida + interesDevengado + moraFijaSugerida);
+  // Pago mínimo sugerido:
+  // Si está en mora o atrasado, ponerse al día con cuotas vencidas + mora + interés.
+  // Si está al día, sugerir la cuota oficial completa programada de la tabla.
+  const pagoMinimoSugerido = estaEnMora || cuotasVencidas > 0
+    ? redondear2(cuotaCapitalSugerida + interesDevengado + moraFijaSugerida)
+    : cuotaProgramadaOficial;
 
   // Saldo de cancelación total al día de hoy
   const saldoCancelacionTotal = redondear2(saldoCapital + interesDevengado + moraFijaSugerida);
@@ -113,15 +132,20 @@ export function calcularLiquidacionCredito(opciones: OpcionesLiquidacion): Resul
     tasaInteresAnual: tasaAnual,
     fechaUltimoPago,
     fechaLiquidacion,
+    fechaProximaCuota,
     diasTranscurridos,
+    diasMesCompleto,
     interesDiario: redondear2(interesDiario),
     interesDevengado,
+    interesMesCompleto,
     diasGracia,
     diasAtraso,
     estaEnMora,
     cuotasVencidas,
     moraFijaSugerida,
+    cuotaCapitalBase,
     cuotaCapitalSugerida,
+    cuotaProgramadaOficial,
     pagoMinimoSugerido,
     saldoCancelacionTotal,
   };

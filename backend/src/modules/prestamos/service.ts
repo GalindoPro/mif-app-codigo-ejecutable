@@ -1,4 +1,5 @@
 import { pool } from "../../db/pool";
+import { withTransaction } from "../../db/transaction";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
 import * as cuentasService from "../cuentas/service";
@@ -160,149 +161,147 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
     fechaInicio: fechaBaseCalculo,
   });
 
-  // Validaciones del Fiador si el crédito es FIDUCIARIO
-  if (data.tipo === "FIDUCIARIO" && data.dpiFiador && data.dpiFiador.trim()) {
-    const rawDpiFiador = data.dpiFiador.replace(/\D/g, "");
-    if (rawDpiFiador.length === 13) {
-      // 1. Verificar si coincide con el socio solicitante
-      const { rows: sRows } = await pool.query(`select dpi, nombres from socios where id = $1`, [data.socioId]);
-      if (sRows[0]?.dpi && sRows[0].dpi.replace(/\D/g, "") === rawDpiFiador) {
-        throw badRequest(`El socio solicitante (${sRows[0].nombres}) no puede ser su propio fiador.`);
-      }
+  return withTransaction(async (client) => {
+    // Validaciones del Fiador si el crédito es FIDUCIARIO
+    if (data.tipo === "FIDUCIARIO" && data.dpiFiador && data.dpiFiador.trim()) {
+      const rawDpiFiador = data.dpiFiador.replace(/\D/g, "");
+      if (rawDpiFiador.length === 13) {
+        // 1. Verificar si coincide con el socio solicitante
+        const { rows: sRows } = await client.query(`select dpi, nombres from socios where id = $1`, [data.socioId]);
+        if (sRows[0]?.dpi && sRows[0].dpi.replace(/\D/g, "") === rawDpiFiador) {
+          throw badRequest(`El socio solicitante (${sRows[0].nombres}) no puede ser su propio fiador.`);
+        }
 
-      // 2. Verificar si este fiador ya respalda un crédito activo
-      const { rows: dupFiador } = await pool.query(
-        `select p.codigo, s.nombres as socio_nombre, s.numero_asociado, p.estado
-         from prestamos p
-         join socios s on s.id = p.socio_id
-         where regexp_replace(coalesce(p.dpi_fiador, ''), '[^0-9]', '', 'g') = $1
-           and p.estado in ('SOLICITUD', 'APROBADO', 'DESEMBOLSADO')
-         limit 1`,
-        [rawDpiFiador],
-      );
-      if (dupFiador[0]) {
-        throw conflict(
-          `El fiador con DPI "${data.dpiFiador.trim()}" ya está respaldando el crédito ${dupFiador[0].codigo} (${dupFiador[0].estado}) del socio "${dupFiador[0].socio_nombre}" (${dupFiador[0].numero_asociado}). No se permiten fiadores duplicados en créditos activos.`,
+        // 2. Verificar si este fiador ya respalda un crédito activo
+        const { rows: dupFiador } = await client.query(
+          `select p.codigo, s.nombres as socio_nombre, s.numero_asociado, p.estado
+           from prestamos p
+           join socios s on s.id = p.socio_id
+           where regexp_replace(coalesce(p.dpi_fiador, ''), '[^0-9]', '', 'g') = $1
+             and p.estado in ('SOLICITUD', 'APROBADO', 'DESEMBOLSADO')
+           limit 1`,
+          [rawDpiFiador],
         );
-      }
-
-      // 3. Si el fiador es un socio de la cooperativa, verificar que no tenga créditos pendientes con mora
-      const { rows: socioFiador } = await pool.query(
-        `select id, nombres, numero_asociado from socios where regexp_replace(coalesce(dpi, ''), '[^0-9]', '', 'g') = $1 limit 1`,
-        [rawDpiFiador],
-      );
-      if (socioFiador[0]) {
-        const { rows: moraRows } = await pool.query(
-          `select codigo from prestamos where socio_id = $1 and estado = 'DESEMBOLSADO' and coalesce(saldo_capital, 0) > 0 limit 1`,
-          [socioFiador[0].id],
-        );
+        if (dupFiador[0]) {
+          throw conflict(
+            `El fiador con DPI "${data.dpiFiador.trim()}" ya está respaldando el crédito ${dupFiador[0].codigo} (${dupFiador[0].estado}) del socio "${dupFiador[0].socio_nombre}" (${dupFiador[0].numero_asociado}). No se permiten fiadores duplicados en créditos activos.`,
+          );
+        }
       }
     }
-  }
 
-  const codigo = await siguienteCodigo(data.agenciaId);
-  const hoy = new Date().toISOString().slice(0, 10);
-  const origenFondos = data.origenFondos || "FONDOS_PROPIOS";
-  const esMigracion = Boolean(data.esMigracion);
-
-  const estadoInicial = esMigracion ? "DESEMBOLSADO" : "APROBADO";
-  const saldoCapitalInicial = esMigracion && data.saldoCapitalActual !== undefined && Number(data.saldoCapitalActual) >= 0
-    ? Number(data.saldoCapitalActual)
-    : data.montoSolicitado;
-  const fechaSolicitud = esMigracion ? (data.fechaDesembolsoOriginal || data.fechaSolicitud || hoy) : (data.fechaSolicitud || hoy);
-  const fechaAprobacion = esMigracion ? (data.fechaDesembolsoOriginal || hoy) : hoy;
-  const fechaDesembolso = esMigracion ? (data.fechaDesembolsoOriginal || hoy) : null;
-  const fechaUltimoPago = esMigracion ? (data.fechaUltimoPago || data.fechaDesembolsoOriginal || hoy) : null;
-
-  let fechaVencimiento: string | null = null;
-  if (esMigracion && fechaDesembolso) {
-    const { rows: vencRows } = await pool.query(
-      `select ($1::date + ($2 * interval '1 month'))::date as venc`,
-      [fechaDesembolso, Number(data.plazoMeses) || 12],
+    const { rows: agencias } = await client.query(`select codigo from agencias where id = $1`, [data.agenciaId]);
+    const codigoAgencia = agencias[0]?.codigo ?? "MIF";
+    const { rows: totalRows } = await client.query(
+      `select count(*)::int as total from prestamos where agencia_id = $1`,
+      [data.agenciaId],
     );
-    fechaVencimiento = vencRows[0]?.venc ?? null;
-  }
+    const secuencial = String(totalRows[0].total + 1).padStart(4, "0");
+    const codigo = `${codigoAgencia}-CR-${secuencial}`;
 
-  let observacionesFinal = data.observaciones ?? "";
-  if (esMigracion) {
-    const notaMigracion = `[MIGRACIÓN HISTÓRICA] Crédito preexistente migrado.${data.numeroCreditoAnterior ? ` No. Crédito Anterior: ${data.numeroCreditoAnterior}.` : ''} Saldo capital migrado: Q ${saldoCapitalInicial.toFixed(2)}, Desembolso original: ${fechaDesembolso || 'N/A'}, Último pago registrado: ${fechaUltimoPago || 'N/A'}.`;
-    observacionesFinal = observacionesFinal ? `${notaMigracion} ${observacionesFinal}` : notaMigracion;
-  }
+    const hoy = new Date().toISOString().slice(0, 10);
+    const origenFondos = data.origenFondos || "FONDOS_PROPIOS";
+    const esMigracion = Boolean(data.esMigracion);
 
-  const { rows } = await pool.query(
-    `insert into prestamos (
-       codigo, socio_id, agencia_id, promotor_id, tipo, estado,
-       tipo_amortizacion, monto_solicitado, monto_aprobado, saldo_capital, tasa_interes_mensual,
-       plazo_meses, cuota_mensual, destino, garantia, ubicacion_garantia, nombre_fiador, dpi_fiador, telefono_fiador,
-       documento_desembolso, observaciones, origen_fondos, fecha_solicitud, fecha_aprobacion, fecha_desembolso, fecha_vencimiento, fecha_ultimo_pago_migracion, es_migracion, numero_credito_anterior
-     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
-     returning *`,
-    [
-      codigo,
-      data.socioId,
-      data.agenciaId,
-      data.promotorId ?? null,
-      data.tipo,
-      estadoInicial,
-      tipoAmort,
-      data.montoSolicitado,
-      data.montoSolicitado, // inicialmente igual al solicitado
-      saldoCapitalInicial,
-      tasa,
-      data.plazoMeses,
-      sim.cuotaMensualEstimada,
-      data.destino ?? null,
-      data.garantia ?? null,
-      data.ubicacionGarantia ?? null,
-      data.nombreFiador ?? null,
-      data.dpiFiador ?? null,
-      data.telefonoFiador ?? null,
-      data.documentoDesembolso ?? null,
-      observacionesFinal || null,
-      origenFondos,
-      fechaSolicitud,
-      fechaAprobacion,
-      fechaDesembolso,
-      fechaVencimiento,
-      fechaUltimoPago,
-      esMigracion,
-      data.numeroCreditoAnterior ?? null,
-    ],
-  );
+    const estadoInicial = esMigracion ? "DESEMBOLSADO" : "APROBADO";
+    const saldoCapitalInicial = esMigracion && data.saldoCapitalActual !== undefined && Number(data.saldoCapitalActual) >= 0
+      ? Number(data.saldoCapitalActual)
+      : data.montoSolicitado;
+    const fechaSolicitud = esMigracion ? (data.fechaDesembolsoOriginal || data.fechaSolicitud || hoy) : (data.fechaSolicitud || hoy);
+    const fechaAprobacion = esMigracion ? (data.fechaDesembolsoOriginal || hoy) : hoy;
+    const fechaDesembolso = esMigracion ? (data.fechaDesembolsoOriginal || hoy) : null;
+    const fechaUltimoPago = esMigracion ? (data.fechaUltimoPago || data.fechaDesembolsoOriginal || hoy) : null;
 
-  const prestamo = rows[0];
-
-  // Si se solicitó, abrir automáticamente la cuenta de Ahorro sobre Préstamo
-  if (data.crearCuentaAhorroSobrePrestamo) {
-    try {
-      const { numeroCuenta } = await cuentasService.siguienteNumero(data.agenciaId, "AHORRO_SOBRE_PRESTAMO");
-      await pool.query(
-        `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, observaciones_apertura, prestamo_id, creado_por_id)
-         values ($1, 'AHORRO_SOBRE_PRESTAMO', $2, $3, 0, $4, $5, $6)
-         on conflict do nothing`,
-        [
-          numeroCuenta,
-          data.socioId,
-          data.agenciaId,
-          `Cuenta de ahorro en garantía vinculada al crédito ${prestamo.codigo}`,
-          prestamo.id,
-          usuarioId,
-        ],
+    let fechaVencimiento: string | null = null;
+    if (esMigracion && fechaDesembolso) {
+      const { rows: vencRows } = await client.query(
+        `select ($1::date + ($2 * interval '1 month'))::date as venc`,
+        [fechaDesembolso, Number(data.plazoMeses) || 12],
       );
-    } catch (err) {
-      console.error("Error al crear automáticamente cuenta de ahorro sobre préstamo:", err);
+      fechaVencimiento = vencRows[0]?.venc ?? null;
     }
-  }
 
-  await registrarAuditoria({
-    entidad: "Prestamo",
-    entidadId: prestamo.id,
-    accion: "CREAR",
-    usuarioId,
-    datosNuevos: prestamo,
+    let observacionesFinal = data.observaciones ?? "";
+    if (esMigracion) {
+      const notaMigracion = `[MIGRACIÓN HISTÓRICA] Crédito preexistente migrado.${data.numeroCreditoAnterior ? ` No. Crédito Anterior: ${data.numeroCreditoAnterior}.` : ''} Saldo capital migrado: Q ${saldoCapitalInicial.toFixed(2)}, Desembolso original: ${fechaDesembolso || 'N/A'}, Último pago registrado: ${fechaUltimoPago || 'N/A'}.`;
+      observacionesFinal = observacionesFinal ? `${notaMigracion} ${observacionesFinal}` : notaMigracion;
+    }
+
+    const { rows } = await client.query(
+      `insert into prestamos (
+         codigo, socio_id, agencia_id, promotor_id, tipo, estado,
+         tipo_amortizacion, monto_solicitado, monto_aprobado, saldo_capital, tasa_interes_mensual,
+         plazo_meses, cuota_mensual, destino, garantia, ubicacion_garantia, nombre_fiador, dpi_fiador, telefono_fiador,
+         documento_desembolso, observaciones, origen_fondos, fecha_solicitud, fecha_aprobacion, fecha_desembolso, fecha_vencimiento, fecha_ultimo_pago_migracion, es_migracion, numero_credito_anterior
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
+       returning *`,
+      [
+        codigo,
+        data.socioId,
+        data.agenciaId,
+        data.promotorId ?? null,
+        data.tipo,
+        estadoInicial,
+        tipoAmort,
+        data.montoSolicitado,
+        data.montoSolicitado, // inicialmente igual al solicitado
+        saldoCapitalInicial,
+        tasa,
+        data.plazoMeses,
+        sim.cuotaMensualEstimada,
+        data.destino ?? null,
+        data.garantia ?? null,
+        data.ubicacionGarantia ?? null,
+        data.nombreFiador ?? null,
+        data.dpiFiador ?? null,
+        data.telefonoFiador ?? null,
+        data.documentoDesembolso ?? null,
+        observacionesFinal || null,
+        origenFondos,
+        fechaSolicitud,
+        fechaAprobacion,
+        fechaDesembolso,
+        fechaVencimiento,
+        fechaUltimoPago,
+        esMigracion,
+        data.numeroCreditoAnterior ?? null,
+      ],
+    );
+
+    const prestamo = rows[0];
+
+    // Si se solicitó, abrir automáticamente la cuenta de Ahorro sobre Préstamo dentro de la transacción
+    if (data.crearCuentaAhorroSobrePrestamo) {
+      try {
+        const { numeroCuenta } = await cuentasService.siguienteNumero(data.agenciaId, "AHORRO_SOBRE_PRESTAMO");
+        await client.query(
+          `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, observaciones_apertura, prestamo_id, creado_por_id)
+           values ($1, 'AHORRO_SOBRE_PRESTAMO', $2, $3, 0, $4, $5, $6)
+           on conflict do nothing`,
+          [
+            numeroCuenta,
+            data.socioId,
+            data.agenciaId,
+            `Cuenta de ahorro en garantía vinculada al crédito ${prestamo.codigo}`,
+            prestamo.id,
+            usuarioId,
+          ],
+        );
+      } catch (err) {
+        console.error("Error al crear automáticamente cuenta de ahorro sobre préstamo:", err);
+      }
+    }
+
+    await registrarAuditoria({
+      entidad: "Prestamo",
+      entidadId: prestamo.id,
+      accion: "CREAR",
+      usuarioId,
+      datosNuevos: prestamo,
+    });
+
+    return prestamo;
   });
-
-  return prestamo;
 }
 
 export async function cambiarEstado(
@@ -312,54 +311,87 @@ export async function cambiarEstado(
   agenciaVisible: string | null,
   montoAprobado?: number,
 ) {
-  const actual = await obtener(id, agenciaVisible);
-
-  let fechaAprobacion = actual.fecha_aprobacion;
-  let fechaDesembolso = actual.fecha_desembolso;
-  let fechaVencimiento = actual.fecha_vencimiento;
-  const hoy = new Date().toISOString().slice(0, 10);
-  let nuevoSaldoCapital = actual.saldo_capital;
-
-  if (nuevoEstado === "APROBADO") {
-    fechaAprobacion = hoy;
-    nuevoSaldoCapital = montoAprobado ?? actual.monto_aprobado ?? actual.monto_solicitado;
-  } else if (nuevoEstado === "DESEMBOLSADO") {
-    if (!fechaAprobacion) fechaAprobacion = hoy;
-    fechaDesembolso = hoy;
-    nuevoSaldoCapital = actual.saldo_capital ?? montoAprobado ?? actual.monto_aprobado ?? actual.monto_solicitado;
-    const { rows: vencRows } = await pool.query(
-      `select (current_date + ($1 * interval '1 month'))::date as venc`,
-      [Number(actual.plazo_meses) || 12],
+  return withTransaction(async (client) => {
+    const { rows: pRows } = await client.query(
+      `select p.*,
+              s.nombres as socio_nombres, s.numero_asociado, s.dpi as socio_dpi,
+              a.nombre as agencia_nombre, a.codigo as agencia_codigo
+       from prestamos p
+       join socios s on s.id = p.socio_id
+       join agencias a on a.id = p.agencia_id
+       where p.id = $1`,
+      [id],
     );
-    fechaVencimiento = vencRows[0]?.venc ?? null;
-  }
+    const actual = pRows[0];
+    if (!actual) throw notFound("Préstamo no encontrado");
+    if (agenciaVisible && actual.agencia_id !== agenciaVisible) {
+      throw forbidden("Ese préstamo pertenece a otra agencia");
+    }
 
-  const { rows } = await pool.query(
-    `update prestamos
-     set estado = $1,
-         monto_aprobado = coalesce($2, monto_aprobado),
-         saldo_capital = coalesce($3, saldo_capital),
-         fecha_aprobacion = $4,
-         fecha_desembolso = $5,
-         fecha_vencimiento = coalesce($6, fecha_vencimiento),
-         updated_at = now()
-     where id = $7
-     returning *`,
-    [nuevoEstado, montoAprobado ?? null, nuevoSaldoCapital, fechaAprobacion, fechaDesembolso, fechaVencimiento, id],
-  );
+    // Reglas de la Máquina de Estados Financiera
+    if (actual.estado === "CANCELADO" && nuevoEstado !== "CANCELADO") {
+      throw conflict("El préstamo ya está CANCELADO y su saldo fue liquidado. No se permite reabrir el crédito.");
+    }
+    if (actual.estado === "RECHAZADO" && nuevoEstado !== "RECHAZADO") {
+      throw conflict("El préstamo fue RECHAZADO por el comité. Debe crearse una nueva solicitud.");
+    }
 
-  const actualizado = rows[0];
+    if (nuevoEstado === "CANCELADO") {
+      const saldo = Number(actual.saldo_capital);
+      if (saldo > 0.01) {
+        throw conflict(
+          `No se puede marcar como CANCELADO un préstamo que aún tiene saldo de capital pendiente (Q ${saldo.toFixed(2)}). Debe liquidarse a través de un cobro de cuota o pago total.`,
+        );
+      }
+    }
 
-  await registrarAuditoria({
-    entidad: "Prestamo",
-    entidadId: id,
-    accion: "ACTUALIZAR",
-    usuarioId,
-    datosAnteriores: { estado: actual.estado, monto_aprobado: actual.monto_aprobado },
-    datosNuevos: { estado: nuevoEstado, monto_aprobado: actualizado.monto_aprobado },
+    let fechaAprobacion = actual.fecha_aprobacion;
+    let fechaDesembolso = actual.fecha_desembolso;
+    let fechaVencimiento = actual.fecha_vencimiento;
+    const hoy = new Date().toISOString().slice(0, 10);
+    let nuevoSaldoCapital = actual.saldo_capital;
+
+    if (nuevoEstado === "APROBADO") {
+      fechaAprobacion = hoy;
+      nuevoSaldoCapital = montoAprobado ?? actual.monto_aprobado ?? actual.monto_solicitado;
+    } else if (nuevoEstado === "DESEMBOLSADO") {
+      if (!fechaAprobacion) fechaAprobacion = hoy;
+      fechaDesembolso = hoy;
+      nuevoSaldoCapital = actual.saldo_capital ?? montoAprobado ?? actual.monto_aprobado ?? actual.monto_solicitado;
+      const { rows: vencRows } = await client.query(
+        `select (current_date + ($1 * interval '1 month'))::date as venc`,
+        [Number(actual.plazo_meses) || 12],
+      );
+      fechaVencimiento = vencRows[0]?.venc ?? null;
+    }
+
+    const { rows } = await client.query(
+      `update prestamos
+       set estado = $1,
+           monto_aprobado = coalesce($2, monto_aprobado),
+           saldo_capital = coalesce($3, saldo_capital),
+           fecha_aprobacion = $4,
+           fecha_desembolso = $5,
+           fecha_vencimiento = coalesce($6, fecha_vencimiento),
+           updated_at = now()
+       where id = $7
+       returning *`,
+      [nuevoEstado, montoAprobado ?? null, nuevoSaldoCapital, fechaAprobacion, fechaDesembolso, fechaVencimiento, id],
+    );
+
+    const actualizado = rows[0];
+
+    await registrarAuditoria({
+      entidad: "Prestamo",
+      entidadId: id,
+      accion: "ACTUALIZAR",
+      usuarioId,
+      datosAnteriores: { estado: actual.estado, monto_aprobado: actual.monto_aprobado },
+      datosNuevos: { estado: nuevoEstado, monto_aprobado: actualizado.monto_aprobado },
+    });
+
+    return actualizado;
   });
-
-  return actualizado;
 }
 
 export async function listarPagos(prestamoId: string) {

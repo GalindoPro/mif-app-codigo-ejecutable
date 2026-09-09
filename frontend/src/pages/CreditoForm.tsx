@@ -264,12 +264,20 @@ export default function CreditoForm() {
       return;
     }
 
+    const montoFinal = esMigracion ? (Number(montoOriginalContrato) || Number(montoSolicitado)) : Number(montoSolicitado);
+    const plazoFinal = esMigracion ? (Number(plazoTotalContrato) || Number(plazoMeses)) : Number(plazoMeses);
+    const saldoFinal = esMigracion ? Number(saldoCapitalActual) : montoFinal;
+
     if (esMigracion) {
-      if (saldoCapitalActual === "" || Number(saldoCapitalActual) < 0) {
+      if (saldoCapitalActual === "" || isNaN(saldoFinal) || saldoFinal < 0) {
         setError("Indica el saldo de capital pendiente actual del crédito.");
         return;
       }
-      if (Number(saldoCapitalActual) > Number(montoSolicitado)) {
+      if (montoFinal <= 0) {
+        setError("Indica el monto original del crédito.");
+        return;
+      }
+      if (saldoFinal > montoFinal) {
         setError("El saldo de capital pendiente no puede ser mayor al monto original solicitado.");
         return;
       }
@@ -293,8 +301,8 @@ export default function CreditoForm() {
         promotorId: promotorId || undefined,
         tipo,
         tipoAmortizacion: "SOBRE_SALDOS",
-        montoSolicitado: Number(montoSolicitado),
-        plazoMeses: Number(plazoMeses),
+        montoSolicitado: montoFinal,
+        plazoMeses: plazoFinal,
         tasaInteresMensual: 2.0,
         destino: destino || undefined,
         garantia:
@@ -312,7 +320,7 @@ export default function CreditoForm() {
         origenFondos,
         esMigracion,
         numeroCreditoAnterior: esMigracion ? (numeroCreditoAnterior.trim() || undefined) : undefined,
-        saldoCapitalActual: esMigracion ? Number(saldoCapitalActual) : undefined,
+        saldoCapitalActual: esMigracion ? saldoFinal : undefined,
         fechaDesembolsoOriginal: esMigracion ? fechaDesembolsoOriginal : undefined,
         fechaUltimoPago: esMigracion ? fechaUltimoPago : undefined,
       });
@@ -422,31 +430,35 @@ export default function CreditoForm() {
             </select>
           </div>
 
-          <div className="field">
-            <label htmlFor="cred-monto">Monto solicitado (Q)</label>
-            <input
-              id="cred-monto"
-              type="number"
-              min="1"
-              step="any"
-              value={montoSolicitado}
-              onChange={(e) => setMontoSolicitado(e.target.value)}
-              required
-            />
-          </div>
+          {!esMigracion && (
+            <>
+              <div className="field">
+                <label htmlFor="cred-monto">Monto solicitado (Q)</label>
+                <input
+                  id="cred-monto"
+                  type="number"
+                  min="1"
+                  step="any"
+                  value={montoSolicitado}
+                  onChange={(e) => setMontoSolicitado(e.target.value)}
+                  required
+                />
+              </div>
 
-          <div className="field">
-            <label htmlFor="cred-plazo">Plazo (meses)</label>
-            <input
-              id="cred-plazo"
-              type="number"
-              min="1"
-              max="120"
-              value={plazoMeses}
-              onChange={(e) => setPlazoMeses(e.target.value)}
-              required
-            />
-          </div>
+              <div className="field">
+                <label htmlFor="cred-plazo">Plazo (meses)</label>
+                <input
+                  id="cred-plazo"
+                  type="number"
+                  min="1"
+                  max="120"
+                  value={plazoMeses}
+                  onChange={(e) => setPlazoMeses(e.target.value)}
+                  required
+                />
+              </div>
+            </>
+          )}
 
           <div className="field">
             <label htmlFor="cred-tasa">Tasa de interés mensual</label>
