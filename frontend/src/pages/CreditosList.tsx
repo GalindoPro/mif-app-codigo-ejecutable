@@ -6,6 +6,8 @@ import {
   ESTADO_PRESTAMO_LABEL,
   formatoQ,
   TIPO_PRESTAMO_LABEL,
+  ORIGEN_FONDOS_SHORT_LABEL,
+  ORIGEN_FONDOS_BADGE_STYLE,
 } from "../types";
 import type { EstadoPrestamo, Prestamo, FiadorItem } from "../types";
 import { formatearDPI, formatearTelefono } from "../lib/formatters";
@@ -345,7 +347,23 @@ export default function CreditosList() {
                         </Link>
                       </td>
                       <td>
-                        <span style={{ fontSize: "0.78rem" }}>{TIPO_PRESTAMO_LABEL[p.tipo]}</span>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", alignItems: "flex-start" }}>
+                          <span style={{ fontSize: "0.78rem" }}>{TIPO_PRESTAMO_LABEL[p.tipo]}</span>
+                          {p.origen_fondos && (
+                            <span
+                              style={{
+                                fontSize: "0.68rem",
+                                fontWeight: 700,
+                                padding: "0.1rem 0.35rem",
+                                borderRadius: "4px",
+                                width: "fit-content",
+                                ...ORIGEN_FONDOS_BADGE_STYLE[p.origen_fondos],
+                              }}
+                            >
+                              {ORIGEN_FONDOS_SHORT_LABEL[p.origen_fondos]}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="mono" style={{ textAlign: "right", fontWeight: 700 }}>
                         {formatoQ(p.monto_aprobado ?? p.monto_solicitado)}

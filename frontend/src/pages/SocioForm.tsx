@@ -26,7 +26,6 @@ export default function SocioForm() {
   const [nombres, setNombres] = useState(() => searchParams.get("nombres") || "");
   const [genero, setGenero] = useState<"M" | "F" | "">("");
   const [dpi, setDpi] = useState(() => (searchParams.get("dpi") ? formatearDPI(searchParams.get("dpi")!) : ""));
-  const [edad, setEdad] = useState("");
   const [fechaIngreso, setFechaIngreso] = useState(() => new Date().toISOString().slice(0, 10));
   const [telefono, setTelefono] = useState(() => (searchParams.get("telefono") ? formatearTelefono(searchParams.get("telefono")!) : ""));
   const [direccion, setDireccion] = useState(() => searchParams.get("direccion") || "");
@@ -209,7 +208,6 @@ export default function SocioForm() {
         nombres,
         genero: genero || undefined,
         dpi: dpi ? dpi.trim() : undefined,
-        edad: edad ? Number(edad) : undefined,
         fechaIngreso,
         telefono: prepararTelefonoParaGuardar(telefono),
         direccion: direccion || undefined,
@@ -322,22 +320,8 @@ export default function SocioForm() {
             </div>
           </div>
 
-          {/* Fila abajo: Edad a la izquierda, Fecha de ingreso a la derecha */}
-          <div className="field">
-            <label htmlFor="edad">Edad (años)</label>
-            <input
-              id="edad"
-              type="number"
-              min="1"
-              max="120"
-              value={edad}
-              onChange={(e) => setEdad(e.target.value)}
-              placeholder="Ej. 35"
-            />
-            <span className="hint">Ingreso manual (buena práctica en campo)</span>
-          </div>
-
-          <div className="field">
+          {/* Fecha de ingreso */}
+          <div className="field" style={{ gridColumn: "1 / -1" }}>
             <label htmlFor="fecha">Fecha de ingreso</label>
             <input
               id="fecha"

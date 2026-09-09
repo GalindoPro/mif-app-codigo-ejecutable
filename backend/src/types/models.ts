@@ -59,6 +59,7 @@ export interface UsuarioAutenticado {
 export type TipoPrestamo = "FIDUCIARIO" | "HIPOTECARIO";
 export type EstadoPrestamo = "SOLICITUD" | "APROBADO" | "DESEMBOLSADO" | "CANCELADO" | "RECHAZADO";
 export type TipoAmortizacion = "CUOTA_NIVELADA" | "SOBRE_SALDOS";
+export type OrigenFondos = "FONDOS_PROPIOS" | "FEDERURAL" | "CHN_GUATEMALA";
 
 export interface Prestamo {
   id: string;
@@ -73,6 +74,7 @@ export interface Prestamo {
   tipo: TipoPrestamo;
   estado: EstadoPrestamo;
   tipo_amortizacion: TipoAmortizacion;
+  origen_fondos?: OrigenFondos;
   monto_solicitado: number;
   monto_aprobado: number | null;
   saldo_capital?: number | null;
@@ -83,12 +85,16 @@ export interface Prestamo {
   garantia: string | null;
   ubicacion_garantia?: string | null;
   nombre_fiador?: string | null;
+  dpi_fiador?: string | null;
+  telefono_fiador?: string | null;
   documento_desembolso?: string | null;
   observaciones: string | null;
   fecha_solicitud: string;
   fecha_aprobacion: string | null;
   fecha_desembolso: string | null;
   fecha_vencimiento?: string | null;
+  fecha_ultimo_pago_migracion?: string | null;
+  es_migracion?: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -96,6 +102,7 @@ export interface Prestamo {
 export interface CuotaAmortizacion {
   numero: number;
   fechaPago: string;
+  dias?: number;
   cuota: number;
   capital: number;
   interes: number;

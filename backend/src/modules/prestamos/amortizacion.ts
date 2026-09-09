@@ -36,12 +36,20 @@ function sumarMes(fechaEntrada: string | Date | undefined, meses: number): strin
   return fecha.toISOString().slice(0, 10);
 }
 
+function calcularDiasEntreFechas(f1: string, f2: string): number {
+  const d1 = new Date(f1 + "T00:00:00");
+  const d2 = new Date(f2 + "T00:00:00");
+  const diffMs = d2.getTime() - d1.getTime();
+  return Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+}
+
 export function calcularAmortizacion(opciones: OpcionesSimulacion): ResultadoSimulacion {
   const monto = Number(opciones.monto);
   const n = Math.max(1, Math.floor(Number(opciones.plazoMeses)));
   const tasaMensual = opciones.tasaInteresMensual !== undefined ? Number(opciones.tasaInteresMensual) : 2.0;
-  const tipo = opciones.tipoAmortizacion ?? "CUOTA_NIVELADA";
-  const fechaBase = opciones.fechaInicio || new Date().toISOString().slice(0, 10);
+  const tasaAnual = tasaMensual * 12;
+  const tipo = opciones.tipoAmortizacion ?? "SOBRE_SALDOS";
+  const fechaBase = formatearAFechaString(opciones.fechaInicio || new Date());
 
   const i = tasaMensual / 100;
   const tabla: CuotaAmortizacion[] = [];
@@ -55,6 +63,10 @@ export function calcularAmortizacion(opciones: OpcionesSimulacion): ResultadoSim
     const cuotaFija = i === 0 ? monto / n : redondear2(monto * ((i * factor) / (factor - 1)));
 
     for (let k = 1; k <= n; k++) {
+      const fechaAnterior = k === 1 ? fechaBase : sumarMes(fechaBase, k - 1);
+      const fechaPago = sumarMes(fechaBase, k);
+      const dias = calcularDiasEntreFechas(fechaAnterior, fechaPago);
+
       const interes = redondear2(saldo * i);
       let capital = redondear2(cuotaFija - interes);
       let cuota = cuotaFija;
@@ -72,7 +84,8 @@ export function calcularAmortizacion(opciones: OpcionesSimulacion): ResultadoSim
 
       tabla.push({
         numero: k,
-        fechaPago: sumarMes(fechaBase, k),
+        fechaPago,
+        dias,
         cuota,
         capital,
         interes,
@@ -91,12 +104,17 @@ export function calcularAmortizacion(opciones: OpcionesSimulacion): ResultadoSim
       tabla,
     };
   } else {
-    // Sobre saldos (Capital constante)
+    // Sobre saldos (Capital constante + interés sobre días exactos del mes / 365)
     const capitalConstante = redondear2(monto / n);
     let cuotaPrimera = 0;
 
     for (let k = 1; k <= n; k++) {
-      const interes = redondear2(saldo * i);
+      const fechaAnterior = k === 1 ? fechaBase : sumarMes(fechaBase, k - 1);
+      const fechaPago = sumarMes(fechaBase, k);
+      const dias = calcularDiasEntreFechas(fechaAnterior, fechaPago);
+
+      // Interés por días calendario exactos del mes (base 365 días)
+      const interes = redondear2((saldo * (tasaAnual / 100) * dias) / 365);
       let capital = capitalConstante;
 
       if (k === n) {
@@ -112,7 +130,8 @@ export function calcularAmortizacion(opciones: OpcionesSimulacion): ResultadoSim
 
       tabla.push({
         numero: k,
-        fechaPago: sumarMes(fechaBase, k),
+        fechaPago,
+        dias,
         cuota,
         capital,
         interes,

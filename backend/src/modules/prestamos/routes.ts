@@ -102,6 +102,11 @@ const crearSchema = z.object({
   observaciones: z.string().optional(),
   fechaSolicitud: z.string().optional(),
   crearCuentaAhorroSobrePrestamo: z.boolean().optional(),
+  origenFondos: z.enum(["FONDOS_PROPIOS", "FEDERURAL", "CHN_GUATEMALA"]).optional(),
+  esMigracion: z.boolean().optional(),
+  saldoCapitalActual: z.number().nonnegative().optional(),
+  fechaUltimoPago: z.string().optional(),
+  fechaDesembolsoOriginal: z.string().optional(),
 });
 
 prestamosRouter.post(

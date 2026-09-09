@@ -135,6 +135,11 @@ export interface DatosCrearPrestamo {
   observaciones?: string;
   fechaSolicitud?: string;
   crearCuentaAhorroSobrePrestamo?: boolean;
+  origenFondos?: "FONDOS_PROPIOS" | "FEDERURAL" | "CHN_GUATEMALA";
+  esMigracion?: boolean;
+  saldoCapitalActual?: number;
+  fechaUltimoPago?: string;
+  fechaDesembolsoOriginal?: string;
 }
 
 export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
@@ -144,12 +149,14 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
   const tasa = data.tasaInteresMensual !== undefined ? Number(data.tasaInteresMensual) : 2.0;
   const tipoAmort = data.tipoAmortizacion ?? "SOBRE_SALDOS";
 
+  const fechaBaseCalculo = data.esMigracion && data.fechaDesembolsoOriginal ? data.fechaDesembolsoOriginal : data.fechaSolicitud;
+
   const sim = calcularAmortizacion({
     monto: data.montoSolicitado,
     plazoMeses: data.plazoMeses,
     tasaInteresMensual: tasa,
     tipoAmortizacion: tipoAmort,
-    fechaInicio: data.fechaSolicitud,
+    fechaInicio: fechaBaseCalculo,
   });
 
   // Validaciones del Fiador si el crédito es FIDUCIARIO
@@ -194,13 +201,40 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
 
   const codigo = await siguienteCodigo(data.agenciaId);
   const hoy = new Date().toISOString().slice(0, 10);
+  const origenFondos = data.origenFondos || "FONDOS_PROPIOS";
+  const esMigracion = Boolean(data.esMigracion);
+
+  const estadoInicial = esMigracion ? "DESEMBOLSADO" : "APROBADO";
+  const saldoCapitalInicial = esMigracion && data.saldoCapitalActual !== undefined && Number(data.saldoCapitalActual) >= 0
+    ? Number(data.saldoCapitalActual)
+    : data.montoSolicitado;
+  const fechaSolicitud = esMigracion ? (data.fechaDesembolsoOriginal || data.fechaSolicitud || hoy) : (data.fechaSolicitud || hoy);
+  const fechaAprobacion = esMigracion ? (data.fechaDesembolsoOriginal || hoy) : hoy;
+  const fechaDesembolso = esMigracion ? (data.fechaDesembolsoOriginal || hoy) : null;
+  const fechaUltimoPago = esMigracion ? (data.fechaUltimoPago || data.fechaDesembolsoOriginal || hoy) : null;
+
+  let fechaVencimiento: string | null = null;
+  if (esMigracion && fechaDesembolso) {
+    const { rows: vencRows } = await pool.query(
+      `select ($1::date + ($2 * interval '1 month'))::date as venc`,
+      [fechaDesembolso, Number(data.plazoMeses) || 12],
+    );
+    fechaVencimiento = vencRows[0]?.venc ?? null;
+  }
+
+  let observacionesFinal = data.observaciones ?? "";
+  if (esMigracion) {
+    const notaMigracion = `[MIGRACIÓN HISTÓRICA] Crédito preexistente migrado. Saldo capital migrado: Q ${saldoCapitalInicial.toFixed(2)}, Desembolso original: ${fechaDesembolso || 'N/A'}, Último pago registrado: ${fechaUltimoPago || 'N/A'}.`;
+    observacionesFinal = observacionesFinal ? `${notaMigracion} ${observacionesFinal}` : notaMigracion;
+  }
 
   const { rows } = await pool.query(
     `insert into prestamos (
        codigo, socio_id, agencia_id, promotor_id, tipo, estado,
        tipo_amortizacion, monto_solicitado, monto_aprobado, saldo_capital, tasa_interes_mensual,
-       plazo_meses, cuota_mensual, destino, garantia, ubicacion_garantia, nombre_fiador, dpi_fiador, telefono_fiador, documento_desembolso, observaciones, fecha_solicitud, fecha_aprobacion
-     ) values ($1, $2, $3, $4, $5, 'APROBADO', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+       plazo_meses, cuota_mensual, destino, garantia, ubicacion_garantia, nombre_fiador, dpi_fiador, telefono_fiador,
+       documento_desembolso, observaciones, origen_fondos, fecha_solicitud, fecha_aprobacion, fecha_desembolso, fecha_vencimiento, fecha_ultimo_pago_migracion, es_migracion
+     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
      returning *`,
     [
       codigo,
@@ -208,10 +242,11 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
       data.agenciaId,
       data.promotorId ?? null,
       data.tipo,
+      estadoInicial,
       tipoAmort,
       data.montoSolicitado,
       data.montoSolicitado, // inicialmente igual al solicitado
-      data.montoSolicitado, // saldo_capital inicial
+      saldoCapitalInicial,
       tasa,
       data.plazoMeses,
       sim.cuotaMensualEstimada,
@@ -222,9 +257,14 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
       data.dpiFiador ?? null,
       data.telefonoFiador ?? null,
       data.documentoDesembolso ?? null,
-      data.observaciones ?? null,
-      data.fechaSolicitud || hoy,
-      hoy,
+      observacionesFinal || null,
+      origenFondos,
+      fechaSolicitud,
+      fechaAprobacion,
+      fechaDesembolso,
+      fechaVencimiento,
+      fechaUltimoPago,
+      esMigracion,
     ],
   );
 
@@ -476,7 +516,7 @@ export async function obtenerLiquidacion(prestamoId: string, fechaLiquidacion?: 
   );
 
   const fechaUltimoPago =
-    pagos[0]?.fecha || prestamo.fecha_desembolso || prestamo.fecha_solicitud || prestamo.created_at;
+    pagos[0]?.fecha || prestamo.fecha_ultimo_pago_migracion || prestamo.fecha_desembolso || prestamo.fecha_solicitud || prestamo.created_at;
 
   const saldoCapital = Number(
     prestamo.saldo_capital !== null && prestamo.saldo_capital !== undefined

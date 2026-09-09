@@ -20,9 +20,15 @@ import type {
   Cuenta,
   DetalleCajaAuxiliar,
   EstadoCajaAuxiliar,
+  OrigenFondos,
   PlazoFijoContrato,
   Prestamo,
   Socio,
+} from "../types";
+import {
+  ORIGEN_FONDOS_LABEL,
+  ORIGEN_FONDOS_SHORT_LABEL,
+  ORIGEN_FONDOS_BADGE_STYLE,
 } from "../types";
 
 const GRUPOS = [
@@ -33,9 +39,20 @@ const GRUPOS = [
 ] as const;
 
 function categoriasDeGrupo(seccion: "BI" | "PROPIO", tipo: "INGRESO" | "EGRESO"): CajaCategoria[] {
-  return CATEGORIA_AUXILIAR_KEYS.filter(
-    (k) => CATEGORIAS_AUXILIAR[k].seccion === seccion && CATEGORIAS_AUXILIAR[k].tipo === tipo,
-  );
+  return CATEGORIA_AUXILIAR_KEYS.filter((k) => {
+    const info = CATEGORIAS_AUXILIAR[k];
+    if (info.seccion !== seccion || info.tipo !== tipo) return false;
+    // Los cobros de créditos (abono, interés, mora) y desembolsos se gestionan de forma centralizada y calculada con sus botones dedicados
+    if (
+      k.includes("PRESTAMO") ||
+      k.includes("INTERES") ||
+      k.includes("MORA") ||
+      k === "COLOCACION_PRESTAMO"
+    ) {
+      return false;
+    }
+    return true;
+  });
 }
 
 export default function AuxiliarCaja() {
@@ -237,6 +254,48 @@ function CajaAbierta({
   const [mostrarLiquidarPF, setMostrarLiquidarPF] = useState(false);
   const [mostrarCierre, setMostrarCierre] = useState(false);
 
+  const resumenFondos = useMemo(() => {
+    const r: Record<
+      OrigenFondos,
+      { cobros: number; colocacion: number; countCobros: number; countColocacion: number }
+    > = {
+      FONDOS_PROPIOS: { cobros: 0, colocacion: 0, countCobros: 0, countColocacion: 0 },
+      FEDERURAL: { cobros: 0, colocacion: 0, countCobros: 0, countColocacion: 0 },
+      CHN_GUATEMALA: { cobros: 0, colocacion: 0, countCobros: 0, countColocacion: 0 },
+    };
+
+    detalle.movimientos.forEach((m) => {
+      let origen: OrigenFondos | null = (m.origen_fondos as OrigenFondos) || null;
+      if (!origen) {
+        if (
+          m.categoria === "COLOCACION_PRESTAMO" ||
+          (m.referencia && m.referencia.includes("CUOTA"))
+        ) {
+          origen = "FONDOS_PROPIOS";
+        }
+      }
+      if (!origen || !r[origen]) return;
+
+      if (m.tipo === "INGRESO") {
+        r[origen].cobros += Number(m.monto);
+        r[origen].countCobros += 1;
+      } else if (m.tipo === "EGRESO") {
+        r[origen].colocacion += Number(m.monto);
+        r[origen].countColocacion += 1;
+      }
+    });
+
+    return r;
+  }, [detalle.movimientos]);
+
+  const tieneMovimientosCredito =
+    resumenFondos.FONDOS_PROPIOS.countCobros > 0 ||
+    resumenFondos.FONDOS_PROPIOS.countColocacion > 0 ||
+    resumenFondos.FEDERURAL.countCobros > 0 ||
+    resumenFondos.FEDERURAL.countColocacion > 0 ||
+    resumenFondos.CHN_GUATEMALA.countCobros > 0 ||
+    resumenFondos.CHN_GUATEMALA.countColocacion > 0;
+
   return (
     <div>
       <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 210px))" }}>
@@ -255,6 +314,89 @@ function CajaAbierta({
         <div className="stat-card accent">
           <span className="label">Saldo actual</span>
           <span className="value">{formatoQ(detalle.saldoActual)}</span>
+        </div>
+      </div>
+
+      {/* CONSOLIDADO DE FONDOS INSTITUCIONALES (FONDOS PROPIOS, FEDERURAL, CHN) */}
+      <div
+        className="card"
+        style={{
+          background: "var(--paper-raised)",
+          border: "1px solid var(--line)",
+          borderRadius: "10px",
+          padding: "0.85rem 1rem",
+          marginBottom: "1.25rem",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+            <span style={{ fontSize: "1.1rem" }}>🏛️</span>
+            <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--ink)" }}>
+              Consolidado de Cartera por Fuente de Fondos (Hoy)
+            </span>
+          </div>
+          <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>
+            {tieneMovimientosCredito ? "Movimientos registrados hoy" : "Sin colocación/cobro aún"}
+          </span>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "0.65rem" }}>
+          {(
+            [
+              { id: "FONDOS_PROPIOS", icon: "🏦", label: "Fondos Propios (MIF)", data: resumenFondos.FONDOS_PROPIOS, color: "#059669" },
+              { id: "FEDERURAL", icon: "🌾", label: "FEDERURAL", data: resumenFondos.FEDERURAL, color: "#d97706" },
+              { id: "CHN_GUATEMALA", icon: "🏛️", label: "CHN-GUATEMALA", data: resumenFondos.CHN_GUATEMALA, color: "#2563eb" },
+            ] as const
+          ).map((f) => {
+            const neto = f.data.cobros - f.data.colocacion;
+            return (
+              <div
+                key={f.id}
+                style={{
+                  background: "var(--paper)",
+                  border: "1px solid var(--line)",
+                  borderRadius: "8px",
+                  padding: "0.65rem 0.8rem",
+                  fontSize: "0.82rem",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                  <span style={{ fontWeight: 700, color: f.color, display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                    <span>{f.icon}</span> {f.label}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "0.68rem",
+                      fontWeight: 700,
+                      padding: "0.1rem 0.35rem",
+                      borderRadius: "4px",
+                      ...ORIGEN_FONDOS_BADGE_STYLE[f.id],
+                    }}
+                  >
+                    {f.data.countCobros + f.data.countColocacion} ops
+                  </span>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.3rem", fontSize: "0.76rem" }}>
+                  <div>
+                    <span style={{ color: "var(--ink-soft)", display: "block" }}>Cobrado:</span>
+                    <strong style={{ color: "#059669" }} className="mono">{formatoQ(f.data.cobros)}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: "var(--ink-soft)", display: "block" }}>Colocado:</span>
+                    <strong style={{ color: "#2563eb" }} className="mono">{formatoQ(f.data.colocacion)}</strong>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: "0.4rem", paddingTop: "0.3rem", borderTop: "1px dashed var(--line)", fontSize: "0.74rem", display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--ink-soft)" }}>Flujo Neto:</span>
+                  <strong className="mono" style={{ color: neto >= 0 ? "#059669" : "#dc2626" }}>
+                    {formatoQ(neto)}
+                  </strong>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -413,7 +555,25 @@ function CajaAbierta({
                 <td className="mono">
                   {new Date(m.created_at).toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}
                 </td>
-                <td>{m.descripcion}</td>
+                <td>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", alignItems: "flex-start" }}>
+                    <span>{m.descripcion}</span>
+                    {m.origen_fondos && (
+                      <span
+                        style={{
+                          fontSize: "0.68rem",
+                          fontWeight: 700,
+                          padding: "0.1rem 0.35rem",
+                          borderRadius: "4px",
+                          width: "fit-content",
+                          ...ORIGEN_FONDOS_BADGE_STYLE[m.origen_fondos as OrigenFondos],
+                        }}
+                      >
+                        {ORIGEN_FONDOS_SHORT_LABEL[m.origen_fondos as OrigenFondos]}
+                      </span>
+                    )}
+                  </div>
+                </td>
                 <td className="mono">{m.referencia ?? "—"}</td>
                 <td>{m.beneficiario}</td>
                 <td className="mono">{m.doc_no ?? "—"}</td>
@@ -437,6 +597,56 @@ function NuevoMovimientoForm({ agenciaId, diaId, onCreado }: { agenciaId: string
     const g = GRUPOS.find((x) => x.key === grupo)!;
     return categoriasDeGrupo(g.seccion, g.tipo);
   }, [grupo]);
+
+  const opcionesAgrupadas = useMemo(() => {
+    if (grupo === "PROPIO_INGRESO") {
+      return [
+        {
+          label: "🏦 Cuentas de Ahorro y Plazo Fijo",
+          opciones: [
+            "DEPOSITO_AHORRO_CORRIENTE",
+            "DEPOSITO_AHORRO_PROGRAMADO",
+            "DEPOSITO_AHORRO_INFANTO_JUVENIL",
+            "DEPOSITO_AHORRO_SOBRE_PRESTAMO",
+            "DEPOSITO_PLAZO_FIJO",
+          ] as CajaCategoria[],
+        },
+        {
+          label: "👥 Asociados y Aportaciones",
+          opciones: ["APORTACION", "INGRESO_ASOCIADO"] as CajaCategoria[],
+        },
+        {
+          label: "💼 Otros Ingresos",
+          opciones: ["COMISION", "INGRESO_VARIO"] as CajaCategoria[],
+        },
+      ];
+    }
+    if (grupo === "PROPIO_EGRESO") {
+      return [
+        {
+          label: "🏦 Retiros de Cuentas y Plazo Fijo",
+          opciones: [
+            "RETIRO_AHORRO_CORRIENTE",
+            "RETIRO_AHORRO_PROGRAMADO",
+            "RETIRO_AHORRO_INFANTO_JUVENIL",
+            "RETIRO_AHORRO_SOBRE_PRESTAMO",
+            "RETIRO_PLAZO_FIJO",
+          ] as CajaCategoria[],
+        },
+        {
+          label: "💼 Otros Egresos",
+          opciones: ["EGRESO_VARIO"] as CajaCategoria[],
+        },
+      ];
+    }
+    // BI
+    return [
+      {
+        label: grupo === "BI_INGRESO" ? "Cobros por cuenta ajena BI" : "Pagos por cuenta ajena BI",
+        opciones: opcionesGrupo,
+      },
+    ];
+  }, [grupo, opcionesGrupo]);
 
   const [categoria, setCategoria] = useState<CajaCategoria>(opcionesGrupo[0]);
   const info = CATEGORIAS_AUXILIAR[categoria];
@@ -470,24 +680,34 @@ function NuevoMovimientoForm({ agenciaId, diaId, onCreado }: { agenciaId: string
       setSugerencias([]);
       return;
     }
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       api
         .get<string[]>("/caja-auxiliar/beneficiarios", { params: { agenciaId, q: beneficiario } })
-        .then(({ data }) => setSugerencias(data));
-    }, 250);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [beneficiario, info.seccion]);
+        .then(({ data }) => setSugerencias(data))
+        .catch(() => setSugerencias([]));
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [agenciaId, beneficiario, info.seccion]);
 
   async function enviar(e: FormEvent) {
     e.preventDefault();
     setError(null);
 
-    const beneficiarioFinal = info.requiereCuenta ? undefined : socio ? socio.nombres : beneficiario;
-    if (!info.requiereCuenta && !beneficiarioFinal) {
-      setError("Indica el beneficiario");
+    const m = Number(monto);
+    if (!m || m <= 0) {
+      setError("El monto debe ser mayor a 0");
       return;
     }
+
+    let beneficiarioFinal = beneficiario.trim();
+    if (!info.requiereCuenta && info.seccion === "PROPIO" && info.requiereSocio && !socioManual) {
+      if (!socio) {
+        setError("Selecciona el socio o activa el modo manual");
+        return;
+      }
+      beneficiarioFinal = socio.nombres;
+    }
+
     if (info.requiereCuenta && !cuenta) {
       setError("Selecciona la cuenta");
       return;
@@ -528,11 +748,15 @@ function NuevoMovimientoForm({ agenciaId, diaId, onCreado }: { agenciaId: string
         <div className="field" style={{ gridColumn: "1 / -1" }}>
           <label htmlFor="aux-categoria">Tipo de movimiento</label>
           <select id="aux-categoria" value={categoria} onChange={(e) => setCategoria(e.target.value as CajaCategoria)}>
-            {opcionesGrupo.map((c) => (
-              <option key={c} value={c}>
-                {CATEGORIAS_AUXILIAR[c].descripcion}
-                {CATEGORIAS_AUXILIAR[c].sinModuloReal ? " (solo registro de caja)" : ""}
-              </option>
+            {opcionesAgrupadas.map((grp) => (
+              <optgroup key={grp.label} label={grp.label}>
+                {grp.opciones.map((c) => (
+                  <option key={c} value={c}>
+                    {CATEGORIAS_AUXILIAR[c].descripcion}
+                    {CATEGORIAS_AUXILIAR[c].sinModuloReal ? " (solo registro de caja)" : ""}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </div>
@@ -810,6 +1034,7 @@ function CobroCreditoVentanilla({
   const [interes, setInteres] = useState("");
   const [mora, setMora] = useState("0");
   const [ahorroSobrePrestamo, setAhorroSobrePrestamo] = useState("0");
+  const [origenFondos, setOrigenFondos] = useState<OrigenFondos>("FONDOS_PROPIOS");
   const [docNo, setDocNo] = useState("");
 
   const [cuentasDebito, setCuentasDebito] = useState<Cuenta[]>([]);
@@ -821,6 +1046,7 @@ function CobroCreditoVentanilla({
 
   async function cargarLiquidacion(p: Prestamo) {
     setPrestamo(p);
+    setOrigenFondos(p.origen_fondos || "FONDOS_PROPIOS");
     setCargandoLiquidacion(true);
     try {
       const { data } = await api.get<{ prestamo: Prestamo; liquidacion: ResultadoLiquidacion }>(
@@ -962,6 +1188,7 @@ function CobroCreditoVentanilla({
         interes: intNum,
         mora: morNum,
         ahorroSobrePrestamo: aspNum,
+        origenFondos,
         docNo: docNo || undefined,
         cuentaDebitoId: usarDebitoAhorro && cuentaDebitoSeleccionada ? cuentaDebitoSeleccionada : undefined,
       });
@@ -979,6 +1206,7 @@ function CobroCreditoVentanilla({
         socioTelefono: socio.telefono,
         creditoCodigo: prestamo.codigo,
         creditoTipo: prestamo.tipo,
+        origenFondos,
         agenciaNombre: prestamo.agencia_nombre || "Agencia MIF COOP",
         saldoCapitalAnterior: saldoActual,
         abonoCapital: capNum,
@@ -1047,6 +1275,69 @@ function CobroCreditoVentanilla({
 
       {prestamo && (
         <>
+          {/* SELECCIÓN DE 3 OPCIONES DE ORIGEN DE FONDOS */}
+          <div
+            style={{
+              background: "var(--paper-raised)",
+              border: "1px solid var(--line)",
+              borderRadius: "8px",
+              padding: "0.85rem",
+              marginBottom: "1rem",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+              <span style={{ fontWeight: 700, fontSize: "0.86rem", color: "var(--ink)" }}>
+                🏛️ Fuente / Origen de Fondos:
+              </span>
+              <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)" }}>
+                {prestamo.origen_fondos ? `Asignado al crédito: ${ORIGEN_FONDOS_LABEL[prestamo.origen_fondos]}` : "Predeterminado: Fondos Propios"}
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.5rem" }}>
+              {(
+                [
+                  { id: "FONDOS_PROPIOS", num: "1", label: "Fondos Propios", icon: "🏦", desc: "MIF COOP" },
+                  { id: "FEDERURAL", num: "2", label: "FEDERURAL", icon: "🌾", desc: "Línea Federural" },
+                  { id: "CHN_GUATEMALA", num: "3", label: "CHN-GUATEMALA", icon: "🏛️", desc: "Crédito Hipotecario Nal." },
+                ] as const
+              ).map((opt) => {
+                const activo = origenFondos === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setOrigenFondos(opt.id)}
+                    style={{
+                      padding: "0.6rem 0.75rem",
+                      borderRadius: "8px",
+                      border: activo ? "2px solid #059669" : "1px solid var(--line)",
+                      background: activo ? "rgba(5, 150, 105, 0.12)" : "var(--paper)",
+                      color: activo ? "#065f46" : "var(--ink)",
+                      fontWeight: activo ? 700 : 500,
+                      cursor: "pointer",
+                      textAlign: "left",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.55rem",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <span style={{ fontSize: "1.25rem" }}>{opt.icon}</span>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <span style={{ fontSize: "0.86rem", fontWeight: activo ? 800 : 600 }}>
+                        <span style={{ opacity: 0.65, marginRight: "0.25rem" }}>{opt.num}.</span>
+                        {opt.label}
+                      </span>
+                      <span style={{ fontSize: "0.7rem", color: activo ? "#047857" : "var(--ink-soft)" }}>
+                        {opt.desc}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* PANEL DE LIQUIDACIÓN EN VIVO (DÍAS TRANSCURRIDOS, INTERÉS DIARIO Y MORA) */}
           <div
             style={{
@@ -1079,23 +1370,23 @@ function CobroCreditoVentanilla({
                   <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.72rem" }}>Días transcurridos</span>
                   <strong style={{ fontSize: "0.95rem", color: "var(--ink)" }}>{liquidacion.diasTranscurridos} días</strong>
                   <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)", display: "block" }}>
-                    {liquidacion.diasAtraso > 0 ? `${liquidacion.diasAtraso} días de atraso` : "Al día"}
+                    {liquidacion.cuotasVencidas > 1 ? `${liquidacion.cuotasVencidas} cuotas vencidas` : liquidacion.diasAtraso > 0 ? `${liquidacion.diasAtraso} días de atraso` : "Al día"}
                   </span>
                 </div>
 
                 <div style={{ background: "var(--paper)", padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
-                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.72rem" }}>Interés diario ({liquidacion.tasaInteresAnual}% anual)</span>
-                  <strong style={{ fontSize: "0.95rem", color: "#d97706" }}>{formatoQ(liquidacion.interesDiario)} / día</strong>
-                  <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)", display: "block" }}>
-                    ({formatoQ(saldoActual)} × 24% / 365)
-                  </span>
-                </div>
-
-                <div style={{ background: "var(--paper)", padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
-                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.72rem" }}>Interés acumulado ({liquidacion.diasTranscurridos}d)</span>
+                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.72rem" }}>Interés del mes ({liquidacion.tasaInteresMensual}% s/saldo)</span>
                   <strong style={{ fontSize: "0.95rem", color: "#d97706" }}>{formatoQ(liquidacion.interesDevengado)}</strong>
                   <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)", display: "block" }}>
-                    {formatoQ(liquidacion.interesDiario)} × {liquidacion.diasTranscurridos}d
+                    ({formatoQ(saldoActual)} × 2.0%)
+                  </span>
+                </div>
+
+                <div style={{ background: "var(--paper)", padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
+                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.72rem" }}>Abono mensual a capital</span>
+                  <strong style={{ fontSize: "0.95rem", color: "#059669" }}>{formatoQ(liquidacion.cuotaCapitalSugerida)}</strong>
+                  <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)", display: "block" }}>
+                    Cuota fijada en plan
                   </span>
                 </div>
 
@@ -1114,23 +1405,50 @@ function CobroCreditoVentanilla({
                     {formatoQ(liquidacion.moraFijaSugerida)}
                   </strong>
                   <span style={{ fontSize: "0.68rem", color: liquidacion.estaEnMora ? "#b91c1c" : "var(--ink-soft)", display: "block" }}>
-                    {liquidacion.estaEnMora ? `> 4 días gracia (Q25 × ${liquidacion.cuotasVencidas})` : "4 días gracia: Q 0.00"}
+                    {liquidacion.estaEnMora ? `(Q25 × ${Math.round(liquidacion.moraFijaSugerida / 25)} cuotas vencidas)` : "4 días gracia: Q 0.00"}
                   </span>
                 </div>
               </div>
             ) : null}
 
-            {/* BOTONES DE PRECARGA RÁPIDA */}
+            {/* BOTONES DE PRECARGA RÁPIDA (CON OPCIÓN DE PONERSE AL DÍA O PAGAR 1 CUOTA) */}
             {liquidacion && (
               <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem", flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  className="btn secondary"
-                  style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem" }}
-                  onClick={() => handleMontoEntregadoChange(String(liquidacion.pagoMinimoSugerido))}
-                >
-                  💵 Pagar Cuota Mínima Sugerida ({formatoQ(liquidacion.pagoMinimoSugerido)})
-                </button>
+                {liquidacion.cuotasVencidas > 1 ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem", borderColor: "#ef4444", color: "#b91c1c", fontWeight: 700 }}
+                      onClick={() => handleMontoEntregadoChange(String(liquidacion.pagoMinimoSugerido))}
+                    >
+                      ⚡ Ponerse al Día ({liquidacion.cuotasVencidas} cuotas: {formatoQ(liquidacion.pagoMinimoSugerido)})
+                    </button>
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem" }}
+                      onClick={() => {
+                        const cap1 = Math.round(((Number(prestamo.monto_aprobado || prestamo.monto_solicitado) / (Number(prestamo.plazo_meses) || 12))) * 100) / 100;
+                        const int1 = Math.round((Number(saldoActual) * 0.02) * 100) / 100;
+                        const tot1 = Math.round((cap1 + int1 + liquidacion.moraFijaSugerida) * 100) / 100;
+                        handleMontoEntregadoChange(String(tot1));
+                      }}
+                    >
+                      💵 Pagar solo 1 cuota ({formatoQ(Math.round(((Number(prestamo.monto_aprobado || prestamo.monto_solicitado) / (Number(prestamo.plazo_meses) || 12)) + (Number(saldoActual) * 0.02) + liquidacion.moraFijaSugerida) * 100) / 100)})
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem", borderColor: "#059669", color: "#059669", fontWeight: 700 }}
+                    onClick={() => handleMontoEntregadoChange(String(liquidacion.pagoMinimoSugerido))}
+                  >
+                    💵 Pagar Cuota Mensual Sugerida ({formatoQ(liquidacion.pagoMinimoSugerido)})
+                  </button>
+                )}
+
                 <button
                   type="button"
                   className="btn secondary"
@@ -1171,26 +1489,45 @@ function CobroCreditoVentanilla({
             </span>
           </div>
 
-          {/* AVISO DE ABONO EXTRAORDINARIO A CAPITAL */}
+          {/* AVISO DE ABONO EXTRAORDINARIO A CAPITAL (COMPACTO) */}
           {esExcedenteCapital && (
             <div
-              className="alert success"
               style={{
-                marginBottom: "1rem",
+                marginBottom: "0.85rem",
+                padding: "0.45rem 0.75rem",
+                background: "rgba(16, 185, 129, 0.12)",
+                border: "1px solid rgba(16, 185, 129, 0.4)",
+                borderRadius: "6px",
                 display: "flex",
                 alignItems: "center",
-                gap: "0.5rem",
-                fontSize: "0.86rem",
-                fontWeight: 600,
+                gap: "0.45rem",
+                fontSize: "0.8rem",
+                color: "#065f46",
               }}
             >
-              <span>⚡</span>
-              <div>
-                <strong>Abono Extraordinario a Capital:</strong> De los {formatoQ(totalCobro)} entregados,{" "}
-                <strong>{formatoQ(excedenteMonto)}</strong> corresponden a excedente y se van <u>DIRECTAMENTE</u> a reducir el Saldo Deudor a <strong>{formatoQ(saldoNuevo)}</strong>.
-              </div>
+              <span style={{ fontSize: "0.95rem" }}>⚡</span>
+              <span>
+                <strong>Abono Extraordinario:</strong> Excedente de <strong>{formatoQ(excedenteMonto)}</strong> directo a Capital (Saldo nuevo: <strong>{formatoQ(saldoNuevo)}</strong>).
+              </span>
             </div>
           )}
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+            <span style={{ fontSize: "0.86rem", fontWeight: 700, color: "var(--ink)" }}>
+              Desglose de Pago (100% editable por ventanilla)
+            </span>
+            <button
+              type="button"
+              className="btn secondary"
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.55rem" }}
+              onClick={() => {
+                if (prestamo) cargarLiquidacion(prestamo);
+              }}
+              title="Restablecer a los valores calculados automáticamente por el sistema"
+            >
+              ↺ Restablecer valores sugeridos
+            </button>
+          </div>
 
           <div className="form-grid">
             <div className="field">
@@ -1386,6 +1723,7 @@ function DesembolsoCreditoForm({
 }) {
   const [prestamos, setPrestamos] = useState<Prestamo[]>([]);
   const [prestamo, setPrestamo] = useState<Prestamo | null>(null);
+  const [origenFondos, setOrigenFondos] = useState<OrigenFondos>("FONDOS_PROPIOS");
   const [cargando, setCargando] = useState(true);
   const [docNo, setDocNo] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -1397,7 +1735,10 @@ function DesembolsoCreditoForm({
       .get<Prestamo[]>("/prestamos", { params: { agenciaId, estado: "APROBADO" } })
       .then(({ data }) => {
         setPrestamos(data);
-        if (data[0]) setPrestamo(data[0]);
+        if (data[0]) {
+          setPrestamo(data[0]);
+          setOrigenFondos(data[0].origen_fondos || "FONDOS_PROPIOS");
+        }
       })
       .catch((err) => setError(mensajeError(err)))
       .finally(() => setCargando(false));
@@ -1429,6 +1770,7 @@ function DesembolsoCreditoForm({
       await api.post(`/caja-auxiliar/${diaId}/desembolso-credito`, {
         prestamoId: prestamo.id,
         docNo: docNo || undefined,
+        origenFondos,
         montoAhorroSobrePrestamo: montoAspRetenido,
       });
       onDesembolsado();
@@ -1468,7 +1810,10 @@ function DesembolsoCreditoForm({
               value={prestamo?.id ?? ""}
               onChange={(e) => {
                 const p = prestamos.find((x) => x.id === e.target.value);
-                if (p) setPrestamo(p);
+                if (p) {
+                  setPrestamo(p);
+                  setOrigenFondos(p.origen_fondos || "FONDOS_PROPIOS");
+                }
               }}
             >
               {prestamos.map((p) => (
@@ -1481,6 +1826,69 @@ function DesembolsoCreditoForm({
 
           {prestamo && (
             <>
+              {/* SELECCIÓN DE ORIGEN DE FONDOS EN DESEMBOLSO */}
+              <div
+                style={{
+                  background: "var(--paper-raised)",
+                  border: "1px solid var(--line)",
+                  borderRadius: "8px",
+                  padding: "0.85rem",
+                  marginBottom: "1rem",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                  <span style={{ fontWeight: 700, fontSize: "0.86rem", color: "var(--ink)" }}>
+                    🏛️ Fuente / Origen de Fondos a Desembolsar:
+                  </span>
+                  <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)" }}>
+                    {prestamo.origen_fondos ? `Asignado: ${ORIGEN_FONDOS_LABEL[prestamo.origen_fondos]}` : "Predeterminado: Fondos Propios"}
+                  </span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.5rem" }}>
+                  {(
+                    [
+                      { id: "FONDOS_PROPIOS", num: "1", label: "Fondos Propios", icon: "🏦", desc: "MIF COOP" },
+                      { id: "FEDERURAL", num: "2", label: "FEDERURAL", icon: "🌾", desc: "Línea Federural" },
+                      { id: "CHN_GUATEMALA", num: "3", label: "CHN-GUATEMALA", icon: "🏛️", desc: "Crédito Hipotecario Nal." },
+                    ] as const
+                  ).map((opt) => {
+                    const activo = origenFondos === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setOrigenFondos(opt.id)}
+                        style={{
+                          padding: "0.6rem 0.75rem",
+                          borderRadius: "8px",
+                          border: activo ? "2px solid #2563eb" : "1px solid var(--line)",
+                          background: activo ? "rgba(37, 99, 235, 0.1)" : "var(--paper)",
+                          color: activo ? "#1d4ed8" : "var(--ink)",
+                          fontWeight: activo ? 700 : 500,
+                          cursor: "pointer",
+                          textAlign: "left",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.55rem",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <span style={{ fontSize: "1.25rem" }}>{opt.icon}</span>
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                          <span style={{ fontSize: "0.86rem", fontWeight: activo ? 800 : 600 }}>
+                            <span style={{ opacity: 0.65, marginRight: "0.25rem" }}>{opt.num}.</span>
+                            {opt.label}
+                          </span>
+                          <span style={{ fontSize: "0.7rem", color: activo ? "#1d4ed8" : "var(--ink-soft)" }}>
+                            {opt.desc}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div
                 style={{
                   display: "grid",
@@ -1676,69 +2084,72 @@ function PanelNovedadesCampo({
   return (
     <div
       style={{
-        background: "linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)",
-        border: "1px solid #a7f3d0",
+        background: "var(--paper-raised)",
+        border: "1.5px solid rgba(16, 185, 129, 0.4)",
         borderRadius: "10px",
-        padding: "1rem",
+        padding: "1rem 1.15rem",
         marginBottom: "1.5rem",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-        <h3 style={{ margin: 0, fontSize: "0.95rem", color: "#065f46", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+        <h3 style={{ margin: 0, fontSize: "0.95rem", color: "#10b981", display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 700 }}>
           <span>🔔</span> Novedades de Campo (Cuentas aperturadas por Promotores)
         </h3>
-        <span className="badge" style={{ background: "#d1fae5", color: "#065f46" }}>
+        <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid #10b981" }}>
           {novedades.length} {novedades.length === 1 ? "cuenta reciente" : "cuentas recientes"}
         </span>
       </div>
-      <p style={{ margin: "0 0 0.75rem", fontSize: "0.82rem", color: "#047857" }}>
+      <p style={{ margin: "0 0 0.85rem", fontSize: "0.82rem", color: "var(--ink-soft)" }}>
         El promotor registró estas cuentas con cuotas pactadas en campo. Haz clic para cobrar el depósito en ventanilla sin reescribir datos:
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.75rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.85rem" }}>
         {novedades.slice(0, 4).map((c) => (
           <div
             key={c.id}
             style={{
-              background: "#fff",
-              border: "1px solid #d1fae5",
+              background: "var(--paper)",
+              border: "1px solid var(--line)",
               borderRadius: "8px",
-              padding: "0.75rem",
+              padding: "0.85rem 1rem",
               fontSize: "0.85rem",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
+              boxShadow: "0 2px 4px rgba(0,0,0,0.06)",
             }}
           >
             <div>
-              <div style={{ fontWeight: 700, color: "var(--ink)" }}>{c.socio_nombres}</div>
-              <div className="mono" style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+              <div style={{ fontWeight: 800, color: "var(--ink)", fontSize: "0.95rem", marginBottom: "0.2rem" }}>
+                {c.socio_nombres}
+              </div>
+              <div className="mono" style={{ fontSize: "0.82rem", color: "var(--accent)", fontWeight: 700 }}>
                 {c.numero_cuenta} — {c.tipo.replace("AHORRO_", "")}
               </div>
               {c.promotor_nombre && (
-                <div style={{ fontSize: "0.78rem", color: "var(--accent)", marginTop: "0.2rem" }}>
-                  Promotor: <strong>{c.promotor_nombre}</strong>
+                <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", marginTop: "0.25rem" }}>
+                  Promotor: <strong style={{ color: "var(--ink)" }}>{c.promotor_nombre}</strong>
                 </div>
               )}
               {c.cuota_pactada && (
-                <div style={{ marginTop: "0.25rem", color: "#059669", fontWeight: 600 }}>
+                <div style={{ marginTop: "0.3rem", color: "#10b981", fontWeight: 700 }}>
                   Cuota pactada: {formatoQ(c.cuota_pactada)}
                 </div>
               )}
               {c.observaciones_apertura && (
-                <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", fontStyle: "italic", marginTop: "0.2rem" }}>
+                <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", fontStyle: "italic", marginTop: "0.25rem" }}>
                   "{c.observaciones_apertura}"
                 </div>
               )}
             </div>
-            <div style={{ marginTop: "0.6rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className="mono" style={{ fontSize: "0.78rem", color: Number(c.saldo_actual) > 0 ? "#16a34a" : "#dc2626" }}>
+            <div style={{ marginTop: "0.75rem", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--line)", paddingTop: "0.55rem" }}>
+              <span className="mono" style={{ fontSize: "0.82rem", fontWeight: 700, color: Number(c.saldo_actual) > 0 ? "#10b981" : "#ef4444" }}>
                 Saldo: {formatoQ(c.saldo_actual)}
               </span>
               <button
                 type="button"
-                className="btn secondary"
-                style={{ fontSize: "0.78rem", padding: "0.25rem 0.5rem" }}
+                className="btn"
+                style={{ fontSize: "0.78rem", padding: "0.3rem 0.65rem", background: "#10b981", borderColor: "#10b981", color: "#fff", fontWeight: 600 }}
                 onClick={() => onSeleccionarCuenta(c)}
               >
                 + Cobrar depósito

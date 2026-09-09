@@ -6,10 +6,13 @@ import {
   ESTADO_PRESTAMO_LABEL,
   formatoQ,
   TIPO_PRESTAMO_LABEL,
+  ORIGEN_FONDOS_LABEL,
+  ORIGEN_FONDOS_BADGE_STYLE,
 } from "../types";
 import type { EstadoPrestamo, Prestamo, PrestamoPago } from "../types";
 import { formatearDPI } from "../lib/formatters";
 import type { ResultadoLiquidacion } from "../lib/liquidacionCredito";
+import ContratoPagareCreditoModal from "../components/ContratoPagareCreditoModal";
 
 export default function CreditoDetail() {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +22,7 @@ export default function CreditoDetail() {
   const [prestamo, setPrestamo] = useState<Prestamo | null>(null);
   const [pagos, setPagos] = useState<PrestamoPago[]>([]);
   const [liquidacion, setLiquidacion] = useState<ResultadoLiquidacion | null>(null);
+  const [mostrarContratoModal, setMostrarContratoModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
@@ -83,7 +87,23 @@ export default function CreditoDetail() {
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+          {prestamo.es_migracion && (
+            <span
+              style={{
+                fontSize: "0.8rem",
+                fontWeight: 700,
+                padding: "0.3rem 0.65rem",
+                borderRadius: "6px",
+                background: "rgba(245, 158, 11, 0.12)",
+                color: "#b45309",
+                border: "1px solid rgba(245, 158, 11, 0.35)",
+              }}
+            >
+              📂 Crédito Migrado
+            </span>
+          )}
+
           <span
             className={`badge ${
               prestamo.estado === "DESEMBOLSADO"
@@ -101,6 +121,22 @@ export default function CreditoDetail() {
           >
             {ESTADO_PRESTAMO_LABEL[prestamo.estado]}
           </span>
+
+          <button
+            type="button"
+            className="btn secondary"
+            onClick={() => setMostrarContratoModal(true)}
+            style={{
+              padding: "0.35rem 0.8rem",
+              fontSize: "0.85rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              fontWeight: 700,
+            }}
+          >
+            📜 Pagaré / Contrato
+          </button>
 
           {puedeAprobar && prestamo.estado === "SOLICITUD" && (
             <button
@@ -432,6 +468,26 @@ export default function CreditoDetail() {
             <dd className="mono" style={{ margin: 0 }}>
               {prestamo.fecha_desembolso ? new Date(prestamo.fecha_desembolso).toLocaleDateString("es-GT") : "Pendiente"}
             </dd>
+
+            <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Fuente de Fondos</dt>
+            <dd style={{ margin: 0 }}>
+              {prestamo.origen_fondos ? (
+                <span
+                  style={{
+                    display: "inline-block",
+                    padding: "0.15rem 0.5rem",
+                    borderRadius: "4px",
+                    fontSize: "0.76rem",
+                    fontWeight: 700,
+                    ...ORIGEN_FONDOS_BADGE_STYLE[prestamo.origen_fondos],
+                  }}
+                >
+                  {ORIGEN_FONDOS_LABEL[prestamo.origen_fondos]}
+                </span>
+              ) : (
+                "Fondos Propios (MIF)"
+              )}
+            </dd>
           </dl>
         </div>
       </div>
@@ -540,6 +596,13 @@ export default function CreditoDetail() {
             </table>
           </div>
         </div>
+      )}
+
+      {mostrarContratoModal && (
+        <ContratoPagareCreditoModal
+          prestamo={prestamo}
+          onClose={() => setMostrarContratoModal(false)}
+        />
       )}
     </div>
   );

@@ -58,50 +58,51 @@ export function calcularLiquidacionCredito(opciones: OpcionesLiquidacion): Resul
   const diffMs = dLiq.getTime() - dUltimo.getTime();
   const diasTranscurridos = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
 
-  // 1. Interés diario exacto = (Saldo Capital * Tasa Anual) / 365
+  // 1. Interés mensual regular al 2.0% s/saldo y cálculo diario
+  const interesMensualRegular = redondear2(saldoCapital * (tasaMensual / 100));
   const interesDiario = (saldoCapital * (tasaAnual / 100)) / 365;
-  const interesDevengado = redondear2(interesDiario * diasTranscurridos);
+  const interesDiarioDevengado = redondear2(interesDiario * diasTranscurridos);
 
-  // 2. Cuota de capital base
+  // 2. Cuota de capital base (Monto original / Plazo meses)
   const cuotaCapitalBase = redondear2(montoOriginal / plazoMeses);
 
   // 3. Cuotas de capital acumuladas y días de atraso
-  // Ciclo regular: 30 días
   const diasAtraso = Math.max(0, diasTranscurridos - 30);
   const diasGracia = 4;
 
-  // Regla de Mora Oficial:
-  // 4 días de gracia: Días de atraso 1 a 4 -> Mora Q 0.00
-  // A partir del 5to día de atraso (diasAtraso >= 5, es decir diasTranscurridos >= 35):
-  // Se cobra Q 25.00 de cargo fijo por cada cuota que ha cumplido más de 4 días de atraso.
   let cuotasVencidas = 0;
   let moraFijaSugerida = 0;
   let estaEnMora = false;
 
   if (diasTranscurridos >= 30) {
-    // Cuántos ciclos mensuales completos han transcurrido
     cuotasVencidas = Math.max(1, Math.floor(diasTranscurridos / 30));
-    
-    // Verificamos si la primera cuota ya excedió los 4 días de gracia (día 5 de atraso = 35 días transcurridos)
-    if (diasTranscurridos >= 35) {
+
+    let cuotasConMora = 0;
+    for (let k = 1; k <= cuotasVencidas + 1; k++) {
+      const diaLimiteGracia = k * 30 + diasGracia; // 34, 64, 94, 124...
+      if (diasTranscurridos > diaLimiteGracia) {
+        cuotasConMora++;
+      }
+    }
+
+    if (cuotasConMora > 0) {
       estaEnMora = true;
-      // Para cada cuota mensual vencida que superó los 4 días de gracia
-      // Cuota 1 vence en día 30 -> gracia hasta día 34 -> mora en día 35
-      // Cuota 2 vence en día 60 -> gracia hasta día 64 -> mora en día 65
-      const cuotasConMora = Math.max(1, Math.floor((diasTranscurridos - 5) / 30));
       moraFijaSugerida = cuotasConMora * 25.0;
     }
   }
 
-  // Cuota capital exigible sugerida (se acumula si han pasado varios meses)
-  const multiplicadorCapital = Math.max(1, Math.floor(diasTranscurridos / 30));
-  const cuotaCapitalSugerida = Math.min(saldoCapital, redondear2(cuotaCapitalBase * multiplicadorCapital));
+  // Cuotas exigibles: si está al día es 1 mes completo; si lleva atraso son los meses vencidos
+  const multiplicadorMeses = Math.max(1, cuotasVencidas);
+  const cuotaCapitalSugerida = Math.min(saldoCapital, redondear2(cuotaCapitalBase * multiplicadorMeses));
 
-  // Pago mínimo sugerido
+  // Interés devengado sugerido para la cuota mensual (1 mes completo si está al día, o N meses si tiene atraso)
+  const interesDevengado = redondear2(interesMensualRegular * multiplicadorMeses);
+
+  // Pago mínimo sugerido para la cuota mensual
   const pagoMinimoSugerido = redondear2(cuotaCapitalSugerida + interesDevengado + moraFijaSugerida);
 
-  // Saldo de cancelación total al día de hoy
-  const saldoCancelacionTotal = redondear2(saldoCapital + interesDevengado + moraFijaSugerida);
+  // Saldo de cancelación total al día de hoy (incluye días exactos si es liquidación total anticipada)
+  const saldoCancelacionTotal = redondear2(saldoCapital + interesDiarioDevengado + moraFijaSugerida);
 
   return {
     saldoCapital,

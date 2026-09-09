@@ -460,6 +460,7 @@ export interface CajaMovimientoAuxiliar {
   doc_no: string | null;
   monto: string;
   saldo_acumulado: string;
+  origen_fondos?: OrigenFondos;
   usuario_nombre: string;
   created_at: string;
 }
@@ -496,11 +497,35 @@ export type TipoAmortizacion = "CUOTA_NIVELADA" | "SOBRE_SALDOS";
 export interface CuotaAmortizacion {
   numero: number;
   fechaPago: string;
+  dias?: number;
   cuota: number;
   capital: number;
   interes: number;
   saldoRestante: number;
 }
+
+export type OrigenFondos = "FONDOS_PROPIOS" | "FEDERURAL" | "CHN_GUATEMALA";
+
+export const ORIGEN_FONDOS_LABEL: Record<OrigenFondos, string> = {
+  FONDOS_PROPIOS: "Fondos Propios (MIF COOP)",
+  FEDERURAL: "FEDERURAL",
+  CHN_GUATEMALA: "CHN - Guatemala",
+};
+
+export const ORIGEN_FONDOS_SHORT_LABEL: Record<OrigenFondos, string> = {
+  FONDOS_PROPIOS: "Fondos Propios",
+  FEDERURAL: "FEDERURAL",
+  CHN_GUATEMALA: "CHN-GUATEMALA",
+};
+
+export const ORIGEN_FONDOS_BADGE_STYLE: Record<
+  OrigenFondos,
+  { bg: string; color: string; border: string; icon: string }
+> = {
+  FONDOS_PROPIOS: { bg: "#ecfdf5", color: "#065f46", border: "#a7f3d0", icon: "🏦" },
+  FEDERURAL: { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe", icon: "🌾" },
+  CHN_GUATEMALA: { bg: "#fef3c7", color: "#92400e", border: "#fde68a", icon: "🏛️" },
+};
 
 export interface ResultadoSimulacion {
   monto: number;
@@ -530,6 +555,7 @@ export interface Prestamo {
   tipo: TipoPrestamo;
   estado: EstadoPrestamo;
   tipo_amortizacion: TipoAmortizacion;
+  origen_fondos?: OrigenFondos;
   monto_solicitado: string | number;
   monto_aprobado: string | number | null;
   saldo_capital?: string | number | null;
@@ -548,6 +574,8 @@ export interface Prestamo {
   fecha_aprobacion: string | null;
   fecha_desembolso: string | null;
   fecha_vencimiento?: string | null;
+  fecha_ultimo_pago_migracion?: string | null;
+  es_migracion?: boolean;
   created_at: string;
   amortizacion?: ResultadoSimulacion;
 }
@@ -590,6 +618,7 @@ export interface PrestamoPago {
   mora: string | number;
   total_pagado: string | number;
   saldo_capital_restante: string | number;
+  origen_fondos?: OrigenFondos;
   usuario_id: string;
   usuario_nombre?: string;
   created_at: string;

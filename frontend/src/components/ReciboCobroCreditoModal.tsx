@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { formatearDPI, formatearQuetzales } from "../lib/formatters";
+import { type OrigenFondos, ORIGEN_FONDOS_LABEL, ORIGEN_FONDOS_BADGE_STYLE } from "../types";
 
 export interface DatosReciboCobro {
   numeroRecibo: string;
@@ -11,6 +12,7 @@ export interface DatosReciboCobro {
   socioTelefono?: string | null;
   creditoCodigo: string;
   creditoTipo: string;
+  origenFondos?: OrigenFondos;
   agenciaNombre: string;
   saldoCapitalAnterior: number;
   abonoCapital: number;
@@ -166,6 +168,24 @@ export default function ReciboCobroCreditoModal({ datos, onClose }: Props) {
             >
               RECIBO NO. {datos.numeroRecibo}
             </div>
+            {datos.origenFondos && (
+              <div style={{ marginTop: "0.4rem" }}>
+                <span
+                  style={{
+                    display: "inline-block",
+                    padding: "0.2rem 0.55rem",
+                    borderRadius: "4px",
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.03em",
+                    ...ORIGEN_FONDOS_BADGE_STYLE[datos.origenFondos],
+                  }}
+                >
+                  {ORIGEN_FONDOS_LABEL[datos.origenFondos]}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* DATOS DE FECHA Y SOCIO */}

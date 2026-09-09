@@ -128,6 +128,7 @@ const cobroCreditoSchema = z.object({
   interes: z.number().min(0),
   mora: z.number().min(0).optional(),
   ahorroSobrePrestamo: z.number().min(0).optional(),
+  origenFondos: z.enum(["FONDOS_PROPIOS", "FEDERURAL", "CHN_GUATEMALA"]).optional(),
   docNo: z.string().optional(),
   cuentaDebitoId: z.string().uuid().optional(),
 });
@@ -146,6 +147,7 @@ cajaAuxiliarRouter.post(
 const desembolsoCreditoSchema = z.object({
   prestamoId: z.string().uuid(),
   docNo: z.string().optional(),
+  origenFondos: z.enum(["FONDOS_PROPIOS", "FEDERURAL", "CHN_GUATEMALA"]).optional(),
   montoAhorroSobrePrestamo: z.number().min(0).optional(),
 });
 

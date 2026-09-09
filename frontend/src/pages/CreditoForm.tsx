@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
@@ -6,6 +6,9 @@ import { useAuth } from "../context/AuthContext";
 import BuscadorSocio from "../components/BuscadorSocio";
 import type {
   Agencia,
+  CuotaAmortizacion,
+  OrigenFondos,
+  ResultadoSimulacion,
   Socio,
   TipoPrestamo,
   UsuarioItem,
@@ -32,6 +35,7 @@ export default function CreditoForm() {
 
   const [socio, setSocio] = useState<Socio | null>(null);
   const [promotorId, setPromotorId] = useState(usuario?.rol === "PROMOTOR" ? usuario.id : "");
+  const [origenFondos, setOrigenFondos] = useState<OrigenFondos>("FONDOS_PROPIOS");
   const [tipo, setTipo] = useState<TipoPrestamo>("FIDUCIARIO");
   const [montoSolicitado, setMontoSolicitado] = useState(searchParams.get("monto") || "10000");
   const [plazoMeses, setPlazoMeses] = useState(searchParams.get("plazo") || "12");
@@ -44,6 +48,89 @@ export default function CreditoForm() {
   const [documentoDesembolso, setDocumentoDesembolso] = useState("");
   const [crearCuentaAhorro, setCrearCuentaAhorro] = useState(true);
 
+  // Migración de crédito histórico (Modo Ultra-Simple por Recibo)
+  const [esMigracion, setEsMigracion] = useState(false);
+  const [saldoCapitalActual, setSaldoCapitalActual] = useState("");
+  const [plazoTotalOriginal, setPlazoTotalOriginal] = useState("30");
+  const [cuotaActualPagar, setCuotaActualPagar] = useState("2");
+  const [fechaUltimoPago, setFechaUltimoPago] = useState("");
+  const [mostrarTablaAmortizacion, setMostrarTablaAmortizacion] = useState(false);
+  const [simulacionAmortizacion, setSimulacionAmortizacion] = useState<ResultadoSimulacion | null>(null);
+  const [cargandoSimulacion, setCargandoSimulacion] = useState(false);
+
+  function sumarMesesAFecha(fechaStr: string, meses: number): string {
+    if (!fechaStr) return "";
+    const [año, mes, dia] = fechaStr.split("-").map(Number);
+    const d = new Date(año, mes - 1 + meses, dia || 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  // Cuotas restantes que faltan pagar = Plazo total original - (Cuota actual - 1)
+  const mesesRestantesCalculados = useMemo(() => {
+    const total = Math.max(1, Number(plazoTotalOriginal) || 30);
+    const actual = Math.max(1, Number(cuotaActualPagar) || 1);
+    const pagadas = Math.max(0, actual - 1);
+    return Math.max(1, total - pagadas);
+  }, [plazoTotalOriginal, cuotaActualPagar]);
+
+  // Cuota capital calculada dividiendo Saldo / Cuotas restantes
+  const cuotaCapitalCalculada = useMemo(() => {
+    const s = Number(saldoCapitalActual) || 0;
+    const m = Math.max(1, mesesRestantesCalculados);
+    if (s <= 0) return 0;
+    return Math.round((s / m) * 100) / 100;
+  }, [saldoCapitalActual, mesesRestantesCalculados]);
+
+  const fechaProximoPagoEstimada = useMemo(() => {
+    if (!fechaUltimoPago) return "";
+    return sumarMesesAFecha(fechaUltimoPago, 1);
+  }, [fechaUltimoPago]);
+
+  // Cálculo de atraso en tiempo real si es migración
+  const calculoAtraso = useMemo(() => {
+    if (!esMigracion || !fechaUltimoPago) return null;
+    const dUltimo = new Date(fechaUltimoPago + "T00:00:00");
+    const dHoy = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00");
+    const diffMs = dHoy.getTime() - dUltimo.getTime();
+    const dias = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+    if (dias < 1) return null;
+
+    const saldo = Number(saldoCapitalActual) || Number(montoSolicitado) || 0;
+    const cuotaCapBase = cuotaCapitalCalculada > 0 ? cuotaCapitalCalculada : Math.round((saldo / Math.max(1, mesesRestantesCalculados)) * 100) / 100;
+
+    const cuotasVencidas = Math.floor(dias / 30);
+    const diasAtraso = Math.max(0, dias - 30);
+
+    // Interés diario (24% anual / 365)
+    const interesDiario = (saldo * 0.24) / 365;
+    const interesAcumulado = Math.round(interesDiario * dias * 100) / 100;
+
+    // Mora: Q 25 por cada cuota mensual vencida que superó 4 días de gracia
+    let cuotasConMora = 0;
+    for (let k = 1; k <= cuotasVencidas + 1; k++) {
+      if (dias > k * 30 + 4) {
+        cuotasConMora++;
+      }
+    }
+    const moraAcumulada = cuotasConMora * 25;
+    const capitalAtrasado = Math.min(saldo, Math.round(cuotaCapBase * Math.max(1, cuotasVencidas) * 100) / 100);
+    const totalPonerseAlDia = Math.round((capitalAtrasado + interesAcumulado + moraAcumulada) * 100) / 100;
+    const totalCancelar = Math.round((saldo + interesAcumulado + moraAcumulada) * 100) / 100;
+
+    return {
+      dias,
+      cuotasVencidas,
+      diasAtraso,
+      cuotasConMora,
+      interesAcumulado,
+      moraAcumulada,
+      capitalAtrasado,
+      totalPonerseAlDia,
+      totalCancelar,
+      estaEnMora: cuotasConMora > 0,
+    };
+  }, [esMigracion, fechaUltimoPago, saldoCapitalActual, montoSolicitado, cuotaCapitalCalculada, mesesRestantesCalculados]);
+
   const [fiadorDuplicado, setFiadorDuplicado] = useState<{
     motivo: string;
     mensaje: string;
@@ -54,6 +141,29 @@ export default function CreditoForm() {
 
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+
+  async function cargarSimulacionAmortizacion() {
+    setCargandoSimulacion(true);
+    try {
+      const monto = Number(saldoCapitalActual) || Number(montoSolicitado) || 1000;
+      const plazo = esMigracion ? Math.max(1, mesesRestantesCalculados) : (Number(plazoMeses) || 12);
+      const fechaBase = fechaUltimoPago || undefined;
+
+      const { data } = await api.post<ResultadoSimulacion>("/prestamos/simular", {
+        monto,
+        plazoMeses: plazo,
+        tasaInteresMensual: 2.0,
+        tipoAmortizacion: "SOBRE_SALDOS",
+        fechaInicio: fechaBase,
+      });
+      setSimulacionAmortizacion(data);
+      setMostrarTablaAmortizacion(true);
+    } catch {
+      setSimulacionAmortizacion(null);
+    } finally {
+      setCargandoSimulacion(false);
+    }
+  }
 
   useEffect(() => {
     const sId = searchParams.get("socioId");
@@ -143,6 +253,25 @@ export default function CreditoForm() {
       return;
     }
 
+    if (esMigracion) {
+      if (saldoCapitalActual === "" || Number(saldoCapitalActual) <= 0) {
+        setError("Indica el saldo actual de capital que debe el asociado según su recibo.");
+        return;
+      }
+      if (plazoTotalOriginal === "" || Number(plazoTotalOriginal) <= 0) {
+        setError("Indica el plazo total original del crédito en meses (ej. 30 o 36).");
+        return;
+      }
+      if (cuotaActualPagar === "" || Number(cuotaActualPagar) <= 0) {
+        setError("Indica qué número de cuota va a pagar hoy (ej. 2).");
+        return;
+      }
+      if (!fechaUltimoPago) {
+        setError("Indica la fecha del último recibo pagado.");
+        return;
+      }
+    }
+
     setError(null);
     setGuardando(true);
 
@@ -153,8 +282,8 @@ export default function CreditoForm() {
         promotorId: promotorId || undefined,
         tipo,
         tipoAmortizacion: "SOBRE_SALDOS",
-        montoSolicitado: Number(montoSolicitado),
-        plazoMeses: Number(plazoMeses),
+        montoSolicitado: esMigracion ? Number(saldoCapitalActual) : Number(montoSolicitado),
+        plazoMeses: esMigracion ? mesesRestantesCalculados : Number(plazoMeses),
         tasaInteresMensual: 2.0,
         destino: destino || undefined,
         garantia:
@@ -169,6 +298,11 @@ export default function CreditoForm() {
         telefonoFiador: tipo === "FIDUCIARIO" ? (telefonoFiador ? prepararTelefonoParaGuardar(telefonoFiador) : undefined) : undefined,
         documentoDesembolso: tipo === "HIPOTECARIO" ? documentoDesembolso || undefined : undefined,
         crearCuentaAhorroSobrePrestamo: crearCuentaAhorro,
+        origenFondos,
+        esMigracion,
+        saldoCapitalActual: esMigracion ? Number(saldoCapitalActual) : undefined,
+        fechaDesembolsoOriginal: esMigracion ? fechaUltimoPago : undefined,
+        fechaUltimoPago: esMigracion ? fechaUltimoPago : undefined,
       });
       navigate(`/creditos/${data.id}`);
     } catch (err) {
@@ -193,6 +327,48 @@ export default function CreditoForm() {
         <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>Datos generales del crédito</h2>
 
         <div className="form-grid">
+          {/* SELECCIÓN DE ORIGEN DE FONDOS */}
+          <div className="field" style={{ gridColumn: "1 / -1" }}>
+            <label style={{ fontWeight: 700, marginBottom: "0.4rem", display: "block" }}>
+              🏛️ Origen / Fuente de Fondos del Crédito
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "0.5rem" }}>
+              {(
+                [
+                  { id: "FONDOS_PROPIOS", label: "🏦 Fondos Propios (MIF)", desc: "Recursos propios" },
+                  { id: "FEDERURAL", label: "🌾 FEDERURAL", desc: "Línea Federural" },
+                  { id: "CHN_GUATEMALA", label: "🏛️ CHN-GUATEMALA", desc: "Crédito Hipotecario Nal." },
+                ] as const
+              ).map((opt) => {
+                const activo = origenFondos === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setOrigenFondos(opt.id)}
+                    style={{
+                      padding: "0.65rem 0.75rem",
+                      borderRadius: "8px",
+                      border: activo ? "2px solid #059669" : "1px solid var(--line)",
+                      background: activo ? "rgba(5, 150, 105, 0.1)" : "var(--paper)",
+                      color: activo ? "#065f46" : "var(--ink)",
+                      fontWeight: activo ? 700 : 500,
+                      cursor: "pointer",
+                      textAlign: "left",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.2rem",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <span style={{ fontSize: "0.88rem" }}>{opt.label}</span>
+                    <span style={{ fontSize: "0.72rem", color: activo ? "#047857" : "var(--ink-soft)" }}>{opt.desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {puedeElegirAgencia && (
             <div className="field">
               <label htmlFor="cred-agencia">Agencia</label>
@@ -234,31 +410,36 @@ export default function CreditoForm() {
             </select>
           </div>
 
-          <div className="field">
-            <label htmlFor="cred-monto">Monto solicitado (Q)</label>
-            <input
-              id="cred-monto"
-              type="number"
-              min="500"
-              step="100"
-              value={montoSolicitado}
-              onChange={(e) => setMontoSolicitado(e.target.value)}
-              required
-            />
-          </div>
+          {/* MONTO Y PLAZO (SOLO PARA CRÉDITOS NUEVOS; SE OCULTA SI ES MIGRACIÓN DE RECIBO) */}
+          {!esMigracion && (
+            <>
+              <div className="field">
+                <label htmlFor="cred-monto">Monto solicitado (Q)</label>
+                <input
+                  id="cred-monto"
+                  type="number"
+                  min="1"
+                  step="any"
+                  value={montoSolicitado}
+                  onChange={(e) => setMontoSolicitado(e.target.value)}
+                  required
+                />
+              </div>
 
-          <div className="field">
-            <label htmlFor="cred-plazo">Plazo (meses)</label>
-            <input
-              id="cred-plazo"
-              type="number"
-              min="1"
-              max="120"
-              value={plazoMeses}
-              onChange={(e) => setPlazoMeses(e.target.value)}
-              required
-            />
-          </div>
+              <div className="field">
+                <label htmlFor="cred-plazo">Plazo (meses)</label>
+                <input
+                  id="cred-plazo"
+                  type="number"
+                  min="1"
+                  max="120"
+                  value={plazoMeses}
+                  onChange={(e) => setPlazoMeses(e.target.value)}
+                  required
+                />
+              </div>
+            </>
+          )}
 
           <div className="field">
             <label htmlFor="cred-tasa">Tasa de interés mensual</label>
@@ -301,6 +482,358 @@ export default function CreditoForm() {
               onChange={(e) => setDestino(capitalizarDescripcion(e.target.value))}
               placeholder="Ej. Compra de mercadería para tienda, abono agrícola, etc."
             />
+          </div>
+
+          {/* SECCIÓN DE MIGRACIÓN DE CRÉDITO HISTÓRICO / PREEXISTENTE (MODO ULTRA-SIMPLE) */}
+          <div
+            className="field"
+            style={{
+              gridColumn: "1 / -1",
+              background: esMigracion ? "rgba(245, 158, 11, 0.08)" : "var(--paper-raised)",
+              border: esMigracion ? "2px solid #f59e0b" : "1px solid var(--line)",
+              borderRadius: "10px",
+              padding: "1rem 1.15rem",
+              transition: "all 0.2s ease",
+            }}
+          >
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.65rem",
+                cursor: "pointer",
+                fontWeight: 700,
+                color: esMigracion ? "#b45309" : "var(--ink)",
+                fontSize: "0.95rem",
+                marginBottom: esMigracion ? "0.85rem" : 0,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={esMigracion}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setEsMigracion(val);
+                  if (val) {
+                    if (!saldoCapitalActual) setSaldoCapitalActual(montoSolicitado);
+                    if (!plazoTotalOriginal) setPlazoTotalOriginal(plazoMeses || "30");
+                    if (!cuotaActualPagar) setCuotaActualPagar("2");
+                    if (!fechaUltimoPago) {
+                      const hace1m = new Date();
+                      hace1m.setMonth(hace1m.getMonth() - 1);
+                      setFechaUltimoPago(hace1m.toISOString().slice(0, 10));
+                    }
+                  }
+                }}
+                style={{ width: "1.2rem", height: "1.2rem", accentColor: "#f59e0b" }}
+              />
+              📂 ¿Es un crédito que ya viene pagando (migración directa según recibo anterior)?
+            </label>
+
+            {esMigracion && (
+              <div>
+                <p style={{ fontSize: "0.84rem", color: "var(--ink-soft)", margin: "0 0 1rem", lineHeight: 1.45 }}>
+                  Ingresa únicamente los datos que trae el recibo/hoja del asociado. El sistema calculará automáticamente las cuotas restantes, la fecha de cobro y el interés exacto, <strong>sin registrar egresos falsos en la caja de hoy</strong>.
+                </p>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "0.85rem" }}>
+                  <div className="field">
+                    <label htmlFor="mig-saldo-cap" style={{ color: "#0284c7", fontWeight: 700 }}>
+                      1. Saldo actual que debe (Q) *
+                    </label>
+                    <input
+                      id="mig-saldo-cap"
+                      type="number"
+                      step="any"
+                      min="1"
+                      value={saldoCapitalActual}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSaldoCapitalActual(val);
+                        setMontoSolicitado(val);
+                      }}
+                      required={esMigracion}
+                      placeholder="Ej. 32039.13"
+                      style={{ fontWeight: 700, fontSize: "1.05rem", borderColor: "#0284c7" }}
+                    />
+                    <span className="hint">Saldo deudor según su último recibo</span>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="mig-plazo-original" style={{ color: "#4f46e5", fontWeight: 700 }}>
+                      2. Plazo total del contrato (meses) *
+                    </label>
+                    <input
+                      id="mig-plazo-original"
+                      type="number"
+                      min="1"
+                      max="120"
+                      value={plazoTotalOriginal}
+                      onChange={(e) => setPlazoTotalOriginal(e.target.value)}
+                      required={esMigracion}
+                      placeholder="Ej. 30 o 36"
+                      style={{ fontWeight: 700, fontSize: "1.05rem", borderColor: "#4f46e5" }}
+                    />
+                    <span className="hint">Meses totales del préstamo original</span>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="mig-cuota-actual" style={{ color: "#059669", fontWeight: 700 }}>
+                      3. ¿Qué No. de cuota va a pagar hoy? *
+                    </label>
+                    <input
+                      id="mig-cuota-actual"
+                      type="number"
+                      min="1"
+                      max={plazoTotalOriginal || "120"}
+                      value={cuotaActualPagar}
+                      onChange={(e) => setCuotaActualPagar(e.target.value)}
+                      required={esMigracion}
+                      placeholder="Ej. 2"
+                      style={{ fontWeight: 700, fontSize: "1.05rem", borderColor: "#059669" }}
+                    />
+                    <span className="hint">
+                      {Number(cuotaActualPagar) > 1
+                        ? `Ya pagó ${Number(cuotaActualPagar) - 1} cuota(s) antes`
+                        : "Primera cuota a pagar"}
+                    </span>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="mig-fecha-ultimo-pago" style={{ color: "#b45309", fontWeight: 700 }}>
+                      4. Fecha del último recibo pagado *
+                    </label>
+                    <input
+                      id="mig-fecha-ultimo-pago"
+                      type="date"
+                      value={fechaUltimoPago}
+                      onChange={(e) => setFechaUltimoPago(e.target.value)}
+                      required={esMigracion}
+                      style={{ borderColor: "#f59e0b", fontWeight: 600 }}
+                    />
+                    <span className="hint">Fecha en que realizó su último abono</span>
+                  </div>
+                </div>
+
+                {/* RESUMEN EN VIVO CLARO Y AUTOMÁTICO */}
+                {Number(saldoCapitalActual) > 0 && mesesRestantesCalculados > 0 && (
+                  <div
+                    style={{
+                      marginTop: "0.85rem",
+                      padding: "0.85rem 1rem",
+                      borderRadius: "8px",
+                      background: "var(--paper)",
+                      border: "1px solid var(--line)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: "0.85rem",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    <div>
+                      <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.72rem" }}>
+                        Cuotas que le faltan pagar
+                      </span>
+                      <strong style={{ fontSize: "1.05rem", color: "#0284c7" }}>
+                        {mesesRestantesCalculados} cuotas restantes
+                      </strong>
+                      <span style={{ display: "block", fontSize: "0.7rem", color: "var(--ink-soft)" }}>
+                        (Cuota #{cuotaActualPagar || 1} de {plazoTotalOriginal || 12})
+                      </span>
+                    </div>
+
+                    <div>
+                      <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.72rem" }}>
+                        Abono mensual a Capital
+                      </span>
+                      <strong style={{ fontSize: "1.05rem", color: "#059669" }}>
+                        Q {cuotaCapitalCalculada.toFixed(2)} / mes
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.72rem" }}>
+                        Próximo pago exigible
+                      </span>
+                      <strong style={{ fontSize: "1.05rem", color: "var(--ink)" }}>
+                        {fechaProximoPagoEstimada || "—"}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span style={{ color: "#065f46", display: "block", fontSize: "0.72rem", fontWeight: 700 }}>
+                        Primera cuota estimada a pagar
+                      </span>
+                      <strong style={{ fontSize: "1.05rem", color: "#059669" }}>
+                        Q {(cuotaCapitalCalculada + (Number(saldoCapitalActual) * 0.02)).toFixed(2)}
+                      </strong>
+                    </div>
+                  </div>
+                )}
+
+                {/* ALERTA EN VIVO DE CUOTAS Y DÍAS DE ATRASO / MORA DETECTADA */}
+                {calculoAtraso && calculoAtraso.dias > 0 && (
+                  <div
+                    style={{
+                      marginTop: "1rem",
+                      padding: "0.85rem 1rem",
+                      borderRadius: "8px",
+                      background: calculoAtraso.estaEnMora ? "rgba(239, 68, 68, 0.08)" : "rgba(245, 158, 11, 0.08)",
+                      border: calculoAtraso.estaEnMora ? "1.5px solid #ef4444" : "1.5px solid #f59e0b",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                      <span style={{ fontWeight: 800, fontSize: "0.88rem", color: calculoAtraso.estaEnMora ? "#b91c1c" : "#b45309", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        <span>⚠️</span> Atraso Detectado: {calculoAtraso.cuotasVencidas > 0 ? `${calculoAtraso.cuotasVencidas} cuota(s) / ` : ""}{calculoAtraso.dias} días transcurridos sin pago
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          padding: "0.15rem 0.5rem",
+                          borderRadius: "4px",
+                          background: calculoAtraso.estaEnMora ? "#fee2e2" : "#fef3c7",
+                          color: calculoAtraso.estaEnMora ? "#991b1b" : "#92400e",
+                          border: calculoAtraso.estaEnMora ? "1px solid #fca5a5" : "1px solid #fde68a",
+                        }}
+                      >
+                        {calculoAtraso.estaEnMora ? `En Mora (${calculoAtraso.cuotasConMora} cuota(s) × Q25)` : "En período de gracia (Q 0 mora)"}
+                      </span>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "0.5rem", fontSize: "0.82rem" }}>
+                      <div style={{ background: "var(--paper)", padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
+                        <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.7rem" }}>Capital vencido ({calculoAtraso.cuotasVencidas} cuotas)</span>
+                        <strong style={{ fontSize: "0.95rem", color: "var(--ink)" }}>Q {calculoAtraso.capitalAtrasado.toFixed(2)}</strong>
+                      </div>
+                      <div style={{ background: "var(--paper)", padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
+                        <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.7rem" }}>Interés devengado ({calculoAtraso.dias}d al 2%)</span>
+                        <strong style={{ fontSize: "0.95rem", color: "#d97706" }}>Q {calculoAtraso.interesAcumulado.toFixed(2)}</strong>
+                      </div>
+                      <div style={{ background: "var(--paper)", padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
+                        <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.7rem" }}>Mora sugerida ({calculoAtraso.cuotasConMora} cuotas)</span>
+                        <strong style={{ fontSize: "0.95rem", color: calculoAtraso.estaEnMora ? "#b91c1c" : "var(--ink)" }}>
+                          Q {calculoAtraso.moraAcumulada.toFixed(2)}
+                        </strong>
+                      </div>
+                      <div style={{ background: "var(--paper)", padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1.5px solid #059669" }}>
+                        <span style={{ color: "#065f46", display: "block", fontSize: "0.7rem", fontWeight: 700 }}>Total para ponerse al día</span>
+                        <strong style={{ fontSize: "1rem", color: "#059669" }}>Q {calculoAtraso.totalPonerseAlDia.toFixed(2)}</strong>
+                      </div>
+                    </div>
+
+                    <p style={{ margin: "0.5rem 0 0", fontSize: "0.74rem", color: "var(--ink-soft)", lineHeight: 1.35 }}>
+                      💡 <em>Nota operativa:</em> Al registrar el crédito, este atraso quedará disponible. Cuando el cajero realice el cobro en ventanilla, podrá cobrar el monto sugerido o ajustarlo según corresponda.
+                    </p>
+                  </div>
+                )}
+
+                {/* BOTÓN Y TABLA DE AMORTIZACIÓN */}
+                <div style={{ marginTop: "1rem" }}>
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    onClick={() => {
+                      if (mostrarTablaAmortizacion) {
+                        setMostrarTablaAmortizacion(false);
+                      } else {
+                        cargarSimulacionAmortizacion();
+                      }
+                    }}
+                    style={{
+                      fontSize: "0.82rem",
+                      padding: "0.4rem 0.75rem",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.4rem",
+                    }}
+                  >
+                    <span>{mostrarTablaAmortizacion ? "▲ Ocultar Plan de Amortización" : "📊 Ver Tabla de Cuotas Pendientes"}</span>
+                  </button>
+
+                  {cargandoSimulacion && (
+                    <span className="hint" style={{ marginLeft: "0.75rem" }}>Generando cuotas pendientes…</span>
+                  )}
+
+                  {mostrarTablaAmortizacion && simulacionAmortizacion && (
+                    <div
+                      style={{
+                        marginTop: "0.85rem",
+                        background: "var(--paper)",
+                        border: "1px solid var(--line)",
+                        borderRadius: "8px",
+                        padding: "0.75rem",
+                        maxHeight: "380px",
+                        overflowY: "auto",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)" }}>
+                          Cronograma de Cuotas Pendientes ({mesesRestantesCalculados} meses)
+                        </span>
+                        <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>
+                          Saldo a liquidar: Q {Number(saldoCapitalActual).toLocaleString("es-GT", { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      <table style={{ width: "100%", fontSize: "0.78rem", borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr style={{ background: "var(--mono-bg)", textAlign: "left" }}>
+                            <th style={{ padding: "0.35rem 0.5rem" }}>No.</th>
+                            <th style={{ padding: "0.35rem 0.5rem" }}>Fecha de Pago</th>
+                            <th style={{ padding: "0.35rem 0.5rem", textAlign: "center" }}>Días</th>
+                            <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Cuota Total</th>
+                            <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Cuota Capital</th>
+                            <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Cuota Interés</th>
+                            <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Deuda Residual</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {simulacionAmortizacion.tabla.map((c: CuotaAmortizacion) => (
+                            <tr
+                              key={c.numero}
+                              style={{
+                                borderBottom: "1px solid var(--line)",
+                              }}
+                            >
+                              <td style={{ padding: "0.35rem 0.5rem" }}>{c.numero}</td>
+                              <td style={{ padding: "0.35rem 0.5rem" }}>{c.fechaPago}</td>
+                              <td style={{ padding: "0.35rem 0.5rem", textAlign: "center", color: "var(--ink-soft)" }}>{c.dias ?? "—"}</td>
+                              <td style={{ padding: "0.35rem 0.5rem", textAlign: "right", fontWeight: 700 }}>Q {c.cuota.toFixed(2)}</td>
+                              <td style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Q {c.capital.toFixed(2)}</td>
+                              <td style={{ padding: "0.35rem 0.5rem", textAlign: "right", color: "#d97706" }}>Q {c.interes.toFixed(2)}</td>
+                              <td style={{ padding: "0.35rem 0.5rem", textAlign: "right", fontWeight: 700 }}>
+                                Q {c.saldoRestante.toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr style={{ background: "var(--mono-bg)", fontWeight: 800, borderTop: "2px solid var(--line)" }}>
+                            <td colSpan={2} style={{ padding: "0.45rem 0.5rem" }}>TOTALES</td>
+                            <td style={{ padding: "0.45rem 0.5rem", textAlign: "center" }}>
+                              {simulacionAmortizacion.tabla.reduce((acc, curr) => acc + (curr.dias || 0), 0)}
+                            </td>
+                            <td style={{ padding: "0.45rem 0.5rem", textAlign: "right" }}>
+                              Q {simulacionAmortizacion.totalPagar.toFixed(2)}
+                            </td>
+                            <td style={{ padding: "0.45rem 0.5rem", textAlign: "right" }}>
+                              Q {simulacionAmortizacion.monto.toFixed(2)}
+                            </td>
+                            <td style={{ padding: "0.45rem 0.5rem", textAlign: "right", color: "#d97706" }}>
+                              Q {simulacionAmortizacion.totalIntereses.toFixed(2)}
+                            </td>
+                            <td style={{ padding: "0.45rem 0.5rem", textAlign: "right" }}>Q 0.00</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {tipo === "FIDUCIARIO" && (

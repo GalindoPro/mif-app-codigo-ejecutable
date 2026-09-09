@@ -381,6 +381,9 @@ alter table prestamos add column if not exists dpi_fiador text;
 alter table prestamos add column if not exists telefono_fiador text;
 alter table prestamos add column if not exists documento_desembolso text;
 alter table prestamos add column if not exists fecha_vencimiento date;
+alter table prestamos add column if not exists origen_fondos text not null default 'FONDOS_PROPIOS';
+alter table prestamos add column if not exists fecha_ultimo_pago_migracion date;
+alter table prestamos add column if not exists es_migracion boolean default false;
 
 create table if not exists prestamo_pagos (
   id                       uuid primary key default gen_random_uuid(),
@@ -396,10 +399,16 @@ create table if not exists prestamo_pagos (
   mora                     numeric(14,2) not null default 0,
   total_pagado             numeric(14,2) not null,
   saldo_capital_restante   numeric(14,2) not null,
+  origen_fondos            text default 'FONDOS_PROPIOS',
   usuario_id               uuid not null references usuarios(id),
   created_at               timestamptz not null default now()
 );
 
 create index if not exists idx_prestamo_pagos_prestamo on prestamo_pagos(prestamo_id, fecha);
 create index if not exists idx_prestamo_pagos_socio on prestamo_pagos(socio_id);
+
+alter table prestamo_pagos add column if not exists origen_fondos text default 'FONDOS_PROPIOS';
+alter table caja_movimientos_auxiliar add column if not exists origen_fondos text;
+alter table ingresos_comif add column if not exists origen_fondos text;
+
 

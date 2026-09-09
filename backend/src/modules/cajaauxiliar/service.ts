@@ -411,6 +411,7 @@ export interface DatosCobroCredito {
   interes: number;
   mora?: number;
   ahorroSobrePrestamo?: number;
+  origenFondos?: "FONDOS_PROPIOS" | "FEDERURAL" | "CHN_GUATEMALA";
   docNo?: string;
   cuentaDebitoId?: string;
 }
@@ -616,6 +617,7 @@ export async function cobrarCuotaCredito(
     }
 
     // 4. Registrar en caja_movimientos_auxiliar
+    const origenFondosFinal = data.origenFondos || prestamo.origen_fondos || "FONDOS_PROPIOS";
     const ref = `${prestamo.codigo}-CUOTA`;
     const detalleDebito = infoCuentaDebito ? ` (Cobrado con débito de cuenta ${infoCuentaDebito.numero_cuenta})` : "";
     const detalleAsp = ahorroSobrePrestamo > 0 ? `, Ahorro: Q${ahorroSobrePrestamo.toFixed(2)}` : "";
@@ -624,8 +626,8 @@ export async function cobrarCuotaCredito(
     const { rows: cajaMovRows } = await client.query(
       `insert into caja_movimientos_auxiliar (
          caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador,
-         referencia, socio_id, beneficiario, descripcion, doc_no, monto, saldo_acumulado, usuario_id
-       ) values ($1, $2, $3, 'PROPIO', $4, 'INGRESO', $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         referencia, socio_id, beneficiario, descripcion, doc_no, monto, saldo_acumulado, origen_fondos, usuario_id
+       ) values ($1, $2, $3, 'PROPIO', $4, 'INGRESO', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        returning *`,
       [
         diaId,
@@ -640,6 +642,7 @@ export async function cobrarCuotaCredito(
         data.docNo ?? null,
         totalCobro,
         saldoAcumulado,
+        origenFondosFinal,
         usuarioId,
       ],
     );
@@ -648,16 +651,16 @@ export async function cobrarCuotaCredito(
     // 5. Registrar en ingresos_comif
     if (abonoCapital > 0) {
       await client.query(
-        `insert into ingresos_comif (agencia_id, fecha, numero_documento, nombre_socio, categoria, monto, usuario_id)
-         values ($1, $2, $3, $4, 'ABONO_PRESTAMO', $5, $6)`,
-        [dia.agencia_id, dia.fecha, data.docNo ?? null, prestamo.socio_nombres, abonoCapital, usuarioId],
+        `insert into ingresos_comif (agencia_id, fecha, numero_documento, nombre_socio, categoria, monto, origen_fondos, usuario_id)
+         values ($1, $2, $3, $4, 'ABONO_PRESTAMO', $5, $6, $7)`,
+        [dia.agencia_id, dia.fecha, data.docNo ?? null, prestamo.socio_nombres, abonoCapital, origenFondosFinal, usuarioId],
       );
     }
     if (interes + mora > 0) {
       await client.query(
-        `insert into ingresos_comif (agencia_id, fecha, numero_documento, nombre_socio, categoria, monto, usuario_id)
-         values ($1, $2, $3, $4, 'INTERES_PRESTAMO', $5, $6)`,
-        [dia.agencia_id, dia.fecha, data.docNo ?? null, prestamo.socio_nombres, interes + mora, usuarioId],
+        `insert into ingresos_comif (agencia_id, fecha, numero_documento, nombre_socio, categoria, monto, origen_fondos, usuario_id)
+         values ($1, $2, $3, $4, 'INTERES_PRESTAMO', $5, $6, $7)`,
+        [dia.agencia_id, dia.fecha, data.docNo ?? null, prestamo.socio_nombres, interes + mora, origenFondosFinal, usuarioId],
       );
     }
 
@@ -676,8 +679,8 @@ export async function cobrarCuotaCredito(
       `insert into prestamo_pagos (
          prestamo_id, socio_id, agencia_id, caja_dia_id, caja_movimiento_id,
          fecha, numero_recibo, abono_capital, interes, mora, total_pagado,
-         saldo_capital_restante, usuario_id
-       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         saldo_capital_restante, origen_fondos, usuario_id
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        returning *`,
       [
         prestamo.id,
@@ -692,6 +695,7 @@ export async function cobrarCuotaCredito(
         mora,
         totalCobro,
         nuevoSaldoCapital,
+        origenFondosFinal,
         usuarioId,
       ],
     );
@@ -732,6 +736,7 @@ export async function cobrarCuotaCredito(
 export interface DatosDesembolsoCredito {
   prestamoId: string;
   docNo?: string;
+  origenFondos?: "FONDOS_PROPIOS" | "FEDERURAL" | "CHN_GUATEMALA";
   montoAhorroSobrePrestamo?: number;
 }
 
@@ -818,13 +823,14 @@ export async function desembolsarCredito(
     let saldoAcumulado = Math.round((saldoPrevio - montoDesembolso) * 100) / 100;
 
     // 2. Registrar egreso en caja_movimientos_auxiliar (Colocación Préstamo)
+    const origenFondosFinal = data.origenFondos || prestamo.origen_fondos || "FONDOS_PROPIOS";
     const detalleAspDesc = montoAsp > 0 ? ` (Retención Ahorro: Q${montoAsp.toFixed(2)}, Neto entregado: Q${efectivoNetoRequerido.toFixed(2)})` : "";
     const descripcion = `Desembolso de crédito ${prestamo.codigo} (${prestamo.tipo})${detalleAspDesc}`;
     const { rows: cajaMovRows } = await client.query(
       `insert into caja_movimientos_auxiliar (
          caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador,
-         referencia, socio_id, beneficiario, descripcion, doc_no, monto, saldo_acumulado, usuario_id
-       ) values ($1, $2, $3, 'PROPIO', 'COLOCACION_PRESTAMO', 'EGRESO', $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         referencia, socio_id, beneficiario, descripcion, doc_no, monto, saldo_acumulado, origen_fondos, usuario_id
+       ) values ($1, $2, $3, 'PROPIO', 'COLOCACION_PRESTAMO', 'EGRESO', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        returning *`,
       [
         diaId,
@@ -838,6 +844,7 @@ export async function desembolsarCredito(
         data.docNo ?? null,
         montoDesembolso,
         saldoAcumulado,
+        origenFondosFinal,
         usuarioId,
       ],
     );
@@ -924,12 +931,13 @@ export async function desembolsarCredito(
     const { rows: prestamoActualizadoRows } = await client.query(
       `update prestamos
        set estado = 'DESEMBOLSADO',
-           fecha_desembolso = $1,
-           saldo_capital = $2,
+           origen_fondos = $1,
+           fecha_desembolso = $2,
+           saldo_capital = $3,
            updated_at = now()
-       where id = $3
+       where id = $4
        returning *`,
-      [dia.fecha, montoDesembolso, prestamo.id],
+      [origenFondosFinal, dia.fecha, montoDesembolso, prestamo.id],
     );
 
     await client.query("commit");
