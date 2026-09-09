@@ -58,25 +58,31 @@ export function calcularLiquidacionCredito(opciones: OpcionesLiquidacion): Resul
   const diffMs = dLiq.getTime() - dUltimo.getTime();
   const diasTranscurridos = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
 
-  // 1. Interés mensual regular al 2.0% s/saldo y cálculo diario
-  const interesMensualRegular = redondear2(saldoCapital * (tasaMensual / 100));
+  // 1. Interés diario exacto = (Saldo Capital * Tasa Anual) / 365
   const interesDiario = (saldoCapital * (tasaAnual / 100)) / 365;
-  const interesDiarioDevengado = redondear2(interesDiario * diasTranscurridos);
+  const interesDevengado = redondear2(interesDiario * diasTranscurridos);
 
-  // 2. Cuota de capital base (Monto original / Plazo meses)
+  // 2. Cuota de capital base
   const cuotaCapitalBase = redondear2(montoOriginal / plazoMeses);
 
   // 3. Cuotas de capital acumuladas y días de atraso
+  // Ciclo regular: 30 días
   const diasAtraso = Math.max(0, diasTranscurridos - 30);
   const diasGracia = 4;
 
+  // Regla de Mora Oficial:
+  // 4 días de gracia por cuota.
+  // Cuota 1 vence a los 30 días -> gracia hasta día 34 -> mora a partir del día 35 (Q 25)
+  // Cuota 2 vence a los 60 días -> gracia hasta día 64 -> mora a partir del día 65 (Q 25)
+  // Cuota 3 vence a los 90 días -> gracia hasta día 94 -> mora a partir del día 95 (Q 25)
+  // Cuota 4 vence a los 120 días -> gracia hasta día 124 -> mora a partir del día 125 (Q 25)
   let cuotasVencidas = 0;
   let moraFijaSugerida = 0;
   let estaEnMora = false;
 
   if (diasTranscurridos >= 30) {
     cuotasVencidas = Math.max(1, Math.floor(diasTranscurridos / 30));
-
+    
     let cuotasConMora = 0;
     for (let k = 1; k <= cuotasVencidas + 1; k++) {
       const diaLimiteGracia = k * 30 + diasGracia; // 34, 64, 94, 124...
@@ -91,18 +97,15 @@ export function calcularLiquidacionCredito(opciones: OpcionesLiquidacion): Resul
     }
   }
 
-  // Cuotas exigibles: si está al día es 1 mes completo; si lleva atraso son los meses vencidos
-  const multiplicadorMeses = Math.max(1, cuotasVencidas);
-  const cuotaCapitalSugerida = Math.min(saldoCapital, redondear2(cuotaCapitalBase * multiplicadorMeses));
+  // Cuota capital exigible sugerida (se acumulan las cuotas de capital de los meses vencidos)
+  const multiplicadorCapital = Math.max(1, Math.floor(diasTranscurridos / 30));
+  const cuotaCapitalSugerida = Math.min(saldoCapital, redondear2(cuotaCapitalBase * multiplicadorCapital));
 
-  // Interés devengado sugerido para la cuota mensual (1 mes completo si está al día, o N meses si tiene atraso)
-  const interesDevengado = redondear2(interesMensualRegular * multiplicadorMeses);
-
-  // Pago mínimo sugerido para la cuota mensual
+  // Pago mínimo sugerido (ponerse al día con cuotas vencidas + intereses + mora)
   const pagoMinimoSugerido = redondear2(cuotaCapitalSugerida + interesDevengado + moraFijaSugerida);
 
-  // Saldo de cancelación total al día de hoy (incluye días exactos si es liquidación total anticipada)
-  const saldoCancelacionTotal = redondear2(saldoCapital + interesDiarioDevengado + moraFijaSugerida);
+  // Saldo de cancelación total al día de hoy
+  const saldoCancelacionTotal = redondear2(saldoCapital + interesDevengado + moraFijaSugerida);
 
   return {
     saldoCapital,

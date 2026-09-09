@@ -16,7 +16,21 @@ import { plazoFijoRouter } from "./modules/plazofijo/routes";
 
 export const app = express();
 
-app.use(cors({ origin: process.env.CORS_ORIGIN?.split(",") ?? true, credentials: true }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+      const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map((s) => s.trim()) ?? [];
+      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
+    credentials: true,
+  }),
+);
 app.use(express.json());
 
 app.get("/health", (_req, res) => res.json({ ok: true, servicio: "mif-backend" }));

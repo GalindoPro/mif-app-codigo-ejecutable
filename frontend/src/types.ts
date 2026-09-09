@@ -576,6 +576,7 @@ export interface Prestamo {
   fecha_vencimiento?: string | null;
   fecha_ultimo_pago_migracion?: string | null;
   es_migracion?: boolean;
+  numero_credito_anterior?: string | null;
   created_at: string;
   amortizacion?: ResultadoSimulacion;
 }

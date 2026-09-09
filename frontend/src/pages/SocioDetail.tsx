@@ -415,6 +415,19 @@ export default function SocioDetail() {
                 </div>
               </div>
               <div className="field">
+                <label htmlFor="edit-edad">Edad (años)</label>
+                <input
+                  id="edit-edad"
+                  type="number"
+                  min="1"
+                  max="120"
+                  value={form.edad}
+                  onChange={(e) => setForm({ ...form, edad: e.target.value })}
+                  placeholder="Ej. 35"
+                />
+                <span className="hint">Ingreso manual (buena práctica en campo)</span>
+              </div>
+              <div className="field">
                 <label htmlFor="edit-telefono">Teléfono (WhatsApp)</label>
                 <div style={{ display: "flex", alignItems: "stretch" }}>
                   <span
@@ -545,6 +558,8 @@ export default function SocioDetail() {
               <dd className="mono" style={{ margin: 0 }}>{new Date(socio.fecha_ingreso).toLocaleDateString("es-GT")}</dd>
               <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Género</dt>
               <dd style={{ margin: 0 }}>{socio.genero === "F" ? "Femenino" : socio.genero === "M" ? "Masculino" : "—"}</dd>
+              <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Edad</dt>
+              <dd className="mono" style={{ margin: 0 }}>{socio.edad ? `${socio.edad} años` : "—"}</dd>
               <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>DPI</dt>
               <dd className="mono" style={{ margin: 0 }}>{socio.dpi ? formatearDPI(socio.dpi) : "—"}</dd>
               <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Teléfono</dt>

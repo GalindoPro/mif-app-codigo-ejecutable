@@ -12,6 +12,7 @@ export interface DatosReciboCobro {
   socioTelefono?: string | null;
   creditoCodigo: string;
   creditoTipo: string;
+  numeroCreditoAnterior?: string | null;
   origenFondos?: OrigenFondos;
   agenciaNombre: string;
   saldoCapitalAnterior: number;
@@ -204,6 +205,11 @@ export default function ReciboCobroCreditoModal({ datos, onClose }: Props) {
             </div>
             <div style={{ textAlign: "right" }}>
               <span style={{ color: "#64748b" }}>Crédito:</span> <strong className="mono">{datos.creditoCodigo}</strong> ({datos.creditoTipo})
+              {datos.numeroCreditoAnterior && (
+                <div style={{ fontSize: "0.76rem", color: "#b45309", fontWeight: 700 }}>
+                  Ref: {datos.numeroCreditoAnterior}
+                </div>
+              )}
             </div>
             {datos.socioDpi && (
               <div style={{ gridColumn: "1 / -1", fontSize: "0.76rem", color: "#64748b" }}>

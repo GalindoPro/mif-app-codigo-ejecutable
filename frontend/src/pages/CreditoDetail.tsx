@@ -84,6 +84,11 @@ export default function CreditoDetail() {
           <p>
             Crédito {TIPO_PRESTAMO_LABEL[prestamo.tipo]} · {prestamo.agencia_nombre} · Promotor:{" "}
             <strong>{prestamo.promotor_nombre ?? "Sin asignar"}</strong>
+            {prestamo.numero_credito_anterior && (
+              <span style={{ marginLeft: "0.6rem", color: "#b45309", fontWeight: 700 }}>
+                · 📋 Ref. Físico: {prestamo.numero_credito_anterior}
+              </span>
+            )}
           </p>
         </div>
 

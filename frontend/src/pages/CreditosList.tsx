@@ -337,6 +337,18 @@ export default function CreditosList() {
                     <tr key={p.id}>
                       <td className="mono" style={{ fontWeight: 600 }}>
                         <Link to={`/creditos/${p.id}`}>{p.codigo}</Link>
+                        {p.numero_credito_anterior && (
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: "0.72rem",
+                              color: "#b45309",
+                              fontWeight: 600,
+                            }}
+                          >
+                            Ref: {p.numero_credito_anterior}
+                          </span>
+                        )}
                       </td>
                       <td>
                         <Link

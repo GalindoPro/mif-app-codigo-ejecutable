@@ -1,3 +1,4 @@
+import axios from "axios";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
@@ -14,20 +15,29 @@ export default function SociosList() {
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
 
+  const [recargar, setRecargar] = useState(0);
+
   // Cargar lista de socios
   useEffect(() => {
     if (tab !== "socios") return;
     const controller = new AbortController();
     setCargando(true);
+    setError(null);
     const timeout = setTimeout(() => {
       api
         .get<ListaSocios>("/socios", {
           params: { q: q || undefined, page, pageSize: 10 },
           signal: controller.signal,
         })
-        .then(({ data }) => setResultado(data))
+        .then(({ data }) => {
+          setResultado(data);
+          setError(null);
+        })
         .catch((err) => {
-          if (err.name !== "CanceledError") setError(mensajeError(err));
+          if (!axios.isCancel(err) && err?.name !== "CanceledError" && (err as { code?: string })?.code !== "ERR_CANCELED") {
+            const msg = mensajeError(err);
+            if (msg) setError(msg);
+          }
         })
         .finally(() => setCargando(false));
     }, 250);
@@ -35,20 +45,24 @@ export default function SociosList() {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [q, page, tab]);
+  }, [q, page, tab, recargar]);
 
   // Cargar lista de fiadores / prospectos
   useEffect(() => {
     if (tab !== "prospectos") return;
     setCargandoFiadores(true);
+    setError(null);
     api
       .get<FiadorItem[]>("/prestamos/fiadores", {
         params: { q: q || undefined, tipoFiltro: "EXTERNOS" },
       })
-      .then(({ data }) => setFiadores(data))
+      .then(({ data }) => {
+        setFiadores(data);
+        setError(null);
+      })
       .catch((err) => setError(mensajeError(err)))
       .finally(() => setCargandoFiadores(false));
-  }, [q, tab]);
+  }, [q, tab, recargar]);
 
   const totalPaginas = resultado ? Math.max(1, Math.ceil(resultado.total / resultado.pageSize)) : 1;
 
@@ -79,7 +93,35 @@ export default function SociosList() {
         </Link>
       </div>
 
-      {error && <div className="alert error">{error}</div>}
+      {error && (
+        <div
+          className="alert error"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "0.5rem",
+          }}
+        >
+          <span>{error}</span>
+          <button
+            type="button"
+            className="btn secondary"
+            style={{
+              padding: "0.25rem 0.65rem",
+              fontSize: "0.82rem",
+              cursor: "pointer",
+              fontWeight: 700,
+              background: "#ffffff",
+              color: "#dc2626",
+              border: "1px solid #fca5a5",
+            }}
+            onClick={() => setRecargar((v) => v + 1)}
+          >
+            🔄 Reintentar
+          </button>
+        </div>
+      )}
 
       {/* Tabs Selector */}
       <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", borderBottom: "1px solid var(--border)", paddingBottom: "0.5rem" }}>

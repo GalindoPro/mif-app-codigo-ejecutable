@@ -58,10 +58,10 @@ export async function listar(params: {
       valores.push(`%${qClean}%`);
       const idxClean = valores.length;
       condiciones.push(
-        `(lower(s.nombres) like $${idx} or lower(p.codigo) like $${idx} or s.dpi like $${idx} or regexp_replace(coalesce(s.dpi, ''), '[^0-9]', '', 'g') like $${idxClean})`,
+        `(lower(s.nombres) like $${idx} or lower(p.codigo) like $${idx} or lower(coalesce(p.numero_credito_anterior, '')) like $${idx} or s.dpi like $${idx} or regexp_replace(coalesce(s.dpi, ''), '[^0-9]', '', 'g') like $${idxClean})`,
       );
     } else {
-      condiciones.push(`(lower(s.nombres) like $${idx} or lower(p.codigo) like $${idx} or s.dpi like $${idx})`);
+      condiciones.push(`(lower(s.nombres) like $${idx} or lower(p.codigo) like $${idx} or lower(coalesce(p.numero_credito_anterior, '')) like $${idx} or s.dpi like $${idx})`);
     }
   }
 
@@ -140,6 +140,7 @@ export interface DatosCrearPrestamo {
   saldoCapitalActual?: number;
   fechaUltimoPago?: string;
   fechaDesembolsoOriginal?: string;
+  numeroCreditoAnterior?: string | null;
 }
 
 export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
@@ -224,7 +225,7 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
 
   let observacionesFinal = data.observaciones ?? "";
   if (esMigracion) {
-    const notaMigracion = `[MIGRACIÓN HISTÓRICA] Crédito preexistente migrado. Saldo capital migrado: Q ${saldoCapitalInicial.toFixed(2)}, Desembolso original: ${fechaDesembolso || 'N/A'}, Último pago registrado: ${fechaUltimoPago || 'N/A'}.`;
+    const notaMigracion = `[MIGRACIÓN HISTÓRICA] Crédito preexistente migrado.${data.numeroCreditoAnterior ? ` No. Crédito Anterior: ${data.numeroCreditoAnterior}.` : ''} Saldo capital migrado: Q ${saldoCapitalInicial.toFixed(2)}, Desembolso original: ${fechaDesembolso || 'N/A'}, Último pago registrado: ${fechaUltimoPago || 'N/A'}.`;
     observacionesFinal = observacionesFinal ? `${notaMigracion} ${observacionesFinal}` : notaMigracion;
   }
 
@@ -233,8 +234,8 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
        codigo, socio_id, agencia_id, promotor_id, tipo, estado,
        tipo_amortizacion, monto_solicitado, monto_aprobado, saldo_capital, tasa_interes_mensual,
        plazo_meses, cuota_mensual, destino, garantia, ubicacion_garantia, nombre_fiador, dpi_fiador, telefono_fiador,
-       documento_desembolso, observaciones, origen_fondos, fecha_solicitud, fecha_aprobacion, fecha_desembolso, fecha_vencimiento, fecha_ultimo_pago_migracion, es_migracion
-     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
+       documento_desembolso, observaciones, origen_fondos, fecha_solicitud, fecha_aprobacion, fecha_desembolso, fecha_vencimiento, fecha_ultimo_pago_migracion, es_migracion, numero_credito_anterior
+     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
      returning *`,
     [
       codigo,
@@ -265,6 +266,7 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
       fechaVencimiento,
       fechaUltimoPago,
       esMigracion,
+      data.numeroCreditoAnterior ?? null,
     ],
   );
 

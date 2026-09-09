@@ -25,10 +25,16 @@ api.interceptors.response.use(
 );
 
 export function mensajeError(err: unknown): string {
+  if (axios.isCancel(err) || (err as { code?: string })?.code === "ERR_CANCELED") {
+    return "";
+  }
   if (axios.isAxiosError(err)) {
     const data = err.response?.data as { error?: string; detalles?: { mensaje: string }[] } | undefined;
     if (data?.detalles?.length) return data.detalles.map((d) => d.mensaje).join(" · ");
-    if (data?.error) return data.error;
+    if (err.message === "Network Error" || err.code === "ERR_NETWORK") {
+      return "No se pudo conectar con el servidor (Error de Red). Verifica que el servicio esté activo.";
+    }
+    if (err.message && err.message !== "canceled") return err.message;
   }
   return "Ocurrió un error inesperado. Intenta de nuevo.";
 }

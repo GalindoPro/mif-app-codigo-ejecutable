@@ -107,6 +107,7 @@ const crearSchema = z.object({
   saldoCapitalActual: z.number().nonnegative().optional(),
   fechaUltimoPago: z.string().optional(),
   fechaDesembolsoOriginal: z.string().optional(),
+  numeroCreditoAnterior: z.string().optional().nullable(),
 });
 
 prestamosRouter.post(

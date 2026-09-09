@@ -384,6 +384,7 @@ alter table prestamos add column if not exists fecha_vencimiento date;
 alter table prestamos add column if not exists origen_fondos text not null default 'FONDOS_PROPIOS';
 alter table prestamos add column if not exists fecha_ultimo_pago_migracion date;
 alter table prestamos add column if not exists es_migracion boolean default false;
+alter table prestamos add column if not exists numero_credito_anterior text;
 
 create table if not exists prestamo_pagos (
   id                       uuid primary key default gen_random_uuid(),
