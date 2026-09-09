@@ -110,16 +110,37 @@ export async function obtener(id: string, agenciaVisible: string | null) {
   if (!socio) throw notFound("Socio no encontrado");
   if (agenciaVisible && socio.agencia_id !== agenciaVisible) throw forbidden("Ese socio pertenece a otra agencia");
 
-  const { rows: cuentas } = await pool.query(
-    `select c.*, coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
-     from cuentas c
-     left join saldos_cuenta sc on sc.cuenta_id = c.id
-     where c.socio_id = $1
-     order by c.created_at`,
-    [id],
-  );
+  const [{ rows: cuentas }, { rows: prestamos }] = await Promise.all([
+    pool.query(
+      `select c.*, coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
+       from cuentas c
+       left join saldos_cuenta sc on sc.cuenta_id = c.id
+       where c.socio_id = $1
+       order by c.created_at`,
+      [id],
+    ),
+    pool.query(
+      `select p.id, p.codigo, p.tipo, p.estado,
+              p.monto_solicitado, p.monto_aprobado, p.saldo_capital,
+              p.plazo_meses, p.cuota_mensual, p.tasa_interes_mensual,
+              p.fecha_solicitud, p.fecha_desembolso,
+              p.es_migracion, p.numero_credito_anterior,
+              u.nombre as promotor_nombre,
+              coalesce(lp.fecha, p.fecha_ultimo_pago_migracion, p.fecha_desembolso) as ultimo_pago_fecha
+       from prestamos p
+       left join usuarios u on u.id = p.promotor_id
+       left join lateral (
+         select fecha from prestamo_pagos pp
+         where pp.prestamo_id = p.id
+         order by fecha desc, created_at desc limit 1
+       ) lp on true
+       where p.socio_id = $1
+       order by p.created_at desc`,
+      [id],
+    ),
+  ]);
 
-  return { ...socio, cuentas };
+  return { ...socio, cuentas, prestamos };
 }
 
 export async function siguienteNumero(agenciaId: string) {

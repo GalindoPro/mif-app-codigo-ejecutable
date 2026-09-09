@@ -265,6 +265,11 @@ export async function registrarMovimientoConClient(
   if (cuenta.estado !== "ACTIVA") throw badRequest("Esta cuenta está cerrada; no se pueden registrar movimientos");
 
   if (data.tipo === "RETIRO") {
+    if (cuenta.tipo === "APORTACION") {
+      throw badRequest(
+        "Las aportaciones de capital social no se pueden retirar directamente. El reembolso se tramita al dar de baja al socio con el jefe de agencia.",
+      );
+    }
     // REGLA CRÍTICA: Ahorro sobre Préstamo no se toca hasta que termine el pago del crédito
     if (cuenta.tipo === "AHORRO_SOBRE_PRESTAMO") {
       const { rows: prestamosActivos } = await client.query(
@@ -355,5 +360,45 @@ export async function registrarMovimiento(
 ) {
   return withTransaction(async (client) => {
     return registrarMovimientoConClient(client, cuentaId, data, usuarioId, agenciaVisible);
+  });
+}
+
+export async function cerrar(cuentaId: string, usuarioId: string, agenciaVisibleParam: string | null) {
+  return withTransaction(async (client) => {
+    const { rows: ctaRows } = await client.query(
+      `select c.*, coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
+       from cuentas c
+       left join saldos_cuenta sc on sc.cuenta_id = c.id
+       where c.id = $1`,
+      [cuentaId],
+    );
+    const cuenta = ctaRows[0];
+    if (!cuenta) throw notFound("Cuenta no encontrada");
+    if (agenciaVisibleParam && cuenta.agencia_id !== agenciaVisibleParam) {
+      throw forbidden("Esa cuenta pertenece a otra agencia");
+    }
+    if (cuenta.estado === "CERRADA") throw conflict("Esta cuenta ya está cerrada.");
+    if (cuenta.tipo === "APORTACION") {
+      throw badRequest("Las cuentas de aportación no se cierran individualmente. El cierre se gestiona al dar de baja al socio.");
+    }
+    const saldo = Number(cuenta.saldo_actual);
+    if (saldo > 0.009) {
+      throw conflict(`No se puede cerrar la cuenta con saldo pendiente de Q ${saldo.toFixed(2)}. Primero registra un retiro por el total del saldo.`);
+    }
+    if (cuenta.tipo === "AHORRO_SOBRE_PRESTAMO") {
+      const { rows: prestamosActivos } = await client.query(
+        `select codigo from prestamos where id = $1 and estado not in ('CANCELADO', 'RECHAZADO') limit 1`,
+        [cuenta.prestamo_id],
+      );
+      if (prestamosActivos[0]) {
+        throw conflict(`La cuenta está en garantía del crédito activo "${prestamosActivos[0].codigo}". Cancela el préstamo antes de cerrar esta cuenta.`);
+      }
+    }
+    const { rows } = await client.query(
+      `update cuentas set estado = 'CERRADA', updated_at = now() where id = $1 returning *`,
+      [cuentaId],
+    );
+    await registrarAuditoria({ entidad: "Cuenta", entidadId: cuentaId, accion: "ACTUALIZAR", usuarioId, datosAnteriores: { estado: "ACTIVA" }, datosNuevos: { estado: "CERRADA" } });
+    return rows[0];
   });
 }

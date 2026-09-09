@@ -96,3 +96,11 @@ cuentasRouter.post(
     res.status(201).json(await service.registrarMovimiento(req.params.id, data, req.user!.id, agenciaVisible(req)));
   }),
 );
+
+cuentasRouter.post(
+  "/:id/cerrar",
+  requireRole("ADMIN", "GERENCIA", "SUPERVISOR"),
+  asyncHandler(async (req, res) => {
+    res.json(await service.cerrar(req.params.id, req.user!.id, agenciaVisible(req)));
+  }),
+);

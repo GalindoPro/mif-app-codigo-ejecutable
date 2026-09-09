@@ -112,6 +112,7 @@ const crearSchema = z.object({
 
 prestamosRouter.post(
   "/",
+  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "PROMOTOR"),
   asyncHandler(async (req, res) => {
     const data = crearSchema.parse(req.body);
     if (req.user?.rol === "PROMOTOR" && !data.promotorId) {
