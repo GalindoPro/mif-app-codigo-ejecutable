@@ -9,6 +9,9 @@ export default function Layout() {
   const navigate = useNavigate();
   const [reseteando, setReseteando] = useState(false);
   const [recargando, setRecargando] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  const closeSidebar = () => setSidebarOpen(false);
 
   async function handleResetGlobal() {
     const confirmado = window.confirm(
@@ -55,7 +58,28 @@ export default function Layout() {
 
   return (
     <div className="shell">
-      <aside className="sidebar">
+      <div className="mobile-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <div
+            style={{
+              width: "32px", height: "32px",
+              background: "linear-gradient(135deg, #047857 0%, #065f46 100%)",
+              color: "#ffffff", borderRadius: "8px", display: "flex",
+              alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: "1rem"
+            }}
+          >
+            M
+          </div>
+          <span style={{ fontSize: "1rem", fontWeight: 800, color: "var(--ink)" }}>MIF COOP</span>
+        </div>
+        <button className="hamburger-btn" onClick={() => setSidebarOpen(true)}>
+          ☰
+        </button>
+      </div>
+
+      <div className={`sidebar-backdrop ${sidebarOpen ? "show" : ""}`} onClick={closeSidebar}></div>
+
+      <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="brand" style={{ padding: "0.25rem 0.25rem 0.75rem", borderBottom: "1px solid var(--line)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
             <div
@@ -109,19 +133,19 @@ export default function Layout() {
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.5rem 0 0.2rem 0.5rem" }}>
                 Ventanilla y Caja
               </div>
-              <NavLink to="/auxiliar-caja" className={cls}>
+              <NavLink to="/auxiliar-caja" className={cls} onClick={closeSidebar}>
                 💵 Auxiliar de caja
               </NavLink>
-              <NavLink to="/caja-chica" className={cls}>
+              <NavLink to="/caja-chica" className={cls} onClick={closeSidebar}>
                 📥 Caja chica
               </NavLink>
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.75rem 0 0.2rem 0.5rem" }}>
                 Consultas y Cobros
               </div>
-              <NavLink to="/socios" className={cls}>
+              <NavLink to="/socios" className={cls} onClick={closeSidebar}>
                 👥 Consultar Socios
               </NavLink>
-              <NavLink to="/creditos" className={cls}>
+              <NavLink to="/creditos" className={cls} onClick={closeSidebar}>
                 📄 Cobro de Créditos
               </NavLink>
             </>
@@ -133,22 +157,22 @@ export default function Layout() {
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.5rem 0 0.2rem 0.5rem" }}>
                 Gestión de Campo
               </div>
-              <NavLink to="/promotor/cartera" className={cls}>
+              <NavLink to="/promotor/cartera" className={cls} onClick={closeSidebar}>
                 📂 Kardex Cartera
               </NavLink>
-              <NavLink to="/socios" className={cls}>
+              <NavLink to="/socios" className={cls} onClick={closeSidebar}>
                 👥 Socios en campo
               </NavLink>
-              <NavLink to="/creditos" className={cls}>
+              <NavLink to="/creditos" className={cls} onClick={closeSidebar}>
                 📄 Créditos & Simulador
               </NavLink>
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.75rem 0 0.2rem 0.5rem" }}>
                 Captaciones
               </div>
-              <NavLink to="/ahorros/corriente" className={cls}>
+              <NavLink to="/ahorros/corriente" className={cls} onClick={closeSidebar}>
                 💰 Cuentas de Ahorro
               </NavLink>
-              <NavLink to="/ahorros/plazo-fijo" className={cls}>
+              <NavLink to="/ahorros/plazo-fijo" className={cls} onClick={closeSidebar}>
                 📈 Inversiones Plazo Fijo
               </NavLink>
             </>
@@ -160,39 +184,39 @@ export default function Layout() {
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.5rem 0 0.2rem 0.5rem" }}>
                 Supervisión y Control
               </div>
-              <NavLink to="/tablero" className={cls}>
+              <NavLink to="/tablero" className={cls} onClick={closeSidebar}>
                 📊 Tablero & Analítica
               </NavLink>
-              <NavLink to="/arqueos/mensual" className={cls}>
+              <NavLink to="/arqueos/mensual" className={cls} onClick={closeSidebar}>
                 📑 Libro Mensual Arqueos
               </NavLink>
 
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.75rem 0 0.2rem 0.5rem" }}>
                 Cartera y Créditos
               </div>
-              <NavLink to="/creditos" className={cls}>
+              <NavLink to="/creditos" className={cls} onClick={closeSidebar}>
                 📄 Bandeja de Créditos
               </NavLink>
-              <NavLink to="/promotor/cartera" className={cls}>
+              <NavLink to="/promotor/cartera" className={cls} onClick={closeSidebar}>
                 📂 Kardex Cartera
               </NavLink>
-              <NavLink to="/auxiliar-caja" className={cls}>
+              <NavLink to="/auxiliar-caja" className={cls} onClick={closeSidebar}>
                 💵 Arqueos e Historial de Caja
               </NavLink>
 
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.75rem 0 0.2rem 0.5rem" }}>
                 Padrón y Captaciones
               </div>
-              <NavLink to="/socios" className={cls}>
+              <NavLink to="/socios" className={cls} onClick={closeSidebar}>
                 👥 Padrón de Socios
               </NavLink>
-              <NavLink to="/aportaciones" className={cls}>
+              <NavLink to="/aportaciones" className={cls} onClick={closeSidebar}>
                 🏛️ Aportaciones de Capital
               </NavLink>
-              <NavLink to="/ahorros/corriente" className={cls}>
+              <NavLink to="/ahorros/corriente" className={cls} onClick={closeSidebar}>
                 💰 Cuentas de Ahorro
               </NavLink>
-              <NavLink to="/ahorros/plazo-fijo" className={cls}>
+              <NavLink to="/ahorros/plazo-fijo" className={cls} onClick={closeSidebar}>
                 📈 Inversiones Plazo Fijo
               </NavLink>
             </>
@@ -204,40 +228,40 @@ export default function Layout() {
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.2rem 0 0.2rem 0.5rem" }}>
                 Control General
               </div>
-              <NavLink to="/tablero" className={cls}>
+              <NavLink to="/tablero" className={cls} onClick={closeSidebar}>
                 📊 Tablero Global
               </NavLink>
-              <NavLink to="/arqueos/mensual" className={cls}>
+              <NavLink to="/arqueos/mensual" className={cls} onClick={closeSidebar}>
                 📑 Libro Mensual Arqueos
               </NavLink>
 
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.6rem 0 0.2rem 0.5rem" }}>
                 Operaciones
               </div>
-              <NavLink to="/auxiliar-caja" className={cls}>
+              <NavLink to="/auxiliar-caja" className={cls} onClick={closeSidebar}>
                 💵 Auxiliar de caja
               </NavLink>
-              <NavLink to="/caja-chica" className={cls}>
+              <NavLink to="/caja-chica" className={cls} onClick={closeSidebar}>
                 📥 Caja chica
               </NavLink>
-              <NavLink to="/creditos" className={cls}>
+              <NavLink to="/creditos" className={cls} onClick={closeSidebar}>
                 📄 Créditos
               </NavLink>
-              <NavLink to="/promotor/cartera" className={cls}>
+              <NavLink to="/promotor/cartera" className={cls} onClick={closeSidebar}>
                 📂 Kardex Cartera
               </NavLink>
 
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.6rem 0 0.2rem 0.5rem" }}>
                 Socios y Captaciones
               </div>
-              <NavLink to="/socios" className={cls}>
+              <NavLink to="/socios" className={cls} onClick={closeSidebar}>
                 👥 Socios
               </NavLink>
-              <NavLink to="/aportaciones" className={cls}>
+              <NavLink to="/aportaciones" className={cls} onClick={closeSidebar}>
                 🏛️ Aportaciones
               </NavLink>
               {TIPOS_AHORRO.map((t) => (
-                <NavLink key={t.slug} to={`/ahorros/${t.slug}`} className={cls}>
+                <NavLink key={t.slug} to={`/ahorros/${t.slug}`} className={cls} onClick={closeSidebar}>
                   {t.titulo}
                 </NavLink>
               ))}
@@ -245,11 +269,20 @@ export default function Layout() {
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.6rem 0 0.2rem 0.5rem" }}>
                 Administración
               </div>
-              <NavLink to="/usuarios" className={cls}>
+              <NavLink to="/alertas" className={cls} onClick={closeSidebar}>
+                🔔 Panel de Alertas
+              </NavLink>
+              <NavLink to="/usuarios" className={cls} onClick={closeSidebar}>
                 👤 Usuarios
               </NavLink>
-              <NavLink to="/agencias" className={cls}>
+              <NavLink to="/agencias" className={cls} onClick={closeSidebar}>
                 🏢 Agencias
+              </NavLink>
+              <NavLink to="/auditoria" className={cls} onClick={closeSidebar}>
+                🔍 Bitácora de Auditoría
+              </NavLink>
+              <NavLink to="/sesiones" className={cls} onClick={closeSidebar}>
+                🛡️ Sesiones Activas
               </NavLink>
             </>
           )}

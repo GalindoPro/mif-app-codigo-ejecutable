@@ -53,6 +53,7 @@ do $$ begin
     'SERVICIOS_BI', 'DEPOSITO_BI', 'RETIRO_BI', 'REMESA_BI',
     'DEPOSITO_AHORRO_CORRIENTE', 'DEPOSITO_AHORRO_PROGRAMADO', 'DEPOSITO_AHORRO_INFANTO_JUVENIL',
     'RETIRO_AHORRO_CORRIENTE', 'RETIRO_AHORRO_PROGRAMADO', 'RETIRO_AHORRO_INFANTO_JUVENIL',
+    'DEPOSITO_AHORRO_SOBRE_PRESTAMO', 'RETIRO_AHORRO_SOBRE_PRESTAMO',
     'DEPOSITO_PLAZO_FIJO', 'RETIRO_PLAZO_FIJO',
     'APORTACION', 'INGRESO_ASOCIADO', 'COMISION',
     'ABONO_PRESTAMO_HIPOTECARIO', 'INTERES_PRESTAMO_HIPOTECARIO', 'MORA_PRESTAMO_HIPOTECARIO',
@@ -60,6 +61,9 @@ do $$ begin
     'COLOCACION_PRESTAMO', 'EGRESO_VARIO', 'INGRESO_VARIO'
   );
 exception when duplicate_object then null; end $$;
+alter type caja_categoria add value if not exists 'DEPOSITO_AHORRO_SOBRE_PRESTAMO';
+alter type caja_categoria add value if not exists 'RETIRO_AHORRO_SOBRE_PRESTAMO';
+
 
 do $$ begin
   create type estado_plazo_fijo as enum ('ACTIVO', 'LIQUIDADO');
@@ -411,5 +415,114 @@ create index if not exists idx_prestamo_pagos_socio on prestamo_pagos(socio_id);
 alter table prestamo_pagos add column if not exists origen_fondos text default 'FONDOS_PROPIOS';
 alter table caja_movimientos_auxiliar add column if not exists origen_fondos text;
 alter table ingresos_comif add column if not exists origen_fondos text;
+
+-- ---------------------------------------------------------------------------
+-- Configuración del sistema (tasas, reglas, parámetros financieros)
+-- ---------------------------------------------------------------------------
+create table if not exists configuracion_sistema (
+  clave       text primary key,
+  valor       text not null,
+  descripcion text,
+  updated_at  timestamptz not null default now()
+);
+insert into configuracion_sistema (clave, valor, descripcion) values
+  ('tasa_interes_mensual_default', '2.0',  'Tasa de interés mensual por defecto (%)'),
+  ('dias_gracia_mora',             '4',    'Días de gracia antes de aplicar mora fija'),
+  ('mora_fija_por_cuota',         '25.0', 'Monto fijo de mora por cuota vencida (Q)'),
+  ('aportacion_minima',           '100.0','Aportación mínima para afiliarse como socio (Q)'),
+  ('isr_porcentaje_plazo_fijo',   '10.0', 'ISR aplicado a intereses de plazo fijo (%)'),
+  ('tasa_plazo_fijo_corto',       '6.0',  'Tasa anual para plazo fijo < 12 meses (%)'),
+  ('tasa_plazo_fijo_largo',       '14.0', 'Tasa anual para plazo fijo de 12+ meses (%)')
+on conflict (clave) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Refinanciamientos de créditos (D1)
+-- ---------------------------------------------------------------------------
+create table if not exists refinanciamientos (
+  id                     uuid primary key default gen_random_uuid(),
+  prestamo_id            uuid not null references prestamos(id),
+  saldo_capital_anterior numeric(14,2) not null,
+  tasa_anterior          numeric(6,2)  not null,
+  plazo_anterior         integer       not null,
+  cuota_anterior         numeric(14,2) not null,
+  nueva_tasa             numeric(6,2)  not null,
+  nuevo_plazo            integer       not null,
+  nueva_cuota            numeric(14,2) not null,
+  observaciones          text,
+  usuario_id             uuid not null references usuarios(id),
+  created_at             timestamptz not null default now()
+);
+create index if not exists idx_refinanciamientos_prestamo on refinanciamientos(prestamo_id);
+
+-- ---------------------------------------------------------------------------
+-- Garantías hipotecarias (D2)
+-- ---------------------------------------------------------------------------
+create table if not exists garantias_hipotecarias (
+  id               uuid primary key default gen_random_uuid(),
+  prestamo_id      uuid not null unique references prestamos(id) on delete cascade,
+  tipo_bien        text not null default 'INMUEBLE',
+  descripcion      text not null,
+  valor_tasacion   numeric(14,2),
+  direccion        text,
+  municipio        text,
+  departamento     text,
+  no_finca         text,
+  folio            text,
+  libro            text,
+  fecha_inscripcion      date,
+  fecha_vencimiento      date,
+  observaciones    text,
+  usuario_id       uuid not null references usuarios(id),
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- Sesiones activas (D4)
+-- ---------------------------------------------------------------------------
+create table if not exists sesiones (
+  jti          text primary key,
+  usuario_id   uuid not null references usuarios(id) on delete cascade,
+  ip           text,
+  user_agent   text,
+  activa       boolean not null default true,
+  created_at   timestamptz not null default now(),
+  expires_at   timestamptz not null,
+  revocada_at  timestamptz,
+  revocada_por uuid references usuarios(id)
+);
+create index if not exists idx_sesiones_usuario on sesiones(usuario_id, activa);
+
+-- ---------------------------------------------------------------------------
+-- Excedentes cooperativos (Bloque C)
+-- ---------------------------------------------------------------------------
+do $$ begin
+  create type estado_excedente as enum ('CALCULADO', 'APLICADO', 'ANULADO');
+exception when duplicate_object then null; end $$;
+
+create table if not exists excedentes (
+  id          uuid primary key default gen_random_uuid(),
+  anio        integer not null,
+  agencia_id  uuid references agencias(id),
+  monto_total numeric(14,2) not null,
+  estado      estado_excedente not null default 'CALCULADO',
+  aplicado_at timestamptz,
+  creado_por  uuid references usuarios(id),
+  created_at  timestamptz not null default now(),
+  unique (anio, agencia_id)
+);
+
+create table if not exists excedentes_detalle (
+  id             uuid primary key default gen_random_uuid(),
+  excedente_id   uuid not null references excedentes(id) on delete cascade,
+  socio_id       uuid not null references socios(id),
+  total_aportacion numeric(14,2) not null,
+  porcentaje     numeric(8,4) not null,
+  monto_asignado numeric(14,2) not null,
+  cuenta_id      uuid references cuentas(id),
+  aplicado       boolean not null default false,
+  created_at     timestamptz not null default now()
+);
+create index if not exists idx_excedentes_detalle_excedente on excedentes_detalle(excedente_id);
 
 

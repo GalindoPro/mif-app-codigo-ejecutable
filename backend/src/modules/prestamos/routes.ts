@@ -166,3 +166,25 @@ prestamosRouter.get(
   }),
 );
 
+const refinanciarSchema = z.object({
+  nuevaTasa: z.number().positive("La nueva tasa debe ser mayor a cero"),
+  nuevoPlazo: z.number().int().min(1, "El plazo mínimo es 1 mes"),
+  observaciones: z.string().optional(),
+});
+
+prestamosRouter.post(
+  "/:id/refinanciar",
+  requireRole("ADMIN", "GERENCIA", "SUPERVISOR"),
+  asyncHandler(async (req, res) => {
+    const data = refinanciarSchema.parse(req.body);
+    res.json(await service.refinanciar(req.params.id, data, req.user!.id, agenciaVisible(req)));
+  }),
+);
+
+prestamosRouter.get(
+  "/:id/refinanciamientos",
+  asyncHandler(async (req, res) => {
+    res.json(await service.listarRefinanciamientos(req.params.id));
+  }),
+);
+

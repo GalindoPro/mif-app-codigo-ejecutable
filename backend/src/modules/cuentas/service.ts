@@ -235,7 +235,7 @@ export async function listarNovedadesCampo(agenciaId: string | null) {
 export interface DatosMovimiento {
   tipo: "DEPOSITO" | "RETIRO";
   monto: number;
-  fecha: string;
+  fecha?: string;
   numeroRecibo?: string;
   descripcion?: string;
 }
@@ -328,11 +328,13 @@ export async function registrarMovimientoConClient(
 
   const clienteMovimientoId = `srv-${cuentaId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+  const fechaMov = data.fecha || new Date().toISOString().slice(0, 10);
+
   const { rows } = await client.query(
     `insert into movimientos (cuenta_id, tipo, monto, fecha, numero_recibo, descripcion, usuario_id, cliente_movimiento_id)
      values ($1,$2,$3,$4,$5,$6,$7,$8)
      returning *`,
-    [cuentaId, data.tipo, data.monto, data.fecha, data.numeroRecibo ?? null, data.descripcion ?? null, usuarioId, clienteMovimientoId],
+    [cuentaId, data.tipo, data.monto, fechaMov, data.numeroRecibo ?? null, data.descripcion ?? null, usuarioId, clienteMovimientoId],
   );
   const movimiento = rows[0];
   await registrarAuditoria({

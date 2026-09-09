@@ -731,3 +731,129 @@ export async function listarFiadores(filtros: FiltrosFiadores) {
   return rows;
 }
 
+export interface DatosRefinanciar {
+  nuevaTasa: number;
+  nuevoPlazo: number;
+  observaciones?: string;
+}
+
+export async function refinanciar(
+  prestamoId: string,
+  data: DatosRefinanciar,
+  usuarioId: string,
+  agenciaVisibleParam: string | null,
+) {
+  if (data.nuevaTasa <= 0) throw badRequest("La nueva tasa debe ser mayor a cero");
+  if (data.nuevoPlazo < 1) throw badRequest("El nuevo plazo debe ser de al menos 1 mes");
+
+  return withTransaction(async (client) => {
+    const { rows: pRows } = await client.query(
+      `select * from prestamos where id = $1`,
+      [prestamoId],
+    );
+    const prestamo = pRows[0];
+    if (!prestamo) throw notFound("Préstamo no encontrado");
+    if (agenciaVisibleParam && prestamo.agencia_id !== agenciaVisibleParam) {
+      throw forbidden("Ese préstamo pertenece a otra agencia");
+    }
+    if (prestamo.estado !== "DESEMBOLSADO") {
+      throw badRequest(`Solo se pueden refinanciar préstamos desembolsados (estado actual: ${prestamo.estado})`);
+    }
+    if (Number(prestamo.saldo_capital) <= 0) {
+      throw badRequest("El préstamo ya está saldado; no requiere refinanciamiento");
+    }
+
+    // Calcular nueva cuota con el saldo actual como nuevo monto
+    const nuevaSim = calcularAmortizacion({
+      monto: Number(prestamo.saldo_capital),
+      plazoMeses: data.nuevoPlazo,
+      tasaInteresMensual: data.nuevaTasa,
+      tipoAmortizacion: prestamo.tipo_amortizacion,
+      fechaInicio: new Date().toISOString().slice(0, 10),
+    });
+
+    // Registrar el refinanciamiento
+    await client.query(
+      `insert into refinanciamientos
+         (prestamo_id, saldo_capital_anterior, tasa_anterior, plazo_anterior, cuota_anterior,
+          nueva_tasa, nuevo_plazo, nueva_cuota, observaciones, usuario_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [
+        prestamoId,
+        prestamo.saldo_capital,
+        prestamo.tasa_interes_mensual,
+        prestamo.plazo_meses,
+        prestamo.cuota_mensual,
+        data.nuevaTasa,
+        data.nuevoPlazo,
+        nuevaSim.cuotaMensualEstimada,
+        data.observaciones ?? null,
+        usuarioId,
+      ],
+    );
+
+    // Actualizar el préstamo con los nuevos términos
+    const hoy = new Date().toISOString().slice(0, 10);
+    const { rows: vencRows } = await client.query(
+      `select ($1::date + ($2 * interval '1 month'))::date as venc`,
+      [hoy, data.nuevoPlazo],
+    );
+
+    const notaRefinanciamiento = `[REFINANCIAMIENTO ${hoy}] Tasa anterior: ${prestamo.tasa_interes_mensual}%, Plazo anterior: ${prestamo.plazo_meses} meses, Cuota anterior: Q${Number(prestamo.cuota_mensual).toFixed(2)}.`;
+    const obsActualizada = prestamo.observaciones
+      ? `${prestamo.observaciones}\n${notaRefinanciamiento}`
+      : notaRefinanciamiento;
+
+    const { rows } = await client.query(
+      `update prestamos set
+         tasa_interes_mensual = $1,
+         plazo_meses = $2,
+         cuota_mensual = $3,
+         fecha_vencimiento = $4,
+         observaciones = $5,
+         updated_at = now()
+       where id = $6
+       returning *`,
+      [
+        data.nuevaTasa,
+        data.nuevoPlazo,
+        nuevaSim.cuotaMensualEstimada,
+        vencRows[0]?.venc ?? null,
+        obsActualizada,
+        prestamoId,
+      ],
+    );
+
+    await registrarAuditoria({
+      entidad: "Prestamo",
+      entidadId: prestamoId,
+      accion: "ACTUALIZAR",
+      usuarioId,
+      datosAnteriores: {
+        tasa_interes_mensual: prestamo.tasa_interes_mensual,
+        plazo_meses: prestamo.plazo_meses,
+        cuota_mensual: prestamo.cuota_mensual,
+      },
+      datosNuevos: {
+        tasa_interes_mensual: data.nuevaTasa,
+        plazo_meses: data.nuevoPlazo,
+        cuota_mensual: nuevaSim.cuotaMensualEstimada,
+        tipo: "REFINANCIAMIENTO",
+      },
+    });
+
+    return { prestamo: rows[0], simulacion: nuevaSim };
+  });
+}
+
+export async function listarRefinanciamientos(prestamoId: string) {
+  const { rows } = await pool.query(
+    `select r.*, u.nombre as usuario_nombre
+     from refinanciamientos r
+     join usuarios u on u.id = r.usuario_id
+     where r.prestamo_id = $1
+     order by r.created_at desc`,
+    [prestamoId],
+  );
+  return rows;
+}

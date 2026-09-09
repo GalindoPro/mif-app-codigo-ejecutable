@@ -99,4 +99,22 @@ export function formatearQuetzales(valor: number | string | null | undefined): s
   return `Q ${num.toLocaleString("es-GT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/**
+ * Formatea fechas YYYY-MM-DD a DD/MM/YYYY evitando desfases de huso horario (GMT-6).
+ */
+export function formatearFechaLocal(fecha: string | Date | null | undefined): string {
+  if (!fecha) return "-";
+  if (fecha instanceof Date) return fecha.toLocaleDateString("es-GT");
+  const str = String(fecha).slice(0, 10);
+  const parts = str.split("-");
+  if (parts.length === 3) {
+    const [y, m, d] = parts.map(Number);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+      return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+    }
+  }
+  return str;
+}
+
+
 

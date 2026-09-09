@@ -24,6 +24,9 @@ import PlazoFijoDetail from "./pages/PlazoFijoDetail";
 import AportacionesList from "./pages/AportacionesList";
 import Usuarios from "./pages/Usuarios";
 import LibroArqueoMensual from "./pages/LibroArqueoMensual";
+import Auditoria from "./pages/Auditoria";
+import Alertas from "./pages/Alertas";
+import Sesiones from "./pages/Sesiones";
 import { useAuth } from "./context/AuthContext";
 
 function InicioRedirect() {
@@ -74,6 +77,9 @@ export default function App() {
           <Route path="/ahorros/:slug/:id" element={<AhorroCuentaDetail />} />
           <Route path="/usuarios" element={<Usuarios />} />
           <Route path="/agencias" element={<Agencias />} />
+          <Route path="/auditoria" element={<Auditoria />} />
+          <Route path="/alertas" element={<Alertas />} />
+          <Route path="/sesiones" element={<Sesiones />} />
         </Route>
         <Route path="*" element={<InicioRedirect />} />
       </Routes>

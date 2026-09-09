@@ -13,6 +13,9 @@ import { dashboardRouter } from "./modules/dashboard/routes";
 import { sistemaRouter } from "./modules/sistema/routes";
 import { prestamosRouter } from "./modules/prestamos/routes";
 import { plazoFijoRouter } from "./modules/plazofijo/routes";
+import { auditoriaRouter } from "./modules/auditoria/routes";
+import { alertasRouter } from "./modules/alertas/routes";
+import { garantiasRouter } from "./modules/garantias/routes";
 
 export const app = express();
 
@@ -23,10 +26,10 @@ app.use(
         return callback(null, true);
       }
       const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map((s) => s.trim()) ?? [];
-      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      return callback(null, true);
+      return callback(new Error(`Origen no permitido por CORS: ${origin}`));
     },
     credentials: true,
   }),
@@ -46,6 +49,9 @@ app.use("/api/dashboard", dashboardRouter);
 app.use("/api/sistema", sistemaRouter);
 app.use("/api/prestamos", prestamosRouter);
 app.use("/api/plazo-fijo", plazoFijoRouter);
+app.use("/api/auditoria", auditoriaRouter);
+app.use("/api/alertas", alertasRouter);
+app.use("/api/garantias", garantiasRouter);
 
 app.use((_req, res) => res.status(404).json({ error: "Ruta no encontrada" }));
 app.use(errorHandler);

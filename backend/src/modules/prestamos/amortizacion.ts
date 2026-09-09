@@ -29,11 +29,15 @@ function formatearAFechaString(fecha: string | Date | undefined): string {
   return String(fecha).slice(0, 10);
 }
 
-function sumarMes(fechaEntrada: string | Date | undefined, meses: number): string {
+export function sumarMesesFinanciero(fechaEntrada: string | Date | undefined, meses: number): string {
   const fechaStr = formatearAFechaString(fechaEntrada);
-  const [año, mes, dia] = fechaStr.split("-").map(Number);
-  const targetMes = mes - 1 + meses;
-  const fecha = new Date(Date.UTC(año, targetMes, dia || 1));
+  const [año, mes, diaOriginal] = fechaStr.split("-").map(Number);
+  const totalMeses = mes - 1 + meses;
+  const targetAño = año + Math.floor(totalMeses / 12);
+  const targetMes = ((totalMeses % 12) + 12) % 12; // 0..11
+  const maxDiasMes = new Date(Date.UTC(targetAño, targetMes + 1, 0)).getUTCDate();
+  const diaFinal = Math.min(diaOriginal || 1, maxDiasMes);
+  const fecha = new Date(Date.UTC(targetAño, targetMes, diaFinal));
   return fecha.toISOString().slice(0, 10);
 }
 
@@ -55,8 +59,8 @@ export function calcularAmortizacion(opciones: OpcionesSimulacion): ResultadoSim
     const cuotaFija = i === 0 ? monto / n : redondear2(monto * ((i * factor) / (factor - 1)));
 
     for (let k = 1; k <= n; k++) {
-      const fechaAnterior = k === 1 ? fechaBase : sumarMes(fechaBase, k - 1);
-      const fechaPago = sumarMes(fechaBase, k);
+      const fechaAnterior = k === 1 ? fechaBase : sumarMesesFinanciero(fechaBase, k - 1);
+      const fechaPago = sumarMesesFinanciero(fechaBase, k);
       const diffMs = new Date(fechaPago + "T00:00:00").getTime() - new Date(fechaAnterior + "T00:00:00").getTime();
       const dias = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
 
@@ -101,8 +105,8 @@ export function calcularAmortizacion(opciones: OpcionesSimulacion): ResultadoSim
     let cuotaPrimera = 0;
 
     for (let k = 1; k <= n; k++) {
-      const fechaAnterior = k === 1 ? fechaBase : sumarMes(fechaBase, k - 1);
-      const fechaPago = sumarMes(fechaBase, k);
+      const fechaAnterior = k === 1 ? fechaBase : sumarMesesFinanciero(fechaBase, k - 1);
+      const fechaPago = sumarMesesFinanciero(fechaBase, k);
       const diffMs = new Date(fechaPago + "T00:00:00").getTime() - new Date(fechaAnterior + "T00:00:00").getTime();
       const dias = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
 

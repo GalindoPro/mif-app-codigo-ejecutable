@@ -20,7 +20,26 @@ interface Cuenta {
   saldo_actual: string;
 }
 
-type SocioConCuentas = Socio & { cuentas: Cuenta[] };
+interface PrestamoBrief {
+  id: string;
+  codigo: string;
+  tipo: string;
+  estado: string;
+  monto_aprobado: string | number | null;
+  monto_solicitado: string | number;
+  saldo_capital: string | number | null;
+  cuota_mensual: string | number;
+  plazo_meses: number;
+  tasa_interes_mensual: string | number;
+  fecha_solicitud: string;
+  fecha_desembolso: string | null;
+  promotor_nombre: string | null;
+  ultimo_pago_fecha: string | null;
+  es_migracion: boolean;
+  numero_credito_anterior: string | null;
+}
+
+type SocioConCuentas = Socio & { cuentas: Cuenta[]; prestamos: PrestamoBrief[] };
 
 const TIPO_CUENTA_LABEL: Record<string, string> = {
   APORTACION: "Aportación Estatutaria",
@@ -32,6 +51,7 @@ const TIPO_CUENTA_LABEL: Record<string, string> = {
 };
 
 const TIPO_SLUG: Record<string, string> = {
+  APORTACION: "aportacion",
   AHORRO_CORRIENTE: "corriente",
   AHORRO_PROGRAMADO: "programado",
   AHORRO_INFANTO_JUVENIL: "infanto-juvenil",

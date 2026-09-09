@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { verifyToken } from "../utils/auth";
+import { verifyToken, jtiEstaRevocado } from "../utils/auth";
 import { unauthorized, forbidden } from "../utils/errors";
 import { RolUsuario, UsuarioAutenticado } from "../types/models";
 
@@ -16,7 +16,11 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) return next(unauthorized());
   try {
-    req.user = verifyToken(header.slice("Bearer ".length));
+    const decoded = verifyToken(header.slice("Bearer ".length));
+    if (decoded.jti && jtiEstaRevocado(decoded.jti)) {
+      return next(unauthorized("Sesión revocada. Por favor inicia sesión nuevamente."));
+    }
+    req.user = decoded;
     return next();
   } catch {
     return next(unauthorized("Sesión inválida o expirada"));

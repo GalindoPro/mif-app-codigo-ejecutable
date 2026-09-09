@@ -16,10 +16,15 @@ import type {
 import {
   capitalizarDescripcion,
   formatearDPI,
+  formatearFechaLocal,
   formatearTelefono,
   limpiarDPI,
   prepararTelefonoParaGuardar,
 } from "../lib/formatters";
+import {
+  calcularAmortizacion,
+  sumarMesesFinanciero,
+} from "../lib/motorFinanciero";
 import InputNombreAutoCompletar from "../components/InputNombreAutoCompletar";
 
 export default function CreditoForm() {
@@ -80,18 +85,12 @@ export default function CreditoForm() {
     setPlazoMeses(plazoTotStr);
 
     if (fechaDesembStr) {
-      const [y, mes, d] = fechaDesembStr.split("-").map(Number);
-      if (y && mes && d) {
-        if (pag > 0) {
-          const dUlt = new Date(Date.UTC(y, mes - 1 + pag, d));
-          setFechaUltimoPago(dUlt.toISOString().slice(0, 10));
-        } else {
-          setFechaUltimoPago(fechaDesembStr);
-        }
-
-        const dProx = new Date(Date.UTC(y, mes + pag, d));
-        setFechaProximoPago(dProx.toISOString().slice(0, 10));
+      if (pag > 0) {
+        setFechaUltimoPago(sumarMesesFinanciero(fechaDesembStr, pag));
+      } else {
+        setFechaUltimoPago(fechaDesembStr);
       }
+      setFechaProximoPago(sumarMesesFinanciero(fechaDesembStr, pag + 1));
     }
   }
 
@@ -155,11 +154,21 @@ export default function CreditoForm() {
 
   async function cargarSimulacionAmortizacion() {
     setCargandoSimulacion(true);
-    try {
-      const monto = esMigracion ? (Number(montoOriginalContrato) || Number(montoSolicitado) || 1000) : (Number(montoSolicitado) || 1000);
-      const plazo = esMigracion ? (Number(plazoTotalContrato) || Number(plazoMeses) || 12) : (Number(plazoMeses) || 12);
-      const fechaBase = esMigracion && fechaDesembolsoOriginal ? fechaDesembolsoOriginal : undefined;
+    const monto = esMigracion ? (Number(montoOriginalContrato) || Number(montoSolicitado) || 1000) : (Number(montoSolicitado) || 1000);
+    const plazo = esMigracion ? (Number(plazoTotalContrato) || Number(plazoMeses) || 12) : (Number(plazoMeses) || 12);
+    const fechaBase = esMigracion && fechaDesembolsoOriginal ? fechaDesembolsoOriginal : undefined;
 
+    const simLocal = calcularAmortizacion({
+      monto,
+      plazoMeses: plazo,
+      tasaInteresMensual: 2.0,
+      tipoAmortizacion: "SOBRE_SALDOS",
+      fechaInicio: fechaBase,
+    });
+    setSimulacionAmortizacion(simLocal);
+    setMostrarTablaAmortizacion(true);
+
+    try {
       const { data } = await api.post<ResultadoSimulacion>("/prestamos/simular", {
         monto,
         plazoMeses: plazo,
@@ -168,9 +177,8 @@ export default function CreditoForm() {
         fechaInicio: fechaBase,
       });
       setSimulacionAmortizacion(data);
-      setMostrarTablaAmortizacion(true);
     } catch {
-      setSimulacionAmortizacion(null);
+      // Si falla la red, simLocal sigue activo
     } finally {
       setCargandoSimulacion(false);
     }
@@ -893,7 +901,7 @@ export default function CreditoForm() {
                                 }}
                               >
                                 <td style={{ padding: "0.35rem 0.5rem" }}>{c.numero}</td>
-                                <td style={{ padding: "0.35rem 0.5rem" }}>{c.fechaPago}</td>
+                                <td style={{ padding: "0.35rem 0.5rem" }}>{formatearFechaLocal(c.fechaPago)}</td>
                                 <td style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Q {c.cuota.toFixed(2)}</td>
                                 <td style={{ padding: "0.35rem 0.5rem", textAlign: "right", fontWeight: 700 }}>Q {c.capital.toFixed(2)}</td>
                                 <td style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Q {c.interes.toFixed(2)}</td>
