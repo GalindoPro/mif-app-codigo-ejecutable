@@ -676,14 +676,17 @@ export default function CobroCreditoVentanilla({
             }}
           >
             <div>
-              <div style={{ fontSize: "0.82rem", color: "#166534" }}>
-                Saldo capital restante tras el pago: <strong>{formatearQuetzales(saldoNuevo)}</strong>
+              <div style={{ fontSize: "0.95rem", color: "#166534", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+                <span>Saldo capital: {formatearQuetzales(saldoActual)}</span>
+                <span style={{ fontSize: "1.1rem" }}>→</span>
+                <span style={{ fontSize: "1.15rem" }}>{formatearQuetzales(saldoNuevo)}</span>
                 {saldoNuevo === 0 && (
-                  <span style={{ marginLeft: "0.5rem", color: "#15803d", fontWeight: 700 }}>
+                  <span style={{ marginLeft: "0.3rem", color: "#15803d", fontWeight: 700 }}>
                     🎉 ¡Crédito Liquidado al 100%!
                   </span>
                 )}
               </div>
+              <div style={{ fontSize: "0.75rem", color: "#166534" }}>Saldo anterior → saldo tras este pago</div>
             </div>
             <div style={{ textAlign: "right" }}>
               <span style={{ fontSize: "0.82rem", color: "#166534" }}>Total a ingresar a caja: </span>
