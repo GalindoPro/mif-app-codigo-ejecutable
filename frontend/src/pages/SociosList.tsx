@@ -67,28 +67,65 @@ export default function SociosList() {
   const totalPaginas = resultado ? Math.max(1, Math.ceil(resultado.total / resultado.pageSize)) : 1;
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-            <h1>{tab === "socios" ? "Socios y Asociados" : "Prospectos / Fiadores Externos"}</h1>
-            {tab === "socios" ? (
-              <span className="badge" style={{ background: "#ecfdf5", color: "#065f46", fontWeight: 700 }}>
-                Padrón Oficial
-              </span>
-            ) : (
-              <span className="badge" style={{ background: "#fef3c7", color: "#92400e", fontWeight: 700 }}>
-                🎯 {fiadores.length} Fiadores sin cuenta (Prospectos de Afiliación)
-              </span>
-            )}
+    <div className="screen-container">
+      {/* CABECERA COMPACTA DE 1 LÍNEA CON TABS INTEGRADAS */}
+      <div className="screen-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.2rem" }}>
+            <span>👥</span> Socios y Asociados
+          </h1>
+          <div style={{ display: "flex", gap: "0.25rem", background: "var(--paper-raised)", padding: "0.18rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+            <button
+              type="button"
+              onClick={() => {
+                setTab("socios");
+                setQ("");
+                setPage(1);
+              }}
+              style={{
+                padding: "0.22rem 0.65rem",
+                borderRadius: "6px",
+                border: "none",
+                fontSize: "0.8rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                background: tab === "socios" ? "var(--primary, #0284c7)" : "transparent",
+                color: tab === "socios" ? "#fff" : "var(--ink-soft)",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.35rem",
+              }}
+            >
+              <span>Padrón</span>
+              <span style={{ fontSize: "0.72rem", opacity: 0.9 }}>({resultado?.total ?? "—"})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTab("prospectos");
+                setQ("");
+              }}
+              style={{
+                padding: "0.22rem 0.65rem",
+                borderRadius: "6px",
+                border: "none",
+                fontSize: "0.8rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                background: tab === "prospectos" ? "#d97706" : "transparent",
+                color: tab === "prospectos" ? "#fff" : "var(--ink-soft)",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.35rem",
+              }}
+            >
+              <span>🎯 Prospectos</span>
+              <span style={{ fontSize: "0.72rem", opacity: 0.9 }}>({fiadores.length})</span>
+            </button>
           </div>
-          <p>
-            {tab === "socios"
-              ? "Padrón oficial de la cooperativa · Mostrando de 10 en 10 en orden correlativo ascendente."
-              : "Personas que respaldan créditos fiduciarios pero aún no tienen cuenta. Ideales para que promotores y cajeros los afilien como socios."}
-          </p>
         </div>
-        <Link to="/socios/nuevo" className="btn">
+
+        <Link to="/socios/nuevo" className="btn" style={{ fontSize: "0.78rem", padding: "0.3rem 0.75rem", fontWeight: 700 }}>
           + Nuevo socio
         </Link>
       </div>
@@ -97,10 +134,12 @@ export default function SociosList() {
         <div
           className="alert error"
           style={{
+            padding: "0.35rem 0.75rem",
+            fontSize: "0.82rem",
+            margin: 0,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            gap: "0.5rem",
           }}
         >
           <span>{error}</span>
@@ -108,13 +147,9 @@ export default function SociosList() {
             type="button"
             className="btn secondary"
             style={{
-              padding: "0.25rem 0.65rem",
-              fontSize: "0.82rem",
-              cursor: "pointer",
+              padding: "0.15rem 0.5rem",
+              fontSize: "0.75rem",
               fontWeight: 700,
-              background: "#ffffff",
-              color: "#dc2626",
-              border: "1px solid #fca5a5",
             }}
             onClick={() => setRecargar((v) => v + 1)}
           >
@@ -123,96 +158,93 @@ export default function SociosList() {
         </div>
       )}
 
-      {/* KPI STRIP - 100% FLUID */}
-      <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", marginBottom: "1.25rem" }}>
-        <div className="stat-card accent">
-          <span className="label">Total Asociados</span>
-          <span className="value mono">{resultado?.total ?? "—"}</span>
-          <span className="sub">En libro de asociados oficial</span>
-        </div>
-        <div className="stat-card">
-          <span className="label">Prospectos / Fiadores</span>
-          <span className="value mono" style={{ color: "#d97706" }}>{fiadores.length}</span>
-          <span className="sub">Sin cuenta de asociado aún</span>
-        </div>
-        <div className="stat-card">
-          <span className="label">Bloque de Padrón</span>
-          <span className="value mono">Pág {page} de {totalPaginas}</span>
-          <span className="sub">10 asociados por vista</span>
-        </div>
-      </div>
-
-      {/* Tabs Selector */}
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", borderBottom: "1px solid var(--border)", paddingBottom: "0.5rem" }}>
-        <button
-          className={`btn ${tab === "socios" ? "" : "secondary"}`}
+      {/* FRANJA DE KPIS COMPACTA (1 FILA) */}
+      <div className="screen-kpis" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+        <div
+          className="stat-card accent"
+          style={{ padding: "0.35rem 0.65rem", cursor: "pointer" }}
           onClick={() => {
             setTab("socios");
             setQ("");
-            setPage(1);
           }}
-          style={{ fontWeight: tab === "socios" ? 700 : 500 }}
         >
-          👥 Socios Registrados
-        </button>
-        <button
-          className={`btn ${tab === "prospectos" ? "" : "secondary"}`}
+          <span className="label" style={{ fontSize: "0.64rem", display: "block" }}>Total Asociados</span>
+          <span className="value mono" style={{ fontSize: "1.05rem" }}>{resultado?.total ?? "—"}</span>
+        </div>
+
+        <div
+          className="stat-card"
+          style={{ padding: "0.35rem 0.65rem", cursor: "pointer", border: tab === "prospectos" ? "1.5px solid #d97706" : undefined }}
           onClick={() => {
             setTab("prospectos");
             setQ("");
           }}
-          style={{ fontWeight: tab === "prospectos" ? 700 : 500 }}
         >
-          🎯 Prospectos / Fiadores Externos
-        </button>
+          <span className="label" style={{ fontSize: "0.64rem", color: "#d97706", fontWeight: 700, display: "block" }}>
+            🎯 Prospectos / Fiadores
+          </span>
+          <span className="value mono" style={{ fontSize: "1.05rem", color: "#d97706" }}>{fiadores.length}</span>
+        </div>
+
+        <div className="stat-card" style={{ padding: "0.35rem 0.65rem" }}>
+          <span className="label" style={{ fontSize: "0.64rem", display: "block" }}>Bloque de Padrón</span>
+          <span className="value mono" style={{ fontSize: "1.05rem" }}>Pág {page} de {totalPaginas}</span>
+        </div>
       </div>
 
-      <div className="searchbar">
-        <input
-          placeholder={tab === "socios" ? "Buscar por nombre, DPI o número de asociado…" : "Buscar fiador por nombre, DPI o crédito…"}
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setPage(1);
-          }}
-        />
+      {/* BARRA DE BÚSQUEDA COMPACTA */}
+      <div className="screen-toolbar">
+        <div style={{ flex: 1, minWidth: 260 }}>
+          <input
+            placeholder={tab === "socios" ? "🔍 Buscar por nombre, DPI o número de asociado…" : "🔍 Buscar fiador por nombre, DPI o crédito…"}
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+            style={{ width: "100%", padding: "0.32rem 0.65rem", fontSize: "0.82rem", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--paper-raised)", color: "var(--ink)" }}
+          />
+        </div>
       </div>
 
+      {/* TABLA DE PADRÓN CON SCROLL INTERNO Y CABECERA STICKY */}
       {tab === "socios" ? (
         <>
-          <div className="table-wrap">
-            <table>
+          <div className="table-scroll-container">
+            <table className="table-compact" style={{ width: "100%" }}>
               <thead>
                 <tr>
-                  <th>No. asociado</th>
-                  <th>Nombre</th>
-                  <th>Agencia</th>
-                  <th>Fecha de ingreso</th>
-                  <th>Cuentas</th>
-                  <th>Estado</th>
+                  <th style={{ width: "14%" }}>No. asociado</th>
+                  <th style={{ width: "32%" }}>Nombre y Contacto</th>
+                  <th style={{ width: "18%" }}>Agencia</th>
+                  <th style={{ width: "14%" }}>Fecha Ingreso</th>
+                  <th style={{ width: "10%", textAlign: "center" }}>Cuentas</th>
+                  <th style={{ width: "12%", textAlign: "center" }}>Estado</th>
                 </tr>
               </thead>
               <tbody>
                 {resultado?.data.map((s) => (
                   <tr key={s.id}>
-                    <td className="mono">{s.numero_asociado}</td>
+                    <td className="mono" style={{ fontWeight: 700 }}>
+                      <Link to={`/socios/${s.id}`}>{s.numero_asociado}</Link>
+                    </td>
                     <td>
-                      <Link to={`/socios/${s.id}`} style={{ fontWeight: 600 }}>
+                      <Link to={`/socios/${s.id}`} style={{ fontWeight: 600, color: "inherit", textDecoration: "none" }}>
                         {s.nombres}
                       </Link>
                       {(s.dpi || s.telefono) && (
-                        <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", marginTop: "0.15rem" }}>
+                        <div style={{ fontSize: "0.72rem", color: "var(--ink-soft)", marginTop: "0.1rem" }}>
                           {s.dpi && <span>DPI: <span className="mono">{formatearDPI(s.dpi)}</span></span>}
                           {s.dpi && s.telefono && <span> · </span>}
                           {s.telefono && <span>Tel: <span className="mono">{s.telefono}</span></span>}
                         </div>
                       )}
                     </td>
-                    <td>{s.agencia_nombre}</td>
-                    <td className="mono">{new Date(s.fecha_ingreso).toLocaleDateString("es-GT")}</td>
-                    <td className="mono">{s.total_cuentas ?? 0}</td>
-                    <td>
-                      <span className={`badge ${s.estado === "ACTIVO" ? "activo" : "inactivo"}`}>
+                    <td style={{ fontSize: "0.8rem" }}>{s.agencia_nombre}</td>
+                    <td className="mono" style={{ fontSize: "0.78rem" }}>{new Date(s.fecha_ingreso).toLocaleDateString("es-GT")}</td>
+                    <td className="mono" style={{ textAlign: "center", fontWeight: 700 }}>{s.total_cuentas ?? 0}</td>
+                    <td style={{ textAlign: "center" }}>
+                      <span className={`badge ${s.estado === "ACTIVO" ? "activo" : "inactivo"}`} style={{ fontSize: "0.7rem", padding: "0.12rem 0.4rem" }}>
                         {s.estado === "ACTIVO" ? "Activo" : "Inactivo"}
                       </span>
                     </td>
@@ -221,29 +253,42 @@ export default function SociosList() {
               </tbody>
             </table>
             {!cargando && resultado?.data.length === 0 && (
-              <div className="empty">
+              <div className="empty" style={{ padding: "1.5rem" }}>
                 {q ? `No hay socios que coincidan con "${q}".` : "Todavía no hay socios registrados."}
               </div>
             )}
           </div>
 
+          {/* PAGINACIÓN FIJA EN PIE */}
           {resultado && resultado.total > resultado.pageSize && (
-            <div className="pagination">
-              <button className="btn secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                Anterior
-              </button>
-              <span>
-                Página {page} de {totalPaginas} · {resultado.total} socios
+            <div className="screen-footer">
+              <span style={{ color: "var(--ink-soft)" }}>
+                Mostrando {resultado.data.length} de {resultado.total} socios · Pág. {page} de {totalPaginas}
               </span>
-              <button className="btn secondary" disabled={page >= totalPaginas} onClick={() => setPage((p) => p + 1)}>
-                Siguiente
-              </button>
+              <div style={{ display: "flex", gap: "0.4rem" }}>
+                <button
+                  className="btn secondary"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                  style={{ fontSize: "0.75rem", padding: "0.22rem 0.6rem" }}
+                >
+                  ← Anterior
+                </button>
+                <button
+                  className="btn secondary"
+                  disabled={page >= totalPaginas}
+                  onClick={() => setPage((p) => p + 1)}
+                  style={{ fontSize: "0.75rem", padding: "0.22rem 0.6rem" }}
+                >
+                  Siguiente →
+                </button>
+              </div>
             </div>
           )}
         </>
       ) : (
-        <div className="table-wrap">
-          <table>
+        <div className="table-scroll-container">
+          <table className="table-compact" style={{ width: "100%" }}>
             <thead>
               <tr>
                 <th>Fiador (Prospecto)</th>
@@ -251,7 +296,7 @@ export default function SociosList() {
                 <th>Dirección / Lugar</th>
                 <th>Crédito que Respalda</th>
                 <th>Socio Titular</th>
-                <th>Acción de Afiliación</th>
+                <th style={{ textAlign: "center" }}>Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -259,52 +304,54 @@ export default function SociosList() {
                 <tr key={`${f.prestamo_id}-${idx}`}>
                   <td>
                     <div style={{ fontWeight: 600 }}>{f.nombre_fiador}</div>
-                    <span className="badge" style={{ background: "#fef3c7", color: "#92400e", fontSize: "0.72rem" }}>
-                      👤 Sin cuenta en cooperativa
+                    <span className="badge" style={{ background: "#fef3c7", color: "#92400e", fontSize: "0.68rem", padding: "0.1rem 0.35rem" }}>
+                      👤 Prospecto
                     </span>
                   </td>
                   <td>
-                    <div className="mono" style={{ fontSize: "0.85rem" }}>
+                    <div className="mono" style={{ fontSize: "0.8rem" }}>
                       {formatearDPI(f.dpi_fiador || "")}
                     </div>
                     {f.telefono_fiador && (
-                      <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+                      <div style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
                         📞 {f.telefono_fiador}
                       </div>
                     )}
                   </td>
-                  <td style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>
+                  <td style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
                     {f.lugar_fiador || "—"}
                   </td>
                   <td>
-                    <Link to={`/creditos/${f.prestamo_id}`} style={{ fontWeight: 600 }} className="mono">
+                    <Link to={`/creditos/${f.prestamo_id}`} style={{ fontWeight: 600, fontSize: "0.8rem" }} className="mono">
                       {f.prestamo_codigo}
                     </Link>
-                    <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
-                      Monto: {formatearQuetzales(f.monto_aprobado || f.monto_solicitado)}
+                    <div style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
+                      {formatearQuetzales(f.monto_aprobado || f.monto_solicitado)}
                     </div>
                   </td>
                   <td>
-                    <Link to={`/socios/${f.socio_id}`} style={{ fontWeight: 500 }}>
+                    <Link to={`/socios/${f.socio_id}`} style={{ fontWeight: 500, fontSize: "0.8rem" }}>
                       {f.socio_nombre}
                     </Link>
-                    <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+                    <div style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
                       Asoc. <span className="mono">{f.socio_numero}</span>
                     </div>
                   </td>
-                  <td>
+                  <td style={{ textAlign: "center" }}>
                     <Link
                       to={`/socios/nuevo?nombres=${encodeURIComponent(f.nombre_fiador)}&dpi=${encodeURIComponent(f.dpi_fiador || "")}&telefono=${encodeURIComponent(f.telefono_fiador || "")}&direccion=${encodeURIComponent(f.lugar_fiador || "")}`}
                       className="btn secondary"
                       style={{
-                        padding: "0.35rem 0.65rem",
-                        fontSize: "0.78rem",
+                        padding: "0.2rem 0.5rem",
+                        fontSize: "0.72rem",
                         background: "#10b981",
                         color: "#fff",
                         borderColor: "#059669",
+                        textDecoration: "none",
+                        fontWeight: 700,
                       }}
                     >
-                      + Afiliar como Socio
+                      + Afiliar
                     </Link>
                   </td>
                 </tr>
@@ -312,7 +359,7 @@ export default function SociosList() {
             </tbody>
           </table>
           {!cargandoFiadores && fiadores.length === 0 && (
-            <div className="empty">
+            <div className="empty" style={{ padding: "1.5rem" }}>
               {q ? `No hay fiadores externos que coincidan con "${q}".` : "No hay fiadores externos registrados en créditos fiduciarios."}
             </div>
           )}
@@ -321,4 +368,3 @@ export default function SociosList() {
     </div>
   );
 }
-

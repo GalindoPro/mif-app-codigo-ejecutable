@@ -26,11 +26,13 @@ export default function AuxiliarCaja() {
   useEffect(() => {
     api.get<Agencia[]>("/agencias").then(({ data }) => {
       setAgencias(data);
-      // ADMIN/GERENCIA no tienen agencia propia (ven todas): sin esto, la
-      // pantalla se queda bloqueada en "Debes tener una agencia asignada"
-      // para siempre, porque el selector de abajo nunca llega a mostrarse.
-      setAgenciaId((actual) => actual || data[0]?.id || "");
+      // Si el usuario es ADMIN/GERENCIA y no tiene agencia asignada,
+      // seleccionar automáticamente la primera agencia disponible
+      if (!usuario?.agenciaId && data.length > 0) {
+        setAgenciaId(data[0].id);
+      }
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function cargarEstado() {
@@ -75,8 +77,12 @@ export default function AuxiliarCaja() {
 
   if (!agenciaId) {
     return (
-      <div>
-        <h1>Auxiliar de caja</h1>
+      <div className="screen-container">
+        <div className="screen-header">
+          <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.2rem" }}>
+            <span>💵</span> Auxiliar de Caja
+          </h1>
+        </div>
         <div className="alert error">Debes tener una agencia asignada o seleccionar una.</div>
       </div>
     );
@@ -85,18 +91,50 @@ export default function AuxiliarCaja() {
   const agenciaActualNombre = agencias.find((a) => a.id === agenciaId)?.nombre ?? "Agencia";
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <h1>Auxiliar de caja</h1>
-          <p>Libro de caja del día: transacciones agente Banco Industrial e ingresos/egresos propios.</p>
+    <div className="screen-container">
+      {/* CABECERA COMPACTA DE 1 LÍNEA */}
+      <div className="screen-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", flexWrap: "wrap" }}>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.2rem" }}>
+            <span>💵</span> Auxiliar de Caja
+          </h1>
+          <span
+            style={{
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              padding: "0.15rem 0.5rem",
+              borderRadius: "4px",
+              background: "rgba(16, 185, 129, 0.15)",
+              color: "#10b981",
+              border: "1px solid rgba(16, 185, 129, 0.3)",
+            }}
+          >
+            Libro de Operaciones Diarias
+          </span>
         </div>
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
-          <button className="btn secondary" onClick={() => setMostrarHistorial(true)}>
-            📅 Historial de Cajas
+
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="btn secondary"
+            onClick={() => setMostrarHistorial(true)}
+            style={{ padding: "0.3rem 0.65rem", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.3rem" }}
+          >
+            <span>📅</span> Historial de Cajas
           </button>
           {puedeElegirAgencia && (
-            <select value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} style={{ maxWidth: 240 }}>
+            <select
+              value={agenciaId}
+              onChange={(e) => setAgenciaId(e.target.value)}
+              style={{
+                padding: "0.3rem 0.65rem",
+                borderRadius: "6px",
+                border: "1px solid var(--line)",
+                background: "var(--paper)",
+                color: "var(--ink)",
+                fontSize: "0.8rem",
+              }}
+            >
               {agencias.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.nombre}
@@ -107,7 +145,11 @@ export default function AuxiliarCaja() {
         </div>
       </div>
 
-      {error && <div className="alert error">{error}</div>}
+      {error && (
+        <div className="alert error" style={{ margin: "0.25rem 0", padding: "0.4rem 0.75rem", fontSize: "0.82rem" }}>
+          {error}
+        </div>
+      )}
 
       {estadoInfo?.estado === "SIN_ABRIR" && (
         <AbrirCajaCard estadoInfo={estadoInfo} cargando={cargando} onAbrir={abrirCaja} />

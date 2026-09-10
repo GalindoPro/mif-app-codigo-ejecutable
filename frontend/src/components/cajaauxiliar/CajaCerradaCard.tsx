@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { DetalleCajaAuxiliar } from "../../types";
-import { formatearQuetzales } from "../../lib/formatters";
+import { formatoQ } from "../../types";
 import ActaArqueoModal from "./ActaArqueoModal";
 
 export interface CajaCerradaCardProps {
@@ -15,110 +15,196 @@ export default function CajaCerradaCard({
   onVerHistorial,
 }: CajaCerradaCardProps) {
   const [mostrarActa, setMostrarActa] = useState(false);
-  const [mostrarMovimientos, setMostrarMovimientos] = useState(false);
 
   const diferencia = Number(detalle.arqueo?.diferencia ?? 0);
   const totalContado = Number(detalle.arqueo?.total_contado ?? (detalle.dia.saldo_final ?? detalle.saldoActual));
 
   return (
-    <div>
-      <div className="card" style={{ borderTop: "4px solid #475569", marginBottom: "1.5rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              <span className="badge inactivo" style={{ fontWeight: 700, padding: "0.3rem 0.75rem" }}>
-                🔒 Caja del Día Cerrada
-              </span>
-              <span className="sub" style={{ margin: 0, fontWeight: 600 }}>
-                {new Date(detalle.dia.fecha).toLocaleDateString("es-GT", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-              </span>
-            </div>
-            <h2 style={{ margin: "0.75rem 0 0.25rem" }}>{agenciaNombre} · Turno Finalizado</h2>
-            <p className="sub" style={{ margin: 0 }}>
-              El arqueo de cierre y conteo físico de efectivo fue registrado exitosamente.
-            </p>
-          </div>
-
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <button className="btn" style={{ background: "#0f766e", borderColor: "#0f766e" }} onClick={() => setMostrarActa(true)}>
-              🖨️ Imprimir Acta Oficial de Arqueo
-            </button>
-            <button className="btn secondary" onClick={() => setMostrarMovimientos((v) => !v)}>
-              {mostrarMovimientos ? "Ocultar movimientos" : `📜 Ver movimientos (${detalle.movimientos.length})`}
-            </button>
-            <button className="btn secondary" onClick={onVerHistorial}>
-              📅 Historial de cajas
-            </button>
-          </div>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, gap: "0.5rem" }}>
+      {/* BARRA DE ESTADO DE CIERRE */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "0.5rem",
+          padding: "0.45rem 0.75rem",
+          background: "var(--paper-raised)",
+          border: "1px solid var(--line)",
+          borderRadius: "8px",
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
+          <span
+            style={{
+              fontSize: "0.74rem",
+              fontWeight: 700,
+              padding: "0.2rem 0.6rem",
+              borderRadius: "4px",
+              background: "rgba(100, 116, 139, 0.2)",
+              color: "#94a3b8",
+              border: "1px solid rgba(148, 163, 184, 0.3)",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.3rem",
+            }}
+          >
+            <span>🔒</span> Turno Finalizado
+          </span>
+          <span style={{ fontWeight: 600, fontSize: "0.86rem", color: "var(--ink)" }}>
+            {agenciaNombre}
+          </span>
+          <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+            · {new Date(detalle.dia.fecha).toLocaleDateString("es-GT", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+          </span>
         </div>
 
-        <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", marginTop: "1.25rem" }}>
-          <div className="stat-card">
-            <span className="label">Saldo inicial</span>
-            <span className="value">{formatearQuetzales(detalle.dia.saldo_inicial)}</span>
-          </div>
-          <div className="stat-card">
-            <span className="label">Total ingresos</span>
-            <span className="value">{formatearQuetzales(detalle.totalIngreso)}</span>
-          </div>
-          <div className="stat-card">
-            <span className="label">Total egresos</span>
-            <span className="value">{formatearQuetzales(detalle.totalEgreso)}</span>
-          </div>
-          <div className="stat-card accent">
-            <span className="label">Saldo final según libro</span>
-            <span className="value">{formatearQuetzales(detalle.dia.saldo_final ?? detalle.saldoActual)}</span>
-          </div>
-          <div className="stat-card">
-            <span className="label">Efectivo contado</span>
-            <span className="value">{formatearQuetzales(totalContado)}</span>
-          </div>
-          <div className={`stat-card ${diferencia === 0 ? "" : "danger"}`}>
-            <span className="label">Diferencia de Arqueo</span>
-            <span className="value" style={{ color: diferencia === 0 ? "#16a34a" : "#dc2626" }}>
-              {diferencia === 0 ? "Cuadrada (Q 0.00)" : (diferencia > 0 ? `Sobrante ${formatearQuetzales(diferencia)}` : `Faltante ${formatearQuetzales(Math.abs(diferencia))}`)}
-            </span>
-          </div>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <button
+            type="button"
+            className="btn"
+            style={{
+              background: "#0f766e",
+              borderColor: "#0f766e",
+              padding: "0.3rem 0.75rem",
+              fontSize: "0.8rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.35rem",
+            }}
+            onClick={() => setMostrarActa(true)}
+          >
+            <span>🖨️</span> Imprimir Acta Oficial
+          </button>
         </div>
       </div>
 
-      {mostrarMovimientos && (
-        <div className="card" style={{ marginBottom: "1.5rem" }}>
-          <h3 style={{ marginTop: 0 }}>Movimientos del día cerrado ({detalle.movimientos.length})</h3>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Hora</th>
-                  <th>Movimiento</th>
-                  <th>Referencia</th>
-                  <th>Beneficiario</th>
-                  <th>Doc.</th>
-                  <th>Ingreso</th>
-                  <th>Egreso</th>
-                  <th>Saldo</th>
-                  <th>Usuario</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detalle.movimientos.map((m) => (
-                  <tr key={m.id}>
-                    <td className="mono">{new Date(m.created_at).toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}</td>
-                    <td>{m.descripcion}</td>
-                    <td className="mono">{m.referencia ?? "—"}</td>
-                    <td>{m.beneficiario}</td>
-                    <td className="mono">{m.doc_no ?? "—"}</td>
-                    <td className="mono movimiento-monto deposito">{m.tipo === "INGRESO" ? formatearQuetzales(m.monto) : ""}</td>
-                    <td className="mono movimiento-monto retiro">{m.tipo === "EGRESO" ? formatearQuetzales(m.monto) : ""}</td>
-                    <td className="mono">{formatearQuetzales(m.saldo_acumulado)}</td>
-                    <td>{m.usuario_nombre}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {/* 6 KPIS HORIZONTALES SIN TRUNCAMIENTO */}
+      <div className="screen-kpis" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
+        <div className="screen-kpi-tile">
+          <span className="screen-kpi-label">SALDO INICIAL</span>
+          <span className="screen-kpi-value" style={{ fontSize: "1.05rem" }}>
+            {formatoQ(detalle.dia.saldo_inicial)}
+          </span>
+          <span className="screen-kpi-sub">Apertura del turno</span>
         </div>
-      )}
+        <div className="screen-kpi-tile">
+          <span className="screen-kpi-label">TOTAL INGRESOS</span>
+          <span className="screen-kpi-value" style={{ color: "#059669", fontSize: "1.05rem" }}>
+            {formatoQ(detalle.totalIngreso)}
+          </span>
+          <span className="screen-kpi-sub">Cobros y depósitos</span>
+        </div>
+        <div className="screen-kpi-tile">
+          <span className="screen-kpi-label">TOTAL EGRESOS</span>
+          <span className="screen-kpi-value" style={{ color: "#d97706", fontSize: "1.05rem" }}>
+            {formatoQ(detalle.totalEgreso)}
+          </span>
+          <span className="screen-kpi-sub">Desembolsos y retiros</span>
+        </div>
+        <div className="screen-kpi-tile accent">
+          <span className="screen-kpi-label">SALDO SEGÚN LIBRO</span>
+          <span className="screen-kpi-value" style={{ fontSize: "1.05rem" }}>
+            {formatoQ(detalle.dia.saldo_final ?? detalle.saldoActual)}
+          </span>
+          <span className="screen-kpi-sub">Libro de caja auxiliar</span>
+        </div>
+        <div className="screen-kpi-tile">
+          <span className="screen-kpi-label">EFECTIVO CONTADO</span>
+          <span className="screen-kpi-value" style={{ fontSize: "1.05rem" }}>
+            {formatoQ(totalContado)}
+          </span>
+          <span className="screen-kpi-sub">Arqueo físico</span>
+        </div>
+        <div
+          className="screen-kpi-tile"
+          style={{
+            borderLeft: diferencia === 0 ? "3px solid #16a34a" : "3px solid #dc2626",
+          }}
+        >
+          <span className="screen-kpi-label">DIFERENCIA ARQUEO</span>
+          <span
+            className="screen-kpi-value"
+            style={{
+              color: diferencia === 0 ? "#16a34a" : "#dc2626",
+              fontSize: "1.05rem",
+            }}
+          >
+            {diferencia === 0
+              ? "Cuadrada (Q 0.00)"
+              : diferencia > 0
+              ? `Sobrante ${formatoQ(diferencia)}`
+              : `Faltante ${formatoQ(Math.abs(diferencia))}`}
+          </span>
+          <span className="screen-kpi-sub">
+            {diferencia === 0 ? "Sin descuadre" : "Auditoría requerida"}
+          </span>
+        </div>
+      </div>
+
+      {/* TABLA DE MOVIMIENTOS CON SCROLL INTERNO Y CABECERA PEGAJOSA */}
+      <div className="table-scroll-container">
+        <table className="table-compact">
+          <thead>
+            <tr>
+              <th style={{ minWidth: 65 }}>HORA</th>
+              <th style={{ minWidth: 160 }}>DESCRIPCIÓN</th>
+              <th style={{ minWidth: 110 }}>REFERENCIA</th>
+              <th style={{ minWidth: 160 }}>BENEFICIARIO / SOCIO</th>
+              <th style={{ minWidth: 80 }}>DOC.</th>
+              <th style={{ minWidth: 95, textAlign: "right" }}>INGRESO</th>
+              <th style={{ minWidth: 95, textAlign: "right" }}>EGRESO</th>
+              <th style={{ minWidth: 100, textAlign: "right" }}>SALDO</th>
+              <th style={{ minWidth: 100 }}>USUARIO</th>
+            </tr>
+          </thead>
+          <tbody>
+            {detalle.movimientos.map((m) => (
+              <tr key={m.id}>
+                <td className="mono" style={{ fontSize: "0.78rem" }}>
+                  {new Date(m.created_at).toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}
+                </td>
+                <td style={{ fontWeight: 600, fontSize: "0.8rem" }}>{m.descripcion}</td>
+                <td className="mono" style={{ fontSize: "0.78rem", color: "var(--accent)" }}>{m.referencia ?? "—"}</td>
+                <td style={{ fontSize: "0.8rem" }}>{m.beneficiario || "—"}</td>
+                <td className="mono" style={{ fontSize: "0.78rem" }}>{m.doc_no ?? "—"}</td>
+                <td className="mono" style={{ color: "#059669", fontWeight: 700, textAlign: "right", fontSize: "0.8rem" }}>
+                  {m.tipo === "INGRESO" ? formatoQ(m.monto) : ""}
+                </td>
+                <td className="mono" style={{ color: "#d97706", fontWeight: 700, textAlign: "right", fontSize: "0.8rem" }}>
+                  {m.tipo === "EGRESO" ? formatoQ(m.monto) : ""}
+                </td>
+                <td className="mono" style={{ fontWeight: 700, textAlign: "right", fontSize: "0.8rem" }}>
+                  {formatoQ(m.saldo_acumulado)}
+                </td>
+                <td style={{ fontSize: "0.76rem", color: "var(--ink-soft)" }}>{m.usuario_nombre}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {detalle.movimientos.length === 0 && (
+          <div className="empty" style={{ padding: "2rem", textAlign: "center", color: "var(--ink-soft)" }}>
+            No se registraron movimientos en este turno.
+          </div>
+        )}
+      </div>
+
+      {/* FOOTER FIJO */}
+      <div className="screen-footer">
+        <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+          Registro de auditoría · Mostrando los {detalle.movimientos.length} movimientos del turno cerrado
+        </span>
+        <button
+          type="button"
+          className="btn secondary"
+          onClick={onVerHistorial}
+          style={{ padding: "0.22rem 0.65rem", fontSize: "0.78rem" }}
+        >
+          📅 Ver otras fechas en Historial
+        </button>
+      </div>
 
       {mostrarActa && (
         <ActaArqueoModal

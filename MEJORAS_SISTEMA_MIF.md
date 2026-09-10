@@ -277,11 +277,51 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
   - **Cabecera Unificada con Pestañas Integradas:** Botones conmutadores de `Cartera ({total})` y `Fiadores ({total})` integrados directamente en el encabezado junto a los accesos al `Simulador` y `+ Nueva solicitud`, ahorrando más de 80px de altura.
   - **Franja de KPIs Ultra Compacta:** Tarjetas interactivas con iconos y montos continuos (*Cartera Activa*, *Por Desembolsar*, *En Solicitud*, *Total Créditos*) que filtran la tabla al hacer clic.
   - **Barra de Herramientas Compacta (`.screen-toolbar`):** Buscador instantáneo y botones de estado rápido (`Todos`, `⚡ Desembolso`, `Cobro`, `Pagados`) en 1 sola fila de 36px.
-  - **Tabla Compacta de Créditos (`.table-compact`):** Altura de filas optimizada para visualizar entre 9 y 12 créditos de inmediato; acciones rápidas (`⚡ Desembolsar`, `💰 Cobrar`, `Finalizar`, `Ficha →`) en una sola línea horizontal sin quebrar filas.
-  - **Paginación Integrada al Pie (`.screen-footer`):** Controles fijos al fondo de la pantalla sin interferir con la tabla.
-  - **Directorio de Fiadores Optimizado:** Misma estructura compacta de 100vh con franja de 3 KPIs (Total, Externos sin cuenta, Socios con cuenta) y tabla con scroll interno.
-- **Sincronización Dual Continua:**
-  - Modificaciones aplicadas en simultáneo en `/Users/galindo/Downloads/mif-app-codigo-ejecutable` y en el entorno de ejecución activo `/Users/galindo/Documents/proyects/carpet/mif-app-codigo-ejecutable`.
+---
+
+## 23. Optimización del Kardex de Cartera a Pantalla Completa (100vh) y Formato Limpio de Vencimientos (`KardexCarteraPromotor.tsx`)
+- **Problema Previo:**
+  - Las 6 tarjetas superiores ocupaban un espacio vertical excesivo y truncaban las cifras de Quetzales con puntos suspensivos (`Q 2,657,460...` y `Q 3,831,594...`).
+  - Las fechas de vencimiento en la tabla mostraban marcas de tiempo UTC crudas (`2029-02-18T06:00:00.000Z`).
+  - La tabla generaba scroll de ventana completa obligando a bajar la página para ver la paginación.
+- **Solución Implementada:**
+  - **Estructura `.screen-container` de 100vh:** Altura exacta calculada `calc(100vh - 2.2rem)` con `overflow: hidden` en escritorio.
+  - **Cabecera Compacta en 1 Sola Línea:** Título principal con selector de mes integrado y botonera de acciones agrupadas (`🖨️ Imprimir`, `+ Nueva Solicitud`, `📥 Excel`, `⚠️ Reset`).
+---
+
+## 24. Optimización del Padrón de Socios a Pantalla Completa (100vh Sin Scroll) (`SociosList.tsx`)
+- **Problema Previo:**
+  - Las 3 tarjetas de asociados ocupaban una altura excesiva en la parte superior.
+  - La fila de pestañas y el buscador estaban apilados verticalmente, empujando la tabla hacia abajo y forzando un scroll de página completa para poder consultar la paginación.
+- **Solución Implementada:**
+  - **Estructura `.screen-container` de 100vh:** Altura exacta `calc(100vh - 2.2rem)` con `overflow: hidden` en monitores de PC.
+  - **Cabecera Unificada en 1 Sola Línea:** Título principal con pestañas conmutadoras integradas (`Padrón ({total})` y `🎯 Prospectos ({fiadores})`) y botón `+ Nuevo socio` a la derecha.
+  - **Franja de KPIs Ultra Delgada:** 3 mini tarjetas compactas de 1 fila (*Total Asociados*, *Prospectos / Fiadores*, *Bloque de Padrón*).
+  - **Barra de Búsqueda Compacta (`.screen-toolbar`):** Input estilizado de ancho completo en una sola línea de 34px.
+  - **Tabla Compacta con Cabecera Sticky (`.table-scroll-container`):** Altura de celdas optimizada para visualizar 10 asociados por vista cómodamente, cabecera fija y scrollbar interno sutil.
+  - **Paginación Fija al Fondo (`.screen-footer`):** Controles `← Anterior` y `Siguiente →` integrados al pie inferior sin desbordar el viewport.
+  - **Sincronización Dual Continua:** Copia simultánea entre `/Users/galindo/Downloads/mif-app-codigo-ejecutable` y `/Users/galindo/Documents/proyects/carpet/mif-app-codigo-ejecutable`.
 
 
 
+
+## 25. Optimización de Aportaciones, Ahorros y Auxiliar de Caja a Pantalla Completa (100vh Sin Scroll) - Cobertura Global Completada
+
+- **Alcance:** `AportacionesList.tsx`, `AhorroList.tsx`, `PlazoFijoList.tsx`, `AuxiliarCaja.tsx`, `CajaAbierta.tsx`, `CajaCerradaCard.tsx`, `app.css`
+- **Problema Previo:**
+  - Las pantallas de Aportaciones, Ahorros y Auxiliar de Caja usaban la estructura antigua `page-head` y `stat-grid` con tarjetas KPI grandes apiladas verticalmente, causando scroll de ventana completa.
+  - CajaAbierta mostraba KPIs, consolidado de fondos, novedades de campo y botones de acción todos apilados antes de la tabla, dejando la tabla de movimientos muy abajo y pequeña.
+  - CajaCerradaCard presentaba los 6 KPIs del arqueo con valores truncados (números con `...`).
+- **Solución Implementada:**
+  - **Padrón de Aportaciones (`AportacionesList.tsx`):** Estructura `.screen-container` de 100vh, cabecera 1 línea con badge "Capital Social Oficial", 4 KPI tiles horizontales (Capital Aportado, Asociados, Promedio, Bloque), barra de búsqueda `.screen-toolbar`, tabla compacta con sticky header y `.screen-footer` con paginación.
+  - **Ahorro Corriente y Cuentas (`AhorroList.tsx`):** Cubre `/ahorros/corriente`, `/programado`, `/infanto-juvenil`, `/sobre-prestamo`. Misma estructura 100vh: 4 KPI tiles (Saldo Total, Depósitos, Retiros, Vista de Cuentas), búsqueda compacta, tabla con columna de acción "Ver cuenta →", scroll interno.
+  - **Ahorro a Plazo Fijo (`PlazoFijoList.tsx`):** 4 KPI tiles (Capital a PF, Intereses Netos, Certificados Vigentes, Vencidos/Por Liquidar), toolbar con buscador y selector de estado, tabla con columnas optimizadas (Plazo/Tasa fusionadas), scroll interno, footer paginación. Fecha formateada con `formatearFechaCorta` para evitar ISO timestamps.
+  - **Auxiliar de Caja (`AuxiliarCaja.tsx`):** Cabecera `.screen-header` compacta en 1 línea con selector de agencia y botón Historial. Fix automático: ADMIN/GERENCIA auto-selecciona primera agencia disponible cuando `agenciaId` es null.
+  - **Caja Abierta (`CajaAbierta.tsx`):** Rediseño a layout 2 columnas `.screen-split-layout` (340px + flex 1):
+    - Panel izquierdo scrollable: Botonera de ventanilla en grid 2×2 (💵 Cobro Cuota, 📤 Desembolso, 📦 Liquidar PF, + Nuevo Mov.) + Botón 🔒 Cerrar Caja a ancho completo + Consolidado de Fuentes de Fondos compacto (MIF/FEDERURAL/CHN) + Panel de Novedades de Campo.
+    - Panel derecho: 4 KPI tiles (Saldo Inicial, Ingresos, Egresos, Saldo Actual) + área dinámica que muestra el formulario activo O la tabla de movimientos con sticky header + footer contador de operaciones.
+  - **Caja Cerrada (`CajaCerradaCard.tsx`):** Barra de estado compacta de 1 línea con badge "Turno Finalizado" y botón Imprimir Acta. 6 KPI tiles horizontales sin truncamiento (Saldo Inicial, Ingresos, Egresos, Saldo Libro, Efectivo Contado, Diferencia Arqueo con color semáforo). Tabla de movimientos del día con scroll interno y sticky header. Footer con botón de historial.
+  - **CSS Global (`app.css`):** Nuevas clases `.screen-kpi-tile`, `.screen-kpi-tile.accent`, `.screen-kpi-label`, `.screen-kpi-value`, `.screen-kpi-sub` para uniformar KPIs en todos los módulos.
+- **Cobertura Completada:** Todas las pantallas del sistema (Tablero, Caja Chica, Créditos, Kardex Cartera, Socios, Aportaciones, Ahorro Corriente/Programado/Infanto-Juvenil/Sobre-Préstamo, Plazo Fijo, Auxiliar de Caja) ahora aplican la arquitectura 100vh single-screen de forma global.
+- **Archivos Modificados:** `frontend/src/pages/AportacionesList.tsx`, `frontend/src/pages/AhorroList.tsx`, `frontend/src/pages/PlazoFijoList.tsx`, `frontend/src/pages/AuxiliarCaja.tsx`, `frontend/src/components/cajaauxiliar/CajaAbierta.tsx`, `frontend/src/components/cajaauxiliar/CajaCerradaCard.tsx`, `frontend/src/styles/app.css`
+- **Sincronización Dual:** Downloads ↔ Documents aplicada en todos los archivos.

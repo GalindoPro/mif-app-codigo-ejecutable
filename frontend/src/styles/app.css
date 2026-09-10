@@ -414,6 +414,52 @@
   flex-shrink: 0;
 }
 
+.screen-kpi-tile {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  gap: 0.15rem;
+}
+.screen-kpi-tile.accent {
+  border-left: 3px solid var(--accent);
+}
+.screen-kpi-label {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.screen-kpi-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+  white-space: nowrap;
+  display: block;
+}
+.screen-kpi-tile.accent .screen-kpi-value {
+  color: var(--accent);
+}
+.screen-kpi-sub {
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
 .screen-split-layout {
   display: grid;
   grid-template-columns: 360px 1fr;

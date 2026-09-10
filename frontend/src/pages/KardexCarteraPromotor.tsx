@@ -115,27 +115,30 @@ export default function KardexCarteraPromotor() {
     }
   }
 
+  function formatearFechaCorta(f: string | null | undefined) {
+    if (!f) return "—";
+    const fechaLimpia = f.includes("T") ? f.split("T")[0] : f;
+    const partes = fechaLimpia.split("-");
+    if (partes.length === 3) {
+      return `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+    return f;
+  }
+
   return (
-    <div>
+    <div className="screen-container">
       {/* ========================================================================= */}
       {/* VISTA EN PANTALLA (INTERACTIVA - NO PRINT)                                */}
       {/* ========================================================================= */}
-      <div className="no-print">
-        {/* Encabezado */}
-        <div className="page-head">
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <span style={{ fontSize: "1.5rem" }}>📂</span>
-              <h1>Kardex de Cartera de Préstamos</h1>
-            </div>
-            <p>
-              Control de cartera de créditos en vivo. Los cobros de cuotas en ventanilla se reflejan aquí al instante sin
-              necesidad de transcribir en Excel.
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-              <label htmlFor="mes-kardex" style={{ fontSize: "0.85rem", color: "var(--ink-soft)", fontWeight: 600 }}>
+      <div className="no-print" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", gap: "0.5rem" }}>
+        {/* Encabezado compacto de 1 línea */}
+        <div className="screen-header">
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+            <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.2rem" }}>
+              <span>📂</span> Kardex de Cartera
+            </h1>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", background: "var(--paper-raised)", padding: "0.15rem 0.5rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
+              <label htmlFor="mes-kardex" style={{ fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 700 }}>
                 Mes:
               </label>
               <input
@@ -143,19 +146,22 @@ export default function KardexCarteraPromotor() {
                 type="month"
                 value={mes}
                 onChange={(e) => setMes(e.target.value)}
-                style={{ padding: "0.4rem 0.6rem", borderRadius: "6px", fontSize: "0.88rem" }}
+                style={{ padding: "0.18rem 0.4rem", borderRadius: "4px", fontSize: "0.8rem", border: "none", background: "transparent", color: "var(--ink)", fontWeight: 600 }}
               />
             </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
             <button
               type="button"
               className="btn secondary"
-              style={{ fontWeight: 700, borderColor: "var(--accent)" }}
+              style={{ fontWeight: 700, borderColor: "var(--accent)", fontSize: "0.76rem", padding: "0.28rem 0.6rem" }}
               onClick={() => window.print()}
             >
-              🖨️ Imprimir Kardex (Horizontal)
+              🖨️ Imprimir
             </button>
-            <Link to="/creditos/nuevo" className="btn">
-              + Nueva Solicitud en Campo
+            <Link to="/creditos/nuevo" className="btn" style={{ fontSize: "0.76rem", padding: "0.28rem 0.65rem", fontWeight: 700 }}>
+              + Nueva Solicitud
             </Link>
             <button
               type="button"
@@ -163,149 +169,151 @@ export default function KardexCarteraPromotor() {
               onClick={handleRecargarDatos}
               disabled={recargando || reseteando}
               style={{
-                fontSize: "0.82rem",
-                padding: "0.35rem 0.75rem",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.35rem",
-                borderColor: "rgba(2, 132, 199, 0.5)",
+                fontSize: "0.74rem",
+                padding: "0.26rem 0.55rem",
+                borderColor: "rgba(2, 132, 199, 0.4)",
                 color: "#38bdf8",
-                background: "rgba(2, 132, 199, 0.1)",
+                background: "rgba(2, 132, 199, 0.08)",
               }}
-              title="Restaurar los 65 préstamos y socios desde los archivos Excel"
+              title="Restaurar base de datos oficial de Excel"
             >
-              {recargando ? "⏳ Recargando..." : "📥 Recargar Datos (Excel)"}
+              {recargando ? "⏳..." : "📥 Excel"}
             </button>
             <button
               type="button"
               className="btn danger"
               onClick={handleReset}
               disabled={reseteando || recargando}
-              style={{ fontSize: "0.82rem", padding: "0.35rem 0.75rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
-              title="Borrar todos los datos y reiniciar el sistema limpio desde cero"
+              style={{ fontSize: "0.74rem", padding: "0.26rem 0.5rem" }}
+              title="Reiniciar el sistema desde cero"
             >
-              {reseteando ? "⏳ Reiniciando..." : "⚠️ Reiniciar a Cero"}
+              {reseteando ? "⏳..." : "⚠️ Reset"}
             </button>
           </div>
         </div>
 
-        {mensajeExito && <div className="alert success" style={{ marginBottom: "1rem" }}>{mensajeExito}</div>}
-        {error && <div className="alert error">{error}</div>}
+        {mensajeExito && <div className="alert success" style={{ padding: "0.35rem 0.75rem", fontSize: "0.82rem", margin: 0 }}>{mensajeExito}</div>}
+        {error && <div className="alert error" style={{ padding: "0.35rem 0.75rem", fontSize: "0.82rem", margin: 0 }}>{error}</div>}
 
-        {/* Tarjetas KPI de Cartera */}
+        {/* Tarjetas KPI de Cartera compactas (Franja delgada de 6 mini-cards) */}
         {kardex && (
           <div
-            className="stat-grid"
-            style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", marginBottom: "1.5rem" }}
+            className="screen-kpis"
+            style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.4rem" }}
           >
-            <div className="stat-card accent">
-              <span className="label">💼 Cartera Activa Viva</span>
-              <span className="value">{formatoQ(kardex.resumen.totalCarteraViva)}</span>
-              <span className="hint">{kardex.resumen.totalCreditos} préstamos registrados</span>
+            <div
+              className="stat-card accent"
+              style={{ padding: "0.35rem 0.65rem", cursor: "pointer" }}
+              onClick={() => setTabTipo("TODOS")}
+              title="Total Cartera Activa Viva"
+            >
+              <span className="label" style={{ fontSize: "0.64rem", display: "block" }}>💼 Cartera Viva ({kardex.resumen.totalCreditos})</span>
+              <span className="value mono" style={{ fontSize: "0.98rem", whiteSpace: "nowrap" }}>{formatoQ(kardex.resumen.totalCarteraViva)}</span>
             </div>
-            <div className="stat-card">
-              <span className="label">🏡 Hipotecarios</span>
-              <span className="value">{formatoQ(kardex.resumen.totalColocadoHipotecario)}</span>
-              <span className="hint">{kardex.resumen.countHipotecarios} créditos colocados</span>
+
+            <div
+              className="stat-card"
+              style={{ padding: "0.35rem 0.65rem", cursor: "pointer", border: tabTipo === "HIPOTECARIO" ? "1.5px solid #0ea5e9" : undefined }}
+              onClick={() => setTabTipo(tabTipo === "HIPOTECARIO" ? "TODOS" : "HIPOTECARIO")}
+              title="Filtrar créditos hipotecarios"
+            >
+              <span className="label" style={{ fontSize: "0.64rem", display: "block" }}>🏡 Hipotecarios ({kardex.resumen.countHipotecarios})</span>
+              <span className="value mono" style={{ fontSize: "0.98rem", whiteSpace: "nowrap" }}>{formatoQ(kardex.resumen.totalColocadoHipotecario)}</span>
             </div>
-            <div className="stat-card">
-              <span className="label">🤝 Fiduciarios</span>
-              <span className="value">{formatoQ(kardex.resumen.totalColocadoFiduciario)}</span>
-              <span className="hint">{kardex.resumen.countFiduciarios} créditos colocados</span>
+
+            <div
+              className="stat-card"
+              style={{ padding: "0.35rem 0.65rem", cursor: "pointer", border: tabTipo === "FIDUCIARIO" ? "1.5px solid #0ea5e9" : undefined }}
+              onClick={() => setTabTipo(tabTipo === "FIDUCIARIO" ? "TODOS" : "FIDUCIARIO")}
+              title="Filtrar créditos fiduciarios"
+            >
+              <span className="label" style={{ fontSize: "0.64rem", display: "block" }}>🤝 Fiduciarios ({kardex.resumen.countFiduciarios})</span>
+              <span className="value mono" style={{ fontSize: "0.98rem", whiteSpace: "nowrap" }}>{formatoQ(kardex.resumen.totalColocadoFiduciario)}</span>
             </div>
-            <div className="stat-card">
-              <span className="label">💵 Cobrado en {mes}</span>
-              <span className="value" style={{ color: "#16a34a" }}>
+
+            <div className="stat-card" style={{ padding: "0.35rem 0.65rem" }}>
+              <span className="label" style={{ fontSize: "0.64rem", display: "block" }}>💵 Cobrado en {mes}</span>
+              <span className="value mono" style={{ fontSize: "0.98rem", color: "#16a34a", whiteSpace: "nowrap" }}>
                 {formatoQ(kardex.resumen.totalCobradoMes)}
               </span>
-              <span className="hint">Ingresos recibidos en caja</span>
             </div>
-            <div className="stat-card">
-              <span className="label">🟢 Socios al Día</span>
-              <span className="value" style={{ color: "#16a34a" }}>
+
+            <div className="stat-card" style={{ padding: "0.35rem 0.65rem" }}>
+              <span className="label" style={{ fontSize: "0.64rem", display: "block" }}>🟢 Al Día</span>
+              <span className="value mono" style={{ fontSize: "0.98rem", color: "#16a34a" }}>
                 {kardex.resumen.sociosAlDia}
               </span>
-              <span className="hint">Cuota del mes pagada</span>
             </div>
-            <div className="stat-card">
-              <span className="label">🔴 Pendientes de Pago</span>
-              <span className="value" style={{ color: "#dc2626" }}>
+
+            <div className="stat-card" style={{ padding: "0.35rem 0.65rem" }}>
+              <span className="label" style={{ fontSize: "0.64rem", display: "block" }}>🔴 Pendientes</span>
+              <span className="value mono" style={{ fontSize: "0.98rem", color: "#dc2626" }}>
                 {kardex.resumen.sociosPendientes}
               </span>
-              <span className="hint">Requieren visita o recordatorio</span>
             </div>
           </div>
         )}
 
-        {/* Pestañas tipo Excel y Barra de búsqueda */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "1rem",
-            flexWrap: "wrap",
-            gap: "1rem",
-          }}
-        >
-          <div style={{ display: "flex", gap: "0.4rem" }}>
+        {/* Pestañas tipo Excel y Barra de búsqueda en 1 sola línea */}
+        <div className="screen-toolbar">
+          <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap" }}>
             <button
               type="button"
-              className={`btn ${tabTipo === "TODOS" ? "" : "secondary"}`}
-              style={{ fontSize: "0.85rem", padding: "0.4rem 0.8rem" }}
+              className={`btn ${tabTipo === "TODOS" ? "primary" : "secondary"}`}
+              style={{ fontSize: "0.75rem", padding: "0.22rem 0.6rem" }}
               onClick={() => setTabTipo("TODOS")}
             >
               📋 Todos ({kardex?.resumen.totalCreditos ?? 0})
             </button>
             <button
               type="button"
-              className={`btn ${tabTipo === "HIPOTECARIO" ? "" : "secondary"}`}
-              style={{ fontSize: "0.85rem", padding: "0.4rem 0.8rem" }}
+              className={`btn ${tabTipo === "HIPOTECARIO" ? "primary" : "secondary"}`}
+              style={{ fontSize: "0.75rem", padding: "0.22rem 0.6rem" }}
               onClick={() => setTabTipo("HIPOTECARIO")}
             >
               🏡 Hipotecario ({kardex?.resumen.countHipotecarios ?? 0})
             </button>
             <button
               type="button"
-              className={`btn ${tabTipo === "FIDUCIARIO" ? "" : "secondary"}`}
-              style={{ fontSize: "0.85rem", padding: "0.4rem 0.8rem" }}
+              className={`btn ${tabTipo === "FIDUCIARIO" ? "primary" : "secondary"}`}
+              style={{ fontSize: "0.75rem", padding: "0.22rem 0.6rem" }}
               onClick={() => setTabTipo("FIDUCIARIO")}
             >
               🤝 Fiduciario ({kardex?.resumen.countFiduciarios ?? 0})
             </button>
           </div>
 
-          <div style={{ flex: 1, minWidth: 260 }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
             <input
               placeholder="🔍 Buscar por socio, comunidad, fiador o código..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              style={{ width: "100%", padding: "0.45rem 0.75rem", fontSize: "0.88rem", borderRadius: "8px", border: "1px solid var(--line)", background: "var(--paper-raised)", color: "var(--ink)" }}
+              style={{ width: "100%", padding: "0.3rem 0.65rem", fontSize: "0.8rem", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--paper-raised)", color: "var(--ink)" }}
             />
           </div>
         </div>
 
-        {/* Contenido / Tabla Interactiva */}
-        {cargando && <div className="card">Cargando Kardex de cartera...</div>}
+        {/* Contenido / Tabla Interactiva con Scroll Interno */}
+        {cargando && <div className="card" style={{ padding: "1rem", textAlign: "center" }}>Cargando Kardex de cartera...</div>}
 
         {!cargando && itemsFiltrados.length === 0 && (
-          <div className="alert info">No se encontraron créditos registrados con los filtros seleccionados.</div>
+          <div className="alert info" style={{ padding: "0.75rem", fontSize: "0.85rem" }}>No se encontraron créditos registrados con los filtros seleccionados.</div>
         )}
 
         {!cargando && itemsFiltrados.length > 0 && (
-          <div className="card" style={{ padding: 0, overflowX: "auto" }}>
-            <table className="table" style={{ width: "100%", margin: 0, fontSize: "0.85rem" }}>
+          <div className="table-scroll-container">
+            <table className="table-compact" style={{ width: "100%" }}>
               <thead>
-                <tr style={{ background: "var(--mono-bg)" }}>
-                  <th style={{ width: "16%" }}>Código / Socio</th>
-                  <th style={{ width: "13%" }}>Comunidad / Ubicación</th>
-                  <th style={{ width: "14%" }}>Garantía & Fiador</th>
-                  <th style={{ width: "10%" }}>Plazo / Vence</th>
-                  <th style={{ width: "11%", textAlign: "right" }}>Valor Crédito</th>
-                  <th style={{ width: "11%", textAlign: "right" }}>Saldo Vivo Capital</th>
-                  <th style={{ width: "10%", textAlign: "right" }}>Cuota Mensual</th>
-                  <th style={{ width: "8%", textAlign: "center" }}>Estado {mes}</th>
-                  <th style={{ width: "7%", textAlign: "center" }}>Acción</th>
+                <tr>
+                  <th style={{ width: "18%" }}>Código / Socio</th>
+                  <th style={{ width: "14%" }}>Comunidad</th>
+                  <th style={{ width: "13%" }}>Garantía & Fiador</th>
+                  <th style={{ width: "12%" }}>Plazo / Vence</th>
+                  <th style={{ width: "10%", textAlign: "right" }}>Valor Crédito</th>
+                  <th style={{ width: "11%", textAlign: "right" }}>Saldo Vivo</th>
+                  <th style={{ width: "9%", textAlign: "right" }}>Cuota</th>
+                  <th style={{ width: "8%", textAlign: "center" }}>Estado</th>
+                  <th style={{ width: "5%", textAlign: "center" }}>Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -315,41 +323,41 @@ export default function KardexCarteraPromotor() {
                   const saldoActual = Number(p.saldo_capital ?? montoOriginal);
 
                   return (
-                    <tr key={p.id} style={{ verticalAlign: "middle" }}>
+                    <tr key={p.id}>
                       {esExpandido ? (
                         <td colSpan={9} style={{ padding: 0 }}>
-                          <div style={{ padding: "1rem", background: "var(--paper-raised)" }}>
+                          <div style={{ padding: "0.8rem", background: "var(--paper-raised)" }}>
                             <div
                               style={{
                                 display: "flex",
                                 justifyContent: "space-between",
                                 alignItems: "center",
-                                marginBottom: "0.75rem",
+                                marginBottom: "0.5rem",
                               }}
                             >
                               <div>
-                                <strong style={{ fontSize: "1.05rem" }}>
+                                <strong style={{ fontSize: "0.95rem" }}>
                                   {p.codigo} · {p.socio_nombres}
                                 </strong>
                                 <span
                                   className="badge"
-                                  style={{ marginLeft: "0.5rem", background: "#dbeafe", color: "#1e40af" }}
+                                  style={{ marginLeft: "0.4rem", background: "#dbeafe", color: "#1e40af", fontSize: "0.72rem" }}
                                 >
                                   {p.tipo}
                                 </span>
                               </div>
-                              <div style={{ display: "flex", gap: "0.5rem" }}>
+                              <div style={{ display: "flex", gap: "0.4rem" }}>
                                 <Link
                                   to={`/creditos/${p.id}`}
                                   className="btn secondary"
-                                  style={{ fontSize: "0.78rem", padding: "0.25rem 0.55rem" }}
+                                  style={{ fontSize: "0.72rem", padding: "0.18rem 0.45rem" }}
                                 >
                                   Ver Ficha Completa →
                                 </Link>
                                 <button
                                   type="button"
                                   className="btn secondary"
-                                  style={{ fontSize: "0.78rem", padding: "0.25rem 0.55rem" }}
+                                  style={{ fontSize: "0.72rem", padding: "0.18rem 0.45rem" }}
                                   onClick={() => setExpandidoId(null)}
                                 >
                                   ✕ Cerrar
@@ -360,10 +368,10 @@ export default function KardexCarteraPromotor() {
                             <div
                               style={{
                                 display: "grid",
-                                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                                gap: "0.75rem",
-                                fontSize: "0.85rem",
-                                marginBottom: "1rem",
+                                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                                gap: "0.5rem",
+                                fontSize: "0.78rem",
+                                marginBottom: "0.75rem",
                               }}
                             >
                               <div>
@@ -388,20 +396,20 @@ export default function KardexCarteraPromotor() {
                               </div>
                               <div>
                                 <span style={{ color: "var(--ink-soft)" }}>Vencimiento:</span>{" "}
-                                <strong>{p.fecha_vencimiento || "—"}</strong>
+                                <strong>{formatearFechaCorta(p.fecha_vencimiento)}</strong>
                               </div>
                             </div>
 
-                            <div style={{ marginTop: "0.5rem" }}>
-                              <h4 style={{ margin: "0 0 0.5rem", fontSize: "0.95rem" }}>
+                            <div>
+                              <h4 style={{ margin: "0 0 0.35rem", fontSize: "0.85rem" }}>
                                 Historial de Pagos y Cobros ({p.pagos.length})
                               </h4>
                               {p.pagos.length === 0 ? (
-                                <p style={{ margin: 0, color: "var(--ink-soft)", fontSize: "0.85rem" }}>
+                                <p style={{ margin: 0, color: "var(--ink-soft)", fontSize: "0.78rem" }}>
                                   No hay pagos registrados en el sistema para este crédito.
                                 </p>
                               ) : (
-                                <table className="table" style={{ width: "100%", fontSize: "0.8rem" }}>
+                                <table className="table-compact" style={{ width: "100%", fontSize: "0.75rem" }}>
                                   <thead>
                                     <tr>
                                       <th>Fecha</th>
@@ -447,23 +455,21 @@ export default function KardexCarteraPromotor() {
                       ) : (
                         <>
                           <td>
-                            <strong className="mono" style={{ color: "var(--accent)" }}>
+                            <strong className="mono" style={{ color: "var(--accent)", fontSize: "0.78rem" }}>
                               {p.codigo}
                             </strong>
-                            <div style={{ fontWeight: 600, fontSize: "0.82rem" }}>{p.socio_nombres}</div>
+                            <div style={{ fontWeight: 600, fontSize: "0.8rem" }}>{p.socio_nombres}</div>
+                          </td>
+                          <td style={{ fontSize: "0.78rem" }}>
+                            {p.ubicacion_garantia || "Chajul"}
+                          </td>
+                          <td style={{ fontSize: "0.78rem" }}>
+                            {p.nombre_fiador || <span style={{ color: "var(--ink-soft)" }}>—</span>}
                           </td>
                           <td>
-                            <div>{p.ubicacion_garantia || "Chajul"}</div>
-                            <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>Comunidad</span>
-                          </td>
-                          <td>
-                            <div>{p.nombre_fiador || "—"}</div>
-                            <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>Fiador solidario</span>
-                          </td>
-                          <td>
-                            <div>{p.plazo_meses} meses</div>
-                            <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>
-                              Vence: {p.fecha_vencimiento || "—"}
+                            <div className="mono" style={{ fontSize: "0.78rem" }}>{p.plazo_meses}m</div>
+                            <span style={{ fontSize: "0.7rem", color: "var(--ink-soft)" }}>
+                              Vence: {formatearFechaCorta(p.fecha_vencimiento)}
                             </span>
                           </td>
                           <td className="mono" style={{ textAlign: "right", fontWeight: 600 }}>
@@ -482,17 +488,17 @@ export default function KardexCarteraPromotor() {
                           <td className="mono" style={{ textAlign: "right" }}>
                             {formatoQ(p.cuota_mensual)}
                           </td>
-                          <td>
+                          <td style={{ textAlign: "center" }}>
                             {p.estadoCuotaMes === "CANCELADO" ? (
-                              <span className="badge inactivo">
+                              <span className="badge inactivo" style={{ fontSize: "0.68rem", padding: "0.12rem 0.35rem" }}>
                                 ⚪ Liquidado
                               </span>
                             ) : p.estadoCuotaMes === "AL_DIA" ? (
-                              <span className="badge activo">
+                              <span className="badge activo" style={{ fontSize: "0.68rem", padding: "0.12rem 0.35rem" }}>
                                 🟢 Al día ({formatoQ(p.totalPagadoMes)})
                               </span>
                             ) : (
-                              <span className="badge danger">
+                              <span className="badge danger" style={{ fontSize: "0.68rem", padding: "0.12rem 0.35rem" }}>
                                 🔴 Pendiente
                               </span>
                             )}
@@ -501,10 +507,10 @@ export default function KardexCarteraPromotor() {
                             <button
                               type="button"
                               className="btn secondary"
-                              style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+                              style={{ fontSize: "0.7rem", padding: "0.18rem 0.35rem", whiteSpace: "nowrap" }}
                               onClick={() => setExpandidoId(p.id)}
                             >
-                              👁️ Ver pagos ({p.pagos.length})
+                              👁️ Pagos ({p.pagos.length})
                             </button>
                           </td>
                         </>
@@ -517,20 +523,30 @@ export default function KardexCarteraPromotor() {
           </div>
         )}
 
+        {/* Paginación integrada en pie de pantalla */}
         {totalItems > pageSize && (
-          <div
-            className="pagination"
-            style={{ display: "flex", gap: "1rem", alignItems: "center", justifyContent: "center", marginTop: "1rem" }}
-          >
-            <button className="btn secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Anterior
-            </button>
-            <span>
-              Mostrando {itemsPaginados.length} de {totalItems} créditos · Página {page} de {totalPaginas}
+          <div className="screen-footer">
+            <span style={{ color: "var(--ink-soft)" }}>
+              Mostrando {itemsPaginados.length} de {totalItems} créditos · Pág. {page} de {totalPaginas}
             </span>
-            <button className="btn secondary" disabled={page >= totalPaginas} onClick={() => setPage((p) => p + 1)}>
-              Siguiente
-            </button>
+            <div style={{ display: "flex", gap: "0.4rem" }}>
+              <button
+                className="btn secondary"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+                style={{ fontSize: "0.75rem", padding: "0.22rem 0.6rem" }}
+              >
+                ← Anterior
+              </button>
+              <button
+                className="btn secondary"
+                disabled={page >= totalPaginas}
+                onClick={() => setPage((p) => p + 1)}
+                style={{ fontSize: "0.75rem", padding: "0.22rem 0.6rem" }}
+              >
+                Siguiente →
+              </button>
+            </div>
           </div>
         )}
       </div>
