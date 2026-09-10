@@ -325,3 +325,91 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
 - **Cobertura Completada:** Todas las pantallas del sistema (Tablero, Caja Chica, Créditos, Kardex Cartera, Socios, Aportaciones, Ahorro Corriente/Programado/Infanto-Juvenil/Sobre-Préstamo, Plazo Fijo, Auxiliar de Caja) ahora aplican la arquitectura 100vh single-screen de forma global.
 - **Archivos Modificados:** `frontend/src/pages/AportacionesList.tsx`, `frontend/src/pages/AhorroList.tsx`, `frontend/src/pages/PlazoFijoList.tsx`, `frontend/src/pages/AuxiliarCaja.tsx`, `frontend/src/components/cajaauxiliar/CajaAbierta.tsx`, `frontend/src/components/cajaauxiliar/CajaCerradaCard.tsx`, `frontend/src/styles/app.css`
 - **Sincronización Dual:** Downloads ↔ Documents aplicada en todos los archivos.
+
+## 26. Optimización del Panel de Alertas a Pantalla Completa (100vh Sin Scroll) (`Alertas.tsx`)
+
+- **Problema Previo:**
+  - La pantalla `/alertas` usaba `page-head` y `stat-grid` con tarjetas KPI grandes apiladas verticalmente.
+  - La lista de alertas se extendía en un contenedor `<div>` sin límite de altura, obligando al usuario a hacer scroll de ventana completa (page height: 1352px vs viewport: 701px).
+- **Solución Implementada:**
+  - **Estructura `.screen-container` de 100vh:** Altura exacta `calc(100vh - 2.2rem)` con `overflow: hidden` en escritorio.
+  - **Cabecera Compacta en 1 Línea (`.screen-header`):** Título con emoji 🔔 + subtítulo descriptivo + indicador de monitoreo activo animado + botón `🔄 Actualizar` manual.
+  - **Franja de 4 KPI Tiles (`.screen-kpis`):** 4 columnas iguales: Total Alertas (accent), ⚡ Atención Inmediata (rojo #ef4444), ⚠️ Advertencias (ámbar #f59e0b), ℹ️ Informativos (azul #3b82f6). Cada tile muestra `label + valor grande + sub` sin truncamiento.
+  - **Barra de Filtros Compacta (`.screen-toolbar`):** 6 botones de categoría en 1 fila (Todas, Caja Auxiliar, Créditos, Plazo Fijo, Caja Chica, Padrón Socios) con contador entre paréntesis. Padding de 0.28rem para máxima compacidad.
+  - **Lista de Alertas con Scroll Interno (`.table-scroll-container`):** `flex: 1` para ocupar todo el espacio restante. Cada alerta en tarjeta compacta de ~70px de altura (vs. ~90px anteriores): padding `0.65rem 1rem`, tipografía reducida (0.88rem título, 0.82rem descripción, 0.74rem detalle). Botón "Atender →" en lugar de "Atender en módulo →" para ahorrar espacio.
+  - **Footer Fijo (`.screen-footer`):** Contador "Mostrando X de Y alertas · Filtro: CATEGORIA" + "Actualización automática cada 20 segundos".
+- **Archivos Modificados:** `frontend/src/pages/Alertas.tsx`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+## 27. Optimización de la Bitácora de Auditoría a Pantalla Completa (100vh Sin Scroll) (`Auditoria.tsx`)
+
+- **Problema Previo:**
+  - La pantalla `/auditoria` usaba `page-head` y `stat-grid` con tarjetas KPI grandes que empujaban la tabla hacia abajo.
+  - Los filtros (búsqueda, entidad, acción, fechas) estaban en filas independientes, consumiendo ~120px de altura antes de la tabla.
+  - La tabla de 25 registros obligaba al usuario a hacer scroll de ventana completa.
+- **Solución Implementada:**
+  - **Estructura `.screen-container` de 100vh:** Altura exacta `calc(100vh - 2.2rem)` con `overflow: hidden` en escritorio.
+  - **Cabecera Compacta en 1 Línea (`.screen-header`):** Título con emoji 🔍 + subtítulo descriptivo + botón contextual "✕ Limpiar filtros" (solo visible cuando hay filtros activos) + indicador de carga.
+  - **Franja de 3 KPI Tiles (`.screen-kpis`):** 3 columnas iguales: Total Eventos Auditados (accent verde), Entidades Monitoreadas (neutro), Página Actual X/Y (neutro). Valores sin truncamiento.
+  - **Barra de Filtros Ultra Compacta (`.screen-toolbar`):** Todos los controles en 1 sola fila horizontal: buscador flex, selector de entidades, selector de acción (con emojis ✅/✏️/🗑️), inputs de fecha Desde/Hasta. Padding de 0.28rem para máxima densidad. Limpiar filtros movido al header para mayor claridad.
+  - **Tabla con Scroll Interno (`.table-scroll-container`):** `flex: 1` para ocupar todo el espacio restante. Tipografía compacta (0.8rem filas, 0.75rem secundario, 0.69rem mono). Badges de acción con fondos semitransparentes `rgba()` para consistencia con el modo oscuro.
+  - **Footer Fijo (`.screen-footer`):** Contador "X registros mostrados · Total: N" a la izquierda + paginación ← / → con número de página al centro derecha.
+  - **Modal de Detalle Actualizado:** Fondos `rgba()` semitransparentes (naranja/verde) en lugar de amarillos/verdes sólidos que rompían la paleta oscura.
+- **Archivos Modificados:** `frontend/src/pages/Auditoria.tsx`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+## 28. Rediseño Completo del Menú Lateral (Sidebar Moderno y Profesional) (`Layout.tsx`, `app.css`)
+
+- **Problema Previo:**
+  - El sidebar usaba el mismo color de fondo `var(--paper-raised)` que el contenido, sin diferenciación visual clara.
+  - Los links de navegación eran bloques simples sin íconos alineados ni indicador visual de activo elegante.
+  - El área de marca era texto plano con opción de agencia en un badge verde básico.
+  - El footer de usuario era texto sin jerarquía visual clara.
+- **Nuevo Diseño Implementado:**
+  - **Fondo Gradiente Oscuro Profundo:** `linear-gradient(180deg, #0b1628, #0d1f3c, #0b1628)` — distinto al contenido, crea una separación visual nítida sin borde duro.
+  - **Barra Superior Animada (Shimmer):** Línea de 3px de gradiente esmeralda `#059669 → #34d399 → #059669` con animación de barrido continuo. Efecto de "acento vivo" en el tope del sidebar.
+  - **Área de Marca (`.brand`):** Logo `M` con gradiente esmeralda + sombra verde (`boxShadow: rgba(5,150,105,0.4)`), nombre en blanco uppercase, subtítulo en `#34d399`. Badge de agencia con punto pulsante animado y borde `rgba(52,211,153,0.2)`.
+  - **Links de Navegación (`.nav a`):** Icono + texto en fila (`display: flex`), color `rgba(255,255,255,0.5)` en reposo → `rgba(255,255,255,0.9)` + `translateX(2px)` en hover. Activo: gradiente verde semitransparente + `box-shadow` con glow + barra indicadora verde de 3px en el borde derecho.
+  - **Etiquetas de Sección (`.nav-section`):** `0.6rem uppercase`, `rgba(255,255,255,0.28)` — discretas pero legibles, sin acaparar altura.
+  - **Scrollbar del Nav:** Oculta (3px) con `scrollbar-width: thin` para mantener la estética sin perder funcionalidad.
+  - **Control de Datos Compacto:** Dos botones horizontales compactos ("📥 Excel" / "⚠️ Reset") con fondos semitransparentes en azul/rojo, sin texto largo que ocupe demasiado espacio.
+  - **Footer de Usuario:** Avatar circular con iniciales en 2 letras + gradiente verde, nombre truncado con ellipsis, rol en gris suave, botón ⏏️ de cierre de sesión en rojo semitransparente (icon-only, con tooltip).
+  - **Ancho Reducido:** 250px → 240px para maximizar el área de contenido.
+- **Archivos Modificados:** `frontend/src/pages/Layout.tsx`, `frontend/src/styles/app.css`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+## 29. Sidebar Colapsable Tipo "Icon Rail" — Menú Profesional Moderno (`Layout.tsx`, `app.css`)
+
+- **Patrón elegido:** Sidebar colapsable con estado `collapsed` — el estándar de apps profesionales como VS Code, Linear, Notion y ERPs bancarios. Óptimo para el perfil mixto PC+tablet del sistema MIF.
+- **Comportamiento:**
+  - **Expandido (240px):** Ícono + texto + etiquetas de sección visibles. Borde activo en derecha.
+  - **Colapsado (56px):** Solo íconos centrados. Etiquetas de sección ocultas (altura 0). Borde activo en izquierda. Tooltip CSS-only al hacer hover sobre cada ítem.
+  - **Toggle:** Clic en el área de marca/logo (`sidebar-toggle`) alterna entre estados con transición suave `cubic-bezier(0.4, 0, 0.2, 1)` de 0.25s. Chevron `‹` rota 180° al colapsar.
+  - **Mobile/Tablet:** Hamburger `☰` en top bar superior + overlay backdrop. Sidebar como drawer lateral completo.
+- **Detalles CSS:**
+  - Variables CSS: `--sidebar-w: 240px`, `--sidebar-collapsed-w: 56px`, `--sidebar-transition`.
+  - `.shell.sidebar-collapsed` modifica `grid-template-columns` y el ancho del `.sidebar`.
+  - `.nav a[data-tooltip]::before`: tooltip posicionado absolutamente en `left: calc(56px - 4px)` con delay de 0.3s para no mostrar en paso rápido.
+  - Sidebar `position: sticky; height: 100vh` — se mantiene en pantalla al hacer scroll del contenido.
+  - `overflow: hidden` en sidebar controla clip del texto durante la transición.
+- **Archivos Modificados:** `frontend/src/pages/Layout.tsx`, `frontend/src/styles/app.css`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+## 30. Tooltip Flotante Universal en Menú Lateral — Pill con Flecha, Siempre Activo (`Layout.tsx`, `app.css`)
+
+- **Funcionalidad:** Al pasar el cursor sobre cualquier ítem del menú (tanto en modo colapsado como expandido), aparece una etiqueta flotante tipo "pill" oscuro a la derecha del ítem con el nombre del módulo.
+- **Implementación:** Tooltip React con `getBoundingClientRect()` + `position: fixed` — evita problemas de `overflow: hidden` del sidebar y del scroll del nav. Timer de 300ms con `useRef<setTimeout>` para no mostrar en pase rápido.
+- **Diseño del tooltip:**
+  - Fondo `#162033` (azul marino oscuro profundo, distinto al sidebar).
+  - Borde `rgba(52,211,153,0.22)` — acento esmeralda suave.
+  - Triángulo apuntando izquierda (hacia el ícono) mediante borders CSS transparentes.
+  - `box-shadow: 0 6px 20px rgba(0,0,0,0.5)` — sombra profunda para efecto flotante.
+  - Animación `tooltip-in` de 0.12s: slide desde `-4px` + fade in.
+  - Texto: `0.76rem`, `fontWeight: 600`, `#e2e8f0`.
+- **Comportamiento:**
+  - Aparece 300ms después de entrar al ítem (no interrumpe navegación rápida).
+  - Desaparece inmediatamente al salir del ítem (`onMouseLeave`).
+  - Funciona en **ambos modos** — colapsado (íconos) y expandido (texto visible).
+  - Timer cancelado correctamente en `onMouseLeave` para evitar tooltips fantasma.
+- **Archivos Modificados:** `frontend/src/pages/Layout.tsx`, `frontend/src/styles/app.css`
+- **Sincronización Dual:** Downloads ↔ Documents completada.

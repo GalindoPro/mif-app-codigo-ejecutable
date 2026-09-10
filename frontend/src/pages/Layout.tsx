@@ -1,8 +1,15 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ROL_LABEL, TIPOS_AHORRO } from "../types";
 import { api, mensajeError } from "../lib/api";
+
+// ── TOOLTIP GLOBAL (portal-style via fixed position) ──
+interface TooltipState {
+  text: string;
+  x: number;
+  y: number;
+}
 
 export default function Layout() {
   const { usuario, logout } = useAuth();
@@ -10,8 +17,29 @@ export default function Layout() {
   const [reseteando, setReseteando] = useState(false);
   const [recargando, setRecargando] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
+  const [collapsed, setCollapsed] = useState(false);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const tooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const closeSidebar = () => setSidebarOpen(false);
+
+  // Show tooltip after 300ms delay
+  const showTooltip = useCallback((e: React.MouseEvent<HTMLAnchorElement>, label: string) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (tooltipTimer.current) clearTimeout(tooltipTimer.current);
+    tooltipTimer.current = setTimeout(() => {
+      setTooltip({
+        text: label,
+        x: rect.right + 10,
+        y: rect.top + rect.height / 2,
+      });
+    }, 300);
+  }, []);
+
+  const hideTooltip = useCallback(() => {
+    if (tooltipTimer.current) clearTimeout(tooltipTimer.current);
+    setTooltip(null);
+  }, []);
 
   async function handleResetGlobal() {
     const confirmado = window.confirm(
@@ -19,7 +47,6 @@ export default function Layout() {
       "Esta acción vaciará todas las tablas (socios, créditos, ahorros, movimientos, cajas) para empezar limpio."
     );
     if (!confirmado) return;
-
     setReseteando(true);
     try {
       const { data } = await api.post<{ ok: boolean; mensaje: string }>("/sistema/reset");
@@ -41,7 +68,6 @@ export default function Layout() {
       "• 692 certificados de plazo fijo"
     );
     if (!confirmado) return;
-
     setRecargando(true);
     try {
       const { data } = await api.post<{ ok: boolean; mensaje: string }>("/sistema/recargar-datos");
@@ -56,342 +82,266 @@ export default function Layout() {
 
   const cls = ({ isActive }: { isActive: boolean }) => (isActive ? "active" : "");
 
+  const iniciales = usuario?.nombre
+    ? usuario.nombre.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
+    : "U";
+
+  // NavItem with universal tooltip
+  function NavItem({ to, icon, label, onClick }: { to: string; icon: string; label: string; onClick?: () => void }) {
+    return (
+      <NavLink
+        to={to}
+        className={cls}
+        onClick={onClick}
+        onMouseEnter={(e) => showTooltip(e, label)}
+        onMouseLeave={hideTooltip}
+      >
+        <span className="nav-icon">{icon}</span>
+        <span className="nav-label">{label}</span>
+      </NavLink>
+    );
+  }
+
+  function Section({ label }: { label: string }) {
+    return <div className="nav-section">{label}</div>;
+  }
+
   return (
-    <div className="shell">
+    <div className={`shell${collapsed ? " sidebar-collapsed" : ""}`}>
+
+      {/* ── GLOBAL TOOLTIP (floating pill) ── */}
+      {tooltip && (
+        <div
+          style={{
+            position: "fixed",
+            left: tooltip.x,
+            top: tooltip.y,
+            transform: "translateY(-50%)",
+            zIndex: 9999,
+            pointerEvents: "none",
+            animation: "tooltip-in 0.12s ease forwards",
+          }}
+        >
+          {/* Arrow */}
+          <div style={{
+            position: "absolute",
+            left: -6,
+            top: "50%",
+            transform: "translateY(-50%)",
+            width: 0, height: 0,
+            borderTop: "5px solid transparent",
+            borderBottom: "5px solid transparent",
+            borderRight: "6px solid #162033",
+          }} />
+          {/* Pill */}
+          <div style={{
+            background: "#162033",
+            color: "#e2e8f0",
+            fontSize: "0.76rem",
+            fontWeight: 600,
+            padding: "0.3rem 0.75rem",
+            borderRadius: "8px",
+            whiteSpace: "nowrap",
+            border: "1px solid rgba(52,211,153,0.22)",
+            boxShadow: "0 6px 20px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.3)",
+            letterSpacing: "0.01em",
+          }}>
+            {tooltip.text}
+          </div>
+        </div>
+      )}
+
+      {/* ── MOBILE TOP BAR ── */}
       <div className="mobile-header">
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <div
-            style={{
-              width: "32px", height: "32px",
-              background: "linear-gradient(135deg, #047857 0%, #065f46 100%)",
-              color: "#ffffff", borderRadius: "8px", display: "flex",
-              alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: "1rem"
-            }}
-          >
-            M
-          </div>
-          <span style={{ fontSize: "1rem", fontWeight: 800, color: "var(--ink)" }}>MIF COOP</span>
+          <div style={{
+            width: 28, height: 28,
+            background: "linear-gradient(135deg, #047857 0%, #065f46 100%)",
+            color: "#fff", borderRadius: "7px",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontWeight: 900, fontSize: "0.9rem",
+          }}>M</div>
+          <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "var(--ink)" }}>MIF COOP</span>
         </div>
-        <button className="hamburger-btn" onClick={() => setSidebarOpen(true)}>
-          ☰
-        </button>
+        <button className="hamburger-btn" onClick={() => setSidebarOpen(true)}>☰</button>
       </div>
 
-      <div className={`sidebar-backdrop ${sidebarOpen ? "show" : ""}`} onClick={closeSidebar}></div>
+      <div className={`sidebar-backdrop ${sidebarOpen ? "show" : ""}`} onClick={closeSidebar} />
 
+      {/* ══════════════════════════════════════════════
+           SIDEBAR COLLAPSIBLE ICON-RAIL
+      ══════════════════════════════════════════════ */}
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
-        <div className="brand" style={{ padding: "0.25rem 0.25rem 0.75rem", borderBottom: "1px solid var(--line)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-            <div
-              style={{
-                width: "36px",
-                height: "36px",
-                background: "linear-gradient(135deg, #047857 0%, #065f46 100%)",
-                color: "#ffffff",
-                borderRadius: "8px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 900,
-                fontSize: "1.1rem",
-                boxShadow: "0 2px 4px rgba(4, 120, 87, 0.25)",
-              }}
-            >
-              M
-            </div>
-            <div>
-              <span className="name" style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--ink)", display: "block", lineHeight: 1.1 }}>
-                MIF COOP
-              </span>
-              <span className="sub" style={{ fontSize: "0.68rem", color: "var(--accent)", fontWeight: 700 }}>
-                Maya Inversiones Futuras
-              </span>
-            </div>
-          </div>
-          <div
-            style={{
-              marginTop: "0.65rem",
-              background: "#ecfdf5",
-              color: "#065f46",
-              padding: "0.25rem 0.5rem",
-              borderRadius: "6px",
-              fontSize: "0.72rem",
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              gap: "0.35rem",
-            }}
+
+        {/* ── BRAND + TOGGLE ── */}
+        <div className="brand">
+          <button
+            className="sidebar-toggle"
+            onClick={() => setCollapsed((c) => !c)}
+            title={collapsed ? "Expandir menú" : "Colapsar menú"}
           >
-            <span>🟢</span> Agencia Chajul · Activa
+            <div className="sidebar-toggle-logo">M</div>
+            <div className="sidebar-toggle-text">
+              <span className="name">MIF COOP</span>
+              <span className="sub">Maya Inversiones Futuras</span>
+            </div>
+            <i className="sidebar-chevron">‹</i>
+          </button>
+          <div className="agency-badge">
+            <span className="agency-badge-dot" />
+            <span className="agency-badge-text">Agencia Chajul · Activa</span>
           </div>
         </div>
 
+        {/* ── NAV ── */}
         <nav className="nav">
-          {/* CAJERO: Ventanilla, Caja Chica, Consulta de Socios y Cobros */}
-          {usuario?.rol === "CAJERO" && (
-            <>
-              <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.5rem 0 0.2rem 0.5rem" }}>
-                Ventanilla y Caja
-              </div>
-              <NavLink to="/auxiliar-caja" className={cls} onClick={closeSidebar}>
-                💵 Auxiliar de caja
-              </NavLink>
-              <NavLink to="/caja-chica" className={cls} onClick={closeSidebar}>
-                📥 Caja chica
-              </NavLink>
-              <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.75rem 0 0.2rem 0.5rem" }}>
-                Consultas y Cobros
-              </div>
-              <NavLink to="/socios" className={cls} onClick={closeSidebar}>
-                👥 Consultar Socios
-              </NavLink>
-              <NavLink to="/creditos" className={cls} onClick={closeSidebar}>
-                📄 Cobro de Créditos
-              </NavLink>
-            </>
-          )}
 
-          {/* PROMOTOR: Cartera de Préstamos, Socios en campo, Solicitudes y Ahorros */}
-          {usuario?.rol === "PROMOTOR" && (
-            <>
-              <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.5rem 0 0.2rem 0.5rem" }}>
-                Gestión de Campo
-              </div>
-              <NavLink to="/promotor/cartera" className={cls} onClick={closeSidebar}>
-                📂 Kardex Cartera
-              </NavLink>
-              <NavLink to="/socios" className={cls} onClick={closeSidebar}>
-                👥 Socios en campo
-              </NavLink>
-              <NavLink to="/creditos" className={cls} onClick={closeSidebar}>
-                📄 Créditos & Simulador
-              </NavLink>
-              <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.75rem 0 0.2rem 0.5rem" }}>
-                Captaciones
-              </div>
-              <NavLink to="/ahorros/corriente" className={cls} onClick={closeSidebar}>
-                💰 Cuentas de Ahorro
-              </NavLink>
-              <NavLink to="/ahorros/plazo-fijo" className={cls} onClick={closeSidebar}>
-                📈 Inversiones Plazo Fijo
-              </NavLink>
-            </>
-          )}
+          {/* ── CAJERO ── */}
+          {usuario?.rol === "CAJERO" && (<>
+            <Section label="Ventanilla y Caja" />
+            <NavItem to="/auxiliar-caja" icon="💵" label="Auxiliar de Caja" onClick={closeSidebar} />
+            <NavItem to="/caja-chica"    icon="📥" label="Caja Chica"       onClick={closeSidebar} />
+            <Section label="Consultas y Cobros" />
+            <NavItem to="/socios"   icon="👥" label="Consultar Socios"  onClick={closeSidebar} />
+            <NavItem to="/creditos" icon="📄" label="Cobro de Créditos" onClick={closeSidebar} />
+          </>)}
 
-          {/* SUPERVISOR (JEFE DE AGENCIA): Supervisión ejecutiva, Aprobación de créditos, Arqueos y Padrón */}
-          {usuario?.rol === "SUPERVISOR" && (
-            <>
-              <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.5rem 0 0.2rem 0.5rem" }}>
-                Supervisión y Control
-              </div>
-              <NavLink to="/tablero" className={cls} onClick={closeSidebar}>
-                📊 Tablero & Analítica
-              </NavLink>
-              <NavLink to="/arqueos/mensual" className={cls} onClick={closeSidebar}>
-                📑 Libro Mensual Arqueos
-              </NavLink>
+          {/* ── PROMOTOR ── */}
+          {usuario?.rol === "PROMOTOR" && (<>
+            <Section label="Gestión de Campo" />
+            <NavItem to="/promotor/cartera"  icon="📂" label="Kardex Cartera"       onClick={closeSidebar} />
+            <NavItem to="/socios"            icon="👥" label="Socios en Campo"      onClick={closeSidebar} />
+            <NavItem to="/creditos"          icon="📄" label="Créditos y Simulador" onClick={closeSidebar} />
+            <Section label="Captaciones" />
+            <NavItem to="/ahorros/corriente"  icon="💰" label="Cuentas de Ahorro"       onClick={closeSidebar} />
+            <NavItem to="/ahorros/plazo-fijo" icon="📈" label="Inversiones Plazo Fijo"  onClick={closeSidebar} />
+          </>)}
 
-              <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.75rem 0 0.2rem 0.5rem" }}>
-                Cartera y Créditos
-              </div>
-              <NavLink to="/creditos" className={cls} onClick={closeSidebar}>
-                📄 Bandeja de Créditos
-              </NavLink>
-              <NavLink to="/promotor/cartera" className={cls} onClick={closeSidebar}>
-                📂 Kardex Cartera
-              </NavLink>
-              <NavLink to="/auxiliar-caja" className={cls} onClick={closeSidebar}>
-                💵 Arqueos e Historial de Caja
-              </NavLink>
+          {/* ── SUPERVISOR ── */}
+          {usuario?.rol === "SUPERVISOR" && (<>
+            <Section label="Supervisión y Control" />
+            <NavItem to="/tablero"         icon="📊" label="Tablero y Analítica"    onClick={closeSidebar} />
+            <NavItem to="/arqueos/mensual" icon="📑" label="Libro Mensual Arqueos"  onClick={closeSidebar} />
+            <Section label="Cartera y Créditos" />
+            <NavItem to="/creditos"         icon="📄" label="Bandeja de Créditos"   onClick={closeSidebar} />
+            <NavItem to="/promotor/cartera" icon="📂" label="Kardex Cartera"        onClick={closeSidebar} />
+            <NavItem to="/auxiliar-caja"    icon="💵" label="Arqueos e Hist. Caja"  onClick={closeSidebar} />
+            <Section label="Padrón y Captaciones" />
+            <NavItem to="/socios"             icon="👥" label="Padrón de Socios"     onClick={closeSidebar} />
+            <NavItem to="/aportaciones"       icon="🏛️" label="Aportaciones Capital" onClick={closeSidebar} />
+            <NavItem to="/ahorros/corriente"  icon="💰" label="Cuentas de Ahorro"    onClick={closeSidebar} />
+            <NavItem to="/ahorros/plazo-fijo" icon="📈" label="Plazo Fijo"           onClick={closeSidebar} />
+          </>)}
 
-              <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.75rem 0 0.2rem 0.5rem" }}>
-                Padrón y Captaciones
-              </div>
-              <NavLink to="/socios" className={cls} onClick={closeSidebar}>
-                👥 Padrón de Socios
-              </NavLink>
-              <NavLink to="/aportaciones" className={cls} onClick={closeSidebar}>
-                🏛️ Aportaciones de Capital
-              </NavLink>
-              <NavLink to="/ahorros/corriente" className={cls} onClick={closeSidebar}>
-                💰 Cuentas de Ahorro
-              </NavLink>
-              <NavLink to="/ahorros/plazo-fijo" className={cls} onClick={closeSidebar}>
-                📈 Inversiones Plazo Fijo
-              </NavLink>
-            </>
-          )}
+          {/* ── ADMIN / GERENCIA ── */}
+          {(usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA") && (<>
+            <Section label="Control General" />
+            <NavItem to="/tablero"         icon="📊" label="Tablero Global"        onClick={closeSidebar} />
+            <NavItem to="/arqueos/mensual" icon="📑" label="Libro Mensual Arqueos" onClick={closeSidebar} />
 
-          {/* ADMIN y GERENCIA: Acceso total de auditoría y configuración */}
-          {(usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA") && (
-            <>
-              <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.2rem 0 0.2rem 0.5rem" }}>
-                Control General
-              </div>
-              <NavLink to="/tablero" className={cls} onClick={closeSidebar}>
-                📊 Tablero Global
-              </NavLink>
-              <NavLink to="/arqueos/mensual" className={cls} onClick={closeSidebar}>
-                📑 Libro Mensual Arqueos
-              </NavLink>
+            <Section label="Operaciones" />
+            <NavItem to="/auxiliar-caja"    icon="💵" label="Auxiliar de Caja" onClick={closeSidebar} />
+            <NavItem to="/caja-chica"       icon="📥" label="Caja Chica"       onClick={closeSidebar} />
+            <NavItem to="/creditos"         icon="📄" label="Créditos"         onClick={closeSidebar} />
+            <NavItem to="/promotor/cartera" icon="📂" label="Kardex Cartera"   onClick={closeSidebar} />
 
-              <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.6rem 0 0.2rem 0.5rem" }}>
-                Operaciones
-              </div>
-              <NavLink to="/auxiliar-caja" className={cls} onClick={closeSidebar}>
-                💵 Auxiliar de caja
-              </NavLink>
-              <NavLink to="/caja-chica" className={cls} onClick={closeSidebar}>
-                📥 Caja chica
-              </NavLink>
-              <NavLink to="/creditos" className={cls} onClick={closeSidebar}>
-                📄 Créditos
-              </NavLink>
-              <NavLink to="/promotor/cartera" className={cls} onClick={closeSidebar}>
-                📂 Kardex Cartera
-              </NavLink>
+            <Section label="Socios y Captaciones" />
+            <NavItem to="/socios"       icon="👥" label="Socios"       onClick={closeSidebar} />
+            <NavItem to="/aportaciones" icon="🏛️" label="Aportaciones" onClick={closeSidebar} />
+            {TIPOS_AHORRO.map((t) => (
+              <NavItem key={t.slug} to={`/ahorros/${t.slug}`} icon="🏦" label={t.titulo} onClick={closeSidebar} />
+            ))}
 
-              <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.6rem 0 0.2rem 0.5rem" }}>
-                Socios y Captaciones
-              </div>
-              <NavLink to="/socios" className={cls} onClick={closeSidebar}>
-                👥 Socios
-              </NavLink>
-              <NavLink to="/aportaciones" className={cls} onClick={closeSidebar}>
-                🏛️ Aportaciones
-              </NavLink>
-              {TIPOS_AHORRO.map((t) => (
-                <NavLink key={t.slug} to={`/ahorros/${t.slug}`} className={cls} onClick={closeSidebar}>
-                  {t.titulo}
-                </NavLink>
-              ))}
-
-              <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.6rem 0 0.2rem 0.5rem" }}>
-                Administración
-              </div>
-              <NavLink to="/alertas" className={cls} onClick={closeSidebar}>
-                🔔 Panel de Alertas
-              </NavLink>
-              <NavLink to="/usuarios" className={cls} onClick={closeSidebar}>
-                👤 Usuarios
-              </NavLink>
-              <NavLink to="/agencias" className={cls} onClick={closeSidebar}>
-                🏢 Agencias
-              </NavLink>
-              <NavLink to="/auditoria" className={cls} onClick={closeSidebar}>
-                🔍 Bitácora de Auditoría
-              </NavLink>
-              <NavLink to="/sesiones" className={cls} onClick={closeSidebar}>
-                🛡️ Sesiones Activas
-              </NavLink>
-            </>
-          )}
+            <Section label="Administración" />
+            <NavItem to="/alertas"   icon="🔔" label="Panel de Alertas"      onClick={closeSidebar} />
+            <NavItem to="/usuarios"  icon="👤" label="Usuarios"              onClick={closeSidebar} />
+            <NavItem to="/agencias"  icon="🏢" label="Agencias"              onClick={closeSidebar} />
+            <NavItem to="/auditoria" icon="🔍" label="Bitácora de Auditoría" onClick={closeSidebar} />
+            <NavItem to="/sesiones"  icon="🛡️" label="Sesiones Activas"      onClick={closeSidebar} />
+          </>)}
         </nav>
 
-        {/* Herramientas de Mantenimiento de Datos (Exclusivo para ADMIN / Sistemas) */}
-        {usuario?.rol === "ADMIN" && (
-          <div
-            style={{
-              margin: "0.5rem 0.25rem 0.75rem",
-              padding: "0.55rem 0.5rem",
-              background: "rgba(2, 132, 199, 0.08)",
-              borderRadius: "8px",
-              border: "1px solid rgba(2, 132, 199, 0.25)",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "0.68rem",
-                fontWeight: 700,
-                color: "#38bdf8",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                marginBottom: "0.4rem",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.3rem",
-              }}
-            >
-              ⚙️ Control de Datos (Sistemas)
+        {/* ── CONTROL DE DATOS (solo ADMIN) ── */}
+        {usuario?.rol === "ADMIN" && !collapsed && (
+          <div style={{
+            padding: "0.5rem 0.75rem",
+            background: "rgba(2,132,199,0.07)",
+            borderTop: "1px solid rgba(255,255,255,0.04)",
+            borderBottom: "1px solid rgba(255,255,255,0.04)",
+            flexShrink: 0,
+          }}>
+            <div style={{
+              fontSize: "0.56rem", fontWeight: 800, color: "rgba(56,189,248,0.6)",
+              textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.35rem",
+            }}>
+              ⚙️ Control de Datos
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+            <div style={{ display: "flex", gap: "0.3rem" }}>
               <button
-                type="button"
-                className="btn secondary"
-                onClick={handleRecargarGlobal}
+                type="button" onClick={handleRecargarGlobal}
                 disabled={recargando || reseteando}
                 style={{
-                  fontSize: "0.72rem",
-                  padding: "0.35rem 0.45rem",
-                  width: "100%",
-                  justifyContent: "center",
-                  borderColor: "rgba(2, 132, 199, 0.4)",
-                  color: "#38bdf8",
-                  fontWeight: 600,
+                  flex: 1, fontSize: "0.66rem", padding: "0.3rem 0.35rem",
+                  background: "rgba(2,132,199,0.15)", color: "#38bdf8",
+                  border: "1px solid rgba(56,189,248,0.2)", borderRadius: "6px",
+                  cursor: "pointer", fontWeight: 600,
+                  opacity: recargando || reseteando ? 0.5 : 1,
                 }}
-                title="Restaurar los 568 socios, 65 créditos y 692 plazos fijos de Excel"
-              >
-                {recargando ? "⏳ Recargando..." : "📥 Recargar Excel"}
-              </button>
+                title="Restaurar datos de Excel"
+              >{recargando ? "⏳ …" : "📥 Excel"}</button>
               <button
-                type="button"
-                className="btn danger"
-                onClick={handleResetGlobal}
+                type="button" onClick={handleResetGlobal}
                 disabled={reseteando || recargando}
                 style={{
-                  fontSize: "0.72rem",
-                  padding: "0.35rem 0.45rem",
-                  width: "100%",
-                  justifyContent: "center",
-                  fontWeight: 600,
+                  flex: 1, fontSize: "0.66rem", padding: "0.3rem 0.35rem",
+                  background: "rgba(220,38,38,0.15)", color: "#f87171",
+                  border: "1px solid rgba(248,113,113,0.2)", borderRadius: "6px",
+                  cursor: "pointer", fontWeight: 600,
+                  opacity: reseteando || recargando ? 0.5 : 1,
                 }}
-                title="Borrar todos los datos y reiniciar el sistema limpio desde cero"
-              >
-                {reseteando ? "⏳ Reiniciando..." : "⚠️ Reiniciar a Cero"}
-              </button>
+                title="Reiniciar sistema a cero"
+              >{reseteando ? "⏳ …" : "⚠️ Reset"}</button>
             </div>
           </div>
         )}
 
-        <div className="sidebar-footer" style={{ padding: "0.75rem 0.5rem", background: "var(--mono-bg)", borderRadius: "8px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        {/* ── FOOTER / USUARIO ── */}
+        <div className="sidebar-footer">
+          <div className="sidebar-footer-inner">
             <div
+              title={usuario?.nombre}
               style={{
-                width: "30px",
-                height: "30px",
-                borderRadius: "50%",
-                background: "var(--accent)",
-                color: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 700,
-                fontSize: "0.85rem",
+                width: 30, height: 30, borderRadius: "50%",
+                background: "linear-gradient(135deg, #059669, #047857)",
+                color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 700, fontSize: "0.75rem", flexShrink: 0,
+                boxShadow: "0 2px 8px rgba(5,150,105,0.4)", cursor: "default",
               }}
-            >
-              {usuario?.nombre?.charAt(0) || "U"}
+            >{iniciales}</div>
+
+            <div className="sidebar-footer-text">
+              <div className="who">{usuario?.nombre}</div>
+              <div className="role">{usuario ? ROL_LABEL[usuario.rol] : ""}</div>
             </div>
-            <div style={{ overflow: "hidden" }}>
-              <div className="who" style={{ fontSize: "0.85rem", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
-                {usuario?.nombre}
-              </div>
-              <div className="role" style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
-                {usuario ? ROL_LABEL[usuario.rol] : ""}
-              </div>
-            </div>
+
+            <button
+              className="sidebar-footer-logout"
+              title="Cerrar sesión"
+              onClick={() => { logout(); navigate("/login", { replace: true }); }}
+              style={{
+                background: "rgba(239,68,68,0.12)",
+                border: "1px solid rgba(239,68,68,0.22)",
+                borderRadius: "6px", color: "#f87171", cursor: "pointer",
+                padding: "0.28rem 0.38rem", fontSize: "0.75rem",
+                flexShrink: 0, transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) => { (e.currentTarget.style.background = "rgba(239,68,68,0.28)"); }}
+              onMouseLeave={(e) => { (e.currentTarget.style.background = "rgba(239,68,68,0.12)"); }}
+            >⏏️</button>
           </div>
-          <button
-            className="link-btn"
-            style={{ color: "#b91c1c", marginTop: "0.5rem", display: "inline-block", fontSize: "0.78rem" }}
-            onClick={() => {
-              logout();
-              navigate("/login", { replace: true });
-            }}
-          >
-            🚪 Cerrar sesión
-          </button>
         </div>
       </aside>
+
       <main className="content">
         <Outlet />
       </main>
