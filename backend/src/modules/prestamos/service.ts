@@ -338,6 +338,15 @@ export async function cambiarEstado(
     if (actual.estado === "RECHAZADO" && nuevoEstado !== "RECHAZADO") {
       throw conflict("El préstamo fue RECHAZADO por el comité. Debe crearse una nueva solicitud.");
     }
+    // El paso a DESEMBOLSADO nunca se hace por este endpoint genérico: no
+    // exige caja abierta, no registra el egreso de efectivo en auxiliar de
+    // caja, y no acredita la cuenta de Ahorro sobre Préstamo si aplica. El
+    // único camino válido es POST /caja-auxiliar/:diaId/desembolso-credito.
+    if (nuevoEstado === "DESEMBOLSADO" && actual.estado !== "DESEMBOLSADO") {
+      throw badRequest(
+        "El desembolso debe registrarse desde Auxiliar de Caja (con la caja del día abierta), para que el efectivo entregado quede contabilizado. Este endpoint no puede marcar un crédito como desembolsado directamente.",
+      );
+    }
 
     if (nuevoEstado === "CANCELADO") {
       const saldo = Number(actual.saldo_capital);

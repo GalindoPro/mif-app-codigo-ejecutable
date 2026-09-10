@@ -416,31 +416,23 @@ export default function CreditosList() {
                       {/* COLUMNA DE ACCIONES RÁPIDAS EN 1 FILA COMPACTA */}
                       <td style={{ textAlign: "center" }}>
                         <div style={{ display: "flex", gap: "0.25rem", justifyContent: "center", alignItems: "center", whiteSpace: "nowrap" }}>
-                          {/* ACCIÓN PARA ESTADO APROBADO: DESEMBOLSAR */}
+                          {/* El desembolso YA NO se hace desde aquí: este atajo marcaba el
+                              crédito como DESEMBOLSADO sin pasar por Auxiliar de Caja, así que
+                              el efectivo entregado nunca quedaba registrado en la caja del día.
+                              El único camino válido es Auxiliar de Caja (con la caja abierta). */}
                           {p.estado === "APROBADO" && puedeGestionar && (
-                            <button
-                              type="button"
-                              className="btn"
+                            <Link
+                              to="/auxiliar-caja"
+                              className="btn secondary"
                               style={{
-                                background: "#059669",
-                                borderColor: "#059669",
                                 fontSize: "0.72rem",
                                 padding: "0.18rem 0.45rem",
                                 fontWeight: 700,
                               }}
-                              disabled={estaProcesando}
-                              onClick={() =>
-                                setModalAccion({
-                                  prestamo: p,
-                                  nuevoEstado: "DESEMBOLSADO",
-                                  titulo: `💵 Confirmar Desembolso de ${p.codigo}`,
-                                  mensaje: `¿Deseas desembolsar y entregar ${formatearQuetzales(p.monto_aprobado ?? p.monto_solicitado)} al socio ${p.socio_nombres}? El crédito entrará inmediatamente a cartera activa.`,
-                                  colorBoton: "#059669",
-                                })
-                              }
+                              title="El desembolso se registra en Auxiliar de Caja, para que el efectivo entregado quede contabilizado"
                             >
-                              {estaProcesando ? "…" : "⚡ Desembolsar"}
-                            </button>
+                              💵 Ir a Auxiliar de Caja
+                            </Link>
                           )}
 
                           {/* ACCIÓN PARA ESTADO SOLICITUD: APROBAR O RECHAZAR */}

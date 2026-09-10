@@ -87,3 +87,52 @@ describe("POST /api/prestamos — atomicidad crédito + cuenta Ahorro sobre Pré
     expect(res.status).toBe(403);
   });
 });
+
+// Cubre el hallazgo: la lista de Créditos tenía un atajo "Desembolsar" que
+// marcaba el préstamo como DESEMBOLSADO vía PATCH /:id/estado sin pasar por
+// Auxiliar de Caja — sin registrar el egreso de efectivo. Ahora ese endpoint
+// rechaza explícitamente el paso a DESEMBOLSADO; el único camino válido es
+// POST /caja-auxiliar/:diaId/desembolso-credito.
+describe("PATCH /api/prestamos/:id/estado — no puede desembolsar sin pasar por caja", () => {
+  let fx: Fixtures;
+  let prestamoId: string;
+
+  beforeEach(async () => {
+    fx = await resetDb();
+    const socio = await request(app)
+      .post("/api/socios")
+      .set("Authorization", `Bearer ${fx.tokens.CAJERO}`)
+      .send({
+        numeroAsociado: "TST-0001",
+        agenciaId: fx.agenciaId,
+        nombres: "Tomás Test",
+        fechaIngreso: "2026-01-01",
+        montoAportacionInicial: 100,
+        reciboAportacionInicial: "REC-0001",
+      });
+    const prestamo = await request(app)
+      .post("/api/prestamos")
+      .set("Authorization", `Bearer ${fx.tokens.SUPERVISOR}`)
+      .send({
+        agenciaId: fx.agenciaId,
+        socioId: socio.body.id,
+        tipo: "FIDUCIARIO",
+        tipoAmortizacion: "SOBRE_SALDOS",
+        montoSolicitado: 10000,
+        plazoMeses: 12,
+      });
+    prestamoId = prestamo.body.id;
+  });
+
+  it("rechaza el intento de pasar a DESEMBOLSADO por este endpoint, incluso para SUPERVISOR", async () => {
+    const res = await request(app)
+      .patch(`/api/prestamos/${prestamoId}/estado`)
+      .set("Authorization", `Bearer ${fx.tokens.SUPERVISOR}`)
+      .send({ estado: "DESEMBOLSADO" });
+
+    expect(res.status).toBe(400);
+
+    const { rows } = await pool.query(`select estado from prestamos where id = $1`, [prestamoId]);
+    expect(rows[0].estado).toBe("APROBADO");
+  });
+});
