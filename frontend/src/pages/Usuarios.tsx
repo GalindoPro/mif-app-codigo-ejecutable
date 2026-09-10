@@ -89,72 +89,104 @@ export default function Usuarios() {
       {error && <div className="alert error">{error}</div>}
       {mensajeExito && <div className="alert success">{mensajeExito}</div>}
 
+      {/* KPI METRICS STRIP - 100% FLUID */}
+      <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", marginBottom: "1.5rem" }}>
+        <div className="stat-card accent">
+          <span className="label">Total Usuarios</span>
+          <span className="value mono">{usuarios?.length ?? 0}</span>
+          <span className="sub">Cuentas creadas</span>
+        </div>
+        <div className="stat-card">
+          <span className="label">Administración y Control</span>
+          <span className="value mono">
+            {usuarios?.filter((u) => u.rol === "ADMIN" || u.rol === "GERENCIA" || u.rol === "SUPERVISOR").length ?? 0}
+          </span>
+          <span className="sub">Admin, Gerencia y Jefes</span>
+        </div>
+        <div className="stat-card">
+          <span className="label">Operaciones y Campo</span>
+          <span className="value mono">
+            {usuarios?.filter((u) => u.rol === "CAJERO" || u.rol === "PROMOTOR").length ?? 0}
+          </span>
+          <span className="sub">Caja y Promoción</span>
+        </div>
+        <div className="stat-card">
+          <span className="label">Cuentas Activas</span>
+          <span className="value mono" style={{ color: "#10b981" }}>
+            {usuarios?.filter((u) => u.activo).length ?? 0}
+          </span>
+          <span className="sub">Habilitados para acceso</span>
+        </div>
+      </div>
+
       {mostrarForm && (
-        <form className="card" onSubmit={crearUsuario} style={{ maxWidth: 560, marginBottom: "1.5rem" }}>
+        <form className="card" onSubmit={crearUsuario} style={{ width: "100%", maxWidth: "100%", marginBottom: "1.5rem" }}>
           <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>Registrar nuevo usuario</h2>
 
-          <div className="field">
-            <label htmlFor="usr-nombre">Nombre y apellido</label>
-            <input
-              id="usr-nombre"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              placeholder="Ej. Pedro Morales López"
-              required
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="usr-email">Correo electrónico</label>
-            <input
-              id="usr-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="ejemplo@mif.coop"
-              required
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="usr-password">Contraseña inicial</label>
-            <input
-              id="usr-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              minLength={8}
-              placeholder="Mínimo 8 caracteres"
-              required
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="usr-rol">Rol del usuario</label>
-            <select id="usr-rol" value={rol} onChange={(e) => setRol(e.target.value as RolUsuario)} required>
-              {ROLES_DISPONIBLES.map((r) => (
-                <option key={r} value={r}>
-                  {ROL_LABEL[r]}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {requiereAgencia && (
+          <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
             <div className="field">
-              <label htmlFor="usr-agencia">Agencia asignada</label>
-              <select id="usr-agencia" value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} required>
-                <option value="" disabled>
-                  Selecciona una agencia
-                </option>
-                {agencias.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.nombre}
+              <label htmlFor="usr-nombre">Nombre y apellido</label>
+              <input
+                id="usr-nombre"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                placeholder="Ej. Pedro Morales López"
+                required
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="usr-email">Correo electrónico</label>
+              <input
+                id="usr-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="ejemplo@mif.coop"
+                required
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="usr-password">Contraseña inicial</label>
+              <input
+                id="usr-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={8}
+                placeholder="Mínimo 8 caracteres"
+                required
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="usr-rol">Rol del usuario</label>
+              <select id="usr-rol" value={rol} onChange={(e) => setRol(e.target.value as RolUsuario)} required>
+                {ROLES_DISPONIBLES.map((r) => (
+                  <option key={r} value={r}>
+                    {ROL_LABEL[r]}
                   </option>
                 ))}
               </select>
             </div>
-          )}
+
+            {requiereAgencia && (
+              <div className="field">
+                <label htmlFor="usr-agencia">Agencia asignada</label>
+                <select id="usr-agencia" value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} required>
+                  <option value="" disabled>
+                    Selecciona una agencia
+                  </option>
+                  {agencias.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
 
           <div style={{ marginTop: "1rem", display: "flex", gap: "0.75rem" }}>
             <button type="submit" className="btn" disabled={guardando}>

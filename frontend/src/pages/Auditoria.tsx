@@ -76,21 +76,37 @@ export default function Auditoria() {
   const totalPaginas = pagina ? Math.max(1, Math.ceil(pagina.total / pageSize)) : 1;
 
   return (
-    <div>
+    <div style={{ width: "100%" }}>
       <div className="page-head">
         <div>
-          <h1>Bitácora de Auditoría</h1>
-          <p>Registro completo de todas las acciones realizadas en el sistema, con quién y cuándo.</p>
-        </div>
-        {pagina && (
-          <div className="stat-card accent" style={{ minWidth: 160 }}>
-            <span className="label">Total registros</span>
-            <span className="value mono">{pagina.total.toLocaleString("es-GT")}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span style={{ fontSize: "1.5rem" }}>🔍</span>
+            <h1>Bitácora de Auditoría</h1>
           </div>
-        )}
+          <p>Registro completo e inmutable de todas las acciones realizadas en el sistema, con quién, cuándo y datos modificados.</p>
+        </div>
       </div>
 
       {error && <div className="alert error">{error}</div>}
+
+      {/* KPI STRIP - 100% FLUID */}
+      <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", marginBottom: "1.5rem" }}>
+        <div className="stat-card accent">
+          <span className="label">Total Eventos Auditados</span>
+          <span className="value mono">{pagina?.total.toLocaleString("es-GT") ?? "0"}</span>
+          <span className="sub">Trazabilidad completa</span>
+        </div>
+        <div className="stat-card">
+          <span className="label">Entidades Monitoreadas</span>
+          <span className="value mono">{entidades.length}</span>
+          <span className="sub">Módulos bajo supervisión</span>
+        </div>
+        <div className="stat-card">
+          <span className="label">Página Actual</span>
+          <span className="value mono">{page} de {totalPaginas}</span>
+          <span className="sub">25 registros por bloque</span>
+        </div>
+      </div>
 
       {/* FILTROS */}
       <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", marginBottom: "1rem", alignItems: "center" }}>

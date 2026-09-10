@@ -474,6 +474,10 @@ export interface DetalleCajaAuxiliar {
   arqueo: { detalle: { valor: number; cantidad: number }[]; total_contado: string; diferencia: string } | null;
 }
 
+export function formatoQ(valor: string | number): string {
+  return `Q ${Number(valor).toLocaleString("es-GT", { minimumFractionDigits: 2 })}`;
+}
+
 export interface UsuarioItem {
   id: string;
   nombre: string;

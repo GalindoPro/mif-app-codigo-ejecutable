@@ -203,3 +203,85 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
 - **Distribución Automática de Excedentes a Capital:**
   - Cuando el socio entrega una cantidad mayor a la cuota requerida: primero se cubre mora, luego interés diario, y **todo el remanente se abona DIRECTAMENTE al Capital**, amortizando y disminuyendo el saldo deudor inmediatamente con alerta visual de confirmación.
 - **Paneles en Tiempo Real:** En la ventanilla de cobro de **Auxiliar de Caja** y en la **Ficha del Crédito** con el saldo exacto para liquidar y cancelar hoy.
+
+---
+
+## 19. Rediseño del Tablero a Pantalla Completa (Sin Scroll en PC), Tiempo Real Automático (10s) y Menú Desplegable (`Tablero.tsx`, `app.css`)
+- **Visualización en Una Sola Pantalla en PC (100vh):**
+  - **Banda Superior de 8 KPIs:** Distribuida en 4 columnas x 2 filas compactas (*Caja Chica, Ahorro Corriente, Ahorro Programado, Ahorro Infantil, Ahorro Plazo Fijo, Aportaciones Capital, Socios Activos, Cartera de Crédito*).
+  - **Cifras Monetarias Continuas:** Aplicación de `white-space: nowrap` y tipografía responsiva `clamp()` en `.stat-card .value` y `.kpi-tile-value` para evitar que montos grandes como `Q 2,657,460.40` quiebren los decimales en una segunda línea.
+  - **Dos Columnas Inferiores Balanceadas:**
+    - *Columna Izquierda:* Panel de Supervisión y Control (o Accesos Rápidos según rol) + Tabla compacta de Desglose por Agencia.
+    - *Columna Derecha:* Monitoreo Estratégico de Servicios con filtros por área, métricas destacadas y barras proporcionales con scroll interno acotado a 200px.
+  - **Cero Huecos Vacíos:** Eliminación de espacios negros muertos y distribución simétrica de la altura en pantallas de escritorio.
+- **Actualización Continua en Tiempo Real (10 Segundos):**
+  - **Supresión del Botón Manual `🔄 Actualizar`:** Cabecera limpia y libre de botones redundantes.
+  - **Polling Silencioso:** Consulta periódica automática cada 10 segundos para actualizar tanto el resumen financiero como la analítica de servicios sin parpadeos visuales.
+  - **Refresco Inmediato por Visibilidad:** Al regresar a la pestaña del navegador (`window.focus` / `visibilitychange`), los datos se actualizan al instante.
+  - **Insignia Animada:** Indicador `● En Vivo · En Tiempo Real` con animación de pulso verde que confirma la conexión activa.
+- **Menú Desplegable de Administración (`⚙️ Opciones del Sistema`):**
+  - Botones administrativos (`📥 Recargar Datos Existentes (Excel)` y `⚠️ Reiniciar a Cero`) agrupados en un menú emergente con confirmación de seguridad, liberando valiosa altura vertical.
+- **Adaptabilidad Responsiva Completa:**
+  - **Escritorio (PC):** Vista unificada en 1 pantalla sin scrollbar vertical forzado.
+  - **Tablet (768px - 1024px):** Cuadrícula fluida de 2 columnas para KPIs y reorganización táctil de paneles.
+  - **Móvil (375px - 640px):** Cuadrícula de 2 columnas para tarjetas financieras y apilamiento vertical natural con navegación táctil fluida.
+
+---
+
+## 20. Optimización de Espacios y Acordeón Desplegable en el Libro Mensual de Arqueos (`LibroArqueoMensual.tsx`)
+- **Ocupación del 100% del Ancho (Eliminación de Vacíos Laterales):**
+  - Se retiró la limitación fija `maxWidth: 1050px` del contenedor del acta notarial, permitiendo que la sábana de operaciones, el encabezado institucional y las firmas se expandan al 100% del ancho útil de la pantalla en monitores y laptops sin dejar huecos negros en los costados.
+- **Acordeón Desplegable de Parámetros Notariales (`mostrarConfiguracion`):**
+  - **Problema previo:** Los 9 campos de configuración ocupaban un recuadro fijo de más de 220px de alto en la parte superior, empujando todo el documento fuera de la vista inicial.
+  - **Solución implementada:** Se integró una barra superior compacta de solo ~36px con insignias de resumen (`Acta: CV-09-2026`, `📍 San Gaspar Chajul`, `⏰ 17:00 – 18:15`, `👤 Pres.: Jacinto Asicona Brito`) y el botón conmutador **`▼ Modificar Datos y Firmantes` / `▲ Ocultar Parámetros`**.
+  - Al hacer clic, el formulario se despliega en cuadrículas simétricas de 4 columnas para parámetros generales y firmantes, manteniendo una navegación ultra rápida.
+- **Cintillo de Cifras Clave Responsivo:**
+  - La franja de 5 indicadores (`Días Operados`, `Efectividad de Cuadre`, `Ingresos`, `Egresos`, `Diferencia`) se adaptó con `grid-template-columns: repeat(auto-fit, minmax(130px, 1fr))` para redistribuirse fluidamente en cualquier tamaño de pantalla sin apiñarse ni quebrar texto.
+- **Firmas Notariales con Auto-Fit:**
+  - Las 4 firmas oficiales ahora fluyen a 2 columnas en tablets y móviles, y a 4 columnas balanceadas en pantallas grandes.
+
+---
+
+## 21. Optimización Integral de Pantallas del Sistema: Ocupación al 100% de Ancho, Eliminación de Espacios Vacíos y Nuevas Vistas Administrativas (`Alertas.tsx`, `Sesiones.tsx`, `Auditoria.tsx`, `CajaChica.tsx`, `AuxiliarCaja.tsx`, `AhorroList.tsx`, `SociosList.tsx`, `Usuarios.tsx`, `Agencias.tsx`, `app.css`)
+- **Aprovechamiento Integral de Pantalla (Escritorio / PC):**
+  - **Retiro de Límites Rígidos:** Se eliminaron las restricciones fijas (`maxWidth: 480px`, `560px`, `580px`, `640px`) en formularios y cuadrículas que dejaban franjas negras muertas en pantallas de PC.
+  - **Fluid Grid en Tarjetas de Métricas (`1fr`):** En todos los módulos (`Auxiliar de caja`, `Caja chica`, `Cuentas de Ahorro`, `Padrón de Socios`, `Usuarios`, `Agencias`, `Alertas`, `Sesiones`), los cintillos de tarjetas ahora utilizan `grid-template-columns: repeat(auto-fit, minmax(200px, 1fr))` garantizando que las tarjetas se estiren y cubran el 100% del monitor sin huecos al final.
+  - **Padding de Contenedor Optimizado:** En `app.css`, `.content` se ajustó a `padding: 1rem 1.5rem` maximizando el área útil visible.
+- **Nuevas Vistas y Endpoints del Módulo de Administración:**
+  - **Panel de Alertas (`/alertas`):** Vista en tiempo real con diagnóstico financiero automatizado: créditos con cuotas pendientes o en mora, cajas auxiliares desfasadas o abiertas sin arqueo, certificados a plazo fijo vencidos o por vencer (≤ 15 días), alerta de saldo bajo en caja chica (< Q 500), y expedientes incompletos en el padrón de socios. Incluye badges de severidad (`Peligro`, `Advertencia`, `Informativa`), pestañas de filtro por categoría y botón de atención directa (`Atender en módulo →`).
+  - **Control de Sesiones y Accesos Activos (`/sesiones`):** Tablero administrativo conectado a la base de datos que lista en tiempo real los colaboradores del sistema, correos institucionales, roles, agencias asignadas, estado de cuenta (`🟢 Habilitado`), última acción auditada y fecha/hora exacta de última actividad.
+  - **Bitácora de Auditoría Conectada (`/auditoria`):** Backend activado con paginación, filtros por texto, entidad, tipo de acción (`CREAR`, `ACTUALIZAR`, `ELIMINAR`) y fechas, con visualización de registros y diferencias JSON al 100% del ancho.
+- **Optimización de Operaciones y Captaciones:**
+  - **Caja Chica (`/caja-chica`):** Tarjetas de Saldo actual, Ingresos y Egresos expandidas al 100%, tabla de comprobantes fluida y formularios de comprobante y reposición de fondo fijo distribuidos en cuadrículas responsivas.
+  - **Auxiliar de Caja (`/auxiliar-caja`):** Tarjetas de fondos (`Saldo inicial`, `Total ingresos`, `Total egresos`, `Saldo actual`) ocupando el 100% del ancho con `minmax(200px, 1fr)`.
+  - **Cuentas de Ahorro (`/ahorros/corriente`, `/programado`, `/infanto-juvenil`, `/sobre-prestamo`):** Reemplazo de anchos fijos de 220px por `minmax(220px, 1fr)` en `AhorroList.tsx`, cubriendo las cuatro modalidades de ahorro con presentación a pantalla completa.
+  - **Padrón de Socios (`/socios`):** Incorporación de cintillo de métricas fluidas (`Total Asociados`, `Prospectos / Fiadores`, `Bloque de Padrón`) y barra de búsqueda de ancho completo.
+  - **Usuarios y Agencias (`/usuarios`, `/agencias`):** Adición de tiras de indicadores ejecutivos, formularios en 2-3 columnas responsivas y tablas de padrón al 100% de ancho.
+- **Adaptabilidad Multi-Dispositivo (PC, Tablet y Móvil):**
+  - **Tablet (768px - 1024px):** Menú lateral colapsable en barra superior con botón hamburguesa, reflow automático de tarjetas en 2 columnas y tablas con scroll suave.
+---
+
+## 22. Arquitectura de Pantalla Completa (100vh Sin Scroll de Ventana) y 2 Columnas Balanceadas en Operaciones y Créditos (`CajaChica.tsx`, `CreditosList.tsx`, `app.css`)
+- **Problema Previo:**
+  - Las pantallas operativas tenían tarjetas KPI gigantes apiladas verticalmente y tablas empujadas hacia el fondo, obligando al usuario a realizar scroll vertical extenso de página completa en pantallas de laptop y PC, dejando además zonas de espacio negro desaprovechadas.
+- **Nueva Arquitectura de Pantalla Única (`.screen-container`):**
+  - Contenedor con altura exacta calculada `height: calc(100vh - 2.2rem)` y `overflow: hidden` en monitores de escritorio (con reflow natural a scroll en tablets y móviles).
+  - Cero scroll en la ventana principal del navegador (`Page Height == Viewport Height`).
+- **Rediseño de Caja Chica (`CajaChica.tsx`):**
+  - **Cabecera Compacta en 1 Línea (`.screen-header`):** Título descriptivo y botones de acción rápida agrupados.
+  - **Franja Horizontal de KPIs Delgada (`.screen-kpis`):** 4 indicadores (Saldo Actual, Total Ingresos, Total Egresos, Comprobantes) en una sola fila compacta de ~50px.
+  - **Distribución en 2 Columnas Balanceadas (`.screen-split-layout`):**
+    - *Columna Izquierda (360px):* Panel "Egresos por Categoría" con barras de progreso dinámicas, montos monetarios y porcentajes del presupuesto consumido, además de formularios emergentes de comprobante y reposición de fondo fijo.
+    - *Columna Derecha (Flex 1):* Buscador en vivo de comprobantes y tabla de registros con encabezado fijo (`sticky`) y scroll interno contenido (`.table-scroll-container`).
+- **Rediseño del Módulo de Créditos (`CreditosList.tsx`):**
+  - **Cabecera Unificada con Pestañas Integradas:** Botones conmutadores de `Cartera ({total})` y `Fiadores ({total})` integrados directamente en el encabezado junto a los accesos al `Simulador` y `+ Nueva solicitud`, ahorrando más de 80px de altura.
+  - **Franja de KPIs Ultra Compacta:** Tarjetas interactivas con iconos y montos continuos (*Cartera Activa*, *Por Desembolsar*, *En Solicitud*, *Total Créditos*) que filtran la tabla al hacer clic.
+  - **Barra de Herramientas Compacta (`.screen-toolbar`):** Buscador instantáneo y botones de estado rápido (`Todos`, `⚡ Desembolso`, `Cobro`, `Pagados`) en 1 sola fila de 36px.
+  - **Tabla Compacta de Créditos (`.table-compact`):** Altura de filas optimizada para visualizar entre 9 y 12 créditos de inmediato; acciones rápidas (`⚡ Desembolsar`, `💰 Cobrar`, `Finalizar`, `Ficha →`) en una sola línea horizontal sin quebrar filas.
+  - **Paginación Integrada al Pie (`.screen-footer`):** Controles fijos al fondo de la pantalla sin interferir con la tabla.
+  - **Directorio de Fiadores Optimizado:** Misma estructura compacta de 100vh con franja de 3 KPIs (Total, Externos sin cuenta, Socios con cuenta) y tabla con scroll interno.
+- **Sincronización Dual Continua:**
+  - Modificaciones aplicadas en simultáneo en `/Users/galindo/Downloads/mif-app-codigo-ejecutable` y en el entorno de ejecución activo `/Users/galindo/Documents/proyects/carpet/mif-app-codigo-ejecutable`.
+
+
+

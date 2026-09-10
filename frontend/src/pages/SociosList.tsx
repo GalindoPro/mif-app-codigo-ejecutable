@@ -123,6 +123,25 @@ export default function SociosList() {
         </div>
       )}
 
+      {/* KPI STRIP - 100% FLUID */}
+      <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", marginBottom: "1.25rem" }}>
+        <div className="stat-card accent">
+          <span className="label">Total Asociados</span>
+          <span className="value mono">{resultado?.total ?? "—"}</span>
+          <span className="sub">En libro de asociados oficial</span>
+        </div>
+        <div className="stat-card">
+          <span className="label">Prospectos / Fiadores</span>
+          <span className="value mono" style={{ color: "#d97706" }}>{fiadores.length}</span>
+          <span className="sub">Sin cuenta de asociado aún</span>
+        </div>
+        <div className="stat-card">
+          <span className="label">Bloque de Padrón</span>
+          <span className="value mono">Pág {page} de {totalPaginas}</span>
+          <span className="sub">10 asociados por vista</span>
+        </div>
+      </div>
+
       {/* Tabs Selector */}
       <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", borderBottom: "1px solid var(--border)", paddingBottom: "0.5rem" }}>
         <button

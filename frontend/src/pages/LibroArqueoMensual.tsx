@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { formatearQuetzales } from "../lib/formatters";
+import { formatoQ } from "../types";
 import type { Agencia } from "../types";
 
 interface DiaArqueo {
@@ -58,18 +58,14 @@ export default function LibroArqueoMensual() {
   const [observaciones, setObservaciones] = useState(
     "Durante la revisión y cotejo documental del presente período, las operaciones de caja se encontraron debidamente soportadas con sus comprobantes y boletas autorizadas. Los saldos en libros coincidieron con el efectivo contado, determinando que los registros de ingresos y egresos fueron llevados con exactitud y estricto apego a los estatutos cooperativos.",
   );
+  const [mostrarConfiguracion, setMostrarConfiguracion] = useState(false);
 
   useEffect(() => {
     setNumeroActa(`CV-${mesNum}-${añoStr}`);
   }, [mes, mesNum, añoStr]);
 
   useEffect(() => {
-    api.get<Agencia[]>("/agencias").then(({ data }) => {
-      setAgencias(data);
-      // ADMIN/GERENCIA no tienen agencia propia (ven todas): sin esto, esta
-      // pantalla nunca consulta nada porque agenciaId se queda vacío.
-      setAgenciaId((actual) => actual || data[0]?.id || "");
-    });
+    api.get<Agencia[]>("/agencias").then(({ data }) => setAgencias(data));
   }, []);
 
   function cargar() {
@@ -152,23 +148,23 @@ export default function LibroArqueoMensual() {
       {/* PANEL DE CONFIGURACIÓN Y CONTROLES (NO PRINT)                             */}
       {/* ========================================================================= */}
       <div className="no-print">
-        <div className="page-head">
+        <div className="page-head" style={{ marginBottom: "0.75rem", paddingBottom: "0.5rem" }}>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <span style={{ fontSize: "1.5rem" }}>📑</span>
-              <h1>Libro de Actas de Arqueo Mensual de Caja</h1>
-              <span className="badge" style={{ background: "#fef3c7", color: "#92400e", fontWeight: 700 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "1.3rem" }}>📑</span>
+              <h1 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 800 }}>Libro de Actas de Arqueo Mensual de Caja</h1>
+              <span className="badge" style={{ background: "#fef3c7", color: "#92400e", fontWeight: 700, fontSize: "0.72rem" }}>
                 Comisión de Vigilancia
               </span>
             </div>
-            <p>
+            <p style={{ margin: "0.15rem 0 0", fontSize: "0.78rem" }}>
               Emisión de actas oficiales con formato estatutario notarial para la Comisión de Vigilancia y Auditoría Interna.
             </p>
           </div>
 
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-              <label htmlFor="mes-picker" style={{ fontSize: "0.85rem", fontWeight: 600 }}>
+          <div style={{ display: "flex", gap: "0.45rem", alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <label htmlFor="mes-picker" style={{ fontSize: "0.8rem", fontWeight: 600 }}>
                 Mes:
               </label>
               <input
@@ -176,12 +172,12 @@ export default function LibroArqueoMensual() {
                 type="month"
                 value={mes}
                 onChange={(e) => setMes(e.target.value)}
-                style={{ padding: "0.35rem 0.5rem", borderRadius: "6px" }}
+                style={{ padding: "0.3rem 0.45rem", borderRadius: "6px", fontSize: "0.82rem" }}
               />
             </div>
 
             {puedeElegirAgencia && (
-              <select value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} style={{ maxWidth: 180 }}>
+              <select value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} style={{ maxWidth: 170, fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}>
                 {agencias.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.nombre}
@@ -195,6 +191,7 @@ export default function LibroArqueoMensual() {
               className="btn secondary"
               onClick={exportarCSV}
               disabled={!datos || datos.dias.length === 0}
+              style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem" }}
             >
               📥 Excel (CSV)
             </button>
@@ -203,117 +200,149 @@ export default function LibroArqueoMensual() {
               className="btn"
               onClick={() => window.print()}
               disabled={!datos || datos.dias.length === 0}
+              style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem" }}
             >
               🖨️ Imprimir Acta Oficial
             </button>
           </div>
         </div>
 
-        {error && <div className="alert error">{error}</div>}
+        {error && <div className="alert error" style={{ margin: "0.4rem 0", padding: "0.5rem 0.75rem", fontSize: "0.82rem" }}>{error}</div>}
 
-        {/* Panel de Datos Editables del Acta (Opciones de Personalización) */}
-        <div className="card" style={{ marginBottom: "1.2rem", background: "var(--paper-raised)" }}>
-          <h3 style={{ margin: "0 0 0.75rem", fontSize: "0.95rem", color: "var(--accent)" }}>
-            ⚙️ Datos Oficiales del Acta Notarial
-          </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem" }}>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label style={{ fontSize: "0.75rem" }}>No. de Acta</label>
-              <input
-                type="text"
-                value={numeroActa}
-                onChange={(e) => setNumeroActa(e.target.value)}
-                placeholder="CV-09-2026"
-                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
-              />
+        {/* Panel Desplegable de Parámetros Notariales */}
+        <div className="card" style={{ marginBottom: "0.75rem", background: "var(--paper-raised)", padding: "0.55rem 0.85rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "0.84rem", fontWeight: 700, color: "var(--accent)" }}>
+                ⚙️ Datos Oficiales del Acta:
+              </span>
+              <span className="badge" style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}>
+                Acta: <strong>{numeroActa}</strong>
+              </span>
+              <span className="badge" style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}>
+                📍 {lugarMunicipio}
+              </span>
+              <span className="badge" style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}>
+                ⏰ {horaInicio} – {horaFin}
+              </span>
+              <span className="badge" style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}>
+                👤 Pres.: {nombrePresidente}
+              </span>
             </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label style={{ fontSize: "0.75rem" }}>Municipio / Lugar</label>
-              <input
-                type="text"
-                value={lugarMunicipio}
-                onChange={(e) => setLugarMunicipio(e.target.value)}
-                placeholder="San Gaspar Chajul, Quiché"
-                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
-              />
-            </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label style={{ fontSize: "0.75rem" }}>Hora Inicio</label>
-              <input
-                type="time"
-                value={horaInicio}
-                onChange={(e) => setHoraInicio(e.target.value)}
-                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
-              />
-            </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label style={{ fontSize: "0.75rem" }}>Hora Cierre</label>
-              <input
-                type="time"
-                value={horaFin}
-                onChange={(e) => setHoraFin(e.target.value)}
-                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
-              />
-            </div>
+
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={() => setMostrarConfiguracion(!mostrarConfiguracion)}
+              style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+              title="Ajustar nombres de la comisión, horario y observaciones"
+            >
+              {mostrarConfiguracion ? "▲ Ocultar Parámetros" : "▼ Modificar Datos y Firmantes"}
+            </button>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: "0.75rem",
-              marginTop: "0.75rem",
-            }}
-          >
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label style={{ fontSize: "0.75rem" }}>Presidente (Comisión Vigilancia)</label>
-              <input
-                type="text"
-                value={nombrePresidente}
-                onChange={(e) => setNombrePresidente(e.target.value)}
-                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
-              />
-            </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label style={{ fontSize: "0.75rem" }}>Secretaria (Comisión Vigilancia)</label>
-              <input
-                type="text"
-                value={nombreSecretaria}
-                onChange={(e) => setNombreSecretaria(e.target.value)}
-                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
-              />
-            </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label style={{ fontSize: "0.75rem" }}>Vocal I (Comisión Vigilancia)</label>
-              <input
-                type="text"
-                value={nombreVocal}
-                onChange={(e) => setNombreVocal(e.target.value)}
-                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
-              />
-            </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label style={{ fontSize: "0.75rem" }}>Receptor Pagador (Cajero)</label>
-              <input
-                type="text"
-                value={nombreCajero}
-                onChange={(e) => setNombreCajero(e.target.value)}
-                style={{ fontSize: "0.85rem", padding: "0.35rem 0.5rem" }}
-              />
-            </div>
-          </div>
+          {mostrarConfiguracion && (
+            <div style={{ marginTop: "0.65rem", paddingTop: "0.65rem", borderTop: "1px solid var(--line)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "0.6rem" }}>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>No. de Acta</label>
+                  <input
+                    type="text"
+                    value={numeroActa}
+                    onChange={(e) => setNumeroActa(e.target.value)}
+                    placeholder="CV-09-2026"
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>Municipio / Lugar</label>
+                  <input
+                    type="text"
+                    value={lugarMunicipio}
+                    onChange={(e) => setLugarMunicipio(e.target.value)}
+                    placeholder="San Gaspar Chajul, Quiché"
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>Hora Inicio</label>
+                  <input
+                    type="time"
+                    value={horaInicio}
+                    onChange={(e) => setHoraInicio(e.target.value)}
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>Hora Cierre</label>
+                  <input
+                    type="time"
+                    value={horaFin}
+                    onChange={(e) => setHoraFin(e.target.value)}
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+              </div>
 
-          <div className="field" style={{ marginTop: "0.75rem", marginBottom: 0 }}>
-            <label style={{ fontSize: "0.75rem" }}>
-              <strong>Observaciones / Hallazgos de Auditoría</strong> (Se imprime en el Punto Tercero del Acta)
-            </label>
-            <textarea
-              rows={2}
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
-              style={{ fontSize: "0.82rem", width: "100%", padding: "0.4rem" }}
-            />
-          </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+                  gap: "0.6rem",
+                  marginTop: "0.6rem",
+                }}
+              >
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>Presidente (Comisión Vigilancia)</label>
+                  <input
+                    type="text"
+                    value={nombrePresidente}
+                    onChange={(e) => setNombrePresidente(e.target.value)}
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>Secretaria (Comisión Vigilancia)</label>
+                  <input
+                    type="text"
+                    value={nombreSecretaria}
+                    onChange={(e) => setNombreSecretaria(e.target.value)}
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>Vocal I (Comisión Vigilancia)</label>
+                  <input
+                    type="text"
+                    value={nombreVocal}
+                    onChange={(e) => setNombreVocal(e.target.value)}
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>Receptor Pagador (Cajero)</label>
+                  <input
+                    type="text"
+                    value={nombreCajero}
+                    onChange={(e) => setNombreCajero(e.target.value)}
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+              </div>
+
+              <div className="field" style={{ marginTop: "0.6rem", marginBottom: 0 }}>
+                <label style={{ fontSize: "0.72rem" }}>
+                  <strong>Observaciones / Hallazgos de Auditoría</strong> (Se imprime en el Punto Tercero del Acta)
+                </label>
+                <textarea
+                  rows={2}
+                  value={observaciones}
+                  onChange={(e) => setObservaciones(e.target.value)}
+                  style={{ fontSize: "0.8rem", width: "100%", padding: "0.35rem 0.45rem" }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -325,9 +354,9 @@ export default function LibroArqueoMensual() {
         style={{
           background: "var(--paper)",
           border: "1px solid var(--line)",
-          padding: "1.5rem",
-          maxWidth: "1050px",
-          margin: "0 auto",
+          padding: "1.1rem 1.4rem",
+          width: "100%",
+          boxSizing: "border-box",
         }}
       >
         {/* Encabezado Institucional */}
@@ -388,12 +417,12 @@ export default function LibroArqueoMensual() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(5, 1fr)",
-                  gap: "0.35rem",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                  gap: "0.45rem",
                   marginBottom: "0.5rem",
                   background: "var(--paper-raised)",
-                  padding: "0.35rem 0.5rem",
-                  borderRadius: "5px",
+                  padding: "0.4rem 0.6rem",
+                  borderRadius: "6px",
                   border: "1px solid var(--line)",
                   fontSize: "0.72rem",
                 }}
@@ -425,7 +454,7 @@ export default function LibroArqueoMensual() {
                     Total Ingresos del Mes
                   </span>
                   <strong className="mono" style={{ fontSize: "0.9rem", color: "#16a34a" }}>
-                    + {formatearQuetzales(datos.resumen.totalIngresosMes)}
+                    + {formatoQ(datos.resumen.totalIngresosMes)}
                   </strong>
                 </div>
 
@@ -434,7 +463,7 @@ export default function LibroArqueoMensual() {
                     Total Egresos del Mes
                   </span>
                   <strong className="mono" style={{ fontSize: "0.9rem", color: "#dc2626" }}>
-                    − {formatearQuetzales(datos.resumen.totalEgresosMes)}
+                    − {formatoQ(datos.resumen.totalEgresosMes)}
                   </strong>
                 </div>
 
@@ -497,19 +526,19 @@ export default function LibroArqueoMensual() {
                               {d.cerrado_por_nombre || d.abierto_por_nombre || nombreCajero}
                             </td>
                             <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
-                              {formatearQuetzales(d.saldo_inicial)}
+                              {formatoQ(d.saldo_inicial)}
                             </td>
                             <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "2px 4px" }}>
-                              {formatearQuetzales(d.total_ingresos)}
+                              {formatoQ(d.total_ingresos)}
                             </td>
                             <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "2px 4px" }}>
-                              {formatearQuetzales(d.total_egresos)}
+                              {formatoQ(d.total_egresos)}
                             </td>
                             <td className="mono" style={{ textAlign: "right", fontWeight: 700, padding: "2px 4px" }}>
-                              {formatearQuetzales(esperado)}
+                              {formatoQ(esperado)}
                             </td>
                             <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
-                              {formatearQuetzales(contado)}
+                              {formatoQ(contado)}
                             </td>
                             <td
                               className="mono"
@@ -520,7 +549,7 @@ export default function LibroArqueoMensual() {
                                 padding: "2px 4px",
                               }}
                             >
-                              {dif === 0 ? formatearQuetzales(0) : dif > 0 ? `+${formatearQuetzales(dif)}` : `-${formatearQuetzales(Math.abs(dif))}`}
+                              {dif === 0 ? "Q 0.00" : dif > 0 ? `+${formatoQ(dif)}` : `-${formatoQ(Math.abs(dif))}`}
                             </td>
                             <td style={{ textAlign: "center", padding: "2px 4px" }}>
                               <span
@@ -544,10 +573,10 @@ export default function LibroArqueoMensual() {
                         </td>
                         <td style={{ padding: "3px 4px" }}>—</td>
                         <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "3px 4px" }}>
-                          {formatearQuetzales(datos.resumen.totalIngresosMes)}
+                          {formatoQ(datos.resumen.totalIngresosMes)}
                         </td>
                         <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "3px 4px" }}>
-                          {formatearQuetzales(datos.resumen.totalEgresosMes)}
+                          {formatoQ(datos.resumen.totalEgresosMes)}
                         </td>
                         <td colSpan={2} style={{ padding: "3px 4px" }}></td>
                         <td
@@ -559,10 +588,10 @@ export default function LibroArqueoMensual() {
                           }}
                         >
                           {datos.resumen.diasConDiferencia === 0
-                            ? formatearQuetzales(0)
+                            ? "Q 0.00"
                             : datos.resumen.totalSobrante > 0
-                            ? `+${formatearQuetzales(datos.resumen.totalSobrante)}`
-                            : `-${formatearQuetzales(datos.resumen.totalFaltante)}`}
+                            ? `+${formatoQ(datos.resumen.totalSobrante)}`
+                            : `-${formatoQ(datos.resumen.totalFaltante)}`}
                         </td>
                         <td style={{ textAlign: "center", padding: "3px 4px" }}>
                           {datos.resumen.diasConDiferencia === 0 ? "✓ CONFORME" : "REVISADO"}
@@ -591,12 +620,12 @@ export default function LibroArqueoMensual() {
             {/* BLOQUE DE FIRMAS OFICIALES (4 FIRMAS CON NOMBRES REALES) */}
             <div
               style={{
-                marginTop: "1.5rem",
+                marginTop: "1.25rem",
                 paddingTop: "0.6rem",
                 borderTop: "1px dashed var(--line)",
                 display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: "1.5rem 1rem",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: "1.25rem 1rem",
                 textAlign: "center",
                 pageBreakInside: "avoid",
               }}

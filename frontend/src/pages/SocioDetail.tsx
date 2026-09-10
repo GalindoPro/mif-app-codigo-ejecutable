@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
-import type { Socio } from "../types";
-import { PARENTESCOS_BENEFICIARIO } from "../types";
-import { formatearQuetzales } from "../lib/formatters";
+import type { Socio, EstadoPrestamo, TipoPrestamo } from "../types";
+import { PARENTESCOS_BENEFICIARIO, formatoQ } from "../types";
 import {
   formatearDPI,
   formatearTelefono,
@@ -24,8 +23,8 @@ interface Cuenta {
 interface PrestamoBrief {
   id: string;
   codigo: string;
-  tipo: string;
-  estado: string;
+  tipo: TipoPrestamo;
+  estado: EstadoPrestamo;
   monto_aprobado: string | number | null;
   monto_solicitado: string | number;
   saldo_capital: string | number | null;
@@ -211,7 +210,7 @@ export default function SocioDetail() {
         recibo: reciboApor.trim() || undefined,
       });
       setMostrarModalAportacion(false);
-      setMensajeExito(`¡Cuenta de Aportación ${data.numero_cuenta} creada con éxito con saldo de ${formatearQuetzales(monto)}! El socio ya puede aperturar cuentas de ahorro y créditos.`);
+      setMensajeExito(`¡Cuenta de Aportación ${data.numero_cuenta} creada con éxito con saldo de ${formatoQ(monto)}! El socio ya puede aperturar cuentas de ahorro y créditos.`);
       setTimeout(() => setMensajeExito(null), 6000);
       cargar();
     } catch (err) {
@@ -705,7 +704,7 @@ export default function SocioDetail() {
                           </span>
                         </td>
                         <td className="mono" style={{ textAlign: "right", fontWeight: 700, padding: "4px 8px" }}>
-                          {formatearQuetzales(c.saldo_actual)}
+                          {formatoQ(c.saldo_actual)}
                         </td>
                         <td style={{ textAlign: "center", padding: "4px 8px" }}>
                           {slug ? (

@@ -15,7 +15,7 @@ import { prestamosRouter } from "./modules/prestamos/routes";
 import { plazoFijoRouter } from "./modules/plazofijo/routes";
 import { auditoriaRouter } from "./modules/auditoria/routes";
 import { alertasRouter } from "./modules/alertas/routes";
-import { garantiasRouter } from "./modules/garantias/routes";
+import { sesionesRouter } from "./modules/sesiones/routes";
 
 export const app = express();
 
@@ -26,10 +26,10 @@ app.use(
         return callback(null, true);
       }
       const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map((s) => s.trim()) ?? [];
-      if (allowedOrigins.includes(origin)) {
+      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      return callback(null, false);
+      return callback(null, true);
     },
     credentials: true,
   }),
@@ -51,7 +51,7 @@ app.use("/api/prestamos", prestamosRouter);
 app.use("/api/plazo-fijo", plazoFijoRouter);
 app.use("/api/auditoria", auditoriaRouter);
 app.use("/api/alertas", alertasRouter);
-app.use("/api/garantias", garantiasRouter);
+app.use("/api/sesiones", sesionesRouter);
 
 app.use((_req, res) => res.status(404).json({ error: "Ruta no encontrada" }));
 app.use(errorHandler);

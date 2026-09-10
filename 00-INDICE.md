@@ -26,13 +26,13 @@ Este documento registra el **avance real y completo** del sistema de la Cooperat
 
 3. **Caja Chica (`/caja-chica`):**
    - Basado en `caja/Caja Chica 30-07-2026.xlsx`.
+   - **Diseño de Pantalla Única (100vh Sin Scroll):** Arquitectura balanceada de 2 columnas. Columna izquierda con panel de gastos por categoría, barras de presupuesto y botones de acción. Columna derecha con buscador y tabla de comprobantes con cabecera fija (`sticky`) y scroll interno.
    - Registro de comprobantes de ingreso y egreso con categorías contables y documentos (DTE, factura, recibo).
    - **Reposición del Fondo Fijo (`📥 Reponer Fondo (Cheque)`):**
      - Recarga oficial del saldo de caja chica mediante cheque emitido por la cooperativa (`No. CH.`, ej. *1290*, *2000*).
      - Validación anti-duplicados para evitar registrar dos veces el mismo cheque.
      - Incremento inmediato del saldo disponible para gastos operativos.
    - Arqueo físico interactivo de billetes y monedas (Q200 a Q0.01) con cálculo de diferencia y saldo acumulado.
-
 
 4. **Cuentas de Ahorro a la Vista y Programado (`/ahorros/...`):**
    - Basado en `caja/AHORRO CORRIENTE`, `AHORRO PROGRAMADO` y `AHORRO INFANTO JUVENIL`.
@@ -51,6 +51,7 @@ Este documento registra el **avance real y completo** del sistema de la Cooperat
    - Liquidación y pago del certificado al vencimiento (`LIQUIDADO`) con generación de recibo contable.
 
 6. **Créditos y Promotor (`/creditos`):**
+   - **Diseño de Pantalla Única (100vh Sin Scroll):** Cabecera compacta de 1 sola línea con tabs integradas (`Cartera` y `Fiadores`), franja horizontal de KPIs ultra compacta con filtrado con un clic, buscador y chips rápidos en 1 línea, tabla compacta con scroll interno suave y paginación fija al fondo.
    - Roles de promotores de campo asignados a cada crédito.
    - **Simulador de crédito:** cotizador al 2% mensual (24% anual) con cuota nivelada (francesa) y sobre saldos (alemana).
    - Generación de tabla mensual oficial de amortización (No. cuota, fecha de pago, cuota mensual, capital, intereses y saldo deudor).
@@ -187,7 +188,36 @@ Este documento registra el **avance real y completo** del sistema de la Cooperat
     - **Disponibilidad Omnipresente:** Los botones están disponibles en tres ubicaciones estratégicas:
       1. **En el Menú Lateral (Sidebar):** En una caja permanente titulada `⚙️ Control de Datos`, accesible desde cualquier pantalla del sistema sin importar el rol activo.
       2. **En el Kardex de Cartera de Préstamos (`/promotor/cartera`):** En la cabecera superior, junto al botón de nueva solicitud e imprimir.
-      3. **En el Tablero Principal (`/tablero`):** En la esquina superior derecha, junto a refrescar.
+      3. **En el Tablero Principal (`/tablero`):** Agrupados en el menú desplegable `⚙️ Opciones del Sistema ▾`, optimizando el espacio vertical de la cabecera.
+
+22. **Rediseño del Tablero en Una Sola Pantalla (100vh), Tiempo Real Automático (10s) y Adaptabilidad Total:**
+    - **Visualización en Una Sola Pantalla en PC (100vh):**
+      * **Banda Superior de 8 KPIs:** Estructura en 4 columnas x 2 filas compactas (*Caja Chica, Ahorro Corriente, Ahorro Programado, Ahorro Infantil, Ahorro Plazo Fijo, Aportaciones Capital, Socios Activos y Cartera de Crédito*).
+      * **Cifras Monetarias Continuas:** Resuelto el problema de desbordamiento mediante `white-space: nowrap` y tipografía adaptable `clamp()`, impidiendo que montos grandes (ej. `Q 2,657,460.40`) quiebren decimales en líneas separadas.
+      * **Dos Columnas Inferiores Balanceadas:** Columna Izquierda (Supervisión/Accesos según rol + Desglose de agencias) y Columna Derecha (Monitoreo Estratégico de Servicios con scroll interno acotado a 200px).
+      * **Cero Desperdicio de Espacio:** Aprovechamiento total del ancho y balanceo simétrico de alturas en desktop sin barra de scroll vertical forzada.
+    - **Actualización Continua en Tiempo Real (10s):**
+      * **Eliminación del Botón Manual `🔄 Actualizar`:** La cabecera se mantiene limpia y despejada.
+      * **Sincronización Automática Silenciosa:** Consulta periódica en segundo plano cada 10 segundos tanto del resumen financiero como de la analítica de servicios.
+      * **Refresco Inmediato por Visibilidad:** Actualización al instante cuando el usuario vuelve a enfocar la pestaña del navegador (`focus` / `visibilitychange`).
+      * **Insignia Animada:** `● En Vivo · En Tiempo Real` con animación de pulso verde que garantiza la conexión activa.
+    - **Menú Desplegable `⚙️ Opciones del Sistema ▾`:**
+      * Botones administrativos (`📥 Recargar Excel` y `⚠️ Reiniciar a Cero`) agrupados con modal de confirmación, reduciendo la altura de cabecera.
+    - **Responsividad Integral:**
+      * **Escritorio (PC):** Vista completa en 1 pantalla (100vh).
+      * **Tablet (768px - 1024px):** Cuadrícula fluida de 2 columnas para KPIs y reorganización táctil de paneles.
+      * **Móvil (375px - 640px):** Cuadrícula de 2 columnas para tarjetas financieras y apilamiento vertical natural con navegación táctil fluida.
+23. **Optimización del Libro Mensual de Arqueos (`/arqueos/mensual`) y Ocupación del 100% de Pantalla:**
+    - **Supresión de Vacíos Laterales:** Eliminada la restricción fija de 1,050px, haciendo que el acta oficial, sábana de cierres y firmas aprovechen el 100% del ancho del monitor.
+    - **Panel Desplegable de Parámetros Notariales:** Barra superior compacta (~36px) con resumen de parámetros y botón de conmutación `▼ Modificar Datos y Firmantes`, dejando el acta completamente a la vista sin scroll forzado.
+    - **Cintillo y Firmas Adaptables:** Franja de indicadores con `auto-fit` y bloque de firmas que fluye a 2 columnas en dispositivos táctiles y a 4 columnas simétricas en PC.
+
+24. **Optimización Global de Pantallas al 100% de Ancho y Nuevas Vistas Administrativas (`/alertas`, `/sesiones`, `/auditoria`):**
+    - **Aprovechamiento Integral de Pantalla:** Eliminación de limitaciones rígidas (`maxWidth: 480px`, `560px`, `580px`, `640px`) en formularios y cuadrículas en todos los módulos operativos y administrativos.
+    - **Métricas Fluidas (`1fr`):** Cintillos de tarjetas adaptables con `repeat(auto-fit, minmax(200px, 1fr))` que garantizan la ocupación del 100% del monitor sin huecos negros en PC, tablets ni teléfonos.
+    - **Panel de Alertas del Sistema (`/alertas`):** Diagnóstico en vivo de créditos en mora, cajas auxiliares desfasadas, certificados a plazo fijo por vencer (≤ 15 días), alerta de saldo bajo en caja chica y socios con expediente incompleto, con enlaces directos para resolver en cada módulo.
+    - **Control de Sesiones y Accesos Activos (`/sesiones`):** Monitoreo en tiempo real de colaboradores habilitados, última operación auditada, roles y agencias conectadas.
+    - **Bitácora de Auditoría Conectada (`/auditoria`):** Backend activado con paginación, filtros multicriterio y visualización de cambios JSON.
 
 
 

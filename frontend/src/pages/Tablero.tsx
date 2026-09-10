@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { formatearQuetzales } from "../lib/formatters";
+import { formatoQ } from "../types";
 import type { ResumenDashboard } from "../types";
 
 export default function Tablero() {
@@ -12,16 +12,49 @@ export default function Tablero() {
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [reseteando, setReseteando] = useState(false);
   const [recargando, setRecargando] = useState(false);
+  const [mostrarOpciones, setMostrarOpciones] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  function cargarResumen() {
+  function cargarResumen(silencioso = false) {
     api
       .get<ResumenDashboard>("/dashboard/resumen")
       .then(({ data }) => setResumen(data))
-      .catch((err) => setError(mensajeError(err)));
+      .catch((err) => {
+        if (!silencioso) setError(mensajeError(err));
+      });
   }
 
+  // Actualización automática en tiempo real cada 10s y al recuperar foco
   useEffect(() => {
-    cargarResumen();
+    cargarResumen(false);
+    const interval = setInterval(() => {
+      cargarResumen(true);
+    }, 10000);
+
+    const onFocus = () => {
+      if (!document.hidden) {
+        cargarResumen(true);
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, []);
+
+  // Cerrar menú de opciones al hacer clic afuera
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setMostrarOpciones(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   async function handleReset() {
@@ -44,7 +77,7 @@ export default function Tablero() {
     try {
       const { data } = await api.post<{ ok: boolean; mensaje: string }>("/sistema/reset");
       setMensajeExito(data.mensaje);
-      cargarResumen();
+      cargarResumen(false);
     } catch (err) {
       setError(mensajeError(err));
     } finally {
@@ -70,7 +103,7 @@ export default function Tablero() {
     try {
       const { data } = await api.post<{ ok: boolean; mensaje: string }>("/sistema/recargar-datos");
       setMensajeExito(data.mensaje);
-      cargarResumen();
+      cargarResumen(false);
     } catch (err) {
       setError(mensajeError(err));
     } finally {
@@ -86,173 +119,186 @@ export default function Tablero() {
   const puedeGestionarDatos = usuario?.rol === "ADMIN" || usuario?.rol === "SUPERVISOR" || usuario?.rol === "GERENCIA";
 
   return (
-    <div>
-      <div className="page-head" style={{ marginBottom: "1rem" }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
-            <h1 style={{ margin: 0, fontSize: "1.45rem", fontWeight: 800 }}>Panel de Control y Operaciones</h1>
-            <span className="badge" style={{ background: "#ecfdf5", color: "#065f46", fontWeight: 700, fontSize: "0.78rem" }}>
-              🟢 Sistema en Línea · En Tiempo Real
+    <div className="dashboard-container">
+      {/* Cabecera Compacta del Tablero */}
+      <div className="dashboard-header">
+        <div className="dashboard-title-area">
+          <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", flexWrap: "wrap" }}>
+            <h1>Panel de Control y Operaciones</h1>
+            <span className="live-badge" title="Actualización continua en tiempo real cada 10s">
+              <span className="live-dot" />
+              En Vivo · En Tiempo Real
             </span>
           </div>
-          <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--ink-soft)" }}>
+          <p>
             Cooperativa Integral de Ahorro y Crédito "Maya Inversiones Futuras", R.L. {varias ? " · Todas las Agencias" : ""}
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-          <button
-            type="button"
-            className="btn secondary"
-            onClick={cargarResumen}
-            style={{ fontSize: "0.82rem", padding: "0.35rem 0.75rem" }}
-          >
-            🔄 Actualizar
-          </button>
-          {puedeGestionarDatos && (
-            <>
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={handleRecargarDatos}
-                disabled={recargando || reseteando}
-                style={{
-                  fontSize: "0.82rem",
-                  padding: "0.35rem 0.75rem",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.35rem",
-                  borderColor: "rgba(2, 132, 199, 0.5)",
-                  color: "#38bdf8",
-                  background: "rgba(2, 132, 199, 0.1)",
-                }}
-                title="Restaurar los 568 socios, 65 préstamos y 692 certificados de plazo fijo desde los archivos Excel"
-              >
-                {recargando ? "⏳ Recargando datos..." : "📥 Recargar Datos Existentes (Excel)"}
-              </button>
-              <button
-                type="button"
-                className="btn danger"
-                onClick={handleReset}
-                disabled={reseteando || recargando}
-                style={{ fontSize: "0.82rem", padding: "0.35rem 0.75rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
-                title="Borrar todos los datos y reiniciar el sistema limpio desde cero"
-              >
-                {reseteando ? "⏳ Reiniciando..." : "⚠️ Reiniciar a Cero"}
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+        {puedeGestionarDatos && (
+          <div className="dashboard-options-dropdown" ref={dropdownRef}>
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={() => setMostrarOpciones(!mostrarOpciones)}
+              style={{ fontSize: "0.78rem", padding: "0.3rem 0.65rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+              title="Herramientas y opciones avanzadas"
+            >
+              ⚙️ Opciones del Sistema ▾
+            </button>
 
-      {mensajeExito && <div className="alert success">{mensajeExito}</div>}
-      {error && <div className="alert error">{error}</div>}
+            {mostrarOpciones && (
+              <div className="dashboard-dropdown-menu">
+                <button
+                  type="button"
+                  className="dashboard-dropdown-item"
+                  onClick={() => {
+                    setMostrarOpciones(false);
+                    handleRecargarDatos();
+                  }}
+                  disabled={recargando || reseteando}
+                >
+                  <span style={{ fontSize: "1.1rem" }}>📥</span>
+                  <div>
+                    <div style={{ color: "#38bdf8" }}>{recargando ? "Recargando datos..." : "Recargar Datos Existentes (Excel)"}</div>
+                    <div style={{ fontSize: "0.68rem", color: "var(--ink-soft)", fontWeight: 400 }}>Restaura los 568 socios, 65 préstamos y 692 PF</div>
+                  </div>
+                </button>
 
-      {/* Grid Principal de Pantalla Completa: 2 Columnas Balanceadas */}
-      <div className="dashboard-grid">
-        {/* Columna Izquierda: Indicadores Financieros y Accesos Rápidos */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          {/* Tarjetas KPI Financieras */}
-          <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0.75rem" }}>
-            {usuario?.rol !== "PROMOTOR" && (
-              <Link to="/caja-chica" className="stat-card" style={{ textDecoration: "none" }}>
-                <span className="label">Caja chica</span>
-                <span className="value" style={{ fontSize: "1.2rem" }}>{formatearQuetzales(global.cajaChica)}</span>
-                <span className="sub">Fondo disponible</span>
-              </Link>
-            )}
-            <Link to="/ahorros/corriente" className="stat-card" style={{ textDecoration: "none" }}>
-              <span className="label">Ahorro corriente</span>
-              <span className="value" style={{ fontSize: "1.2rem", color: "var(--accent)" }}>{formatearQuetzales(global.ahorroCorriente)}</span>
-              <span className="sub">Disponible a la vista</span>
-            </Link>
-            <Link to="/ahorros/programado" className="stat-card" style={{ textDecoration: "none" }}>
-              <span className="label">Ahorro programado</span>
-              <span className="value" style={{ fontSize: "1.2rem" }}>{formatearQuetzales(global.ahorroProgramado)}</span>
-              <span className="sub">Cuota pactada</span>
-            </Link>
-            <Link to="/ahorros/infanto-juvenil" className="stat-card" style={{ textDecoration: "none" }}>
-              <span className="label">Ahorro infantil</span>
-              <span className="value" style={{ fontSize: "1.2rem" }}>{formatearQuetzales(global.ahorroInfantoJuvenil)}</span>
-              <span className="sub">Infanto juvenil</span>
-            </Link>
-            <Link to="/ahorros/plazo-fijo" className="stat-card" style={{ textDecoration: "none" }}>
-              <span className="label">Ahorro Plazo Fijo</span>
-              <span className="value" style={{ fontSize: "1.2rem", color: "#f59e0b" }}>
-                {global.plazoFijo && global.plazoFijo.monto > 0 ? formatearQuetzales(global.plazoFijo.monto) : "Kardex PF"}
-              </span>
-              <span className="sub">{global.plazoFijo?.count ?? 692} certificados</span>
-            </Link>
-            <Link to="/aportaciones" className="stat-card" style={{ textDecoration: "none" }}>
-              <span className="label">Aportaciones Capital</span>
-              <span className="value" style={{ fontSize: "1.2rem", color: "var(--accent)" }}>
-                {formatearQuetzales(global.aportaciones?.saldo ?? 11600)}
-              </span>
-              <span className="sub">{global.aportaciones?.count ?? 117} socios aportantes</span>
-            </Link>
-            <Link to="/socios" className="stat-card" style={{ textDecoration: "none" }}>
-              <span className="label">Socios activos</span>
-              <span className="value mono" style={{ fontSize: "1.2rem" }}>{global.totalSocios}</span>
-              <span className="sub">{global.movimientosHoy} mov. hoy</span>
-            </Link>
-            {usuario?.rol !== "CAJERO" && (
-              <Link to="/creditos" className="stat-card accent" style={{ textDecoration: "none" }}>
-                <span className="label">Cartera de Crédito</span>
-                <span className="value" style={{ fontSize: "1.2rem", color: "#38bdf8" }}>
-                  {formatearQuetzales(global.carteraPrestamos?.saldo ?? 15210193.13)}
-                </span>
-                <span className="sub">{global.carteraPrestamos?.count ?? 65} préstamos activos</span>
-              </Link>
+                <button
+                  type="button"
+                  className="dashboard-dropdown-item danger"
+                  onClick={() => {
+                    setMostrarOpciones(false);
+                    handleReset();
+                  }}
+                  disabled={reseteando || recargando}
+                >
+                  <span style={{ fontSize: "1.1rem" }}>⚠️</span>
+                  <div>
+                    <div>{reseteando ? "Reiniciando..." : "Reiniciar Sistema a Cero"}</div>
+                    <div style={{ fontSize: "0.68rem", opacity: 0.8, fontWeight: 400 }}>Borra registros y limpia la base de datos</div>
+                  </div>
+                </button>
+              </div>
             )}
           </div>
+        )}
+      </div>
 
-          {/* Accesos Rápidos según Rol (Jefe de Agencia / Supervisor vs Cajero/Promotor) */}
-          <div className="card" style={{ padding: "1rem 1.25rem" }}>
-            <h3 style={{ margin: "0 0 0.75rem", fontSize: "0.95rem", fontWeight: 700, color: "var(--ink)" }}>
-              {usuario?.rol === "SUPERVISOR" || usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA"
-                ? "🛡️ Panel de Supervisión y Control de Agencia"
-                : "⚡ Accesos Rápidos de Operación"}
-            </h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "0.6rem" }}>
+      {mensajeExito && <div className="alert success" style={{ margin: "0.25rem 0", padding: "0.5rem 0.8rem", fontSize: "0.82rem" }}>{mensajeExito}</div>}
+      {error && <div className="alert error" style={{ margin: "0.25rem 0", padding: "0.5rem 0.8rem", fontSize: "0.82rem" }}>{error}</div>}
+
+      {/* Banda Superior: 8 Tarjetas KPI Financieras */}
+      <div className="dashboard-kpi-band">
+        {usuario?.rol !== "PROMOTOR" && (
+          <Link to="/caja-chica" className="kpi-tile">
+            <span className="kpi-tile-label">Caja chica</span>
+            <span className="kpi-tile-value">{formatoQ(global.cajaChica)}</span>
+            <span className="kpi-tile-sub">Fondo disponible</span>
+          </Link>
+        )}
+        <Link to="/ahorros/corriente" className="kpi-tile">
+          <span className="kpi-tile-label">Ahorro corriente</span>
+          <span className="kpi-tile-value" style={{ color: "var(--accent)" }}>{formatoQ(global.ahorroCorriente)}</span>
+          <span className="kpi-tile-sub">Disponible a la vista</span>
+        </Link>
+        <Link to="/ahorros/programado" className="kpi-tile">
+          <span className="kpi-tile-label">Ahorro programado</span>
+          <span className="kpi-tile-value">{formatoQ(global.ahorroProgramado)}</span>
+          <span className="kpi-tile-sub">Cuota pactada</span>
+        </Link>
+        <Link to="/ahorros/infanto-juvenil" className="kpi-tile">
+          <span className="kpi-tile-label">Ahorro infantil</span>
+          <span className="kpi-tile-value">{formatoQ(global.ahorroInfantoJuvenil)}</span>
+          <span className="kpi-tile-sub">Infanto juvenil</span>
+        </Link>
+        <Link to="/ahorros/plazo-fijo" className="kpi-tile">
+          <span className="kpi-tile-label">Ahorro Plazo Fijo</span>
+          <span className="kpi-tile-value" style={{ color: "#f59e0b" }}>
+            {global.plazoFijo && global.plazoFijo.monto > 0 ? formatoQ(global.plazoFijo.monto) : "Kardex PF"}
+          </span>
+          <span className="kpi-tile-sub">{global.plazoFijo?.count ?? 692} certificados</span>
+        </Link>
+        <Link to="/aportaciones" className="kpi-tile">
+          <span className="kpi-tile-label">Aportaciones Capital</span>
+          <span className="kpi-tile-value" style={{ color: "var(--accent)" }}>
+            {formatoQ(global.aportaciones?.saldo ?? 11600)}
+          </span>
+          <span className="kpi-tile-sub">{global.aportaciones?.count ?? 117} socios aportantes</span>
+        </Link>
+        <Link to="/socios" className="kpi-tile">
+          <span className="kpi-tile-label">Socios activos</span>
+          <span className="kpi-tile-value mono">{global.totalSocios}</span>
+          <span className="kpi-tile-sub">{global.movimientosHoy} mov. hoy</span>
+        </Link>
+        {usuario?.rol !== "CAJERO" && (
+          <Link to="/creditos" className="kpi-tile accent">
+            <span className="kpi-tile-label">Cartera de Crédito</span>
+            <span className="kpi-tile-value" style={{ color: "#38bdf8" }}>
+              {formatoQ(global.carteraPrestamos?.saldo ?? 15210193.13)}
+            </span>
+            <span className="kpi-tile-sub">{global.carteraPrestamos?.count ?? 65} préstamos activos</span>
+          </Link>
+        )}
+      </div>
+
+      {/* Cuadrícula Inferior: 2 Paneles Balanceados Lado a Lado */}
+      <div className="dashboard-lower-grid">
+        {/* Panel Izquierdo: Supervisión y Control / Accesos Rápidos */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+          <div className="dashboard-panel-card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: "0.88rem", fontWeight: 700, color: "var(--ink)" }}>
+                {usuario?.rol === "SUPERVISOR" || usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA"
+                  ? "🛡️ Panel de Supervisión y Control de Agencia"
+                  : "⚡ Accesos Rápidos de Operación"}
+              </h3>
+              <span className="badge" style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}>
+                {usuario?.rol}
+              </span>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(115px, 1fr))", gap: "0.45rem" }}>
               {usuario?.rol === "SUPERVISOR" || usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA" ? (
                 <>
-                  <Link to="/libro-mensual-arqueos" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.82rem", padding: "0.45rem" }}>
+                  <Link to="/libro-mensual-arqueos" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
                     📑 Libro Arqueos
                   </Link>
-                  <Link to="/creditos" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.82rem", padding: "0.45rem" }}>
+                  <Link to="/creditos" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
                     🤝 Aprobar Créditos
                   </Link>
-                  <Link to="/promotor/cartera" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.82rem", padding: "0.45rem" }}>
+                  <Link to="/promotor/cartera" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
                     📂 Kardex Cartera
                   </Link>
-                  <Link to="/socios" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.82rem", padding: "0.45rem" }}>
+                  <Link to="/socios" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
                     👥 Padrón Socios
                   </Link>
-                  <Link to="/ahorros/plazo-fijo" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.82rem", padding: "0.45rem" }}>
+                  <Link to="/ahorros/plazo-fijo" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
                     🔒 Plazos Fijos
                   </Link>
-                  <Link to="/aportaciones" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.82rem", padding: "0.45rem" }}>
+                  <Link to="/aportaciones" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
                     🏛️ Aportaciones
                   </Link>
-                  <Link to="/auxiliar-caja" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.82rem", padding: "0.45rem" }}>
+                  <Link to="/auxiliar-caja" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
                     📊 Historial Cierres
                   </Link>
                 </>
               ) : (
                 <>
-                  <Link to="/auxiliar-caja" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.82rem", padding: "0.45rem" }}>
+                  <Link to="/auxiliar-caja" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
                     💵 Ventanilla Caja
                   </Link>
-                  <Link to="/promotor/cartera" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.82rem", padding: "0.45rem" }}>
+                  <Link to="/promotor/cartera" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
                     📂 Kardex Cartera
                   </Link>
-                  <Link to="/socios" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.82rem", padding: "0.45rem" }}>
+                  <Link to="/socios" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
                     👥 Padrón Socios
                   </Link>
-                  <Link to="/aportaciones" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.82rem", padding: "0.45rem" }}>
+                  <Link to="/aportaciones" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
                     🏛️ Aportaciones
                   </Link>
-                  <Link to="/ahorros/corriente" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.82rem", padding: "0.45rem" }}>
+                  <Link to="/ahorros/corriente" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
                     💰 Ahorros
                   </Link>
                 </>
@@ -260,29 +306,29 @@ export default function Tablero() {
             </div>
           </div>
 
-          {/* Resumen por Agencia (si aplica) */}
+          {/* Desglose por Agencia (si aplica) */}
           {varias && (
-            <div className="card" style={{ padding: "1rem" }}>
-              <h3 style={{ margin: "0 0 0.5rem", fontSize: "0.95rem" }}>Desglose por Agencia</h3>
-              <div className="table-wrap">
-                <table style={{ fontSize: "0.82rem" }}>
+            <div className="dashboard-panel-card">
+              <h3 style={{ margin: "0 0 0.35rem", fontSize: "0.85rem", fontWeight: 700 }}>Desglose por Agencia</h3>
+              <div className="table-wrap" style={{ maxHeight: "160px", overflowY: "auto" }}>
+                <table style={{ fontSize: "0.78rem" }}>
                   <thead>
                     <tr>
-                      <th>Agencia</th>
-                      <th style={{ textAlign: "right" }}>Caja chica</th>
-                      <th style={{ textAlign: "right" }}>Ahorro corriente</th>
-                      <th style={{ textAlign: "right" }}>Cartera Crédito</th>
-                      <th style={{ textAlign: "center" }}>Socios</th>
+                      <th style={{ padding: "0.35rem 0.5rem" }}>Agencia</th>
+                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Caja chica</th>
+                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Ahorro corriente</th>
+                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Cartera Crédito</th>
+                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "center" }}>Socios</th>
                     </tr>
                   </thead>
                   <tbody>
                     {porAgencia.map((a) => (
                       <tr key={a.agenciaId}>
-                        <td style={{ fontWeight: 600 }}>{a.agenciaNombre}</td>
-                        <td className="mono" style={{ textAlign: "right" }}>{formatearQuetzales(a.cajaChica.saldo)}</td>
-                        <td className="mono" style={{ textAlign: "right" }}>{formatearQuetzales(a.ahorroCorriente.saldoTotal)}</td>
-                        <td className="mono" style={{ textAlign: "right", color: "#38bdf8" }}>{formatearQuetzales(a.carteraPrestamos?.saldo ?? 0)}</td>
-                        <td className="mono" style={{ textAlign: "center" }}>{a.totalSocios}</td>
+                        <td style={{ padding: "0.35rem 0.5rem", fontWeight: 600 }}>{a.agenciaNombre}</td>
+                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>{formatoQ(a.cajaChica.saldo)}</td>
+                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>{formatoQ(a.ahorroCorriente.saldoTotal)}</td>
+                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right", color: "#38bdf8" }}>{formatoQ(a.carteraPrestamos?.saldo ?? 0)}</td>
+                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "center" }}>{a.totalSocios}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -292,7 +338,7 @@ export default function Tablero() {
           )}
         </div>
 
-        {/* Columna Derecha: Gráfica de Servicios en Vivo (Supervisor / Gerencia / Admin) */}
+        {/* Panel Derecho: Monitoreo Estratégico de Servicios */}
         <div>
           {(usuario?.rol === "SUPERVISOR" || usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA") && (
             <PanelGraficaServicios agenciaIdInicial={usuario?.agenciaId ?? undefined} />
@@ -339,15 +385,38 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
     }
   }, [puedeElegirAgencia]);
 
-  useEffect(() => {
-    setCargando(true);
+  function cargarAnalitica(silencioso = false) {
+    if (!silencioso) setCargando(true);
     api
       .get<AnaliticaResponse>("/caja-auxiliar/analitica-servicios", {
         params: { agenciaId: agenciaId || undefined, periodo },
       })
       .then(({ data }) => setDatos(data))
       .catch(() => {})
-      .finally(() => setCargando(false));
+      .finally(() => {
+        if (!silencioso) setCargando(false);
+      });
+  }
+
+  useEffect(() => {
+    cargarAnalitica(false);
+    const interval = setInterval(() => {
+      cargarAnalitica(true);
+    }, 10000);
+
+    const onFocus = () => {
+      if (!document.hidden) {
+        cargarAnalitica(true);
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
   }, [agenciaId, periodo]);
 
   const periodoLabel = periodo === "semana" ? "Últimos 7 días" : periodo === "mes" ? "Últimos 30 días" : "Año actual";
@@ -363,24 +432,24 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
   const servicioTopFiltro = serviciosFiltrados[0] ?? null;
 
   return (
-    <div className="card" style={{ marginTop: 0, borderTop: "4px solid #0284c7" }}>
+    <div className="dashboard-panel-card" style={{ borderTop: "3px solid #0284c7" }}>
       {/* Encabezado del Panel */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem", marginBottom: "1rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-            <h2 style={{ margin: 0, fontSize: "1.2rem" }}>📊 Monitoreo Estratégico de Servicios</h2>
-            <span className="badge" style={{ background: "rgba(2, 132, 199, 0.15)", color: "#38bdf8", fontWeight: 700, border: "1px solid rgba(2, 132, 199, 0.3)" }}>
-              En Vivo
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+            <h2 style={{ margin: 0, fontSize: "0.98rem", fontWeight: 700 }}>📊 Monitoreo Estratégico de Servicios</h2>
+            <span className="live-badge" style={{ fontSize: "0.68rem", padding: "0.15rem 0.45rem" }}>
+              <span className="live-dot" /> En Vivo
             </span>
           </div>
-          <p className="sub" style={{ margin: "0.25rem 0 0" }}>
-            Gráficas y demanda transaccional por servicio ({periodoLabel}).
+          <p style={{ margin: "0.15rem 0 0", fontSize: "0.74rem", color: "var(--ink-soft)" }}>
+            Demanda transaccional ({periodoLabel})
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
           {puedeElegirAgencia && agencias.length > 0 && (
-            <select value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} style={{ maxWidth: 200, fontSize: "0.82rem" }}>
+            <select value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} style={{ maxWidth: 170, fontSize: "0.76rem", padding: "0.25rem 0.45rem" }}>
               <option value="">🏢 Todas las Agencias</option>
               {agencias.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -390,11 +459,11 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
             </select>
           )}
 
-          <div style={{ display: "inline-flex", background: "var(--mono-bg)", borderRadius: "8px", padding: "0.2rem", border: "1px solid var(--line)" }}>
+          <div style={{ display: "inline-flex", background: "var(--mono-bg)", borderRadius: "6px", padding: "0.15rem", border: "1px solid var(--line)" }}>
             <button
               type="button"
               className={`btn ${periodo === "semana" ? "" : "secondary"}`}
-              style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem", borderRadius: "6px" }}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
               onClick={() => setPeriodo("semana")}
             >
               Semana
@@ -402,7 +471,7 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
             <button
               type="button"
               className={`btn ${periodo === "mes" ? "" : "secondary"}`}
-              style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem", borderRadius: "6px" }}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
               onClick={() => setPeriodo("mes")}
             >
               Mes
@@ -410,7 +479,7 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
             <button
               type="button"
               className={`btn ${periodo === "anio" ? "" : "secondary"}`}
-              style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem", borderRadius: "6px" }}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
               onClick={() => setPeriodo("anio")}
             >
               Año
@@ -420,53 +489,53 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
       </div>
 
       {/* Pestañas de Segmentación por Área Financiera */}
-      <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", marginBottom: "1.25rem", borderBottom: "1px solid var(--line)", paddingBottom: "0.75rem" }}>
+      <div style={{ display: "flex", gap: "0.25rem", flexWrap: "wrap", borderBottom: "1px solid var(--line)", paddingBottom: "0.4rem" }}>
         <button
           type="button"
           className={`btn ${filtroModulo === "TODOS" ? "" : "secondary"}`}
-          style={{ fontSize: "0.78rem", padding: "0.35rem 0.65rem" }}
+          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
           onClick={() => setFiltroModulo("TODOS")}
         >
-          🌐 Consolidado General ({datos?.totalOperaciones ?? 0})
+          🌐 Consolidado ({datos?.totalOperaciones ?? 0})
         </button>
         <button
           type="button"
           className={`btn ${filtroModulo === "AHORROS" ? "" : "secondary"}`}
-          style={{ fontSize: "0.78rem", padding: "0.35rem 0.65rem" }}
+          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
           onClick={() => setFiltroModulo("AHORROS")}
         >
-          🏦 Ahorros & Plazo Fijo
+          🏦 Ahorros & PF
         </button>
         <button
           type="button"
           className={`btn ${filtroModulo === "CREDITOS" ? "" : "secondary"}`}
-          style={{ fontSize: "0.78rem", padding: "0.35rem 0.65rem" }}
+          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
           onClick={() => setFiltroModulo("CREDITOS")}
         >
-          💼 Cartera & Préstamos
+          💼 Créditos
         </button>
         <button
           type="button"
           className={`btn ${filtroModulo === "CAJA_CHICA" ? "" : "secondary"}`}
-          style={{ fontSize: "0.78rem", padding: "0.35rem 0.65rem" }}
+          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
           onClick={() => setFiltroModulo("CAJA_CHICA")}
         >
-          ☕ Caja Chica & Gastos
+          ☕ Caja Chica
         </button>
         <button
           type="button"
           className={`btn ${filtroModulo === "VENTANILLA" ? "" : "secondary"}`}
-          style={{ fontSize: "0.78rem", padding: "0.35rem 0.65rem" }}
+          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
           onClick={() => setFiltroModulo("VENTANILLA")}
         >
-          💵 Agente BI & Ventanilla
+          💵 Ventanilla
         </button>
       </div>
 
-      {cargando && <div className="card">Actualizando analítica de servicios...</div>}
+      {cargando && <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", padding: "0.5rem" }}>Cargando datos en vivo...</div>}
 
       {!cargando && (!datos || serviciosFiltrados.length === 0) && (
-        <div className="alert info" style={{ margin: "1rem 0" }}>
+        <div className="alert info" style={{ margin: "0.5rem 0", padding: "0.5rem 0.75rem", fontSize: "0.78rem" }}>
           No hay movimientos registrados en esta categoría durante el período seleccionado ({periodoLabel}).
         </div>
       )}
@@ -474,46 +543,36 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
       {datos && serviciosFiltrados.length > 0 && (
         <>
           {/* Métricas destacadas de la categoría seleccionada */}
-          <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", marginBottom: "1.25rem", gap: "0.6rem" }}>
-            <div className="stat-card accent">
-              <span className="label">🏆 Mayor Demanda</span>
-              <span className="value" style={{ fontSize: "1.05rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.45rem" }}>
+            <div className="kpi-tile accent" style={{ minHeight: 52, padding: "0.4rem 0.6rem" }}>
+              <span className="kpi-tile-label">🏆 Mayor Demanda</span>
+              <span className="kpi-tile-value" style={{ fontSize: "0.86rem", margin: "0.1rem 0" }}>
                 {servicioTopFiltro ? `${servicioTopFiltro.icon} ${servicioTopFiltro.label}` : "—"}
               </span>
-              <span className="sub">
+              <span className="kpi-tile-sub" style={{ fontSize: "0.65rem" }}>
                 {servicioTopFiltro
                   ? `${servicioTopFiltro.cantidad} op. (${totalOperacionesFiltro > 0 ? Math.round((servicioTopFiltro.cantidad / totalOperacionesFiltro) * 1000) / 10 : 0}%)`
                   : ""}
               </span>
             </div>
-            <div className="stat-card">
-              <span className="label">Operaciones</span>
-              <span className="value mono">{totalOperacionesFiltro}</span>
-              <span className="sub">En este rubro</span>
+
+            <div className="kpi-tile" style={{ minHeight: 52, padding: "0.4rem 0.6rem" }}>
+              <span className="kpi-tile-label">Operaciones</span>
+              <span className="kpi-tile-value mono" style={{ fontSize: "0.96rem", margin: "0.1rem 0" }}>{totalOperacionesFiltro}</span>
+              <span className="kpi-tile-sub" style={{ fontSize: "0.65rem" }}>En este rubro</span>
             </div>
-            <div className="stat-card">
-              <span className="label">Volumen Operado</span>
-              <span className="value mono" style={{ color: "var(--accent)", fontSize: "1.1rem" }}>
-                {formatearQuetzales(volumenTotalFiltro)}
+
+            <div className="kpi-tile" style={{ minHeight: 52, padding: "0.4rem 0.6rem" }}>
+              <span className="kpi-tile-label">Volumen Operado</span>
+              <span className="kpi-tile-value mono" style={{ color: "var(--accent)", fontSize: "0.96rem", margin: "0.1rem 0" }}>
+                {formatoQ(volumenTotalFiltro)}
               </span>
-              <span className="sub">Flujo de dinero</span>
+              <span className="kpi-tile-sub" style={{ fontSize: "0.65rem" }}>Flujo monetario</span>
             </div>
           </div>
 
           {/* Gráfica de Barras Proporcionales de la Categoría */}
-          <h3 style={{ margin: "0 0 0.85rem", fontSize: "0.92rem", fontWeight: 700 }}>
-            {filtroModulo === "TODOS"
-              ? "Distribución Global entre Servicios"
-              : filtroModulo === "AHORROS"
-                ? "Distribución de Depósitos y Ahorro"
-                : filtroModulo === "CREDITOS"
-                  ? "Distribución de Colocación y Cobro de Créditos"
-                  : filtroModulo === "CAJA_CHICA"
-                    ? "Distribución de Gastos de Caja Chica"
-                    : "Distribución de Operaciones de Ventanilla"}
-          </h3>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", maxHeight: "200px", overflowY: "auto", paddingRight: "0.2rem" }}>
             {serviciosFiltrados.map((s, idx) => {
               const barColors = [
                 "linear-gradient(90deg, #0284c7, #38bdf8)",
@@ -533,25 +592,26 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
                   key={s.categoria}
                   style={{
                     background: "var(--mono-bg)",
-                    padding: "0.7rem 0.9rem",
-                    borderRadius: "8px",
+                    padding: "0.4rem 0.65rem",
+                    borderRadius: "6px",
                     border: "1px solid var(--line)",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                      <span style={{ fontSize: "1.15rem" }}>{s.icon}</span>
-                      <strong style={{ fontSize: "0.88rem", color: "var(--ink)" }}>{s.label}</strong>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
+                      <span style={{ fontSize: "1rem" }}>{s.icon}</span>
+                      <strong style={{ fontSize: "0.78rem", color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.label}</strong>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
                       <span
                         className="badge"
                         style={{
                           background: "var(--paper-raised)",
                           color: "var(--ink-soft)",
                           fontWeight: 700,
-                          fontSize: "0.72rem",
+                          fontSize: "0.66rem",
                           border: "1px solid var(--line)",
+                          padding: "0.1rem 0.35rem",
                         }}
                       >
                         {s.cantidad} op. ({porcentajeRelativo}%)
@@ -559,19 +619,20 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
                       <strong
                         className="mono"
                         style={{
-                          fontSize: "0.92rem",
+                          fontSize: "0.82rem",
                           color: "var(--accent)",
-                          minWidth: 95,
+                          minWidth: 80,
                           textAlign: "right",
+                          whiteSpace: "nowrap",
                         }}
                       >
-                        {formatearQuetzales(s.totalMonto)}
+                        {formatoQ(s.totalMonto)}
                       </strong>
                     </div>
                   </div>
 
                   {/* Barra Visual Proporcional */}
-                  <div style={{ background: "var(--line)", height: "8px", borderRadius: "999px", overflow: "hidden" }}>
+                  <div style={{ background: "var(--line)", height: "6px", borderRadius: "999px", overflow: "hidden" }}>
                     <div
                       style={{
                         background: bgGradient,

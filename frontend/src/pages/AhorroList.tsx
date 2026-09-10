@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
-import { TIPOS_AHORRO } from "../types";
-import { formatearQuetzales } from "../lib/formatters";
+import { formatoQ, TIPOS_AHORRO } from "../types";
 import type { Cuenta, ResumenCuentas } from "../types";
 
 export default function AhorroList() {
@@ -64,19 +63,19 @@ export default function AhorroList() {
 
       {error && <div className="alert error">{error}</div>}
 
-      <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 220px))" }}>
+      <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", marginBottom: "1.5rem" }}>
         <div className="stat-card accent">
           <span className="label">Saldo total</span>
-          <span className="value">{formatearQuetzales(saldoTotal)}</span>
+          <span className="value">{formatoQ(saldoTotal)}</span>
           <span className="sub">{resumen?.totalCuentas ?? cuentas?.length ?? 0} cuenta(s)</span>
         </div>
         <div className="stat-card">
           <span className="label">Total depósitos</span>
-          <span className="value">{formatearQuetzales(resumen?.totalDepositos ?? 0)}</span>
+          <span className="value">{formatoQ(resumen?.totalDepositos ?? 0)}</span>
         </div>
         <div className="stat-card">
           <span className="label">Total retiros</span>
-          <span className="value">{formatearQuetzales(resumen?.totalRetiros ?? 0)}</span>
+          <span className="value">{formatoQ(resumen?.totalRetiros ?? 0)}</span>
         </div>
       </div>
 
@@ -112,7 +111,7 @@ export default function AhorroList() {
                     {c.socio_nombres}
                   </Link>
                 </td>
-                <td className="mono">{formatearQuetzales(c.saldo_actual)}</td>
+                <td className="mono">{formatoQ(c.saldo_actual)}</td>
                 <td>
                   <span className={`badge ${c.estado === "ACTIVA" ? "activo" : "inactivo"}`}>
                     {c.estado === "ACTIVA" ? "Activa" : "Cerrada"}

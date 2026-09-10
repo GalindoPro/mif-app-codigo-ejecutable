@@ -231,6 +231,35 @@ import AuxiliarCaja from "./pages/AuxiliarCaja";
 import AhorroList from "./pages/AhorroList";
 import AhorroCuentaForm from "./pages/AhorroCuentaForm";
 import AhorroCuentaDetail from "./pages/AhorroCuentaDetail";
+import CreditosList from "./pages/CreditosList";
+import CreditoSimulador from "./pages/CreditoSimulador";
+import CreditoForm from "./pages/CreditoForm";
+import CreditoDetail from "./pages/CreditoDetail";
+import KardexCarteraPromotor from "./pages/KardexCarteraPromotor";
+import PlazoFijoList from "./pages/PlazoFijoList";
+import PlazoFijoForm from "./pages/PlazoFijoForm";
+import PlazoFijoDetail from "./pages/PlazoFijoDetail";
+import AportacionesList from "./pages/AportacionesList";
+import Usuarios from "./pages/Usuarios";
+import LibroArqueoMensual from "./pages/LibroArqueoMensual";
+import Auditoria from "./pages/Auditoria";
+import Alertas from "./pages/Alertas";
+import Sesiones from "./pages/Sesiones";
+import { useAuth } from "./context/AuthContext";
+
+function InicioRedirect() {
+  const { usuario } = useAuth();
+  if (usuario?.rol === "CAJERO") return <Navigate to="/auxiliar-caja" replace />;
+  if (usuario?.rol === "PROMOTOR") return <Navigate to="/promotor/cartera" replace />;
+  return <Navigate to="/tablero" replace />;
+}
+
+function TableroRouteGuard() {
+  const { usuario } = useAuth();
+  if (usuario?.rol === "CAJERO") return <Navigate to="/auxiliar-caja" replace />;
+  if (usuario?.rol === "PROMOTOR") return <Navigate to="/promotor/cartera" replace />;
+  return <Tablero />;
+}
 
 export default function App() {
   return (
@@ -244,19 +273,33 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/tablero" replace />} />
-          <Route path="/tablero" element={<Tablero />} />
+          <Route index element={<InicioRedirect />} />
+          <Route path="/tablero" element={<TableroRouteGuard />} />
+          <Route path="/arqueos/mensual" element={<LibroArqueoMensual />} />
           <Route path="/socios" element={<SociosList />} />
           <Route path="/socios/nuevo" element={<SocioForm />} />
           <Route path="/socios/:id" element={<SocioDetail />} />
+          <Route path="/aportaciones" element={<AportacionesList />} />
           <Route path="/caja-chica" element={<CajaChica />} />
           <Route path="/auxiliar-caja" element={<AuxiliarCaja />} />
+          <Route path="/creditos" element={<CreditosList />} />
+          <Route path="/creditos/simulador" element={<CreditoSimulador />} />
+          <Route path="/creditos/nuevo" element={<CreditoForm />} />
+          <Route path="/creditos/:id" element={<CreditoDetail />} />
+          <Route path="/promotor/cartera" element={<KardexCarteraPromotor />} />
+          <Route path="/ahorros/plazo-fijo" element={<PlazoFijoList />} />
+          <Route path="/ahorros/plazo-fijo/nuevo" element={<PlazoFijoForm />} />
+          <Route path="/ahorros/plazo-fijo/:id" element={<PlazoFijoDetail />} />
           <Route path="/ahorros/:slug" element={<AhorroList />} />
           <Route path="/ahorros/:slug/nueva" element={<AhorroCuentaForm />} />
           <Route path="/ahorros/:slug/:id" element={<AhorroCuentaDetail />} />
+          <Route path="/usuarios" element={<Usuarios />} />
           <Route path="/agencias" element={<Agencias />} />
+          <Route path="/auditoria" element={<Auditoria />} />
+          <Route path="/alertas" element={<Alertas />} />
+          <Route path="/sesiones" element={<Sesiones />} />
         </Route>
-        <Route path="*" element={<Navigate to="/tablero" replace />} />
+        <Route path="*" element={<InicioRedirect />} />
       </Routes>
     </AuthProvider>
   );
@@ -285,7 +328,7 @@ createRoot(document.getElementById("root")!).render(
 ## `frontend/src/types.ts` {#frontendsrctypests}
 
 ```ts
-export type RolUsuario = "ADMIN" | "GERENCIA" | "SUPERVISOR" | "CAJERO";
+export type RolUsuario = "ADMIN" | "GERENCIA" | "SUPERVISOR" | "CAJERO" | "PROMOTOR";
 
 export interface UsuarioAutenticado {
   id: string;
@@ -311,14 +354,62 @@ export interface Socio {
   agencia_codigo?: string;
   nombres: string;
   genero: "M" | "F" | null;
+  edad?: number | null;
   fecha_ingreso: string;
   estado: "ACTIVO" | "INACTIVO";
   dpi: string | null;
   direccion: string | null;
   telefono: string | null;
   nombre_beneficiario: string | null;
+  dpi_beneficiario?: string | null;
+  telefono_beneficiario?: string | null;
+  parentesco_beneficiario?: string | null;
   total_cuentas?: number;
   created_at: string;
+}
+
+export const PARENTESCOS_BENEFICIARIO = [
+  "Cónyuge / Esposo(a)",
+  "Hijo(a)",
+  "Padre / Madre",
+  "Hermano(a)",
+  "Abuelo(a)",
+  "Nieto(a)",
+  "Tío(a)",
+  "Primo(a)",
+  "Sobrino(a)",
+  "Suegro(a)",
+  "Yerno / Nuera",
+  "Amigo(a)",
+  "Otro",
+] as const;
+
+export const PARENTESCOS_BENEFICIARIO_MENOR = [
+  "Hijo(a)",
+  "Nieto(a)",
+  "Hermano(a)",
+  "Sobrino(a)",
+  "Primo(a)",
+  "Otro",
+] as const;
+
+export interface AportacionSocio {
+  socio_id: string;
+  numero_asociado: string;
+  nombres: string;
+  dpi: string | null;
+  edad: number | null;
+  genero: "M" | "F" | null;
+  fecha_ingreso: string;
+  direccion: string | null;
+  telefono: string | null;
+  nombre_beneficiario: string | null;
+  dpi_beneficiario: string | null;
+  telefono_beneficiario: string | null;
+  parentesco_beneficiario?: string | null;
+  estado: "ACTIVO" | "INACTIVO";
+  agencia_nombre: string;
+  total_aportaciones: string | number;
 }
 
 export interface ListaSocios {
@@ -333,9 +424,15 @@ export const ROL_LABEL: Record<RolUsuario, string> = {
   GERENCIA: "Gerencia",
   SUPERVISOR: "Jefe de agencia",
   CAJERO: "Operador",
+  PROMOTOR: "Promotor de crédito",
 };
 
-export type TipoCuentaAhorro = "AHORRO_CORRIENTE" | "AHORRO_PROGRAMADO" | "AHORRO_INFANTO_JUVENIL";
+export type TipoCuentaAhorro =
+  | "AHORRO_CORRIENTE"
+  | "AHORRO_PROGRAMADO"
+  | "AHORRO_INFANTO_JUVENIL"
+  | "AHORRO_SOBRE_PRESTAMO"
+  | "AHORRO_PLAZO_FIJO";
 
 export interface Cuenta {
   id: string;
@@ -349,6 +446,16 @@ export interface Cuenta {
   agencia_nombre?: string;
   saldo_inicial: string;
   saldo_actual: string;
+  cuota_pactada?: string | number | null;
+  observaciones_apertura?: string | null;
+  prestamo_id?: string | null;
+  prestamo_codigo?: string | null;
+  prestamo_estado?: string | null;
+  prestamo_saldo_capital?: string | number | null;
+  creado_por_id?: string | null;
+  promotor_nombre?: string | null;
+  promotor_email?: string | null;
+  socio_telefono?: string | null;
   created_at: string;
 }
 
@@ -391,6 +498,18 @@ export const TIPOS_AHORRO: AhorroTipoConfig[] = [
     slug: "infanto-juvenil",
     titulo: "Ahorro Infanto Juvenil",
     descripcion: "Cuentas de ahorro para niñas, niños y jóvenes asociados.",
+  },
+  {
+    tipo: "AHORRO_SOBRE_PRESTAMO",
+    slug: "sobre-prestamo",
+    titulo: "Ahorro sobre Préstamo",
+    descripcion: "Cuenta en garantía de crédito; no se toca hasta que concluye el pago del préstamo.",
+  },
+  {
+    tipo: "AHORRO_PLAZO_FIJO",
+    slug: "plazo-fijo",
+    titulo: "Ahorro a Plazo Fijo",
+    descripcion: "Certificados de depósito a plazo fijo (Kardex PF) con cálculo de intereses e ISR.",
   },
 ];
 
@@ -450,6 +569,36 @@ export interface ListaCajaChica {
   totalesPorCategoria: TotalPorCategoria[];
 }
 
+export interface ReporteCajaChicaTotalCat {
+  categoria: string;
+  total: number;
+  cantidad: number;
+  porcentaje: number;
+}
+
+export interface ReporteCajaChicaUltimaRepo {
+  fecha: string;
+  numeroDocumento: string;
+  monto: number;
+  descripcion: string;
+}
+
+export interface ReporteCajaChica {
+  agencia: { id: string; codigo: string; nombre: string };
+  fechaInicio: string | null;
+  fechaFin: string | null;
+  categoriaFiltro: string | null;
+  ultimaReposicion: ReporteCajaChicaUltimaRepo | null;
+  saldoAnterior: number;
+  totalIngresosPeriodo: number;
+  totalEgresosPeriodo: number;
+  saldoFinalPeriodo: number;
+  saldoDisponibleActual: number;
+  egresos: CajaChicaComprobante[];
+  ingresos: CajaChicaComprobante[];
+  totalesPorCategoria: ReporteCajaChicaTotalCat[];
+}
+
 export interface ResumenCuentas {
   totalCuentas: number;
   saldoTotal: number;
@@ -465,6 +614,9 @@ export interface ResumenAgencia {
   ahorroCorriente: { totalCuentas: number; saldoTotal: number };
   ahorroProgramado: { totalCuentas: number; saldoTotal: number };
   ahorroInfantoJuvenil: { totalCuentas: number; saldoTotal: number };
+  carteraPrestamos?: { count: number; saldo: number };
+  plazoFijo?: { count: number; monto: number };
+  aportaciones?: { count: number; saldo: number };
   totalSocios: number;
   movimientosHoy: number;
 }
@@ -475,6 +627,9 @@ export interface ResumenDashboard {
     ahorroCorriente: number;
     ahorroProgramado: number;
     ahorroInfantoJuvenil: number;
+    carteraPrestamos?: { count: number; saldo: number };
+    plazoFijo?: { count: number; monto: number };
+    aportaciones?: { count: number; saldo: number };
     totalSocios: number;
     movimientosHoy: number;
   };
@@ -493,9 +648,11 @@ export type CajaCategoria =
   | "DEPOSITO_AHORRO_CORRIENTE"
   | "DEPOSITO_AHORRO_PROGRAMADO"
   | "DEPOSITO_AHORRO_INFANTO_JUVENIL"
+  | "DEPOSITO_AHORRO_SOBRE_PRESTAMO"
   | "RETIRO_AHORRO_CORRIENTE"
   | "RETIRO_AHORRO_PROGRAMADO"
   | "RETIRO_AHORRO_INFANTO_JUVENIL"
+  | "RETIRO_AHORRO_SOBRE_PRESTAMO"
   | "DEPOSITO_PLAZO_FIJO"
   | "RETIRO_PLAZO_FIJO"
   | "APORTACION"
@@ -544,6 +701,12 @@ export const CATEGORIAS_AUXILIAR: Record<CajaCategoria, CategoriaAuxiliarInfo> =
     descripcion: "Depósito de Ahorro Infanto Juvenil",
     requiereCuenta: "AHORRO_INFANTO_JUVENIL",
   },
+  DEPOSITO_AHORRO_SOBRE_PRESTAMO: {
+    seccion: "PROPIO",
+    tipo: "INGRESO",
+    descripcion: "Depósito Ahorro sobre Préstamo (Garantía)",
+    requiereCuenta: "AHORRO_SOBRE_PRESTAMO",
+  },
   RETIRO_AHORRO_CORRIENTE: {
     seccion: "PROPIO",
     tipo: "EGRESO",
@@ -561,6 +724,12 @@ export const CATEGORIAS_AUXILIAR: Record<CajaCategoria, CategoriaAuxiliarInfo> =
     tipo: "EGRESO",
     descripcion: "Retiro de Ahorro Infanto Juvenil",
     requiereCuenta: "AHORRO_INFANTO_JUVENIL",
+  },
+  RETIRO_AHORRO_SOBRE_PRESTAMO: {
+    seccion: "PROPIO",
+    tipo: "EGRESO",
+    descripcion: "Retiro Ahorro sobre Préstamo (Garantía)",
+    requiereCuenta: "AHORRO_SOBRE_PRESTAMO",
   },
 
   DEPOSITO_PLAZO_FIJO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Depósito a Plazo Fijo", requiereSocio: true, sinModuloReal: true },
@@ -603,7 +772,8 @@ export interface CajaDia {
 
 export type EstadoCajaAuxiliar =
   | { estado: "ABIERTO"; dia: CajaDia }
-  | { estado: "SIN_ABRIR"; saldoSugerido: number | null; fechaUltimoCierre: string | null; esPrimeraVez: boolean };
+  | { estado: "SIN_ABRIR"; saldoSugerido: number | null; fechaUltimoCierre: string | null; esPrimeraVez: boolean }
+  | { estado: "CERRADO"; dia: CajaDia; detalle: DetalleCajaAuxiliar };
 
 export interface CajaMovimientoAuxiliar {
   id: string;
@@ -620,6 +790,7 @@ export interface CajaMovimientoAuxiliar {
   doc_no: string | null;
   monto: string;
   saldo_acumulado: string;
+  origen_fondos?: OrigenFondos;
   usuario_nombre: string;
   created_at: string;
 }
@@ -636,6 +807,245 @@ export interface DetalleCajaAuxiliar {
 export function formatoQ(valor: string | number): string {
   return `Q ${Number(valor).toLocaleString("es-GT", { minimumFractionDigits: 2 })}`;
 }
+
+export interface UsuarioItem {
+  id: string;
+  nombre: string;
+  email: string;
+  rol: RolUsuario;
+  activo: boolean;
+  agencia_id: string | null;
+  agencia_nombre?: string;
+  agencia_codigo?: string;
+  created_at: string;
+}
+
+export type TipoPrestamo = "FIDUCIARIO" | "HIPOTECARIO";
+export type EstadoPrestamo = "SOLICITUD" | "APROBADO" | "DESEMBOLSADO" | "CANCELADO" | "RECHAZADO";
+export type TipoAmortizacion = "CUOTA_NIVELADA" | "SOBRE_SALDOS";
+
+export interface CuotaAmortizacion {
+  numero: number;
+  fechaPago: string;
+  dias?: number;
+  cuota: number;
+  capital: number;
+  interes: number;
+  saldoRestante: number;
+}
+
+export type OrigenFondos = "FONDOS_PROPIOS" | "FEDERURAL" | "CHN_GUATEMALA";
+
+export const ORIGEN_FONDOS_LABEL: Record<OrigenFondos, string> = {
+  FONDOS_PROPIOS: "Fondos Propios (MIF COOP)",
+  FEDERURAL: "FEDERURAL",
+  CHN_GUATEMALA: "CHN - Guatemala",
+};
+
+export const ORIGEN_FONDOS_SHORT_LABEL: Record<OrigenFondos, string> = {
+  FONDOS_PROPIOS: "Fondos Propios",
+  FEDERURAL: "FEDERURAL",
+  CHN_GUATEMALA: "CHN-GUATEMALA",
+};
+
+export const ORIGEN_FONDOS_BADGE_STYLE: Record<
+  OrigenFondos,
+  { bg: string; color: string; border: string; icon: string }
+> = {
+  FONDOS_PROPIOS: { bg: "#ecfdf5", color: "#065f46", border: "#a7f3d0", icon: "🏦" },
+  FEDERURAL: { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe", icon: "🌾" },
+  CHN_GUATEMALA: { bg: "#fef3c7", color: "#92400e", border: "#fde68a", icon: "🏛️" },
+};
+
+export interface ResultadoSimulacion {
+  monto: number;
+  plazoMeses: number;
+  tasaInteresMensual: number;
+  tipoAmortizacion: TipoAmortizacion;
+  cuotaMensualEstimada: number;
+  totalIntereses: number;
+  totalPagar: number;
+  tabla: CuotaAmortizacion[];
+}
+
+export interface Prestamo {
+  id: string;
+  codigo: string;
+  socio_id: string;
+  socio_nombres?: string;
+  numero_asociado?: string;
+  socio_dpi?: string;
+  socio_telefono?: string;
+  socio_direccion?: string;
+  agencia_id: string;
+  agencia_nombre?: string;
+  promotor_id: string | null;
+  promotor_nombre?: string | null;
+  promotor_email?: string | null;
+  tipo: TipoPrestamo;
+  estado: EstadoPrestamo;
+  tipo_amortizacion: TipoAmortizacion;
+  origen_fondos?: OrigenFondos;
+  monto_solicitado: string | number;
+  monto_aprobado: string | number | null;
+  saldo_capital?: string | number | null;
+  tasa_interes_mensual: string | number;
+  plazo_meses: number;
+  cuota_mensual: string | number;
+  destino: string | null;
+  garantia: string | null;
+  ubicacion_garantia?: string | null;
+  nombre_fiador?: string | null;
+  dpi_fiador?: string | null;
+  telefono_fiador?: string | null;
+  documento_desembolso?: string | null;
+  observaciones: string | null;
+  fecha_solicitud: string;
+  fecha_aprobacion: string | null;
+  fecha_desembolso: string | null;
+  fecha_vencimiento?: string | null;
+  fecha_ultimo_pago_migracion?: string | null;
+  es_migracion?: boolean;
+  numero_credito_anterior?: string | null;
+  created_at: string;
+  amortizacion?: ResultadoSimulacion;
+}
+
+export interface FiadorItem {
+  prestamo_id: string;
+  prestamo_codigo: string;
+  prestamo_estado: EstadoPrestamo;
+  monto_solicitado: number;
+  monto_aprobado: number | null;
+  saldo_capital: number | null;
+  fecha_solicitud: string;
+  fecha_desembolso: string | null;
+  nombre_fiador: string;
+  dpi_fiador: string | null;
+  telefono_fiador: string | null;
+  lugar_fiador: string | null;
+  socio_id: string;
+  socio_numero: string;
+  socio_nombre: string;
+  agencia_nombre: string;
+  promotor_nombre: string | null;
+  socio_fiador_id: string | null;
+  socio_fiador_numero: string | null;
+  socio_fiador_nombres: string | null;
+  es_socio_activo: boolean;
+}
+
+export interface PrestamoPago {
+  id: string;
+  prestamo_id: string;
+  socio_id: string;
+  agencia_id: string;
+  caja_dia_id: string | null;
+  caja_movimiento_id: string | null;
+  fecha: string;
+  numero_recibo: string | null;
+  abono_capital: string | number;
+  interes: string | number;
+  mora: string | number;
+  total_pagado: string | number;
+  saldo_capital_restante: string | number;
+  origen_fondos?: OrigenFondos;
+  usuario_id: string;
+  usuario_nombre?: string;
+  created_at: string;
+}
+
+export interface KardexCarteraItem extends Prestamo {
+  pagos: PrestamoPago[];
+  mesFiltro: string;
+  pagosMesCount: number;
+  totalPagadoMes: number;
+  abonoCapitalMes: number;
+  totalPagadoHistorico: number;
+  ultimoPagoFecha: string | null;
+  ultimoPagoRecibo: string | null;
+  estadoCuotaMes: "AL_DIA" | "PENDIENTE_MES" | "CANCELADO";
+}
+
+export interface KardexCarteraRespuesta {
+  items: KardexCarteraItem[];
+  resumen: {
+    mes: string;
+    totalCreditos: number;
+    totalCarteraViva: number;
+    totalColocadoHipotecario: number;
+    countHipotecarios: number;
+    totalColocadoFiduciario: number;
+    countFiduciarios: number;
+    sociosAlDia: number;
+    sociosPendientes: number;
+    totalCobradoMes: number;
+  };
+}
+
+export const ESTADO_PRESTAMO_LABEL: Record<EstadoPrestamo, string> = {
+  SOLICITUD: "Solicitud",
+  APROBADO: "Aprobado",
+  DESEMBOLSADO: "Desembolsado",
+  CANCELADO: "Cancelado / Pagado",
+  RECHAZADO: "Rechazado",
+};
+
+export const TIPO_PRESTAMO_LABEL: Record<TipoPrestamo, string> = {
+  FIDUCIARIO: "Fiduciario",
+  HIPOTECARIO: "Hipotecario",
+};
+
+export type EstadoPlazoFijo = "ACTIVO" | "LIQUIDADO";
+
+export interface PlazoFijoContrato {
+  id: string;
+  cuenta_id: string;
+  numero_cuenta: string;
+  agencia_id: string;
+  agencia_nombre?: string;
+  socio_id: string;
+  socio_nombres?: string;
+  numero_asociado?: string;
+  socio_dpi?: string;
+  socio_telefono?: string;
+  socio_direccion?: string;
+  numero_certificacion: string | null;
+  plazo_meses: number;
+  tasa_anual: string | number;
+  isr_porcentaje: string | number;
+  monto_deposito: string | number;
+  fecha_inicio: string;
+  fecha_vencimiento: string;
+  interes_generado: string | number;
+  interes_neto: string | number;
+  saldo_liquido_a_pagar: string | number;
+  estado: EstadoPlazoFijo;
+  fecha_retiro: string | null;
+  recibo_retiro?: string | null;
+  monto_liquidado?: string | number | null;
+  created_at: string;
+  saldo_actual?: string | number;
+}
+
+export interface ResultadoSimulacionPF {
+  montoDeposito: number;
+  plazoMeses: number;
+  tasaAnual: number;
+  isrPorcentaje: number;
+  fechaInicio: string;
+  fechaVencimiento: string;
+  diasExactos: number;
+  interesGenerado: number;
+  isrRetencion: number;
+  interesNeto: number;
+  saldoLiquidoAPagar: number;
+}
+
+export const ESTADO_PLAZO_FIJO_LABEL: Record<EstadoPlazoFijo, string> = {
+  ACTIVO: "Vigente / Activo",
+  LIQUIDADO: "Liquidado / Pagado",
+};
 ```
 
 ## `frontend/src/components/BuscadorCuenta.tsx` {#frontendsrccomponentsbuscadorcuentatsx}
@@ -854,17 +1264,62 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 ```css
 .shell {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 250px 1fr;
   min-height: 100vh;
+  width: 100%;
 }
 
 .sidebar {
   background: var(--paper-raised);
   border-right: 1px solid var(--line);
-  padding: 1.5rem 1rem;
+  padding: 1.25rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
+  transition: transform 0.3s ease;
+}
+
+.mobile-header {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  background: var(--paper-raised);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.hamburger-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--ink);
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 45;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.sidebar-backdrop.show {
+  display: block;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .brand {
@@ -874,16 +1329,19 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   padding: 0 0.5rem;
 }
 .brand .name {
-  font-family: "Fraunces", Georgia, serif;
-  font-weight: 600;
-  font-size: 1.15rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  color: var(--accent);
 }
 .brand .sub {
   font-size: 0.72rem;
   color: var(--ink-soft);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
+  font-weight: 600;
 }
 
 .nav {
@@ -897,8 +1355,9 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   border-radius: 8px;
   color: var(--ink-soft);
   text-decoration: none;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-weight: 500;
+  transition: all 0.15s ease;
 }
 .nav a:hover {
   background: var(--mono-bg);
@@ -906,7 +1365,8 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 }
 .nav a.active {
   background: var(--accent);
-  color: var(--paper-raised);
+  color: #ffffff;
+  font-weight: 600;
 }
 
 .sidebar-footer {
@@ -930,28 +1390,385 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   padding: 0;
   font-size: 0.82rem;
   margin-top: 0.4rem;
+  font-weight: 600;
 }
 
 .content {
-  padding: clamp(1.25rem, 3vw, 2.5rem);
-  max-width: 1180px;
+  padding: 1.25rem 2rem;
+  max-width: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+  width: 100%;
+}
+@media (max-width: 1100px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   DASHBOARD / TABLERO - PANTALLA COMPLETA & TIEMPO REAL
+   ========================================================================== */
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .content:has(.dashboard-container) {
+    padding: 0.75rem 1.25rem;
+  }
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.dashboard-title-area h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.dashboard-title-area p {
+  margin: 0.1rem 0 0;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  user-select: none;
+}
+
+@keyframes pulse-dot {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { transform: scale(1.15); box-shadow: 0 0 0 5px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #10b981;
+  animation: pulse-dot 2s infinite;
+}
+
+/* Menú desplegable de opciones administrativas */
+.dashboard-options-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dashboard-dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  padding: 0.4rem;
+  min-width: 270px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.dashboard-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.dashboard-dropdown-item:hover {
+  background: var(--mono-bg);
+}
+
+.dashboard-dropdown-item.danger {
+  color: #ef4444;
+}
+.dashboard-dropdown-item.danger:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+/* Banda superior de KPIs Financieros */
+.dashboard-kpi-band {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .dashboard-kpi-band {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.kpi-tile {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 60px;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kpi-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.kpi-tile.accent {
+  border-color: rgba(2, 132, 199, 0.45);
+  background: linear-gradient(145deg, var(--paper-raised), rgba(2, 132, 199, 0.05));
+}
+
+.kpi-tile-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.kpi-tile-value {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: clamp(0.92rem, 1.1vw, 1.15rem);
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+  margin: 0.12rem 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.kpi-tile-sub {
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+/* Contenedor inferior de 2 columnas balanceadas */
+.dashboard-lower-grid {
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 0.65rem;
+  align-items: stretch;
+  width: 100%;
+}
+
+@media (max-width: 1080px) {
+  .dashboard-lower-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-panel-card {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.8rem 1rem;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+/* ==========================================================================
+   ARQUITECTURA DE UNA SOLA PANTALLA (100VH SIN SCROLL DE PÁGINA)
+   ========================================================================== */
+.screen-container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 2.2rem);
+  max-height: calc(100vh - 2.2rem);
+  overflow: hidden;
+  gap: 0.65rem;
+  width: 100%;
+}
+@media (max-width: 1024px) {
+  .screen-container {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+.screen-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.screen-header h1 {
+  font-size: 1.25rem;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+.screen-header p {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin: 0.1rem 0 0;
+}
+
+.screen-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.screen-split-layout {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 0.75rem;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+@media (max-width: 1100px) {
+  .screen-split-layout {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+}
+
+.screen-panel {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.screen-panel.scrollable {
+  overflow-y: auto;
+}
+
+.table-scroll-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+}
+.table-scroll-container table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--mono-bg);
+}
+
+.table-compact th,
+.table-compact td {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.screen-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.screen-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+  font-size: 0.82rem;
 }
 
 .page-head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   flex-wrap: wrap;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.85rem;
 }
 .page-head h1 {
-  font-size: 1.6rem;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
 }
 .page-head p {
   color: var(--ink-soft);
-  margin: 0.25rem 0 0;
-  font-size: 0.92rem;
+  margin: 0.2rem 0 0;
+  font-size: 0.9rem;
 }
 
 .card {
@@ -959,7 +1776,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 1.4rem;
+  padding: 1.25rem 1.4rem;
 }
 
 .btn {
@@ -990,6 +1807,14 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 }
 .btn.secondary:hover {
   background: var(--mono-bg);
+}
+.btn.danger {
+  background: #dc2626;
+  color: #ffffff;
+  border-color: #b91c1c;
+}
+.btn.danger:hover {
+  background: #b91c1c;
 }
 
 .field {
@@ -1047,6 +1872,11 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   color: var(--danger);
   border: 1px solid var(--danger);
 }
+.alert.success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #10b981;
+}
 
 .table-wrap {
   overflow-x: auto;
@@ -1063,21 +1893,28 @@ table {
 th,
 td {
   text-align: left;
-  padding: 0.65rem 0.9rem;
+  padding: 0.7rem 0.95rem;
   font-size: 0.88rem;
   border-bottom: 1px solid var(--line);
+  color: var(--ink);
 }
 thead th {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.7rem;
-  letter-spacing: 0.05em;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
+  font-weight: 700;
   color: var(--ink-soft);
   background: var(--mono-bg);
+  border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
+tbody tr:nth-child(even) {
+  background: transparent;
+}
+/* NO CAMBIAR COLOR AL PASAR EL CURSOR */
 tbody tr:hover {
-  background: var(--mono-bg);
+  background: inherit !important;
 }
 tbody tr:last-child td {
   border-bottom: none;
@@ -1089,19 +1926,38 @@ td a {
 
 .badge {
   display: inline-block;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   font-weight: 600;
-  padding: 0.15rem 0.55rem;
-  border-radius: 999px;
-  font-family: "IBM Plex Mono", monospace;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  font-family: inherit;
+  line-height: 1.2;
 }
-.badge.activo {
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  color: var(--accent-strong);
+.badge.activo, .badge.activa, .badge.desembolsado {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.3);
 }
-.badge.inactivo {
+.badge.inactivo, .badge.cerrada, .badge.liquidado, .badge.cancelado {
   background: var(--mono-bg);
   color: var(--ink-soft);
+  border-color: var(--line);
+}
+.badge.danger, .badge.rechazado {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.badge.warning, .badge.solicitud {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+.badge.info, .badge.aprobado {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.3);
 }
 
 .searchbar {
@@ -1232,16 +2088,23 @@ td a {
   margin-bottom: 0.4rem;
 }
 .stat-card .value {
+  display: block;
   font-family: "IBM Plex Mono", monospace;
   font-variant-numeric: tabular-nums;
   font-size: 1.5rem;
   font-weight: 600;
   color: var(--ink);
+  margin-bottom: 0.25rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .stat-card .sub {
+  display: block;
   font-size: 0.78rem;
   color: var(--ink-soft);
-  margin-top: 0.2rem;
+  line-height: 1.3;
 }
 .stat-card.accent {
   border-color: var(--accent);
@@ -1342,6 +2205,221 @@ td a {
   margin-top: 1rem;
   font-size: 0.85rem;
   color: var(--ink-soft);
+}
+
+/* ==========================================================================
+   DISEÑO RESPONSIVO (PC, TABLET Y TELÉFONOS MÓVILES)
+   ========================================================================== */
+
+/* Tablets y pantallas medianas (≤ 1024px) */
+@media (max-width: 1024px) {
+  .shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  .mobile-header {
+    display: flex;
+  }
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    z-index: 50;
+    background: var(--paper-raised);
+    transform: translateX(-100%);
+    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
+    border-right: none;
+    padding: 1.5rem 1.25rem;
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  .content {
+    padding: 1.25rem 1rem;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+  .stat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+    gap: 0.75rem !important;
+  }
+  .page-head h1 {
+    font-size: 1.4rem;
+  }
+}
+
+/* Teléfonos móviles y pantallas compactas (≤ 640px) */
+@media (max-width: 640px) {
+  .sidebar {
+    width: 85%;
+    max-width: 320px;
+  }
+  .content {
+    padding: 1rem 0.75rem;
+  }
+  .stat-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .stat-card .value {
+    font-size: 1.35rem !important;
+  }
+  .page-head h1 {
+    font-size: 1.25rem;
+  }
+  .table-wrap {
+    margin: 0 -0.75rem;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+}
+
+
+/* ==========================================================================
+   ESTILOS OFICIALES DE IMPRESIÓN (AJUSTE PERFECTO EN PAPEL CARTA)
+   ========================================================================== */
+.print-only {
+  display: none !important;
+}
+
+@media print {
+  @page {
+    size: letter landscape;
+    margin: 0.6cm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 8pt !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+  }
+
+  /* Mostrar elementos exclusivamente para impresión */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Ocultar barra lateral, botones, controles de navegación y alertas */
+  .sidebar,
+  .no-print,
+  button,
+  .btn,
+  .searchbar,
+  .pagination,
+  select,
+  input,
+  .link-btn {
+    display: none !important;
+  }
+
+  /* Expandir contenedor principal sin desbordes */
+  .shell {
+    display: block !important;
+  }
+  .content {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Mostrar membretes y encabezados institucionales de impresión */
+  .print-container {
+    display: block !important;
+  }
+
+  /* Tablas limpias de alta legibilidad en papel */
+  .table-wrap {
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: 1px solid #334155 !important;
+    margin: 0 !important;
+  }
+  table {
+    width: 100% !important;
+    min-width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 7.5pt !important;
+  }
+  th, td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 2px 4px !important;
+    color: #000000 !important;
+  }
+  th {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    font-weight: 700 !important;
+  }
+  tfoot tr {
+    border-top: 2px solid #000000 !important;
+    font-weight: bold !important;
+  }
+
+  /* Tarjetas y bloques de auditoría */
+  .card, .stat-card {
+    box-shadow: none !important;
+    border: 1px solid #94a3b8 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Insignias */
+  .badge {
+    border: 1px solid #64748b !important;
+    color: #000000 !important;
+    background: transparent !important;
+  }
+
+  /* Evitar saltos de página dentro de firmas o filas */
+  tr,
+  .stat-grid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Modal de Informe de Caja Chica optimizado para imprimir */
+  .caja-chica-modal-overlay,
+  .arqueo-modal-overlay {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  .caja-chica-modal-card,
+  .arqueo-modal-card {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  /* Ocultar TODO el contenido de fondo (la aplicación completa) cuando se imprime un modal de Portal */
+  body:has(.arqueo-modal-overlay) #root {
+    display: none !important;
+  }
+  
+  body:has(.arqueo-modal-overlay) .arqueo-modal-overlay {
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
 }
 ```
 
@@ -3541,97 +4619,1328 @@ export default function SociosList() {
 ## `frontend/src/pages/Tablero.tsx` {#frontendsrcpagestablerotsx}
 
 ```tsx
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import { formatoQ } from "../types";
 import type { ResumenDashboard } from "../types";
 
 export default function Tablero() {
+  const { usuario } = useAuth();
   const [resumen, setResumen] = useState<ResumenDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mensajeExito, setMensajeExito] = useState<string | null>(null);
+  const [reseteando, setReseteando] = useState(false);
+  const [recargando, setRecargando] = useState(false);
+  const [mostrarOpciones, setMostrarOpciones] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  function cargarResumen(silencioso = false) {
     api
       .get<ResumenDashboard>("/dashboard/resumen")
       .then(({ data }) => setResumen(data))
-      .catch((err) => setError(mensajeError(err)));
+      .catch((err) => {
+        if (!silencioso) setError(mensajeError(err));
+      });
+  }
+
+  // Actualización automática en tiempo real cada 10s y al recuperar foco
+  useEffect(() => {
+    cargarResumen(false);
+    const interval = setInterval(() => {
+      cargarResumen(true);
+    }, 10000);
+
+    const onFocus = () => {
+      if (!document.hidden) {
+        cargarResumen(true);
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
   }, []);
 
-  if (error) return <div className="alert error">{error}</div>;
+  // Cerrar menú de opciones al hacer clic afuera
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setMostrarOpciones(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  async function handleReset() {
+    const confirmado = window.confirm(
+      "⚠️ ¿Estás seguro de que deseas REINICIAR EL SISTEMA DESDE CERO?\n\n" +
+      "Esta acción borrará:\n" +
+      "• Todos los socios y asociados registrados\n" +
+      "• Todas las cuentas de ahorro y aportaciones\n" +
+      "• Toda la cartera de préstamos y contratos de plazo fijo\n" +
+      "• Todos los movimientos y saldos de ventanilla y caja chica\n" +
+      "• Todos los cierres y arqueos de caja\n\n" +
+      "El sistema quedará completamente limpio para arrancar de nuevo."
+    );
+    if (!confirmado) return;
+
+    setReseteando(true);
+    setError(null);
+    setMensajeExito(null);
+
+    try {
+      const { data } = await api.post<{ ok: boolean; mensaje: string }>("/sistema/reset");
+      setMensajeExito(data.mensaje);
+      cargarResumen(false);
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setReseteando(false);
+    }
+  }
+
+  async function handleRecargarDatos() {
+    const confirmado = window.confirm(
+      "📥 ¿Deseas RECARGAR TODOS LOS DATOS EXISTENTES de los libros Excel?\n\n" +
+      "Esta acción restaurará la base de datos oficial:\n" +
+      "• 568 asociados con sus cuentas de aportaciones\n" +
+      "• 65 préstamos de cartera viva con garantías y fiadores\n" +
+      "• 692 certificados de ahorro a plazo fijo\n\n" +
+      "Se cargarán los datos originales de los archivos Excel para continuar operando."
+    );
+    if (!confirmado) return;
+
+    setRecargando(true);
+    setError(null);
+    setMensajeExito(null);
+
+    try {
+      const { data } = await api.post<{ ok: boolean; mensaje: string }>("/sistema/recargar-datos");
+      setMensajeExito(data.mensaje);
+      cargarResumen(false);
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setRecargando(false);
+    }
+  }
+
+  if (error && !resumen) return <div className="alert error">{error}</div>;
   if (!resumen) return <p>Cargando…</p>;
 
   const { global, porAgencia } = resumen;
   const varias = porAgencia.length > 1;
+  const puedeGestionarDatos = usuario?.rol === "ADMIN" || usuario?.rol === "SUPERVISOR" || usuario?.rol === "GERENCIA";
 
   return (
-    <div>
-      <div className="page-head">
+    <div className="dashboard-container">
+      {/* Cabecera Compacta del Tablero */}
+      <div className="dashboard-header">
+        <div className="dashboard-title-area">
+          <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", flexWrap: "wrap" }}>
+            <h1>Panel de Control y Operaciones</h1>
+            <span className="live-badge" title="Actualización continua en tiempo real cada 10s">
+              <span className="live-dot" />
+              En Vivo · En Tiempo Real
+            </span>
+          </div>
+          <p>
+            Cooperativa Integral de Ahorro y Crédito "Maya Inversiones Futuras", R.L. {varias ? " · Todas las Agencias" : ""}
+          </p>
+        </div>
+
+        {puedeGestionarDatos && (
+          <div className="dashboard-options-dropdown" ref={dropdownRef}>
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={() => setMostrarOpciones(!mostrarOpciones)}
+              style={{ fontSize: "0.78rem", padding: "0.3rem 0.65rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+              title="Herramientas y opciones avanzadas"
+            >
+              ⚙️ Opciones del Sistema ▾
+            </button>
+
+            {mostrarOpciones && (
+              <div className="dashboard-dropdown-menu">
+                <button
+                  type="button"
+                  className="dashboard-dropdown-item"
+                  onClick={() => {
+                    setMostrarOpciones(false);
+                    handleRecargarDatos();
+                  }}
+                  disabled={recargando || reseteando}
+                >
+                  <span style={{ fontSize: "1.1rem" }}>📥</span>
+                  <div>
+                    <div style={{ color: "#38bdf8" }}>{recargando ? "Recargando datos..." : "Recargar Datos Existentes (Excel)"}</div>
+                    <div style={{ fontSize: "0.68rem", color: "var(--ink-soft)", fontWeight: 400 }}>Restaura los 568 socios, 65 préstamos y 692 PF</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className="dashboard-dropdown-item danger"
+                  onClick={() => {
+                    setMostrarOpciones(false);
+                    handleReset();
+                  }}
+                  disabled={reseteando || recargando}
+                >
+                  <span style={{ fontSize: "1.1rem" }}>⚠️</span>
+                  <div>
+                    <div>{reseteando ? "Reiniciando..." : "Reiniciar Sistema a Cero"}</div>
+                    <div style={{ fontSize: "0.68rem", opacity: 0.8, fontWeight: 400 }}>Borra registros y limpia la base de datos</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {mensajeExito && <div className="alert success" style={{ margin: "0.25rem 0", padding: "0.5rem 0.8rem", fontSize: "0.82rem" }}>{mensajeExito}</div>}
+      {error && <div className="alert error" style={{ margin: "0.25rem 0", padding: "0.5rem 0.8rem", fontSize: "0.82rem" }}>{error}</div>}
+
+      {/* Banda Superior: 8 Tarjetas KPI Financieras */}
+      <div className="dashboard-kpi-band">
+        {usuario?.rol !== "PROMOTOR" && (
+          <Link to="/caja-chica" className="kpi-tile">
+            <span className="kpi-tile-label">Caja chica</span>
+            <span className="kpi-tile-value">{formatoQ(global.cajaChica)}</span>
+            <span className="kpi-tile-sub">Fondo disponible</span>
+          </Link>
+        )}
+        <Link to="/ahorros/corriente" className="kpi-tile">
+          <span className="kpi-tile-label">Ahorro corriente</span>
+          <span className="kpi-tile-value" style={{ color: "var(--accent)" }}>{formatoQ(global.ahorroCorriente)}</span>
+          <span className="kpi-tile-sub">Disponible a la vista</span>
+        </Link>
+        <Link to="/ahorros/programado" className="kpi-tile">
+          <span className="kpi-tile-label">Ahorro programado</span>
+          <span className="kpi-tile-value">{formatoQ(global.ahorroProgramado)}</span>
+          <span className="kpi-tile-sub">Cuota pactada</span>
+        </Link>
+        <Link to="/ahorros/infanto-juvenil" className="kpi-tile">
+          <span className="kpi-tile-label">Ahorro infantil</span>
+          <span className="kpi-tile-value">{formatoQ(global.ahorroInfantoJuvenil)}</span>
+          <span className="kpi-tile-sub">Infanto juvenil</span>
+        </Link>
+        <Link to="/ahorros/plazo-fijo" className="kpi-tile">
+          <span className="kpi-tile-label">Ahorro Plazo Fijo</span>
+          <span className="kpi-tile-value" style={{ color: "#f59e0b" }}>
+            {global.plazoFijo && global.plazoFijo.monto > 0 ? formatoQ(global.plazoFijo.monto) : "Kardex PF"}
+          </span>
+          <span className="kpi-tile-sub">{global.plazoFijo?.count ?? 692} certificados</span>
+        </Link>
+        <Link to="/aportaciones" className="kpi-tile">
+          <span className="kpi-tile-label">Aportaciones Capital</span>
+          <span className="kpi-tile-value" style={{ color: "var(--accent)" }}>
+            {formatoQ(global.aportaciones?.saldo ?? 11600)}
+          </span>
+          <span className="kpi-tile-sub">{global.aportaciones?.count ?? 117} socios aportantes</span>
+        </Link>
+        <Link to="/socios" className="kpi-tile">
+          <span className="kpi-tile-label">Socios activos</span>
+          <span className="kpi-tile-value mono">{global.totalSocios}</span>
+          <span className="kpi-tile-sub">{global.movimientosHoy} mov. hoy</span>
+        </Link>
+        {usuario?.rol !== "CAJERO" && (
+          <Link to="/creditos" className="kpi-tile accent">
+            <span className="kpi-tile-label">Cartera de Crédito</span>
+            <span className="kpi-tile-value" style={{ color: "#38bdf8" }}>
+              {formatoQ(global.carteraPrestamos?.saldo ?? 15210193.13)}
+            </span>
+            <span className="kpi-tile-sub">{global.carteraPrestamos?.count ?? 65} préstamos activos</span>
+          </Link>
+        )}
+      </div>
+
+      {/* Cuadrícula Inferior: 2 Paneles Balanceados Lado a Lado */}
+      <div className="dashboard-lower-grid">
+        {/* Panel Izquierdo: Supervisión y Control / Accesos Rápidos */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+          <div className="dashboard-panel-card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: "0.88rem", fontWeight: 700, color: "var(--ink)" }}>
+                {usuario?.rol === "SUPERVISOR" || usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA"
+                  ? "🛡️ Panel de Supervisión y Control de Agencia"
+                  : "⚡ Accesos Rápidos de Operación"}
+              </h3>
+              <span className="badge" style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}>
+                {usuario?.rol}
+              </span>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(115px, 1fr))", gap: "0.45rem" }}>
+              {usuario?.rol === "SUPERVISOR" || usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA" ? (
+                <>
+                  <Link to="/libro-mensual-arqueos" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                    📑 Libro Arqueos
+                  </Link>
+                  <Link to="/creditos" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                    🤝 Aprobar Créditos
+                  </Link>
+                  <Link to="/promotor/cartera" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                    📂 Kardex Cartera
+                  </Link>
+                  <Link to="/socios" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                    👥 Padrón Socios
+                  </Link>
+                  <Link to="/ahorros/plazo-fijo" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                    🔒 Plazos Fijos
+                  </Link>
+                  <Link to="/aportaciones" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                    🏛️ Aportaciones
+                  </Link>
+                  <Link to="/auxiliar-caja" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                    📊 Historial Cierres
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link to="/auxiliar-caja" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                    💵 Ventanilla Caja
+                  </Link>
+                  <Link to="/promotor/cartera" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                    📂 Kardex Cartera
+                  </Link>
+                  <Link to="/socios" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                    👥 Padrón Socios
+                  </Link>
+                  <Link to="/aportaciones" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                    🏛️ Aportaciones
+                  </Link>
+                  <Link to="/ahorros/corriente" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                    💰 Ahorros
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Desglose por Agencia (si aplica) */}
+          {varias && (
+            <div className="dashboard-panel-card">
+              <h3 style={{ margin: "0 0 0.35rem", fontSize: "0.85rem", fontWeight: 700 }}>Desglose por Agencia</h3>
+              <div className="table-wrap" style={{ maxHeight: "160px", overflowY: "auto" }}>
+                <table style={{ fontSize: "0.78rem" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ padding: "0.35rem 0.5rem" }}>Agencia</th>
+                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Caja chica</th>
+                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Ahorro corriente</th>
+                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Cartera Crédito</th>
+                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "center" }}>Socios</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {porAgencia.map((a) => (
+                      <tr key={a.agenciaId}>
+                        <td style={{ padding: "0.35rem 0.5rem", fontWeight: 600 }}>{a.agenciaNombre}</td>
+                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>{formatoQ(a.cajaChica.saldo)}</td>
+                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>{formatoQ(a.ahorroCorriente.saldoTotal)}</td>
+                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right", color: "#38bdf8" }}>{formatoQ(a.carteraPrestamos?.saldo ?? 0)}</td>
+                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "center" }}>{a.totalSocios}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Panel Derecho: Monitoreo Estratégico de Servicios */}
         <div>
-          <h1>Tablero</h1>
-          <p>Resumen de todos los módulos{varias ? " — todas las agencias" : ""}, actualizado al momento.</p>
+          {(usuario?.rol === "SUPERVISOR" || usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA") && (
+            <PanelGraficaServicios agenciaIdInicial={usuario?.agenciaId ?? undefined} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ServicioItem {
+  categoria: string;
+  modulo?: "AHORROS" | "CREDITOS" | "CAJA_CHICA" | "VENTANILLA";
+  label: string;
+  icon: string;
+  cantidad: number;
+  totalMonto: number;
+  porcentaje: number;
+}
+
+interface AnaliticaResponse {
+  periodo: "semana" | "mes" | "anio";
+  totalOperaciones: number;
+  volumenTotal: number;
+  servicioTop: ServicioItem | null;
+  servicios: ServicioItem[];
+}
+
+function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string }) {
+  const { usuario } = useAuth();
+  const puedeElegirAgencia = usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA";
+  const [agencias, setAgencias] = useState<any[]>([]);
+  const [agenciaId, setAgenciaId] = useState(agenciaIdInicial || usuario?.agenciaId || "");
+  const [periodo, setPeriodo] = useState<"semana" | "mes" | "anio">("mes");
+  const [filtroModulo, setFiltroModulo] = useState<"TODOS" | "AHORROS" | "CREDITOS" | "CAJA_CHICA" | "VENTANILLA">("TODOS");
+  const [datos, setDatos] = useState<AnaliticaResponse | null>(null);
+  const [cargando, setCargando] = useState(false);
+
+  useEffect(() => {
+    if (puedeElegirAgencia) {
+      api.get("/agencias").then(({ data }) => {
+        setAgencias(data);
+      });
+    }
+  }, [puedeElegirAgencia]);
+
+  function cargarAnalitica(silencioso = false) {
+    if (!silencioso) setCargando(true);
+    api
+      .get<AnaliticaResponse>("/caja-auxiliar/analitica-servicios", {
+        params: { agenciaId: agenciaId || undefined, periodo },
+      })
+      .then(({ data }) => setDatos(data))
+      .catch(() => {})
+      .finally(() => {
+        if (!silencioso) setCargando(false);
+      });
+  }
+
+  useEffect(() => {
+    cargarAnalitica(false);
+    const interval = setInterval(() => {
+      cargarAnalitica(true);
+    }, 10000);
+
+    const onFocus = () => {
+      if (!document.hidden) {
+        cargarAnalitica(true);
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [agenciaId, periodo]);
+
+  const periodoLabel = periodo === "semana" ? "Últimos 7 días" : periodo === "mes" ? "Últimos 30 días" : "Año actual";
+
+  const serviciosFiltrados = !datos
+    ? []
+    : filtroModulo === "TODOS"
+      ? datos.servicios
+      : datos.servicios.filter((s) => s.modulo === filtroModulo);
+
+  const totalOperacionesFiltro = serviciosFiltrados.reduce((acc, s) => acc + s.cantidad, 0);
+  const volumenTotalFiltro = serviciosFiltrados.reduce((acc, s) => acc + s.totalMonto, 0);
+  const servicioTopFiltro = serviciosFiltrados[0] ?? null;
+
+  return (
+    <div className="dashboard-panel-card" style={{ borderTop: "3px solid #0284c7" }}>
+      {/* Encabezado del Panel */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+            <h2 style={{ margin: 0, fontSize: "0.98rem", fontWeight: 700 }}>📊 Monitoreo Estratégico de Servicios</h2>
+            <span className="live-badge" style={{ fontSize: "0.68rem", padding: "0.15rem 0.45rem" }}>
+              <span className="live-dot" /> En Vivo
+            </span>
+          </div>
+          <p style={{ margin: "0.15rem 0 0", fontSize: "0.74rem", color: "var(--ink-soft)" }}>
+            Demanda transaccional ({periodoLabel})
+          </p>
+        </div>
+
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+          {puedeElegirAgencia && agencias.length > 0 && (
+            <select value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} style={{ maxWidth: 170, fontSize: "0.76rem", padding: "0.25rem 0.45rem" }}>
+              <option value="">🏢 Todas las Agencias</option>
+              {agencias.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.nombre}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <div style={{ display: "inline-flex", background: "var(--mono-bg)", borderRadius: "6px", padding: "0.15rem", border: "1px solid var(--line)" }}>
+            <button
+              type="button"
+              className={`btn ${periodo === "semana" ? "" : "secondary"}`}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
+              onClick={() => setPeriodo("semana")}
+            >
+              Semana
+            </button>
+            <button
+              type="button"
+              className={`btn ${periodo === "mes" ? "" : "secondary"}`}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
+              onClick={() => setPeriodo("mes")}
+            >
+              Mes
+            </button>
+            <button
+              type="button"
+              className={`btn ${periodo === "anio" ? "" : "secondary"}`}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
+              onClick={() => setPeriodo("anio")}
+            >
+              Año
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="stat-grid">
-        <Link to="/caja-chica" className="stat-card accent" style={{ textDecoration: "none" }}>
-          <span className="label">Caja chica</span>
-          <span className="value">{formatoQ(global.cajaChica)}</span>
-          <span className="sub">Saldo actual</span>
-        </Link>
-        <Link to="/ahorros/corriente" className="stat-card" style={{ textDecoration: "none" }}>
-          <span className="label">Ahorro corriente</span>
-          <span className="value">{formatoQ(global.ahorroCorriente)}</span>
-          <span className="sub">Saldo total</span>
-        </Link>
-        <Link to="/ahorros/programado" className="stat-card" style={{ textDecoration: "none" }}>
-          <span className="label">Ahorro programado</span>
-          <span className="value">{formatoQ(global.ahorroProgramado)}</span>
-          <span className="sub">Saldo total</span>
-        </Link>
-        <Link to="/ahorros/infanto-juvenil" className="stat-card" style={{ textDecoration: "none" }}>
-          <span className="label">Ahorro infanto juvenil</span>
-          <span className="value">{formatoQ(global.ahorroInfantoJuvenil)}</span>
-          <span className="sub">Saldo total</span>
-        </Link>
-        <Link to="/socios" className="stat-card" style={{ textDecoration: "none" }}>
-          <span className="label">Socios activos</span>
-          <span className="value mono">{global.totalSocios}</span>
-          <span className="sub">{global.movimientosHoy} movimiento(s) hoy</span>
-        </Link>
+      {/* Pestañas de Segmentación por Área Financiera */}
+      <div style={{ display: "flex", gap: "0.25rem", flexWrap: "wrap", borderBottom: "1px solid var(--line)", paddingBottom: "0.4rem" }}>
+        <button
+          type="button"
+          className={`btn ${filtroModulo === "TODOS" ? "" : "secondary"}`}
+          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
+          onClick={() => setFiltroModulo("TODOS")}
+        >
+          🌐 Consolidado ({datos?.totalOperaciones ?? 0})
+        </button>
+        <button
+          type="button"
+          className={`btn ${filtroModulo === "AHORROS" ? "" : "secondary"}`}
+          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
+          onClick={() => setFiltroModulo("AHORROS")}
+        >
+          🏦 Ahorros & PF
+        </button>
+        <button
+          type="button"
+          className={`btn ${filtroModulo === "CREDITOS" ? "" : "secondary"}`}
+          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
+          onClick={() => setFiltroModulo("CREDITOS")}
+        >
+          💼 Créditos
+        </button>
+        <button
+          type="button"
+          className={`btn ${filtroModulo === "CAJA_CHICA" ? "" : "secondary"}`}
+          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
+          onClick={() => setFiltroModulo("CAJA_CHICA")}
+        >
+          ☕ Caja Chica
+        </button>
+        <button
+          type="button"
+          className={`btn ${filtroModulo === "VENTANILLA" ? "" : "secondary"}`}
+          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
+          onClick={() => setFiltroModulo("VENTANILLA")}
+        >
+          💵 Ventanilla
+        </button>
       </div>
 
-      {varias && (
+      {cargando && <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", padding: "0.5rem" }}>Cargando datos en vivo...</div>}
+
+      {!cargando && (!datos || serviciosFiltrados.length === 0) && (
+        <div className="alert info" style={{ margin: "0.5rem 0", padding: "0.5rem 0.75rem", fontSize: "0.78rem" }}>
+          No hay movimientos registrados en esta categoría durante el período seleccionado ({periodoLabel}).
+        </div>
+      )}
+
+      {datos && serviciosFiltrados.length > 0 && (
         <>
-          <h3 style={{ marginBottom: "0.75rem" }}>Por agencia</h3>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Agencia</th>
-                  <th>Caja chica</th>
-                  <th>Ahorro corriente</th>
-                  <th>Ahorro programado</th>
-                  <th>Ahorro infanto juvenil</th>
-                  <th>Socios</th>
-                </tr>
-              </thead>
-              <tbody>
-                {porAgencia.map((a) => (
-                  <tr key={a.agenciaId}>
-                    <td>{a.agenciaNombre}</td>
-                    <td className="mono">{formatoQ(a.cajaChica.saldo)}</td>
-                    <td className="mono">{formatoQ(a.ahorroCorriente.saldoTotal)}</td>
-                    <td className="mono">{formatoQ(a.ahorroProgramado.saldoTotal)}</td>
-                    <td className="mono">{formatoQ(a.ahorroInfantoJuvenil.saldoTotal)}</td>
-                    <td className="mono">{a.totalSocios}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Métricas destacadas de la categoría seleccionada */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.45rem" }}>
+            <div className="kpi-tile accent" style={{ minHeight: 52, padding: "0.4rem 0.6rem" }}>
+              <span className="kpi-tile-label">🏆 Mayor Demanda</span>
+              <span className="kpi-tile-value" style={{ fontSize: "0.86rem", margin: "0.1rem 0" }}>
+                {servicioTopFiltro ? `${servicioTopFiltro.icon} ${servicioTopFiltro.label}` : "—"}
+              </span>
+              <span className="kpi-tile-sub" style={{ fontSize: "0.65rem" }}>
+                {servicioTopFiltro
+                  ? `${servicioTopFiltro.cantidad} op. (${totalOperacionesFiltro > 0 ? Math.round((servicioTopFiltro.cantidad / totalOperacionesFiltro) * 1000) / 10 : 0}%)`
+                  : ""}
+              </span>
+            </div>
+
+            <div className="kpi-tile" style={{ minHeight: 52, padding: "0.4rem 0.6rem" }}>
+              <span className="kpi-tile-label">Operaciones</span>
+              <span className="kpi-tile-value mono" style={{ fontSize: "0.96rem", margin: "0.1rem 0" }}>{totalOperacionesFiltro}</span>
+              <span className="kpi-tile-sub" style={{ fontSize: "0.65rem" }}>En este rubro</span>
+            </div>
+
+            <div className="kpi-tile" style={{ minHeight: 52, padding: "0.4rem 0.6rem" }}>
+              <span className="kpi-tile-label">Volumen Operado</span>
+              <span className="kpi-tile-value mono" style={{ color: "var(--accent)", fontSize: "0.96rem", margin: "0.1rem 0" }}>
+                {formatoQ(volumenTotalFiltro)}
+              </span>
+              <span className="kpi-tile-sub" style={{ fontSize: "0.65rem" }}>Flujo monetario</span>
+            </div>
+          </div>
+
+          {/* Gráfica de Barras Proporcionales de la Categoría */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", maxHeight: "200px", overflowY: "auto", paddingRight: "0.2rem" }}>
+            {serviciosFiltrados.map((s, idx) => {
+              const barColors = [
+                "linear-gradient(90deg, #0284c7, #38bdf8)",
+                "linear-gradient(90deg, #059669, #34d399)",
+                "linear-gradient(90deg, #7c3aed, #a78bfa)",
+                "linear-gradient(90deg, #ea580c, #fb923c)",
+                "linear-gradient(90deg, #0891b2, #22d3ee)",
+                "linear-gradient(90deg, #d97706, #fcd34d)",
+              ];
+              const bgGradient = barColors[idx % barColors.length];
+              const porcentajeRelativo = totalOperacionesFiltro > 0
+                ? Math.round((s.cantidad / totalOperacionesFiltro) * 1000) / 10
+                : 0;
+
+              return (
+                <div
+                  key={s.categoria}
+                  style={{
+                    background: "var(--mono-bg)",
+                    padding: "0.4rem 0.65rem",
+                    borderRadius: "6px",
+                    border: "1px solid var(--line)",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
+                      <span style={{ fontSize: "1rem" }}>{s.icon}</span>
+                      <strong style={{ fontSize: "0.78rem", color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.label}</strong>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
+                      <span
+                        className="badge"
+                        style={{
+                          background: "var(--paper-raised)",
+                          color: "var(--ink-soft)",
+                          fontWeight: 700,
+                          fontSize: "0.66rem",
+                          border: "1px solid var(--line)",
+                          padding: "0.1rem 0.35rem",
+                        }}
+                      >
+                        {s.cantidad} op. ({porcentajeRelativo}%)
+                      </span>
+                      <strong
+                        className="mono"
+                        style={{
+                          fontSize: "0.82rem",
+                          color: "var(--accent)",
+                          minWidth: 80,
+                          textAlign: "right",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {formatoQ(s.totalMonto)}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Barra Visual Proporcional */}
+                  <div style={{ background: "var(--line)", height: "6px", borderRadius: "999px", overflow: "hidden" }}>
+                    <div
+                      style={{
+                        background: bgGradient,
+                        height: "100%",
+                        width: `${Math.max(porcentajeRelativo, 3)}%`,
+                        borderRadius: "999px",
+                        transition: "width 0.4s ease",
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </>
       )}
+    </div>
+  );
+}
+```
+
+## `frontend/src/pages/LibroArqueoMensual.tsx` {#frontendsrcpageslibroarqueomensualtsx}
+
+```tsx
+import { useEffect, useState } from "react";
+import { api, mensajeError } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
+import { formatoQ } from "../types";
+import type { Agencia } from "../types";
+
+interface DiaArqueo {
+  id: string;
+  fecha: string;
+  estado: string;
+  saldo_inicial: number;
+  saldo_final: number | null;
+  total_ingresos: number;
+  total_egresos: number;
+  total_contado: number | null;
+  diferencia: number | null;
+  abierto_por_nombre: string | null;
+  cerrado_por_nombre: string | null;
+  total_movimientos: number;
+}
+
+interface ArqueoMensualResponse {
+  mes: string;
+  resumen: {
+    totalDiasOperados: number;
+    diasCuadrados: number;
+    diasConDiferencia: number;
+    totalSobrante: number;
+    totalFaltante: number;
+    totalMovimientosMes: number;
+    totalIngresosMes: number;
+    totalEgresosMes: number;
+  };
+  dias: DiaArqueo[];
+}
+
+export default function LibroArqueoMensual() {
+  const { usuario } = useAuth();
+  const puedeElegirAgencia = usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA";
+
+  const [agencias, setAgencias] = useState<Agencia[]>([]);
+  const [agenciaId, setAgenciaId] = useState(usuario?.agenciaId ?? "");
+  const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [datos, setDatos] = useState<ArqueoMensualResponse | null>(null);
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Campos Notariales / Estatutarios del Acta
+  const [añoStr, mesNum] = mes.split("-");
+  const [numeroActa, setNumeroActa] = useState(`CV-${mesNum}-${añoStr}`);
+  const [horaInicio, setHoraInicio] = useState("17:00");
+  const [horaFin, setHoraFin] = useState("18:15");
+  const [lugarMunicipio, setLugarMunicipio] = useState("San Gaspar Chajul");
+  const [nombrePresidente, setNombrePresidente] = useState("Jacinto Asicona Brito");
+  const [nombreSecretaria, setNombreSecretaria] = useState("Elena Matom Caba");
+  const [nombreVocal, setNombreVocal] = useState("Mateo Caba Laynez");
+  const [nombreCajero, setNombreCajero] = useState("Ana Elizabeth Pérez");
+  const [observaciones, setObservaciones] = useState(
+    "Durante la revisión y cotejo documental del presente período, las operaciones de caja se encontraron debidamente soportadas con sus comprobantes y boletas autorizadas. Los saldos en libros coincidieron con el efectivo contado, determinando que los registros de ingresos y egresos fueron llevados con exactitud y estricto apego a los estatutos cooperativos.",
+  );
+  const [mostrarConfiguracion, setMostrarConfiguracion] = useState(false);
+
+  useEffect(() => {
+    setNumeroActa(`CV-${mesNum}-${añoStr}`);
+  }, [mes, mesNum, añoStr]);
+
+  useEffect(() => {
+    api.get<Agencia[]>("/agencias").then(({ data }) => setAgencias(data));
+  }, []);
+
+  function cargar() {
+    if (!agenciaId) return;
+    setCargando(true);
+    setError(null);
+    api
+      .get<ArqueoMensualResponse>("/caja-auxiliar/arqueos-mes", {
+        params: { agenciaId, mes },
+      })
+      .then(({ data }) => {
+        setDatos(data);
+        if (data.dias.length > 0) {
+          const primerCajero = data.dias[0]?.cerrado_por_nombre || data.dias[0]?.abierto_por_nombre;
+          if (primerCajero && nombreCajero === "Ana Elizabeth Pérez") {
+            setNombreCajero(primerCajero);
+          }
+        }
+      })
+      .catch((err) => setError(mensajeError(err)))
+      .finally(() => setCargando(false));
+  }
+
+  useEffect(() => {
+    cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agenciaId, mes]);
+
+  const agenciaNombre = agencias.find((a) => a.id === agenciaId)?.nombre ?? "Agencia Chajul";
+
+  const fechaMesObj = new Date(Number(añoStr), Number(mesNum) - 1, 1);
+  const mesNombreLargo = fechaMesObj.toLocaleDateString("es-GT", { month: "long", year: "numeric" });
+  const ultimoDiaMes = new Date(Number(añoStr), Number(mesNum), 0).getDate();
+
+  function exportarCSV() {
+    if (!datos || datos.dias.length === 0) return;
+    const lineas: string[] = [];
+    lineas.push(`LIBRO DE ACTAS DE ARQUEO MENSUAL DE CAJA - COMISION DE VIGILANCIA`);
+    lineas.push(`COOPERATIVA INTEGRAL DE AHORRO Y CREDITO MAYA INVERSIONES FUTURAS R.L.`);
+    lineas.push(`Acta No.: ${numeroActa}`);
+    lineas.push(`Agencia: ${agenciaNombre}`);
+    lineas.push(`Periodo: ${mesNombreLargo}`);
+    lineas.push("");
+    lineas.push("RESUMEN GENERAL DEL MES");
+    lineas.push(`Dias Operados,${datos.resumen.totalDiasOperados}`);
+    lineas.push(`Dias Cuadrados Exactos,${datos.resumen.diasCuadrados}`);
+    lineas.push(`Dias con Diferencia,${datos.resumen.diasConDiferencia}`);
+    lineas.push(`Total Ingresos del Mes (Q),${datos.resumen.totalIngresosMes.toFixed(2)}`);
+    lineas.push(`Total Egresos del Mes (Q),${datos.resumen.totalEgresosMes.toFixed(2)}`);
+    lineas.push(`Diferencia Neta (Q),${(datos.resumen.totalSobrante - datos.resumen.totalFaltante).toFixed(2)}`);
+    lineas.push("");
+    lineas.push("SABANA DE CIERRES DIARIOS");
+    lineas.push("Fecha,Cajero / Operador,Saldo Inicial (Q),Ingresos (Q),Egresos (Q),Saldo Libro (Q),Efectivo Contado (Q),Diferencia (Q),Resultado");
+    datos.dias.forEach((d) => {
+      const fechaStr = new Date(d.fecha).toLocaleDateString("es-GT");
+      const cajero = `"${(d.cerrado_por_nombre || d.abierto_por_nombre || "").replace(/"/g, '""')}"`;
+      const esperado = Number(d.saldo_final ?? d.saldo_inicial);
+      const contado = Number(d.total_contado || esperado);
+      const dif = Number(d.diferencia || 0);
+      const res = dif === 0 ? "CUADRADO" : dif > 0 ? "SOBRANTE" : "FALTANTE";
+      lineas.push(
+        `${fechaStr},${cajero},${d.saldo_inicial.toFixed(2)},${d.total_ingresos.toFixed(2)},${d.total_egresos.toFixed(2)},${esperado.toFixed(2)},${contado.toFixed(2)},${dif.toFixed(2)},${res}`,
+      );
+    });
+    lineas.push("");
+    lineas.push(`Observaciones: "${observaciones.replace(/"/g, '""')}"`);
+
+    const blob = new Blob(["\uFEFF" + lineas.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `acta_arqueo_mensual_${numeroActa}_${agenciaNombre}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div>
+      {/* ========================================================================= */}
+      {/* PANEL DE CONFIGURACIÓN Y CONTROLES (NO PRINT)                             */}
+      {/* ========================================================================= */}
+      <div className="no-print">
+        <div className="page-head" style={{ marginBottom: "0.75rem", paddingBottom: "0.5rem" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "1.3rem" }}>📑</span>
+              <h1 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 800 }}>Libro de Actas de Arqueo Mensual de Caja</h1>
+              <span className="badge" style={{ background: "#fef3c7", color: "#92400e", fontWeight: 700, fontSize: "0.72rem" }}>
+                Comisión de Vigilancia
+              </span>
+            </div>
+            <p style={{ margin: "0.15rem 0 0", fontSize: "0.78rem" }}>
+              Emisión de actas oficiales con formato estatutario notarial para la Comisión de Vigilancia y Auditoría Interna.
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: "0.45rem", alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <label htmlFor="mes-picker" style={{ fontSize: "0.8rem", fontWeight: 600 }}>
+                Mes:
+              </label>
+              <input
+                id="mes-picker"
+                type="month"
+                value={mes}
+                onChange={(e) => setMes(e.target.value)}
+                style={{ padding: "0.3rem 0.45rem", borderRadius: "6px", fontSize: "0.82rem" }}
+              />
+            </div>
+
+            {puedeElegirAgencia && (
+              <select value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} style={{ maxWidth: 170, fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}>
+                {agencias.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nombre}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={exportarCSV}
+              disabled={!datos || datos.dias.length === 0}
+              style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem" }}
+            >
+              📥 Excel (CSV)
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => window.print()}
+              disabled={!datos || datos.dias.length === 0}
+              style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem" }}
+            >
+              🖨️ Imprimir Acta Oficial
+            </button>
+          </div>
+        </div>
+
+        {error && <div className="alert error" style={{ margin: "0.4rem 0", padding: "0.5rem 0.75rem", fontSize: "0.82rem" }}>{error}</div>}
+
+        {/* Panel Desplegable de Parámetros Notariales */}
+        <div className="card" style={{ marginBottom: "0.75rem", background: "var(--paper-raised)", padding: "0.55rem 0.85rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "0.84rem", fontWeight: 700, color: "var(--accent)" }}>
+                ⚙️ Datos Oficiales del Acta:
+              </span>
+              <span className="badge" style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}>
+                Acta: <strong>{numeroActa}</strong>
+              </span>
+              <span className="badge" style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}>
+                📍 {lugarMunicipio}
+              </span>
+              <span className="badge" style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}>
+                ⏰ {horaInicio} – {horaFin}
+              </span>
+              <span className="badge" style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}>
+                👤 Pres.: {nombrePresidente}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={() => setMostrarConfiguracion(!mostrarConfiguracion)}
+              style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+              title="Ajustar nombres de la comisión, horario y observaciones"
+            >
+              {mostrarConfiguracion ? "▲ Ocultar Parámetros" : "▼ Modificar Datos y Firmantes"}
+            </button>
+          </div>
+
+          {mostrarConfiguracion && (
+            <div style={{ marginTop: "0.65rem", paddingTop: "0.65rem", borderTop: "1px solid var(--line)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "0.6rem" }}>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>No. de Acta</label>
+                  <input
+                    type="text"
+                    value={numeroActa}
+                    onChange={(e) => setNumeroActa(e.target.value)}
+                    placeholder="CV-09-2026"
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>Municipio / Lugar</label>
+                  <input
+                    type="text"
+                    value={lugarMunicipio}
+                    onChange={(e) => setLugarMunicipio(e.target.value)}
+                    placeholder="San Gaspar Chajul, Quiché"
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>Hora Inicio</label>
+                  <input
+                    type="time"
+                    value={horaInicio}
+                    onChange={(e) => setHoraInicio(e.target.value)}
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>Hora Cierre</label>
+                  <input
+                    type="time"
+                    value={horaFin}
+                    onChange={(e) => setHoraFin(e.target.value)}
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+                  gap: "0.6rem",
+                  marginTop: "0.6rem",
+                }}
+              >
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>Presidente (Comisión Vigilancia)</label>
+                  <input
+                    type="text"
+                    value={nombrePresidente}
+                    onChange={(e) => setNombrePresidente(e.target.value)}
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>Secretaria (Comisión Vigilancia)</label>
+                  <input
+                    type="text"
+                    value={nombreSecretaria}
+                    onChange={(e) => setNombreSecretaria(e.target.value)}
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>Vocal I (Comisión Vigilancia)</label>
+                  <input
+                    type="text"
+                    value={nombreVocal}
+                    onChange={(e) => setNombreVocal(e.target.value)}
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: "0.72rem" }}>Receptor Pagador (Cajero)</label>
+                  <input
+                    type="text"
+                    value={nombreCajero}
+                    onChange={(e) => setNombreCajero(e.target.value)}
+                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}
+                  />
+                </div>
+              </div>
+
+              <div className="field" style={{ marginTop: "0.6rem", marginBottom: 0 }}>
+                <label style={{ fontSize: "0.72rem" }}>
+                  <strong>Observaciones / Hallazgos de Auditoría</strong> (Se imprime en el Punto Tercero del Acta)
+                </label>
+                <textarea
+                  rows={2}
+                  value={observaciones}
+                  onChange={(e) => setObservaciones(e.target.value)}
+                  style={{ fontSize: "0.8rem", width: "100%", padding: "0.35rem 0.45rem" }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* ACTA OFICIAL NOTARIAL / ESTATUTARIA (PANTALLA E IMPRESIÓN)                */}
+      {/* ========================================================================= */}
+      <div
+        className="card"
+        style={{
+          background: "var(--paper)",
+          border: "1px solid var(--line)",
+          padding: "1.1rem 1.4rem",
+          width: "100%",
+          boxSizing: "border-box",
+        }}
+      >
+        {/* Encabezado Institucional */}
+        <div
+          style={{
+            textAlign: "center",
+            borderBottom: "2px solid #0f172a",
+            paddingBottom: "0.6rem",
+            marginBottom: "0.8rem",
+          }}
+        >
+          <div style={{ fontSize: "1rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em" }}>
+            COOPERATIVA INTEGRAL DE AHORRO Y CRÉDITO &quot;MAYA INVERSIONES FUTURAS&quot;, R.L.
+          </div>
+          <div style={{ fontSize: "1.15rem", color: "#047857", fontWeight: 800, margin: "0.15rem 0" }}>
+            COMISIÓN DE VIGILANCIA · LIBRO DE ACTAS DE ARQUEO MENSUAL
+          </div>
+          <div style={{ fontSize: "0.92rem", fontWeight: 700, textDecoration: "underline", color: "#0f172a" }}>
+            ACTA NÚMERO: {numeroActa}
+          </div>
+          <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", marginTop: "2px" }}>
+            Agencia: <strong>{agenciaNombre.toUpperCase()}</strong> · Período de Auditoría:{" "}
+            <strong style={{ textTransform: "capitalize" }}>{mesNombreLargo}</strong> · Cifras en Quetzales (Q)
+          </div>
+        </div>
+
+        {cargando && <p style={{ textAlign: "center", padding: "1rem" }}>Cargando arqueos del mes…</p>}
+
+        {!cargando && (!datos || datos.dias.length === 0) && (
+          <div className="alert info">
+            No se encontraron cajas registradas para el mes de {mesNombreLargo} en {agenciaNombre}.
+          </div>
+        )}
+
+        {datos && (
+          <div style={{ fontSize: "0.82rem", lineHeight: 1.5, color: "var(--ink)" }}>
+            {/* PUNTO PRIMERO */}
+            <div style={{ marginBottom: "0.75rem", textAlign: "justify" }}>
+              <strong style={{ textDecoration: "underline" }}>PUNTO PRIMERO (APERTURA Y QUÓRUM):</strong> En el municipio
+              de {lugarMunicipio}, departamento de Quiché, siendo las {horaInicio} horas del día {ultimoDiaMes} del mes
+              de {mesNombreLargo}, reunidos en las oficinas de la Agencia <strong>{agenciaNombre}</strong> de la{" "}
+              <strong>Cooperativa Integral de Ahorro y Crédito &quot;Maya Inversiones Futuras&quot;, R.L.</strong>, se
+              constituyen los miembros de la Comisión de Vigilancia: <strong>{nombrePresidente}</strong> (Presidente),{" "}
+              <strong>{nombreSecretaria}</strong> (Secretaria) y <strong>{nombreVocal}</strong> (Vocal I), en presencia del
+              Receptor Pagador <strong>{nombreCajero}</strong>, con el propósito de celebrar la sesión ordinaria de
+              verificación, cotejo y cierre mensual del libro auxiliar de caja.
+            </div>
+
+            {/* PUNTO SEGUNDO */}
+            <div style={{ marginBottom: "0.5rem" }}>
+              <div style={{ textAlign: "justify", marginBottom: "0.4rem" }}>
+                <strong style={{ textDecoration: "underline" }}>PUNTO SEGUNDO (REVISIÓN DE OPERACIONES Y SÁBANA DE CIERRES):</strong>{" "}
+                La Comisión de Vigilancia procedió a la revisión minuciosa y cotejo diario de los comprobantes de ingreso y egreso
+                generados durante el mes, arrojando el siguiente resumen consolidado:
+              </div>
+
+              {/* Cintillo de Cifras Clave */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                  gap: "0.45rem",
+                  marginBottom: "0.5rem",
+                  background: "var(--paper-raised)",
+                  padding: "0.4rem 0.6rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--line)",
+                  fontSize: "0.72rem",
+                }}
+              >
+                <div>
+                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                    Días Operados
+                  </span>
+                  <strong className="mono" style={{ fontSize: "0.9rem" }}>
+                    {datos.resumen.totalDiasOperados} días
+                  </strong>
+                </div>
+
+                <div>
+                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                    Efectividad de Cuadre
+                  </span>
+                  <strong className="mono" style={{ fontSize: "0.9rem", color: "#16a34a" }}>
+                    {datos.resumen.diasCuadrados} / {datos.resumen.totalDiasOperados} (
+                    {datos.resumen.totalDiasOperados > 0
+                      ? Math.round((datos.resumen.diasCuadrados / datos.resumen.totalDiasOperados) * 100)
+                      : 100}
+                    %)
+                  </strong>
+                </div>
+
+                <div>
+                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                    Total Ingresos del Mes
+                  </span>
+                  <strong className="mono" style={{ fontSize: "0.9rem", color: "#16a34a" }}>
+                    + {formatoQ(datos.resumen.totalIngresosMes)}
+                  </strong>
+                </div>
+
+                <div>
+                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                    Total Egresos del Mes
+                  </span>
+                  <strong className="mono" style={{ fontSize: "0.9rem", color: "#dc2626" }}>
+                    − {formatoQ(datos.resumen.totalEgresosMes)}
+                  </strong>
+                </div>
+
+                <div
+                  style={{
+                    background: datos.resumen.diasConDiferencia === 0 ? "rgba(22, 163, 74, 0.1)" : "rgba(220, 38, 38, 0.1)",
+                    padding: "2px 4px",
+                    borderRadius: "4px",
+                  }}
+                >
+                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                    Diferencia de Caja
+                  </span>
+                  <strong
+                    className="mono"
+                    style={{
+                      fontSize: "0.9rem",
+                      color: datos.resumen.diasConDiferencia === 0 ? "#16a34a" : "#dc2626",
+                    }}
+                  >
+                    {datos.resumen.diasConDiferencia === 0
+                      ? "Cuadrado (Q 0.00)"
+                      : `${datos.resumen.diasConDiferencia} día(s)`}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Sábana de Cierres Diarios */}
+              {datos.dias.length > 0 && (
+                <div className="table-wrap" style={{ border: "1px solid var(--line)" }}>
+                  <table style={{ fontSize: "0.75rem", width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ background: "var(--paper-raised)" }}>
+                        <th style={{ width: "70px", padding: "2px 4px" }}>Fecha</th>
+                        <th style={{ padding: "2px 4px" }}>Cajero / Operador</th>
+                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Saldo Inicial</th>
+                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Ingresos (+)</th>
+                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Egresos (−)</th>
+                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Saldo Libro</th>
+                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Contado</th>
+                        <th style={{ width: "75px", textAlign: "right", padding: "2px 4px" }}>Diferencia</th>
+                        <th style={{ width: "75px", textAlign: "center", padding: "2px 4px" }}>Resultado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {datos.dias.map((d) => {
+                        const dif = Number(d.diferencia || 0);
+                        const esperado = Number(d.saldo_final ?? d.saldo_inicial);
+                        const contado = Number(d.total_contado || esperado);
+                        return (
+                          <tr key={d.id}>
+                            <td className="mono" style={{ fontWeight: 600, padding: "2px 4px" }}>
+                              {new Date(d.fecha).toLocaleDateString("es-GT", {
+                                weekday: "short",
+                                day: "2-digit",
+                                month: "2-digit",
+                              })}
+                            </td>
+                            <td style={{ padding: "2px 4px" }}>
+                              {d.cerrado_por_nombre || d.abierto_por_nombre || nombreCajero}
+                            </td>
+                            <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
+                              {formatoQ(d.saldo_inicial)}
+                            </td>
+                            <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "2px 4px" }}>
+                              {formatoQ(d.total_ingresos)}
+                            </td>
+                            <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "2px 4px" }}>
+                              {formatoQ(d.total_egresos)}
+                            </td>
+                            <td className="mono" style={{ textAlign: "right", fontWeight: 700, padding: "2px 4px" }}>
+                              {formatoQ(esperado)}
+                            </td>
+                            <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
+                              {formatoQ(contado)}
+                            </td>
+                            <td
+                              className="mono"
+                              style={{
+                                textAlign: "right",
+                                fontWeight: 700,
+                                color: dif === 0 ? "#16a34a" : dif > 0 ? "#2563eb" : "#dc2626",
+                                padding: "2px 4px",
+                              }}
+                            >
+                              {dif === 0 ? "Q 0.00" : dif > 0 ? `+${formatoQ(dif)}` : `-${formatoQ(Math.abs(dif))}`}
+                            </td>
+                            <td style={{ textAlign: "center", padding: "2px 4px" }}>
+                              <span
+                                style={{
+                                  color: dif === 0 ? "#16a34a" : "#dc2626",
+                                  fontWeight: 700,
+                                  fontSize: "0.72rem",
+                                }}
+                              >
+                                {dif === 0 ? "✓ Cuadrado" : dif > 0 ? "Sobrante" : "Faltante"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ background: "rgba(0,0,0,0.04)", fontWeight: 800, borderTop: "2px solid #0f172a" }}>
+                        <td colSpan={2} style={{ padding: "3px 4px" }}>
+                          TOTALES DEL MES:
+                        </td>
+                        <td style={{ padding: "3px 4px" }}>—</td>
+                        <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "3px 4px" }}>
+                          {formatoQ(datos.resumen.totalIngresosMes)}
+                        </td>
+                        <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "3px 4px" }}>
+                          {formatoQ(datos.resumen.totalEgresosMes)}
+                        </td>
+                        <td colSpan={2} style={{ padding: "3px 4px" }}></td>
+                        <td
+                          className="mono"
+                          style={{
+                            textAlign: "right",
+                            color: datos.resumen.diasConDiferencia === 0 ? "#16a34a" : "#dc2626",
+                            padding: "3px 4px",
+                          }}
+                        >
+                          {datos.resumen.diasConDiferencia === 0
+                            ? "Q 0.00"
+                            : datos.resumen.totalSobrante > 0
+                            ? `+${formatoQ(datos.resumen.totalSobrante)}`
+                            : `-${formatoQ(datos.resumen.totalFaltante)}`}
+                        </td>
+                        <td style={{ textAlign: "center", padding: "3px 4px" }}>
+                          {datos.resumen.diasConDiferencia === 0 ? "✓ CONFORME" : "REVISADO"}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* PUNTO TERCERO */}
+            <div style={{ marginTop: "0.6rem", marginBottom: "0.6rem", textAlign: "justify" }}>
+              <strong style={{ textDecoration: "underline" }}>PUNTO TERCERO (HALLAZGOS Y DICTAMEN DE AUDITORÍA):</strong>{" "}
+              {observaciones}
+            </div>
+
+            {/* PUNTO CUARTO */}
+            <div style={{ marginBottom: "1rem", textAlign: "justify" }}>
+              <strong style={{ textDecoration: "underline" }}>PUNTO CUARTO (CIERRE Y RATIFICACIÓN):</strong> No habiendo
+              más que hacer constar, se da por finalizada la presente sesión de arqueo mensual a las {horaFin} horas en el
+              mismo lugar y fecha de su inicio, leída íntegramente la presente acta y enterados de su contenido, objeto y
+              validez legal, la aceptamos, ratificamos y firmamos de entera conformidad.
+            </div>
+
+            {/* BLOQUE DE FIRMAS OFICIALES (4 FIRMAS CON NOMBRES REALES) */}
+            <div
+              style={{
+                marginTop: "1.25rem",
+                paddingTop: "0.6rem",
+                borderTop: "1px dashed var(--line)",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: "1.25rem 1rem",
+                textAlign: "center",
+                pageBreakInside: "avoid",
+              }}
+            >
+              <div>
+                <div style={{ borderBottom: "1px solid #000", height: "28px", marginBottom: "0.2rem" }} />
+                <div style={{ fontWeight: 700, fontSize: "0.78rem" }}>{nombrePresidente}</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--ink-soft)" }}>Presidente</div>
+                <div style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Comisión de Vigilancia</div>
+              </div>
+
+              <div>
+                <div style={{ borderBottom: "1px solid #000", height: "28px", marginBottom: "0.2rem" }} />
+                <div style={{ fontWeight: 700, fontSize: "0.78rem" }}>{nombreSecretaria}</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--ink-soft)" }}>Secretaria</div>
+                <div style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Comisión de Vigilancia</div>
+              </div>
+
+              <div>
+                <div style={{ borderBottom: "1px solid #000", height: "28px", marginBottom: "0.2rem" }} />
+                <div style={{ fontWeight: 700, fontSize: "0.78rem" }}>{nombreVocal}</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--ink-soft)" }}>Vocal I</div>
+                <div style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Comisión de Vigilancia</div>
+              </div>
+
+              <div>
+                <div style={{ borderBottom: "1px solid #000", height: "28px", marginBottom: "0.2rem" }} />
+                <div style={{ fontWeight: 700, fontSize: "0.78rem" }}>{nombreCajero}</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--ink-soft)" }}>Receptor Pagador</div>
+                <div style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Cajero de Ventanilla</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

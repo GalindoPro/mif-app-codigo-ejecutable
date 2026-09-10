@@ -57,24 +57,47 @@ export default function Agencias() {
 
       {error && <div className="alert error">{error}</div>}
 
+      {/* KPI METRICS - 100% FLUID */}
+      <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", marginBottom: "1.5rem" }}>
+        <div className="stat-card accent">
+          <span className="label">Total Agencias</span>
+          <span className="value mono">{agencias.length}</span>
+          <span className="sub">Puntos de atención registrados</span>
+        </div>
+        <div className="stat-card">
+          <span className="label">Agencias Operativas</span>
+          <span className="value mono" style={{ color: "#10b981" }}>
+            {agencias.filter((a) => a.activa).length}
+          </span>
+          <span className="sub">Activas para ventanilla y campo</span>
+        </div>
+      </div>
+
       {mostrarForm && (
-        <form className="card" onSubmit={crear} style={{ maxWidth: 480, marginBottom: "1.5rem" }}>
-          <div className="field">
-            <label>Código</label>
-            <input value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase())} required maxLength={30} />
-            <span className="hint">Corto y sin espacios, p. ej. CHAJUL.</span>
+        <form className="card" onSubmit={crear} style={{ width: "100%", maxWidth: "100%", marginBottom: "1.5rem" }}>
+          <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+            <div className="field">
+              <label>Código</label>
+              <input value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase())} required maxLength={30} />
+              <span className="hint">Corto y sin espacios, p. ej. CHAJUL.</span>
+            </div>
+            <div className="field">
+              <label>Nombre</label>
+              <input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+            </div>
+            <div className="field">
+              <label>Dirección</label>
+              <input value={direccion} onChange={(e) => setDireccion(e.target.value)} />
+            </div>
           </div>
-          <div className="field">
-            <label>Nombre</label>
-            <input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <button className="btn" type="submit" disabled={guardando}>
+              {guardando ? "Guardando…" : "Guardar agencia"}
+            </button>
+            <button type="button" className="btn secondary" onClick={() => setMostrarForm(false)}>
+              Cancelar
+            </button>
           </div>
-          <div className="field">
-            <label>Dirección</label>
-            <input value={direccion} onChange={(e) => setDireccion(e.target.value)} />
-          </div>
-          <button className="btn" type="submit" disabled={guardando}>
-            {guardando ? "Guardando…" : "Guardar agencia"}
-          </button>
         </form>
       )}
 
