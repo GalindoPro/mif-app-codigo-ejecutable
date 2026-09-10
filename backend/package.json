@@ -10,8 +10,11 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:seed:excel": "tsx src/db/seed-excel.ts",
+    "db:seed:demo": "tsx src/db/seed-demo.ts",
+    "db:seed:load-test": "tsx src/db/seed-load-test.ts",
     "db:reset": "tsx src/db/reset.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -29,7 +32,10 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^20.14.15",
     "@types/pg": "^8.23.1",
+    "@types/supertest": "^7.2.1",
+    "supertest": "^7.2.2",
     "tsx": "^4.19.1",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.9"
   }
 }

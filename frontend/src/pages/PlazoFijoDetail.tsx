@@ -4,10 +4,9 @@ import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import {
   ESTADO_PLAZO_FIJO_LABEL,
-  formatoQ,
 } from "../types";
 import type { PlazoFijoContrato } from "../types";
-import { formatearDPI } from "../lib/formatters";
+import { formatearDPI, formatearQuetzales } from "../lib/formatters";
 
 export default function PlazoFijoDetail() {
   const { id } = useParams<{ id: string }>();
@@ -160,7 +159,7 @@ export default function PlazoFijoDetail() {
                   onChange={() => setIncluirIntereses(false)}
                 />
                 <span>
-                  <strong>Solo Capital:</strong> {formatoQ(contrato.monto_deposito)} (Intereses ya retirados o pendientes)
+                  <strong>Solo Capital:</strong> {formatearQuetzales(contrato.monto_deposito)} (Intereses ya retirados o pendientes)
                 </span>
               </label>
               <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
@@ -171,8 +170,8 @@ export default function PlazoFijoDetail() {
                   onChange={() => setIncluirIntereses(true)}
                 />
                 <span>
-                  <strong>Capital + Interés Neto Líquido:</strong> {formatoQ(contrato.saldo_liquido_a_pagar)}{" "}
-                  <span style={{ color: "#16a34a" }}>(+{formatoQ(contrato.interes_neto)} interés neto)</span>
+                  <strong>Capital + Interés Neto Líquido:</strong> {formatearQuetzales(contrato.saldo_liquido_a_pagar)}{" "}
+                  <span style={{ color: "#16a34a" }}>(+{formatearQuetzales(contrato.interes_neto)} interés neto)</span>
                 </span>
               </label>
             </div>
@@ -191,7 +190,7 @@ export default function PlazoFijoDetail() {
             }}
           >
             <span style={{ color: "#166534", fontSize: "0.85rem" }}>Total a entregar al socio:</span>
-            <strong style={{ fontSize: "1.25rem", color: "#166534" }}>{formatoQ(montoALiquidarEstimado)}</strong>
+            <strong style={{ fontSize: "1.25rem", color: "#166534" }}>{formatearQuetzales(montoALiquidarEstimado)}</strong>
           </div>
 
           <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
@@ -201,7 +200,7 @@ export default function PlazoFijoDetail() {
               style={{ background: "#059669", borderColor: "#059669" }}
               disabled={liquidando}
             >
-              {liquidando ? "Liquidando..." : `Confirmar entrega de ${formatoQ(montoALiquidarEstimado)}`}
+              {liquidando ? "Liquidando..." : `Confirmar entrega de ${formatearQuetzales(montoALiquidarEstimado)}`}
             </button>
             <button type="button" className="btn secondary" onClick={() => setMostrarModal(false)}>
               Cancelar
@@ -213,20 +212,20 @@ export default function PlazoFijoDetail() {
       <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", marginBottom: "1.5rem" }}>
         <div className="stat-card accent">
           <span className="label">Saldo Líquido a Pagar</span>
-          <span className="value">{formatoQ(contrato.saldo_liquido_a_pagar)}</span>
+          <span className="value">{formatearQuetzales(contrato.saldo_liquido_a_pagar)}</span>
           <span className="sub">Capital + Interés Neto</span>
         </div>
 
         <div className="stat-card">
           <span className="label">Capital Invertido</span>
-          <span className="value">{formatoQ(contrato.monto_deposito)}</span>
+          <span className="value">{formatearQuetzales(contrato.monto_deposito)}</span>
           <span className="sub">Plazo {contrato.plazo_meses} meses</span>
         </div>
 
         <div className="stat-card">
           <span className="label">Interés Neto</span>
           <span className="value" style={{ color: "#16a34a" }}>
-            {formatoQ(contrato.interes_neto)}
+            {formatearQuetzales(contrato.interes_neto)}
           </span>
           <span className="sub">Tasa {contrato.tasa_anual}% anual</span>
         </div>
@@ -302,17 +301,17 @@ export default function PlazoFijoDetail() {
 
             <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Interés Bruto</dt>
             <dd className="mono" style={{ margin: 0 }}>
-              {formatoQ(contrato.interes_generado)}
+              {formatearQuetzales(contrato.interes_generado)}
             </dd>
 
             <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Retención ISR ({contrato.isr_porcentaje}%)</dt>
             <dd className="mono" style={{ margin: 0, color: "#dc2626" }}>
-              - {formatoQ(Number(contrato.interes_generado) - Number(contrato.interes_neto))}
+              - {formatearQuetzales(Number(contrato.interes_generado) - Number(contrato.interes_neto))}
             </dd>
 
             <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Interés Neto</dt>
             <dd className="mono" style={{ margin: 0, fontWeight: 600, color: "#16a34a" }}>
-              {formatoQ(contrato.interes_neto)}
+              {formatearQuetzales(contrato.interes_neto)}
             </dd>
 
             <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Fecha Liquidación</dt>

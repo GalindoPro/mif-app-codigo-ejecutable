@@ -3,10 +3,9 @@ import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import {
   ESTADO_PLAZO_FIJO_LABEL,
-  formatoQ,
 } from "../types";
 import type { PlazoFijoContrato } from "../types";
-import { formatearDPI } from "../lib/formatters";
+import { formatearDPI, formatearQuetzales } from "../lib/formatters";
 
 export default function PlazoFijoList() {
   const [contratos, setContratos] = useState<PlazoFijoContrato[] | null>(null);
@@ -65,13 +64,13 @@ export default function PlazoFijoList() {
       <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", marginBottom: "1.5rem" }}>
         <div className="stat-card accent">
           <span className="label">Capital a Plazo Fijo</span>
-          <span className="value">{formatoQ(totalInversionActiva)}</span>
+          <span className="value">{formatearQuetzales(totalInversionActiva)}</span>
           <span className="sub">En certificados activos</span>
         </div>
         <div className="stat-card">
           <span className="label">Intereses netos a pagar</span>
           <span className="value" style={{ color: "#d97706" }}>
-            {formatoQ(totalInteresesComprometidos)}
+            {formatearQuetzales(totalInteresesComprometidos)}
           </span>
           <span className="sub">Proyectados al vencimiento</span>
         </div>
@@ -159,7 +158,7 @@ export default function PlazoFijoList() {
                     <strong>{c.socio_nombres}</strong>
                     {c.socio_dpi && <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>DPI: {formatearDPI(c.socio_dpi)}</div>}
                   </td>
-                  <td className="mono" style={{ fontWeight: 700 }}>{formatoQ(c.monto_deposito)}</td>
+                  <td className="mono" style={{ fontWeight: 700 }}>{formatearQuetzales(c.monto_deposito)}</td>
                   <td className="mono">{c.plazo_meses} meses</td>
                   <td className="mono">{c.tasa_anual}%</td>
                   <td className="mono">
@@ -174,7 +173,7 @@ export default function PlazoFijoList() {
                     </span>
                   </td>
                   <td className="mono" style={{ color: "#f59e0b" }}>
-                    {formatoQ(c.interes_neto)}
+                    {formatearQuetzales(c.interes_neto)}
                   </td>
                   <td>
                     <span className={`badge ${c.estado === "ACTIVO" ? (estaVencido ? "danger" : "activo") : "inactivo"}`}>

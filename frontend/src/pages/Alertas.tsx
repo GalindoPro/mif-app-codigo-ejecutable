@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
-import { formatoQ } from "../types";
+import { formatearQuetzales } from "../lib/formatters";
 import { formatearFechaLocal } from "../lib/formatters";
 
 interface PlazoFijoAlerta {
@@ -145,7 +145,7 @@ export default function Alertas() {
                           </div>
                         </td>
                         <td style={{ fontSize: "0.82rem" }}>{c.promotor_nombre ?? "—"}</td>
-                        <td className="mono" style={{ textAlign: "right", fontWeight: 700 }}>{formatoQ(c.saldo_capital)}</td>
+                        <td className="mono" style={{ textAlign: "right", fontWeight: 700 }}>{formatearQuetzales(c.saldo_capital)}</td>
                         <td style={{ textAlign: "center" }}>
                           <span style={{
                             fontWeight: 700, fontFamily: "monospace",
@@ -195,8 +195,8 @@ export default function Alertas() {
                             {wa && <a href={wa} target="_blank" rel="noreferrer" style={{ color: "#25d366", fontSize: "0.72rem", fontWeight: 700, textDecoration: "none" }}>WA💬</a>}
                           </div>
                         </td>
-                        <td className="mono" style={{ textAlign: "right" }}>{formatoQ(pf.monto_deposito)}</td>
-                        <td className="mono" style={{ textAlign: "right", fontWeight: 700, color: "var(--accent)" }}>{formatoQ(pf.saldo_liquido_a_pagar)}</td>
+                        <td className="mono" style={{ textAlign: "right" }}>{formatearQuetzales(pf.monto_deposito)}</td>
+                        <td className="mono" style={{ textAlign: "right", fontWeight: 700, color: "var(--accent)" }}>{formatearQuetzales(pf.saldo_liquido_a_pagar)}</td>
                         <td className="mono">{formatearFechaLocal(pf.fecha_vencimiento)}</td>
                         <td style={{ textAlign: "center" }}>
                           <span style={{
@@ -247,7 +247,7 @@ export default function Alertas() {
                             {wa && <a href={wa} target="_blank" rel="noreferrer" style={{ color: "#25d366", fontSize: "0.72rem", fontWeight: 700, textDecoration: "none" }}>WA💬</a>}
                           </div>
                         </td>
-                        <td className="mono" style={{ textAlign: "right", fontWeight: 700 }}>{formatoQ(c.saldo_capital)}</td>
+                        <td className="mono" style={{ textAlign: "right", fontWeight: 700 }}>{formatearQuetzales(c.saldo_capital)}</td>
                         <td className="mono">{formatearFechaLocal(c.dias_para_vencimiento !== undefined ? String(c.fecha_referencia) : null)}</td>
                         <td style={{ textAlign: "center" }}>
                           <span style={{

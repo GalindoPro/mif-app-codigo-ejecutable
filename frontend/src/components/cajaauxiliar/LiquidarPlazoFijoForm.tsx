@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { api, mensajeError } from "../../lib/api";
-import { formatoQ } from "../../types";
+import { formatearQuetzales } from "../../lib/formatters";
 import type { PlazoFijoContrato } from "../../types";
 
 export interface LiquidarPlazoFijoFormProps {
@@ -104,7 +104,7 @@ export default function LiquidarPlazoFijoForm({
             >
               {contratos.map((c) => (
                 <option key={c.id} value={c.id}>
-                  Certificado #{c.numero_certificacion ?? "—"} • {c.socio_nombres} ({c.numero_cuenta}) — {formatoQ(c.monto_deposito)}
+                  Certificado #{c.numero_certificacion ?? "—"} • {c.socio_nombres} ({c.numero_cuenta}) — {formatearQuetzales(c.monto_deposito)}
                 </option>
               ))}
             </select>
@@ -134,11 +134,11 @@ export default function LiquidarPlazoFijoForm({
                 </div>
                 <div>
                   <span style={{ color: "var(--ink-soft)" }}>Capital invertido:</span>{" "}
-                  <strong>{formatoQ(contrato.monto_deposito)}</strong>
+                  <strong>{formatearQuetzales(contrato.monto_deposito)}</strong>
                 </div>
                 <div>
                   <span style={{ color: "var(--ink-soft)" }}>Interés neto generado:</span>{" "}
-                  <strong style={{ color: "#16a34a" }}>{formatoQ(contrato.interes_neto)}</strong>
+                  <strong style={{ color: "#16a34a" }}>{formatearQuetzales(contrato.interes_neto)}</strong>
                 </div>
                 <div>
                   <span style={{ color: "var(--ink-soft)" }}>Vencimiento:</span>{" "}
@@ -157,7 +157,7 @@ export default function LiquidarPlazoFijoForm({
                       onChange={() => setIncluirIntereses(false)}
                     />
                     <span>
-                      <strong>Solo Capital:</strong> {formatoQ(contrato.monto_deposito)}
+                      <strong>Solo Capital:</strong> {formatearQuetzales(contrato.monto_deposito)}
                     </span>
                   </label>
                   <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
@@ -168,7 +168,7 @@ export default function LiquidarPlazoFijoForm({
                       onChange={() => setIncluirIntereses(true)}
                     />
                     <span>
-                      <strong>Capital + Interés Neto:</strong> {formatoQ(contrato.saldo_liquido_a_pagar)}
+                      <strong>Capital + Interés Neto:</strong> {formatearQuetzales(contrato.saldo_liquido_a_pagar)}
                     </span>
                   </label>
                 </div>
@@ -179,7 +179,7 @@ export default function LiquidarPlazoFijoForm({
                   <label>Monto a entregar en efectivo</label>
                   <input
                     type="text"
-                    value={formatoQ(montoALiquidar)}
+                    value={formatearQuetzales(montoALiquidar)}
                     disabled
                     style={{ fontWeight: 700, fontSize: "1.1rem" }}
                   />
@@ -203,7 +203,7 @@ export default function LiquidarPlazoFijoForm({
 
               {saldoInsuficiente ? (
                 <div className="alert error" style={{ marginTop: "0.75rem" }}>
-                  ⚠️ Saldo insuficiente en caja: Se requieren {formatoQ(montoALiquidar)}, pero la caja solo tiene {formatoQ(saldoCajaActual)}. Ingrese fondos antes de liquidar.
+                  ⚠️ Saldo insuficiente en caja: Se requieren {formatearQuetzales(montoALiquidar)}, pero la caja solo tiene {formatearQuetzales(saldoCajaActual)}. Ingrese fondos antes de liquidar.
                 </div>
               ) : (
                 <div
@@ -222,11 +222,11 @@ export default function LiquidarPlazoFijoForm({
                 >
                   <div style={{ fontSize: "0.82rem", color: "#5b21b6" }}>
                     Saldo en caja tras el egreso:{" "}
-                    <strong>{formatoQ(saldoCajaActual - montoALiquidar)}</strong>
+                    <strong>{formatearQuetzales(saldoCajaActual - montoALiquidar)}</strong>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <span style={{ fontSize: "0.82rem", color: "#5b21b6" }}>Total a pagar: </span>
-                    <strong style={{ fontSize: "1.25rem", color: "#5b21b6" }}>{formatoQ(montoALiquidar)}</strong>
+                    <strong style={{ fontSize: "1.25rem", color: "#5b21b6" }}>{formatearQuetzales(montoALiquidar)}</strong>
                   </div>
                 </div>
               )}
@@ -238,7 +238,7 @@ export default function LiquidarPlazoFijoForm({
                   style={{ background: "#7c3aed", borderColor: "#7c3aed" }}
                   disabled={guardando || saldoInsuficiente}
                 >
-                  {guardando ? "Liquidando…" : `📦 Entregar ${formatoQ(montoALiquidar)} en efectivo`}
+                  {guardando ? "Liquidando…" : `📦 Entregar ${formatearQuetzales(montoALiquidar)} en efectivo`}
                 </button>
               </div>
             </>

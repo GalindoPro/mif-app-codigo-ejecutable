@@ -5,14 +5,15 @@ import { calcularPlazoFijo } from "./calculo";
 import type { ParametrosPlazoFijo } from "./calculo";
 
 export async function siguienteCertificado(agenciaId: string): Promise<string> {
+  // Máximo ya usado, no count(*) (mismo motivo que en socios/cuentas/prestamos).
   const { rows } = await pool.query(
-    `select count(*)::int as total
+    `select coalesce(max(nullif(regexp_replace(pf.numero_certificacion, '\\D', '', 'g'), '')::int), 0) as max_num
      from plazo_fijo_contratos pf
      join cuentas c on c.id = pf.cuenta_id
      where c.agencia_id = $1`,
     [agenciaId],
   );
-  return String(rows[0].total + 1);
+  return String(rows[0].max_num + 1);
 }
 
 export async function siguienteCodigoCuenta(agenciaId: string): Promise<string> {
@@ -20,10 +21,11 @@ export async function siguienteCodigoCuenta(agenciaId: string): Promise<string> 
   const codigoAgencia = agencias[0]?.codigo ?? "MIF";
 
   const { rows } = await pool.query(
-    `select count(*)::int as total from cuentas where agencia_id = $1 and tipo = 'AHORRO_PLAZO_FIJO'`,
+    `select coalesce(max(nullif(regexp_replace(numero_cuenta, '\\D', '', 'g'), '')::int), 0) as max_num
+     from cuentas where agencia_id = $1 and tipo = 'AHORRO_PLAZO_FIJO'`,
     [agenciaId],
   );
-  const secuencial = String(rows[0].total + 1).padStart(4, "0");
+  const secuencial = String(rows[0].max_num + 1).padStart(4, "0");
   return `${codigoAgencia}-PF-${secuencial}`;
 }
 

@@ -4,7 +4,11 @@ import { withTransaction } from "../../db/transaction";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
 import * as cuentasService from "../cuentas/service";
+import { calcularLiquidacionCredito } from "../prestamos/liquidacion";
 import { CATEGORIAS, CajaCategoria, DENOMINACIONES, categoriasDelGrupo } from "./categorias";
+
+// Tolerancia de redondeo entre lo calculado en el cliente y el recálculo oficial del servidor.
+const TOLERANCIA_LIQUIDACION = 0.01;
 
 function hoyISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -479,6 +483,44 @@ export async function cobrarCuotaCredito(
       );
     }
 
+    // El cajero puede cobrar un interés/mora distinto al que calcula el
+    // sistema (el recibo físico manda: condonaciones, descuentos, acuerdos
+    // verbales con el socio, etc.). No se bloquea, pero queda registrado en
+    // auditoría cada vez que el monto cobrado no coincide con el cálculo
+    // oficial, para que un supervisor lo pueda revisar después.
+    const { rows: ultimoPagoRows } = await client.query(
+      `select fecha from prestamo_pagos where prestamo_id = $1 order by fecha desc, created_at desc limit 1`,
+      [prestamo.id],
+    );
+    const fechaUltimoPago =
+      ultimoPagoRows[0]?.fecha ||
+      prestamo.fecha_ultimo_pago_migracion ||
+      prestamo.fecha_desembolso ||
+      prestamo.fecha_solicitud ||
+      prestamo.created_at;
+
+    const liquidacionOficial = calcularLiquidacionCredito({
+      saldoCapital: saldoActualCapital,
+      tasaInteresMensual: Number(prestamo.tasa_interes_mensual) || 2.0,
+      plazoMeses: Number(prestamo.plazo_meses) || 12,
+      montoOriginal: Number(prestamo.monto_aprobado || prestamo.monto_solicitado),
+      cuotaMensualEstimada: Number(prestamo.cuota_mensual) || 0,
+      fechaUltimoPago,
+      fechaLiquidacion: dia.fecha,
+      tipoAmortizacion: prestamo.tipo_amortizacion,
+    });
+
+    const interesDifiere = Math.abs(interes - liquidacionOficial.interesDevengado) > TOLERANCIA_LIQUIDACION;
+    const moraDifiere = Math.abs(mora - liquidacionOficial.moraFijaSugerida) > TOLERANCIA_LIQUIDACION;
+    const diferenciaCalculoOficial = interesDifiere || moraDifiere
+      ? {
+          interesCobrado: interes,
+          interesCalculadoOficial: liquidacionOficial.interesDevengado,
+          moraCobrada: mora,
+          moraCalculadaOficial: liquidacionOficial.moraFijaSugerida,
+        }
+      : null;
+
     const nuevoSaldoCapital = Math.max(0, Math.round((saldoActualCapital - abonoCapital) * 100) / 100);
     const nuevoEstadoPrestamo = nuevoSaldoCapital === 0 ? "CANCELADO" : prestamo.estado;
 
@@ -729,6 +771,10 @@ export async function cobrarCuotaCredito(
         ahorroSobrePrestamo,
         cuentaAsp: cuentaAspInfo,
         nuevoSaldoCapital,
+        // Presente solo cuando el cajero cobró un interés/mora distinto al
+        // que calcula el sistema — así un supervisor lo puede filtrar en la
+        // bitácora de auditoría sin tener que revisar cobro por cobro.
+        diferenciaCalculoOficial,
       },
     });
 
@@ -739,6 +785,7 @@ export async function cobrarCuotaCredito(
       ahorroSobrePrestamoAcreditado: ahorroSobrePrestamo,
       cuentaAsp: cuentaAspInfo,
       prestamoCancelado: nuevoEstadoPrestamo === "CANCELADO",
+      diferenciaCalculoOficial,
     };
   });
 }
@@ -946,16 +993,25 @@ export async function desembolsarCredito(
     }
 
     // 4. Actualizar estado del préstamo a DESEMBOLSADO
+    // fecha_vencimiento también se fija aquí (no solo en migraciones): es el
+    // momento real en que empieza a correr el plazo de un crédito nuevo.
+    const { rows: vencRows } = await client.query(
+      `select ($1::date + ($2 * interval '1 month'))::date as venc`,
+      [dia.fecha, Number(prestamo.plazo_meses) || 12],
+    );
+    const fechaVencimiento = vencRows[0]?.venc ?? null;
+
     const { rows: prestamoActualizadoRows } = await client.query(
       `update prestamos
        set estado = 'DESEMBOLSADO',
            origen_fondos = $1,
            fecha_desembolso = $2,
-           saldo_capital = $3,
+           fecha_vencimiento = $3,
+           saldo_capital = $4,
            updated_at = now()
-       where id = $4
+       where id = $5
        returning *`,
-      [origenFondosFinal, dia.fecha, montoDesembolso, prestamo.id],
+      [origenFondosFinal, dia.fecha, fechaVencimiento, montoDesembolso, prestamo.id],
     );
 
     await registrarAuditoria({

@@ -1,3 +1,5 @@
+import { redondear2, formatearFecha } from "../../utils/financiero";
+
 export interface OpcionesLiquidacion {
   saldoCapital: number;
   tasaInteresMensual: number; // Ej. 2.0%
@@ -33,15 +35,6 @@ export interface ResultadoLiquidacion {
   saldoCancelacionTotal: number;
 }
 
-function redondear2(val: number): number {
-  return Math.round((val + Number.EPSILON) * 100) / 100;
-}
-
-function formatearFecha(fecha: string | Date | undefined): string {
-  if (!fecha) return new Date().toISOString().slice(0, 10);
-  if (fecha instanceof Date) return fecha.toISOString().slice(0, 10);
-  return String(fecha).slice(0, 10);
-}
 
 /**
  * Calcula la liquidación de intereses diarios, mora y capital exigible

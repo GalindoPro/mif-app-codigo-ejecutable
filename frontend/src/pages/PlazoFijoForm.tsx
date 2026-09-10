@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import BuscadorSocio from "../components/BuscadorSocio";
-import { formatoQ } from "../types";
+import { formatearQuetzales } from "../lib/formatters";
 import type { Agencia, ResultadoSimulacionPF, Socio } from "../types";
 
 export default function PlazoFijoForm() {
@@ -421,7 +421,7 @@ export default function PlazoFijoForm() {
             <div className="stat-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
               <div className="stat-card accent" style={{ gridColumn: "1 / -1" }}>
                 <span className="label">SALDO LÍQUIDO TOTAL A PAGAR</span>
-                <span className="value" style={{ fontSize: "1.85rem" }}>{formatoQ(simulacion.saldoLiquidoAPagar)}</span>
+                <span className="value" style={{ fontSize: "1.85rem" }}>{formatearQuetzales(simulacion.saldoLiquidoAPagar)}</span>
                 <span className="sub">Capital invertido + Interés Neto ganado</span>
               </div>
 
@@ -443,14 +443,14 @@ export default function PlazoFijoForm() {
 
               <div className="stat-card">
                 <span className="label">INTERÉS BRUTO GENERADO</span>
-                <span className="value">{formatoQ(simulacion.interesGenerado)}</span>
+                <span className="value">{formatearQuetzales(simulacion.interesGenerado)}</span>
                 <span className="sub">Tasa pactada: {simulacion.tasaAnual}%</span>
               </div>
 
               <div className="stat-card">
                 <span className="label">RETENCIÓN ISR (10%)</span>
                 <span className="value" style={{ color: "#dc2626" }}>
-                  - {formatoQ(simulacion.isrRetencion)}
+                  - {formatearQuetzales(simulacion.isrRetencion)}
                 </span>
                 <span className="sub">Impuesto legal retenido</span>
               </div>
@@ -458,7 +458,7 @@ export default function PlazoFijoForm() {
               <div className="stat-card" style={{ gridColumn: "1 / -1" }}>
                 <span className="label">INTERÉS NETO QUE COBRARÁ EL ASOCIADO</span>
                 <span className="value" style={{ color: "#16a34a", fontSize: "1.5rem" }}>
-                  {formatoQ(simulacion.interesNeto)}
+                  {formatearQuetzales(simulacion.interesNeto)}
                 </span>
                 <span className="sub">Ganancia líquida libre de impuestos</span>
               </div>
@@ -468,13 +468,13 @@ export default function PlazoFijoForm() {
               <h3 style={{ marginTop: 0, fontSize: "0.95rem" }}>Resumen del Certificado</h3>
               <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--ink-soft)", lineHeight: 1.5 }}>
                 El socio <strong>{socio?.nombres ?? "(Seleccionar socio)"}</strong> invertirá un capital de{" "}
-                <strong>{formatoQ(simulacion.montoDeposito)}</strong> durante <strong>{simulacion.plazoMeses} meses</strong> (
+                <strong>{formatearQuetzales(simulacion.montoDeposito)}</strong> durante <strong>{simulacion.plazoMeses} meses</strong> (
                 <strong>{simulacion.diasExactos} días calendario exactos</strong>). Del{" "}
                 <strong>{new Date(simulacion.fechaInicio + "T00:00:00").toLocaleDateString("es-GT")}</strong> al{" "}
                 <strong>{new Date(simulacion.fechaVencimiento + "T00:00:00").toLocaleDateString("es-GT")}</strong>, la cooperativa calculará el{" "}
                 <strong>{simulacion.tasaAnual}%</strong> por cada día transcurrido. Al vencer el contrato, el asociado cobrará un total de{" "}
-                <strong>{formatoQ(simulacion.saldoLiquidoAPagar)}</strong> (que incluye{" "}
-                <strong>{formatoQ(simulacion.interesNeto)}</strong> de ganancia neta tras descontar el 10% de ISR).
+                <strong>{formatearQuetzales(simulacion.saldoLiquidoAPagar)}</strong> (que incluye{" "}
+                <strong>{formatearQuetzales(simulacion.interesNeto)}</strong> de ganancia neta tras descontar el 10% de ISR).
               </p>
             </div>
           </div>

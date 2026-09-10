@@ -4,11 +4,11 @@ import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import {
   ESTADO_PRESTAMO_LABEL,
-  formatoQ,
   TIPO_PRESTAMO_LABEL,
   ORIGEN_FONDOS_LABEL,
   ORIGEN_FONDOS_BADGE_STYLE,
 } from "../types";
+import { formatearQuetzales } from "../lib/formatters";
 import type { EstadoPrestamo, Prestamo, PrestamoPago } from "../types";
 import { formatearDPI, formatearFechaLocal } from "../lib/formatters";
 import type { ResultadoLiquidacion } from "../lib/liquidacionCredito";
@@ -317,7 +317,7 @@ export default function CreditoDetail() {
       <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", marginBottom: "1.5rem" }}>
         <div className="stat-card accent">
           <span className="label">Cuota mensual</span>
-          <span className="value">{formatoQ(prestamo.cuota_mensual)}</span>
+          <span className="value">{formatearQuetzales(prestamo.cuota_mensual)}</span>
           <span className="sub">
             {prestamo.tipo_amortizacion === "CUOTA_NIVELADA" ? "Cuota fija nivelada" : "Sobre saldos"}
           </span>
@@ -325,7 +325,7 @@ export default function CreditoDetail() {
 
         <div className="stat-card">
           <span className="label">Monto del crédito</span>
-          <span className="value">{formatoQ(montoMostrar)}</span>
+          <span className="value">{formatearQuetzales(montoMostrar)}</span>
           <span className="sub">Plazo {prestamo.plazo_meses} meses</span>
         </div>
 
@@ -338,7 +338,7 @@ export default function CreditoDetail() {
         <div className="stat-card">
           <span className="label">Total de intereses</span>
           <span className="value" style={{ color: "#d97706" }}>
-            {prestamo.amortizacion ? formatoQ(prestamo.amortizacion.totalIntereses) : "—"}
+            {prestamo.amortizacion ? formatearQuetzales(prestamo.amortizacion.totalIntereses) : "—"}
           </span>
           <span className="sub">al finalizar el crédito</span>
         </div>
@@ -351,7 +351,7 @@ export default function CreditoDetail() {
               color: Number(prestamo.saldo_capital ?? montoMostrar) > 0 ? "var(--accent)" : "#16a34a",
             }}
           >
-            {formatoQ(prestamo.saldo_capital ?? montoMostrar)}
+            {formatearQuetzales(prestamo.saldo_capital ?? montoMostrar)}
           </span>
           <span className="sub">
             {prestamo.estado === "CANCELADO" ? "Crédito pagado al 100%" : "Deuda viva en cartera"}
@@ -406,17 +406,17 @@ export default function CreditoDetail() {
 
             <div style={{ background: "var(--paper)", padding: "0.6rem 0.8rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
               <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)", display: "block" }}>Interés diario ({liquidacion.tasaInteresAnual}% anual)</span>
-              <strong style={{ fontSize: "1.1rem", color: "#d97706" }}>{formatoQ(liquidacion.interesDiario)} / día</strong>
+              <strong style={{ fontSize: "1.1rem", color: "#d97706" }}>{formatearQuetzales(liquidacion.interesDiario)} / día</strong>
               <span style={{ fontSize: "0.7rem", color: "var(--ink-soft)", display: "block" }}>
-                ({formatoQ(liquidacion.saldoCapital)} × 24% / 365)
+                ({formatearQuetzales(liquidacion.saldoCapital)} × 24% / 365)
               </span>
             </div>
 
             <div style={{ background: "var(--paper)", padding: "0.6rem 0.8rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
               <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)", display: "block" }}>Interés acumulado hoy ({liquidacion.diasTranscurridos}d)</span>
-              <strong style={{ fontSize: "1.1rem", color: "#d97706" }}>{formatoQ(liquidacion.interesDevengado)}</strong>
+              <strong style={{ fontSize: "1.1rem", color: "#d97706" }}>{formatearQuetzales(liquidacion.interesDevengado)}</strong>
               <span style={{ fontSize: "0.7rem", color: "var(--ink-soft)", display: "block" }}>
-                {formatoQ(liquidacion.interesDiario)} × {liquidacion.diasTranscurridos}d
+                {formatearQuetzales(liquidacion.interesDiario)} × {liquidacion.diasTranscurridos}d
               </span>
             </div>
 
@@ -432,7 +432,7 @@ export default function CreditoDetail() {
                 Recargo de mora
               </span>
               <strong style={{ fontSize: "1.1rem", color: liquidacion.estaEnMora ? "#b91c1c" : "var(--ink)" }}>
-                {formatoQ(liquidacion.moraFijaSugerida)}
+                {formatearQuetzales(liquidacion.moraFijaSugerida)}
               </strong>
               <span style={{ fontSize: "0.7rem", color: liquidacion.estaEnMora ? "#b91c1c" : "var(--ink-soft)", display: "block" }}>
                 {liquidacion.estaEnMora ? `> 4 días de gracia (Q25 × ${liquidacion.cuotasVencidas})` : "4 días gracia: Q 0.00"}
@@ -443,7 +443,7 @@ export default function CreditoDetail() {
               <span style={{ fontSize: "0.74rem", color: "#065f46", display: "block", fontWeight: 700 }}>
                 Saldo Cancelación Total Hoy
               </span>
-              <strong style={{ fontSize: "1.15rem", color: "#047857" }}>{formatoQ(liquidacion.saldoCancelacionTotal)}</strong>
+              <strong style={{ fontSize: "1.15rem", color: "#047857" }}>{formatearQuetzales(liquidacion.saldoCancelacionTotal)}</strong>
               <span style={{ fontSize: "0.7rem", color: "#065f46", display: "block" }}>
                 Capital + Interés {liquidacion.diasTranscurridos}d + Mora
               </span>
@@ -633,19 +633,19 @@ export default function CreditoDetail() {
                     <td className="mono">{new Date(p.fecha).toLocaleDateString("es-GT")}</td>
                     <td className="mono">{p.numero_recibo ?? "—"}</td>
                     <td className="mono" style={{ color: "var(--accent)", fontWeight: 600 }}>
-                      {formatoQ(p.abono_capital)}
+                      {formatearQuetzales(p.abono_capital)}
                     </td>
                     <td className="mono" style={{ color: "#d97706" }}>
-                      {formatoQ(p.interes)}
+                      {formatearQuetzales(p.interes)}
                     </td>
                     <td className="mono" style={{ color: Number(p.mora) > 0 ? "#dc2626" : "inherit" }}>
-                      {formatoQ(p.mora)}
+                      {formatearQuetzales(p.mora)}
                     </td>
                     <td className="mono" style={{ fontWeight: 700 }}>
-                      {formatoQ(p.total_pagado)}
+                      {formatearQuetzales(p.total_pagado)}
                     </td>
                     <td className="mono" style={{ fontWeight: 600 }}>
-                      {formatoQ(p.saldo_capital_restante)}
+                      {formatearQuetzales(p.saldo_capital_restante)}
                     </td>
                     <td>{p.usuario_nombre ?? "—"}</td>
                   </tr>
@@ -667,7 +667,7 @@ export default function CreditoDetail() {
             </div>
             <div className="stat-card" style={{ padding: "0.5rem 1rem" }}>
               <span className="label">Total a pagar</span>
-              <span className="value" style={{ fontSize: "1.1rem" }}>{formatoQ(prestamo.amortizacion.totalPagar)}</span>
+              <span className="value" style={{ fontSize: "1.1rem" }}>{formatearQuetzales(prestamo.amortizacion.totalPagar)}</span>
             </div>
           </div>
 
@@ -691,15 +691,15 @@ export default function CreditoDetail() {
                     </td>
                     <td className="mono">{new Date(c.fechaPago).toLocaleDateString("es-GT")}</td>
                     <td className="mono" style={{ fontWeight: 600 }}>
-                      {formatoQ(c.cuota)}
+                      {formatearQuetzales(c.cuota)}
                     </td>
                     <td className="mono" style={{ color: "var(--accent)" }}>
-                      {formatoQ(c.capital)}
+                      {formatearQuetzales(c.capital)}
                     </td>
                     <td className="mono" style={{ color: "#d97706" }}>
-                      {formatoQ(c.interes)}
+                      {formatearQuetzales(c.interes)}
                     </td>
-                    <td className="mono">{formatoQ(c.saldoRestante)}</td>
+                    <td className="mono">{formatearQuetzales(c.saldoRestante)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -741,7 +741,7 @@ export default function CreditoDetail() {
             <dl style={{ display: "grid", gridTemplateColumns: "160px 1fr", rowGap: "0.45rem", fontSize: "0.85rem", margin: 0 }}>
               <dt style={{ color: "var(--ink-soft)" }}>Tipo de bien</dt><dd style={{ margin: 0, fontWeight: 600 }}>{garantia.tipo_bien}</dd>
               <dt style={{ color: "var(--ink-soft)" }}>Descripción</dt><dd style={{ margin: 0 }}>{garantia.descripcion}</dd>
-              {garantia.valor_tasacion && <><dt style={{ color: "var(--ink-soft)" }}>Valor tasación</dt><dd style={{ margin: 0, fontWeight: 700 }}>{formatoQ(garantia.valor_tasacion)}</dd></>}
+              {garantia.valor_tasacion && <><dt style={{ color: "var(--ink-soft)" }}>Valor tasación</dt><dd style={{ margin: 0, fontWeight: 700 }}>{formatearQuetzales(garantia.valor_tasacion)}</dd></>}
               {garantia.no_finca && <><dt style={{ color: "var(--ink-soft)" }}>No. Finca</dt><dd style={{ margin: 0, fontFamily: "monospace" }}>{garantia.no_finca} · Folio {garantia.folio} · Libro {garantia.libro}</dd></>}
               {garantia.municipio && <><dt style={{ color: "var(--ink-soft)" }}>Ubicación</dt><dd style={{ margin: 0 }}>{[garantia.direccion, garantia.municipio, garantia.departamento].filter(Boolean).join(", ")}</dd></>}
               {garantia.fecha_inscripcion && <><dt style={{ color: "var(--ink-soft)" }}>Inscripción</dt><dd style={{ margin: 0, fontFamily: "monospace" }}>{formatearFechaLocal(garantia.fecha_inscripcion)}</dd></>}
@@ -852,12 +852,12 @@ export default function CreditoDetail() {
                   {refinanciamientos.map((r) => (
                     <tr key={r.id}>
                       <td className="mono" style={{ padding: "5px 8px" }}>{formatearFechaLocal(r.created_at)}</td>
-                      <td className="mono" style={{ textAlign: "right", padding: "5px 8px", fontWeight: 700 }}>{formatoQ(r.saldo_capital_anterior)}</td>
+                      <td className="mono" style={{ textAlign: "right", padding: "5px 8px", fontWeight: 700 }}>{formatearQuetzales(r.saldo_capital_anterior)}</td>
                       <td style={{ padding: "5px 8px", fontSize: "0.79rem" }}>
-                        Tasa {r.tasa_anterior}%/mes · {r.plazo_anterior}m · Cuota {formatoQ(r.cuota_anterior)}
+                        Tasa {r.tasa_anterior}%/mes · {r.plazo_anterior}m · Cuota {formatearQuetzales(r.cuota_anterior)}
                       </td>
                       <td style={{ padding: "5px 8px", fontSize: "0.79rem", color: "#2563eb", fontWeight: 600 }}>
-                        Tasa {r.nueva_tasa}%/mes · {r.nuevo_plazo}m · Cuota {formatoQ(r.nueva_cuota)}
+                        Tasa {r.nueva_tasa}%/mes · {r.nuevo_plazo}m · Cuota {formatearQuetzales(r.nueva_cuota)}
                       </td>
                       <td style={{ padding: "5px 8px", fontSize: "0.79rem" }}>{r.usuario_nombre}</td>
                     </tr>

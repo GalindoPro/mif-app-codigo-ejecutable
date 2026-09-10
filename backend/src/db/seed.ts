@@ -1,6 +1,7 @@
 // Crea la agencia y el usuario administrador iniciales. Se puede correr una
 // sola vez después de aplicar db/schema.sql (npm run db:migrate && npm run db:seed).
 import "dotenv/config";
+import crypto from "crypto";
 import { pool } from "./pool";
 import { hashPassword } from "../utils/auth";
 
@@ -15,7 +16,10 @@ async function main() {
   console.log(`Agencia lista: ${agencia.nombre} (${agencia.id})`);
 
   const email = "admin@mif.coop";
-  const passwordTemporal = "CambiaEsto123!";
+  // La contraseña nunca debe quedar fija en el código fuente. Se toma de
+  // SEED_PASSWORD si el operador la definió, o se genera una aleatoria que
+  // solo se muestra una vez en esta consola.
+  const passwordTemporal = process.env.SEED_PASSWORD || crypto.randomBytes(9).toString("base64url");
   const passwordHash = await hashPassword(passwordTemporal);
 
   await pool.query(
@@ -60,7 +64,9 @@ async function main() {
   console.log(`  Supervisor:  ${supervisorEmail}`);
   console.log(`  Cajero:      ${cajeroEmail}`);
   console.log(`  Promotor:    ${promotorEmail}`);
-  console.log(`  Contraseña para todos: ${passwordTemporal}`);
+  console.log(`  Contraseña temporal para todos: ${passwordTemporal}`);
+  console.log("  ⚠️  Esta contraseña no se guarda en ningún archivo. Cópiala ahora");
+  console.log("     y cambia cada cuenta en su primer inicio de sesión.");
 
   await pool.end();
 }

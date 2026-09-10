@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, mensajeError } from "../lib/api";
-import { CATEGORIA_CAJA_CHICA_LABEL, formatoQ } from "../types";
+import { CATEGORIA_CAJA_CHICA_LABEL } from "../types";
+import { formatearQuetzales } from "../lib/formatters";
 import type { Agencia, CategoriaCajaChica, ReporteCajaChica } from "../types";
 
 interface Props {
@@ -450,7 +451,7 @@ export default function CajaChicaReporteModal({
                   Gastos Justificados ({reporte.egresos.length})
                 </span>
                 <strong className="mono" style={{ color: "#dc2626", fontSize: "1.05rem" }}>
-                  − {formatoQ(reporte.totalEgresosPeriodo)}
+                  − {formatearQuetzales(reporte.totalEgresosPeriodo)}
                 </strong>
               </div>
 
@@ -459,7 +460,7 @@ export default function CajaChicaReporteModal({
                   Reposiciones Recibidas ({reporte.ingresos.length})
                 </span>
                 <strong className="mono" style={{ color: "#16a34a", fontSize: "1.05rem" }}>
-                  + {formatoQ(reporte.totalIngresosPeriodo)}
+                  + {formatearQuetzales(reporte.totalIngresosPeriodo)}
                 </strong>
               </div>
 
@@ -468,7 +469,7 @@ export default function CajaChicaReporteModal({
                   Efectivo Físico en Caja
                 </span>
                 <strong className="mono" style={{ color: "var(--ink)", fontSize: "1.05rem" }}>
-                  {formatoQ(reporte.saldoDisponibleActual)}
+                  {formatearQuetzales(reporte.saldoDisponibleActual)}
                 </strong>
               </div>
 
@@ -477,7 +478,7 @@ export default function CajaChicaReporteModal({
                   Monto a Reponer
                 </span>
                 <strong className="mono" style={{ color: "#b91c1c", fontSize: "1.05rem" }}>
-                  {formatoQ(reporte.totalEgresosPeriodo)}
+                  {formatearQuetzales(reporte.totalEgresosPeriodo)}
                 </strong>
               </div>
             </div>
@@ -529,7 +530,7 @@ export default function CajaChicaReporteModal({
                         </td>
                         <td style={{ padding: "2px 4px" }}>{c.descripcion}</td>
                         <td className="mono" style={{ textAlign: "right", color: "#dc2626", fontWeight: 700, padding: "2px 4px" }}>
-                          − {formatoQ(c.monto)}
+                          − {formatearQuetzales(c.monto)}
                         </td>
                       </tr>
                     ))}
@@ -548,7 +549,7 @@ export default function CajaChicaReporteModal({
                           TOTAL GASTOS EJECUTADOS:
                         </td>
                         <td className="mono" style={{ textAlign: "right", color: "#dc2626", fontSize: "0.85rem", padding: "3px 6px" }}>
-                          {formatoQ(reporte.totalEgresosPeriodo)}
+                          {formatearQuetzales(reporte.totalEgresosPeriodo)}
                         </td>
                       </tr>
                     </tfoot>
@@ -602,7 +603,7 @@ export default function CajaChicaReporteModal({
                             <td style={{ fontWeight: 600, padding: "2px 4px" }}>{nombre}</td>
                             <td style={{ textAlign: "center", padding: "2px 4px" }}>{t.cantidad}</td>
                             <td className="mono" style={{ textAlign: "right", fontWeight: 700, padding: "2px 4px" }}>
-                              {formatoQ(t.total)}
+                              {formatearQuetzales(t.total)}
                             </td>
                             <td style={{ textAlign: "right", fontWeight: 600, padding: "2px 4px" }}>
                               {t.porcentaje.toFixed(1)}%
@@ -658,7 +659,7 @@ export default function CajaChicaReporteModal({
                             <strong>No. CH. {c.numero_documento}</strong> ({c.beneficiario})
                           </td>
                           <td className="mono" style={{ textAlign: "right", color: "#16a34a", fontWeight: 700, padding: "2px 4px" }}>
-                            + {formatoQ(c.monto)}
+                            + {formatearQuetzales(c.monto)}
                           </td>
                         </tr>
                       ))}
@@ -689,19 +690,19 @@ export default function CajaChicaReporteModal({
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.25rem" }}>
                     <div>
                       <span style={{ color: "var(--ink-soft)" }}>(+) Saldo Inicial:</span>{" "}
-                      <strong>{formatoQ(reporte.saldoAnterior)}</strong>
+                      <strong>{formatearQuetzales(reporte.saldoAnterior)}</strong>
                     </div>
                     <div>
                       <span style={{ color: "#166534" }}>(+) Reposiciones:</span>{" "}
-                      <strong style={{ color: "#166534" }}>+ {formatoQ(reporte.totalIngresosPeriodo)}</strong>
+                      <strong style={{ color: "#166534" }}>+ {formatearQuetzales(reporte.totalIngresosPeriodo)}</strong>
                     </div>
                     <div>
                       <span style={{ color: "#991b1b" }}>(−) Gastos:</span>{" "}
-                      <strong style={{ color: "#dc2626" }}>− {formatoQ(reporte.totalEgresosPeriodo)}</strong>
+                      <strong style={{ color: "#dc2626" }}>− {formatearQuetzales(reporte.totalEgresosPeriodo)}</strong>
                     </div>
                     <div style={{ background: "#dcfce7", padding: "1px 4px", borderRadius: "3px" }}>
                       <span style={{ color: "#166534", fontWeight: 700 }}>(=) Efectivo:</span>{" "}
-                      <strong style={{ color: "#166534" }}>{formatoQ(reporte.saldoFinalPeriodo)}</strong>
+                      <strong style={{ color: "#166534" }}>{formatearQuetzales(reporte.saldoFinalPeriodo)}</strong>
                     </div>
                   </div>
                 </div>

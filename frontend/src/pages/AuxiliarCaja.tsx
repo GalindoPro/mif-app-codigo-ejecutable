@@ -24,7 +24,13 @@ export default function AuxiliarCaja() {
   const [mostrarHistorial, setMostrarHistorial] = useState(false);
 
   useEffect(() => {
-    api.get<Agencia[]>("/agencias").then(({ data }) => setAgencias(data));
+    api.get<Agencia[]>("/agencias").then(({ data }) => {
+      setAgencias(data);
+      // ADMIN/GERENCIA no tienen agencia propia (ven todas): sin esto, la
+      // pantalla se queda bloqueada en "Debes tener una agencia asignada"
+      // para siempre, porque el selector de abajo nunca llega a mostrarse.
+      setAgenciaId((actual) => actual || data[0]?.id || "");
+    });
   }, []);
 
   function cargarEstado() {

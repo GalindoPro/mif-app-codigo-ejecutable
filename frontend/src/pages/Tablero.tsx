@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { formatoQ } from "../types";
+import { formatearQuetzales } from "../lib/formatters";
 import type { ResumenDashboard } from "../types";
 
 export default function Tablero() {
@@ -157,36 +157,36 @@ export default function Tablero() {
             {usuario?.rol !== "PROMOTOR" && (
               <Link to="/caja-chica" className="stat-card" style={{ textDecoration: "none" }}>
                 <span className="label">Caja chica</span>
-                <span className="value" style={{ fontSize: "1.2rem" }}>{formatoQ(global.cajaChica)}</span>
+                <span className="value" style={{ fontSize: "1.2rem" }}>{formatearQuetzales(global.cajaChica)}</span>
                 <span className="sub">Fondo disponible</span>
               </Link>
             )}
             <Link to="/ahorros/corriente" className="stat-card" style={{ textDecoration: "none" }}>
               <span className="label">Ahorro corriente</span>
-              <span className="value" style={{ fontSize: "1.2rem", color: "var(--accent)" }}>{formatoQ(global.ahorroCorriente)}</span>
+              <span className="value" style={{ fontSize: "1.2rem", color: "var(--accent)" }}>{formatearQuetzales(global.ahorroCorriente)}</span>
               <span className="sub">Disponible a la vista</span>
             </Link>
             <Link to="/ahorros/programado" className="stat-card" style={{ textDecoration: "none" }}>
               <span className="label">Ahorro programado</span>
-              <span className="value" style={{ fontSize: "1.2rem" }}>{formatoQ(global.ahorroProgramado)}</span>
+              <span className="value" style={{ fontSize: "1.2rem" }}>{formatearQuetzales(global.ahorroProgramado)}</span>
               <span className="sub">Cuota pactada</span>
             </Link>
             <Link to="/ahorros/infanto-juvenil" className="stat-card" style={{ textDecoration: "none" }}>
               <span className="label">Ahorro infantil</span>
-              <span className="value" style={{ fontSize: "1.2rem" }}>{formatoQ(global.ahorroInfantoJuvenil)}</span>
+              <span className="value" style={{ fontSize: "1.2rem" }}>{formatearQuetzales(global.ahorroInfantoJuvenil)}</span>
               <span className="sub">Infanto juvenil</span>
             </Link>
             <Link to="/ahorros/plazo-fijo" className="stat-card" style={{ textDecoration: "none" }}>
               <span className="label">Ahorro Plazo Fijo</span>
               <span className="value" style={{ fontSize: "1.2rem", color: "#f59e0b" }}>
-                {global.plazoFijo && global.plazoFijo.monto > 0 ? formatoQ(global.plazoFijo.monto) : "Kardex PF"}
+                {global.plazoFijo && global.plazoFijo.monto > 0 ? formatearQuetzales(global.plazoFijo.monto) : "Kardex PF"}
               </span>
               <span className="sub">{global.plazoFijo?.count ?? 692} certificados</span>
             </Link>
             <Link to="/aportaciones" className="stat-card" style={{ textDecoration: "none" }}>
               <span className="label">Aportaciones Capital</span>
               <span className="value" style={{ fontSize: "1.2rem", color: "var(--accent)" }}>
-                {formatoQ(global.aportaciones?.saldo ?? 11600)}
+                {formatearQuetzales(global.aportaciones?.saldo ?? 11600)}
               </span>
               <span className="sub">{global.aportaciones?.count ?? 117} socios aportantes</span>
             </Link>
@@ -199,7 +199,7 @@ export default function Tablero() {
               <Link to="/creditos" className="stat-card accent" style={{ textDecoration: "none" }}>
                 <span className="label">Cartera de Crédito</span>
                 <span className="value" style={{ fontSize: "1.2rem", color: "#38bdf8" }}>
-                  {formatoQ(global.carteraPrestamos?.saldo ?? 15210193.13)}
+                  {formatearQuetzales(global.carteraPrestamos?.saldo ?? 15210193.13)}
                 </span>
                 <span className="sub">{global.carteraPrestamos?.count ?? 65} préstamos activos</span>
               </Link>
@@ -279,9 +279,9 @@ export default function Tablero() {
                     {porAgencia.map((a) => (
                       <tr key={a.agenciaId}>
                         <td style={{ fontWeight: 600 }}>{a.agenciaNombre}</td>
-                        <td className="mono" style={{ textAlign: "right" }}>{formatoQ(a.cajaChica.saldo)}</td>
-                        <td className="mono" style={{ textAlign: "right" }}>{formatoQ(a.ahorroCorriente.saldoTotal)}</td>
-                        <td className="mono" style={{ textAlign: "right", color: "#38bdf8" }}>{formatoQ(a.carteraPrestamos?.saldo ?? 0)}</td>
+                        <td className="mono" style={{ textAlign: "right" }}>{formatearQuetzales(a.cajaChica.saldo)}</td>
+                        <td className="mono" style={{ textAlign: "right" }}>{formatearQuetzales(a.ahorroCorriente.saldoTotal)}</td>
+                        <td className="mono" style={{ textAlign: "right", color: "#38bdf8" }}>{formatearQuetzales(a.carteraPrestamos?.saldo ?? 0)}</td>
                         <td className="mono" style={{ textAlign: "center" }}>{a.totalSocios}</td>
                       </tr>
                     ))}
@@ -494,7 +494,7 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
             <div className="stat-card">
               <span className="label">Volumen Operado</span>
               <span className="value mono" style={{ color: "var(--accent)", fontSize: "1.1rem" }}>
-                {formatoQ(volumenTotalFiltro)}
+                {formatearQuetzales(volumenTotalFiltro)}
               </span>
               <span className="sub">Flujo de dinero</span>
             </div>
@@ -565,7 +565,7 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
                           textAlign: "right",
                         }}
                       >
-                        {formatoQ(s.totalMonto)}
+                        {formatearQuetzales(s.totalMonto)}
                       </strong>
                     </div>
                   </div>

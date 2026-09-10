@@ -1,4 +1,5 @@
 import { pool } from "../../db/pool";
+import { withTransaction } from "../../db/transaction";
 import { Socio } from "../../types/models";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
@@ -144,8 +145,11 @@ export async function obtener(id: string, agenciaVisible: string | null) {
 }
 
 export async function siguienteNumero(agenciaId: string) {
+  // Máximo número ya asignado (no count(*)): con count(*), borrar un socio de
+  // prueba o migrar socios con numeración física fuera de orden deja huecos
+  // que hacen que el "siguiente" número choque con uno ya existente.
   const { rows } = await pool.query(
-    `select a.codigo, count(s.id)::int as total
+    `select a.codigo, coalesce(max(nullif(regexp_replace(s.numero_asociado, '\\D', '', 'g'), '')::int), 0) as max_num
      from agencias a left join socios s on s.agencia_id = a.id
      where a.id = $1
      group by a.codigo`,
@@ -153,7 +157,7 @@ export async function siguienteNumero(agenciaId: string) {
   );
   const fila = rows[0];
   if (!fila) throw notFound("Agencia no encontrada");
-  const siguiente = String(fila.total + 1).padStart(4, "0");
+  const siguiente = String(fila.max_num + 1).padStart(4, "0");
   return { numeroAsociado: `${fila.codigo}-${siguiente}` };
 }
 
@@ -248,47 +252,53 @@ export async function crear(data: DatosSocio, usuarioId: string): Promise<Socio>
     throw badRequest("El número de boleta o recibo de pago es obligatorio para respaldar la aportación estatutaria inicial.");
   }
 
-  const { rows } = await pool.query<Socio>(
-    `insert into socios
-      (numero_asociado, agencia_id, nombres, genero, edad, fecha_ingreso, dpi, direccion, telefono, nombre_beneficiario, dpi_beneficiario, telefono_beneficiario, parentesco_beneficiario, creado_por_id)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-     returning *`,
-    [
-      data.numeroAsociado,
-      data.agenciaId,
-      capitalizarNombre(data.nombres)!,
-      data.genero ?? null,
-      data.edad ?? null,
-      data.fechaIngreso,
-      data.dpi ?? null,
-      capitalizarDescripcion(data.direccion) ?? null,
-      data.telefono ?? null,
-      capitalizarNombre(data.nombreBeneficiario) ?? null,
-      data.dpiBeneficiario ?? null,
-      data.telefonoBeneficiario ?? null,
-      data.parentescoBeneficiario ?? null,
-      usuarioId,
-    ],
-  );
-  const socio = rows[0];
+  // El socio y su cuenta de aportación estatutaria deben crearse juntos:
+  // si la cuenta fallara después de crear el socio, quedaría un socio sin la
+  // aportación que el propio reglamento exige. Ambos inserts van en una sola
+  // transacción para que cualquier fallo revierta los dos.
+  return withTransaction(async (client) => {
+    const { rows } = await client.query<Socio>(
+      `insert into socios
+        (numero_asociado, agencia_id, nombres, genero, edad, fecha_ingreso, dpi, direccion, telefono, nombre_beneficiario, dpi_beneficiario, telefono_beneficiario, parentesco_beneficiario, creado_por_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       returning *`,
+      [
+        data.numeroAsociado,
+        data.agenciaId,
+        capitalizarNombre(data.nombres)!,
+        data.genero ?? null,
+        data.edad ?? null,
+        data.fechaIngreso,
+        data.dpi ?? null,
+        capitalizarDescripcion(data.direccion) ?? null,
+        data.telefono ?? null,
+        capitalizarNombre(data.nombreBeneficiario) ?? null,
+        data.dpiBeneficiario ?? null,
+        data.telefonoBeneficiario ?? null,
+        data.parentescoBeneficiario ?? null,
+        usuarioId,
+      ],
+    );
+    const socio = rows[0];
 
-  // Crear automáticamente la cuenta de APORTACION del socio con la aportación estatutaria inicial (mínimo Q 100.00)
-  const { rows: agencias } = await pool.query(`select codigo from agencias where id = $1`, [data.agenciaId]);
-  const codAgencia = agencias[0]?.codigo ?? "MIF";
-  const numCuentaAportacion = `${codAgencia}-APOR-${data.numeroAsociado}`;
-  const obsApertura = data.reciboAportacionInicial
-    ? `Aportación estatutaria inicial. Comprobante/Recibo: ${data.reciboAportacionInicial.trim()}`
-    : "Aportación estatutaria inicial al afiliarse";
+    // Crear automáticamente la cuenta de APORTACION del socio con la aportación estatutaria inicial (mínimo Q 100.00)
+    const { rows: agencias } = await client.query(`select codigo from agencias where id = $1`, [data.agenciaId]);
+    const codAgencia = agencias[0]?.codigo ?? "MIF";
+    const numCuentaAportacion = `${codAgencia}-APOR-${data.numeroAsociado}`;
+    const obsApertura = data.reciboAportacionInicial
+      ? `Aportación estatutaria inicial. Comprobante/Recibo: ${data.reciboAportacionInicial.trim()}`
+      : "Aportación estatutaria inicial al afiliarse";
 
-  await pool.query(
-    `insert into cuentas (numero_cuenta, tipo, estado, socio_id, agencia_id, saldo_inicial, observaciones_apertura, creado_por_id)
-     values ($1, 'APORTACION', 'ACTIVA', $2, $3, $4, $5, $6)
-     on conflict (numero_cuenta) do update set saldo_inicial = $4, observaciones_apertura = $5`,
-    [numCuentaAportacion, socio.id, data.agenciaId, montoApor, obsApertura, usuarioId],
-  );
+    await client.query(
+      `insert into cuentas (numero_cuenta, tipo, estado, socio_id, agencia_id, saldo_inicial, observaciones_apertura, creado_por_id)
+       values ($1, 'APORTACION', 'ACTIVA', $2, $3, $4, $5, $6)
+       on conflict (numero_cuenta) do update set saldo_inicial = $4, observaciones_apertura = $5`,
+      [numCuentaAportacion, socio.id, data.agenciaId, montoApor, obsApertura, usuarioId],
+    );
 
-  await registrarAuditoria({ entidad: "Socio", entidadId: socio.id, accion: "CREAR", usuarioId, datosNuevos: socio });
-  return socio;
+    await registrarAuditoria({ entidad: "Socio", entidadId: socio.id, accion: "CREAR", usuarioId, datosNuevos: socio });
+    return socio;
+  });
 }
 
 export async function verificarDpi(dpi: string, socioIdActual?: string) {

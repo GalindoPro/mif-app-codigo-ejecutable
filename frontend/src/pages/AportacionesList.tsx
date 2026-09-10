@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
-import { formatoQ } from "../types";
+import { formatearQuetzales } from "../lib/formatters";
 import type { AportacionSocio } from "../types";
 import { formatearDPI } from "../lib/formatters";
 
@@ -56,7 +56,7 @@ export default function AportacionesList() {
       <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", marginBottom: "1.5rem" }}>
         <div className="stat-card accent">
           <span className="label">Capital Social Aportado</span>
-          <span className="value">{formatoQ(totalCapital)}</span>
+          <span className="value">{formatearQuetzales(totalCapital)}</span>
           <span className="sub">Total en aportaciones</span>
         </div>
         <div className="stat-card">
@@ -66,7 +66,7 @@ export default function AportacionesList() {
         </div>
         <div className="stat-card">
           <span className="label">Aportación promedio</span>
-          <span className="value">{formatoQ(promedioAportacion)}</span>
+          <span className="value">{formatearQuetzales(promedioAportacion)}</span>
           <span className="sub">Por asociado activo</span>
         </div>
       </div>
@@ -129,7 +129,7 @@ export default function AportacionesList() {
                   </span>
                 </td>
                 <td className="mono" style={{ fontWeight: 700, color: "var(--accent)" }}>
-                  {formatoQ(a.total_aportaciones)}
+                  {formatearQuetzales(a.total_aportaciones)}
                 </td>
                 <td>
                   <strong>{a.nombre_beneficiario ?? "—"}</strong>

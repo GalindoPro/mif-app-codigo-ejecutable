@@ -4,11 +4,11 @@ import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import {
   ESTADO_PRESTAMO_LABEL,
-  formatoQ,
   TIPO_PRESTAMO_LABEL,
   ORIGEN_FONDOS_SHORT_LABEL,
   ORIGEN_FONDOS_BADGE_STYLE,
 } from "../types";
+import { formatearQuetzales } from "../lib/formatters";
 import type { EstadoPrestamo, Prestamo, FiadorItem } from "../types";
 import { formatearDPI, formatearTelefono } from "../lib/formatters";
 
@@ -100,10 +100,12 @@ export default function CreditosList() {
     }
   }
 
+  // Saldo vivo real (lo que los socios deben hoy), no el monto original
+  // colocado — mismo criterio que el Tablero y el Kardex de Cartera.
   const totalDesembolsado =
     prestamos
       ?.filter((p) => p.estado === "DESEMBOLSADO")
-      .reduce((acc, p) => acc + Number(p.monto_aprobado ?? p.monto_solicitado), 0) ?? 0;
+      .reduce((acc, p) => acc + Number(p.saldo_capital ?? p.monto_aprobado ?? p.monto_solicitado), 0) ?? 0;
 
   const pendientes = prestamos?.filter((p) => p.estado === "SOLICITUD").length ?? 0;
   const aprobados = prestamos?.filter((p) => p.estado === "APROBADO").length ?? 0;
@@ -218,7 +220,7 @@ export default function CreditosList() {
               onClick={() => setEstadoFiltro(estadoFiltro === "DESEMBOLSADO" ? "" : "DESEMBOLSADO")}
             >
               <span className="label">Cartera Activa ({desembolsados})</span>
-              <span className="value">{formatoQ(totalDesembolsado)}</span>
+              <span className="value">{formatearQuetzales(totalDesembolsado)}</span>
               <span className="sub">Préstamos desembolsados en cobro</span>
             </div>
 
@@ -378,11 +380,11 @@ export default function CreditosList() {
                         </div>
                       </td>
                       <td className="mono" style={{ textAlign: "right", fontWeight: 700 }}>
-                        {formatoQ(p.monto_aprobado ?? p.monto_solicitado)}
+                        {formatearQuetzales(p.monto_aprobado ?? p.monto_solicitado)}
                       </td>
                       <td className="mono">{p.plazo_meses}m</td>
                       <td className="mono" style={{ textAlign: "right", color: "var(--accent)" }}>
-                        {formatoQ(p.cuota_mensual)}
+                        {formatearQuetzales(p.cuota_mensual)}
                       </td>
                       <td style={{ fontSize: "0.8rem" }}>
                         {p.promotor_nombre ?? <span style={{ color: "var(--ink-soft)" }}>—</span>}
@@ -425,7 +427,7 @@ export default function CreditosList() {
                                   prestamo: p,
                                   nuevoEstado: "DESEMBOLSADO",
                                   titulo: `💵 Confirmar Desembolso de ${p.codigo}`,
-                                  mensaje: `¿Deseas desembolsar y entregar ${formatoQ(p.monto_aprobado ?? p.monto_solicitado)} al socio ${p.socio_nombres}? El crédito entrará inmediatamente a cartera activa.`,
+                                  mensaje: `¿Deseas desembolsar y entregar ${formatearQuetzales(p.monto_aprobado ?? p.monto_solicitado)} al socio ${p.socio_nombres}? El crédito entrará inmediatamente a cartera activa.`,
                                   colorBoton: "#059669",
                                 })
                               }
@@ -734,7 +736,7 @@ export default function CreditosList() {
                             Socio: <strong>{f.socio_nombre}</strong> ({f.socio_numero})
                           </span>
                           <span className="mono" style={{ fontSize: "0.78rem", color: "var(--ink)" }}>
-                            Monto: {formatoQ(f.monto_aprobado ?? f.monto_solicitado)}
+                            Monto: {formatearQuetzales(f.monto_aprobado ?? f.monto_solicitado)}
                           </span>
                         </div>
                       </td>

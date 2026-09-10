@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { CATEGORIA_CAJA_CHICA_LABEL, formatoQ } from "../types";
+import { CATEGORIA_CAJA_CHICA_LABEL } from "../types";
+import { formatearQuetzales } from "../lib/formatters";
 import type { Agencia, CategoriaCajaChica, ListaCajaChica } from "../types";
 import CajaChicaReporteModal from "../components/CajaChicaReporteModal";
 
@@ -227,7 +228,7 @@ export default function CajaChica() {
               style={{ background: "#059669", borderColor: "#059669" }}
               disabled={repoGuardando}
             >
-              {repoGuardando ? "Ingresando fondo…" : `Confirmar ingreso de ${formatoQ(Number(repoMonto) || 0)}`}
+              {repoGuardando ? "Ingresando fondo…" : `Confirmar ingreso de ${formatearQuetzales(Number(repoMonto) || 0)}`}
             </button>
             <button type="button" className="btn secondary" onClick={() => setMostrarReposicion(false)}>
               Cancelar
@@ -240,15 +241,15 @@ export default function CajaChica() {
         <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 220px))" }}>
           <div className="stat-card accent">
             <span className="label">Saldo actual</span>
-            <span className="value">{formatoQ(resultado.saldoActual)}</span>
+            <span className="value">{formatearQuetzales(resultado.saldoActual)}</span>
           </div>
           <div className="stat-card">
             <span className="label">Total ingresos</span>
-            <span className="value">{formatoQ(resultado.totalIngresos)}</span>
+            <span className="value">{formatearQuetzales(resultado.totalIngresos)}</span>
           </div>
           <div className="stat-card">
             <span className="label">Total egresos</span>
-            <span className="value">{formatoQ(resultado.totalEgresos)}</span>
+            <span className="value">{formatearQuetzales(resultado.totalEgresos)}</span>
           </div>
         </div>
       )}
@@ -272,7 +273,7 @@ export default function CajaChica() {
                         ? "Sin categoría"
                         : CATEGORIA_CAJA_CHICA_LABEL[c.categoria as CategoriaCajaChica] ?? c.categoria}
                     </td>
-                    <td className="mono">{formatoQ(c.total)}</td>
+                    <td className="mono">{formatearQuetzales(c.total)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -391,7 +392,7 @@ export default function CajaChica() {
                 <td>{c.tipo === "INGRESO" ? "Ingreso" : "Egreso"}</td>
                 <td>{c.categoria ? CATEGORIA_CAJA_CHICA_LABEL[c.categoria] : "—"}</td>
                 <td className={`mono movimiento-monto ${c.tipo === "EGRESO" ? "retiro" : "deposito"}`}>
-                  {c.tipo === "EGRESO" ? "−" : "+"} {formatoQ(c.monto)}
+                  {c.tipo === "EGRESO" ? "−" : "+"} {formatearQuetzales(c.monto)}
                 </td>
                 <td>{c.usuario_nombre}</td>
               </tr>

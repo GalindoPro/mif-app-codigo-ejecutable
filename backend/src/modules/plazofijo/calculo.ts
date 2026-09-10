@@ -1,3 +1,5 @@
+import { redondear2, formatearFecha } from "../../utils/financiero";
+
 export interface ParametrosPlazoFijo {
   montoDeposito: number;
   plazoMeses: number;
@@ -18,16 +20,6 @@ export interface ResultadoPlazoFijo {
   isrRetencion: number;
   interesNeto: number;
   saldoLiquidoAPagar: number;
-}
-
-function redondear2(val: number): number {
-  return Math.round((val + Number.EPSILON) * 100) / 100;
-}
-
-function formatearFecha(fecha: string | Date | undefined): string {
-  if (!fecha) return new Date().toISOString().slice(0, 10);
-  if (fecha instanceof Date) return fecha.toISOString().slice(0, 10);
-  return String(fecha).slice(0, 10);
 }
 
 export function calcularVencimiento(fechaEntrada: string | Date | undefined, meses: number): string {

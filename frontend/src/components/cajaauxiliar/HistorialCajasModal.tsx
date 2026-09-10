@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import { formatoQ } from "../../types";
+import { formatearQuetzales } from "../../lib/formatters";
 import type { DetalleCajaAuxiliar } from "../../types";
 import ActaArqueoModal from "./ActaArqueoModal";
 
@@ -96,10 +96,10 @@ export default function HistorialCajasModal({
                         {d.estado === "ABIERTO" ? "🟢 Abierto" : "🔒 Cerrado"}
                       </span>
                     </td>
-                    <td className="mono">{formatoQ(d.saldo_inicial)}</td>
-                    <td className="mono" style={{ color: "#16a34a" }}>{formatoQ(d.total_ingresos)}</td>
-                    <td className="mono" style={{ color: "#dc2626" }}>{formatoQ(d.total_egresos)}</td>
-                    <td className="mono" style={{ fontWeight: 700 }}>{formatoQ(d.saldo_final ?? d.saldo_inicial)}</td>
+                    <td className="mono">{formatearQuetzales(d.saldo_inicial)}</td>
+                    <td className="mono" style={{ color: "#16a34a" }}>{formatearQuetzales(d.total_ingresos)}</td>
+                    <td className="mono" style={{ color: "#dc2626" }}>{formatearQuetzales(d.total_egresos)}</td>
+                    <td className="mono" style={{ fontWeight: 700 }}>{formatearQuetzales(d.saldo_final ?? d.saldo_inicial)}</td>
                     <td style={{ fontSize: "0.82rem" }}>{d.cerrado_por_nombre || d.abierto_por_nombre || "—"}</td>
                     <td>
                       <button

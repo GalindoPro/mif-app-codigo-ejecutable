@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
-import { formatoQ } from "../types";
+import { formatearQuetzales } from "../lib/formatters";
 import type { Cuenta, TipoCuentaAhorro } from "../types";
 
 export default function BuscadorCuenta({
@@ -46,7 +46,7 @@ export default function BuscadorCuenta({
         <div>
           <strong>{seleccionada.socio_nombres}</strong>
           <span className="mono"> · {seleccionada.numero_cuenta}</span>
-          <span> · saldo {formatoQ(seleccionada.saldo_actual)}</span>
+          <span> · saldo {formatearQuetzales(seleccionada.saldo_actual)}</span>
         </div>
         <button type="button" className="link-btn" onClick={() => onSeleccionar(null)}>
           Cambiar
@@ -80,7 +80,7 @@ export default function BuscadorCuenta({
               >
                 <span>{c.socio_nombres}</span>
                 <span className="mono">
-                  {c.numero_cuenta} · {formatoQ(c.saldo_actual)}
+                  {c.numero_cuenta} · {formatearQuetzales(c.saldo_actual)}
                 </span>
               </button>
             </li>

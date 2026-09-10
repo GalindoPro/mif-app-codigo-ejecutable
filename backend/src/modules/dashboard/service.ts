@@ -41,12 +41,16 @@ export async function resumen(agenciaId: string | null) {
      group by cu.agencia_id`,
   );
 
+  // Cartera de crédito = saldo vivo real de lo DESEMBOLSADO (lo que los
+  // socios deben hoy), mismo criterio que el Kardex de Cartera y la lista de
+  // Créditos. Los APROBADOS (pendientes de desembolso) todavía no son deuda
+  // viva ni "cartera" en sentido estricto, así que no entran en este conteo.
   const { rows: prestamos } = await pool.query(
     `select p.agencia_id,
             count(*)::int as total_prestamos,
-            coalesce(sum(coalesce(p.saldo_capital, p.monto_aprobado)), 0)::numeric(14,2) as saldo_total
+            coalesce(sum(p.saldo_capital), 0)::numeric(14,2) as saldo_total
      from prestamos p
-     where p.estado in ('DESEMBOLSADO', 'APROBADO')
+     where p.estado = 'DESEMBOLSADO'
      group by p.agencia_id`,
   );
 

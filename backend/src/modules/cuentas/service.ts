@@ -62,14 +62,20 @@ export async function resumen(params: { tipo: TipoCuentaAhorro; agenciaId: strin
   }
   const where = condiciones.join(" and ");
 
+  // saldo_total se calcula en una subconsulta aparte de los depósitos/retiros
+  // a propósito: unir cuentas con movimientos en la MISMA consulta multiplica
+  // (fan-out) cada fila de cuenta por su número de movimientos, así que sumar
+  // el saldo (un valor por cuenta, no por movimiento) ahí lo duplicaba tantas
+  // veces como movimientos tuviera esa cuenta.
   const { rows } = await pool.query(
     `select
-       count(distinct c.id)::int as total_cuentas,
-       coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0) as saldo_total,
+       (select count(distinct c.id)::int from cuentas c where ${where}) as total_cuentas,
+       (select coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0)
+        from cuentas c left join saldos_cuenta sc on sc.cuenta_id = c.id
+        where ${where}) as saldo_total,
        coalesce(sum(case when m.tipo = 'DEPOSITO' then m.monto else 0 end), 0) as total_depositos,
        coalesce(sum(case when m.tipo = 'RETIRO' then m.monto else 0 end), 0) as total_retiros
      from cuentas c
-     left join saldos_cuenta sc on sc.cuenta_id = c.id
      left join movimientos m on m.cuenta_id = c.id
      where ${where}`,
     valores,
@@ -84,8 +90,11 @@ export async function resumen(params: { tipo: TipoCuentaAhorro; agenciaId: strin
 }
 
 export async function siguienteNumero(agenciaId: string, tipo: TipoCuentaAhorro) {
+  // Máximo número ya usado, no count(*) (ver misma corrección en
+  // socios/service.ts y prestamos/service.ts: un hueco en la secuencia hace
+  // que count(*) genere un número que ya existe).
   const { rows } = await pool.query(
-    `select a.codigo, count(c.id)::int as total
+    `select a.codigo, coalesce(max(nullif(regexp_replace(c.numero_cuenta, '\\D', '', 'g'), '')::int), 0) as max_num
      from agencias a left join cuentas c on c.agencia_id = a.id and c.tipo = $2
      where a.id = $1
      group by a.codigo`,
@@ -94,7 +103,7 @@ export async function siguienteNumero(agenciaId: string, tipo: TipoCuentaAhorro)
   const fila = rows[0];
   if (!fila) throw notFound("Agencia no encontrada");
   const prefijo = PREFIJO_TIPO[tipo] ?? tipo;
-  const siguiente = String(fila.total + 1).padStart(4, "0");
+  const siguiente = String(fila.max_num + 1).padStart(4, "0");
   return { numeroCuenta: `${fila.codigo}-${prefijo}-${siguiente}` };
 }
 

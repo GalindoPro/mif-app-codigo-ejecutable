@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { DetalleCajaAuxiliar } from "../../types";
-import { formatoQ } from "../../types";
+import { formatearQuetzales } from "../../lib/formatters";
 import ActaArqueoModal from "./ActaArqueoModal";
 
 export interface CajaCerradaCardProps {
@@ -55,28 +55,28 @@ export default function CajaCerradaCard({
         <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", marginTop: "1.25rem" }}>
           <div className="stat-card">
             <span className="label">Saldo inicial</span>
-            <span className="value">{formatoQ(detalle.dia.saldo_inicial)}</span>
+            <span className="value">{formatearQuetzales(detalle.dia.saldo_inicial)}</span>
           </div>
           <div className="stat-card">
             <span className="label">Total ingresos</span>
-            <span className="value">{formatoQ(detalle.totalIngreso)}</span>
+            <span className="value">{formatearQuetzales(detalle.totalIngreso)}</span>
           </div>
           <div className="stat-card">
             <span className="label">Total egresos</span>
-            <span className="value">{formatoQ(detalle.totalEgreso)}</span>
+            <span className="value">{formatearQuetzales(detalle.totalEgreso)}</span>
           </div>
           <div className="stat-card accent">
             <span className="label">Saldo final según libro</span>
-            <span className="value">{formatoQ(detalle.dia.saldo_final ?? detalle.saldoActual)}</span>
+            <span className="value">{formatearQuetzales(detalle.dia.saldo_final ?? detalle.saldoActual)}</span>
           </div>
           <div className="stat-card">
             <span className="label">Efectivo contado</span>
-            <span className="value">{formatoQ(totalContado)}</span>
+            <span className="value">{formatearQuetzales(totalContado)}</span>
           </div>
           <div className={`stat-card ${diferencia === 0 ? "" : "danger"}`}>
             <span className="label">Diferencia de Arqueo</span>
             <span className="value" style={{ color: diferencia === 0 ? "#16a34a" : "#dc2626" }}>
-              {diferencia === 0 ? "Cuadrada (Q 0.00)" : (diferencia > 0 ? `Sobrante ${formatoQ(diferencia)}` : `Faltante ${formatoQ(Math.abs(diferencia))}`)}
+              {diferencia === 0 ? "Cuadrada (Q 0.00)" : (diferencia > 0 ? `Sobrante ${formatearQuetzales(diferencia)}` : `Faltante ${formatearQuetzales(Math.abs(diferencia))}`)}
             </span>
           </div>
         </div>
@@ -108,9 +108,9 @@ export default function CajaCerradaCard({
                     <td className="mono">{m.referencia ?? "—"}</td>
                     <td>{m.beneficiario}</td>
                     <td className="mono">{m.doc_no ?? "—"}</td>
-                    <td className="mono movimiento-monto deposito">{m.tipo === "INGRESO" ? formatoQ(m.monto) : ""}</td>
-                    <td className="mono movimiento-monto retiro">{m.tipo === "EGRESO" ? formatoQ(m.monto) : ""}</td>
-                    <td className="mono">{formatoQ(m.saldo_acumulado)}</td>
+                    <td className="mono movimiento-monto deposito">{m.tipo === "INGRESO" ? formatearQuetzales(m.monto) : ""}</td>
+                    <td className="mono movimiento-monto retiro">{m.tipo === "EGRESO" ? formatearQuetzales(m.monto) : ""}</td>
+                    <td className="mono">{formatearQuetzales(m.saldo_acumulado)}</td>
                     <td>{m.usuario_nombre}</td>
                   </tr>
                 ))}

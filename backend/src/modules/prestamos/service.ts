@@ -17,11 +17,16 @@ export async function siguienteCodigo(agenciaId: string): Promise<string> {
   const { rows: agencias } = await pool.query(`select codigo from agencias where id = $1`, [agenciaId]);
   const codigoAgencia = agencias[0]?.codigo ?? "MIF";
 
+  // Se toma el máximo número ya usado (no count(*)): un count(*) genera un
+  // código duplicado en cuanto hay un hueco en la secuencia, por ejemplo tras
+  // borrar un crédito de prueba o si una migración entró con un correlativo
+  // fuera de orden.
   const { rows } = await pool.query(
-    `select count(*)::int as total from prestamos where agencia_id = $1`,
+    `select coalesce(max(nullif(regexp_replace(codigo, '\\D', '', 'g'), '')::int), 0) as max_num
+     from prestamos where agencia_id = $1`,
     [agenciaId],
   );
-  const secuencial = String(rows[0].total + 1).padStart(4, "0");
+  const secuencial = String(rows[0].max_num + 1).padStart(4, "0");
   return `${codigoAgencia}-CR-${secuencial}`;
 }
 
@@ -193,10 +198,11 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
     const { rows: agencias } = await client.query(`select codigo from agencias where id = $1`, [data.agenciaId]);
     const codigoAgencia = agencias[0]?.codigo ?? "MIF";
     const { rows: totalRows } = await client.query(
-      `select count(*)::int as total from prestamos where agencia_id = $1`,
+      `select coalesce(max(nullif(regexp_replace(codigo, '\\D', '', 'g'), '')::int), 0) as max_num
+       from prestamos where agencia_id = $1`,
       [data.agenciaId],
     );
-    const secuencial = String(totalRows[0].total + 1).padStart(4, "0");
+    const secuencial = String(totalRows[0].max_num + 1).padStart(4, "0");
     const codigo = `${codigoAgencia}-CR-${secuencial}`;
 
     const hoy = new Date().toISOString().slice(0, 10);
@@ -270,26 +276,23 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
 
     const prestamo = rows[0];
 
-    // Si se solicitó, abrir automáticamente la cuenta de Ahorro sobre Préstamo dentro de la transacción
+    // Si se solicitó, abrir automáticamente la cuenta de Ahorro sobre Préstamo dentro de la transacción.
+    // Si esto falla, debe revertirse también la creación del crédito (no tragarse el error).
     if (data.crearCuentaAhorroSobrePrestamo) {
-      try {
-        const { numeroCuenta } = await cuentasService.siguienteNumero(data.agenciaId, "AHORRO_SOBRE_PRESTAMO");
-        await client.query(
-          `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, observaciones_apertura, prestamo_id, creado_por_id)
-           values ($1, 'AHORRO_SOBRE_PRESTAMO', $2, $3, 0, $4, $5, $6)
-           on conflict do nothing`,
-          [
-            numeroCuenta,
-            data.socioId,
-            data.agenciaId,
-            `Cuenta de ahorro en garantía vinculada al crédito ${prestamo.codigo}`,
-            prestamo.id,
-            usuarioId,
-          ],
-        );
-      } catch (err) {
-        console.error("Error al crear automáticamente cuenta de ahorro sobre préstamo:", err);
-      }
+      const { numeroCuenta } = await cuentasService.siguienteNumero(data.agenciaId, "AHORRO_SOBRE_PRESTAMO");
+      await client.query(
+        `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, observaciones_apertura, prestamo_id, creado_por_id)
+         values ($1, 'AHORRO_SOBRE_PRESTAMO', $2, $3, 0, $4, $5, $6)
+         on conflict do nothing`,
+        [
+          numeroCuenta,
+          data.socioId,
+          data.agenciaId,
+          `Cuenta de ahorro en garantía vinculada al crédito ${prestamo.codigo}`,
+          prestamo.id,
+          usuarioId,
+        ],
+      );
     }
 
     await registrarAuditoria({

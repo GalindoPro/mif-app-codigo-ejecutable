@@ -4,10 +4,10 @@ import type {
   OrigenFondos,
 } from "../../types";
 import {
-  formatoQ,
   ORIGEN_FONDOS_BADGE_STYLE,
   ORIGEN_FONDOS_SHORT_LABEL,
 } from "../../types";
+import { formatearQuetzales } from "../../lib/formatters";
 import PanelNovedadesCampo from "./PanelNovedadesCampo";
 import NuevoMovimientoForm from "./NuevoMovimientoForm";
 import CobroCreditoVentanilla from "./CobroCreditoVentanilla";
@@ -81,19 +81,19 @@ export default function CajaAbierta({
       <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 210px))" }}>
         <div className="stat-card">
           <span className="label">Saldo inicial</span>
-          <span className="value">{formatoQ(detalle.dia.saldo_inicial)}</span>
+          <span className="value">{formatearQuetzales(detalle.dia.saldo_inicial)}</span>
         </div>
         <div className="stat-card">
           <span className="label">Total ingresos</span>
-          <span className="value">{formatoQ(detalle.totalIngreso)}</span>
+          <span className="value">{formatearQuetzales(detalle.totalIngreso)}</span>
         </div>
         <div className="stat-card">
           <span className="label">Total egresos</span>
-          <span className="value">{formatoQ(detalle.totalEgreso)}</span>
+          <span className="value">{formatearQuetzales(detalle.totalEgreso)}</span>
         </div>
         <div className="stat-card accent">
           <span className="label">Saldo actual</span>
-          <span className="value">{formatoQ(detalle.saldoActual)}</span>
+          <span className="value">{formatearQuetzales(detalle.saldoActual)}</span>
         </div>
       </div>
 
@@ -160,18 +160,18 @@ export default function CajaAbierta({
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.3rem", fontSize: "0.76rem" }}>
                   <div>
                     <span style={{ color: "var(--ink-soft)", display: "block" }}>Cobrado:</span>
-                    <strong style={{ color: "#059669" }} className="mono">{formatoQ(f.data.cobros)}</strong>
+                    <strong style={{ color: "#059669" }} className="mono">{formatearQuetzales(f.data.cobros)}</strong>
                   </div>
                   <div>
                     <span style={{ color: "var(--ink-soft)", display: "block" }}>Colocado:</span>
-                    <strong style={{ color: "#2563eb" }} className="mono">{formatoQ(f.data.colocacion)}</strong>
+                    <strong style={{ color: "#2563eb" }} className="mono">{formatearQuetzales(f.data.colocacion)}</strong>
                   </div>
                 </div>
 
                 <div style={{ marginTop: "0.4rem", paddingTop: "0.3rem", borderTop: "1px dashed var(--line)", fontSize: "0.74rem", display: "flex", justifyContent: "space-between" }}>
                   <span style={{ color: "var(--ink-soft)" }}>Flujo Neto:</span>
                   <strong className="mono" style={{ color: neto >= 0 ? "#059669" : "#dc2626" }}>
-                    {formatoQ(neto)}
+                    {formatearQuetzales(neto)}
                   </strong>
                 </div>
               </div>
@@ -357,9 +357,9 @@ export default function CajaAbierta({
                 <td className="mono">{m.referencia ?? "—"}</td>
                 <td>{m.beneficiario}</td>
                 <td className="mono">{m.doc_no ?? "—"}</td>
-                <td className="mono movimiento-monto deposito">{m.tipo === "INGRESO" ? formatoQ(m.monto) : ""}</td>
-                <td className="mono movimiento-monto retiro">{m.tipo === "EGRESO" ? formatoQ(m.monto) : ""}</td>
-                <td className="mono">{formatoQ(m.saldo_acumulado)}</td>
+                <td className="mono movimiento-monto deposito">{m.tipo === "INGRESO" ? formatearQuetzales(m.monto) : ""}</td>
+                <td className="mono movimiento-monto retiro">{m.tipo === "EGRESO" ? formatearQuetzales(m.monto) : ""}</td>
+                <td className="mono">{formatearQuetzales(m.saldo_acumulado)}</td>
                 <td>{m.usuario_nombre}</td>
               </tr>
             ))}
