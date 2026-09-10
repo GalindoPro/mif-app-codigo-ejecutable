@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { api, mensajeError } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import BuscadorSocio from "../BuscadorSocio";
@@ -269,7 +270,16 @@ export default function CobroCreditoVentanilla({
 
       {socio && !cargandoPrestamos && prestamos.length === 0 && (
         <div className="alert warning" style={{ marginTop: "0.5rem" }}>
-          El socio <strong>{socio.nombres}</strong> no tiene préstamos activos para cobro.
+          <div>
+            El socio <strong>{socio.nombres}</strong> no tiene préstamos activos para cobro.
+          </div>
+          <div style={{ fontSize: "0.82rem", marginTop: "0.4rem" }}>
+            ¿Tiene un crédito físico preexistente que aún no está en el sistema, o necesita solicitar uno nuevo? Pide a un
+            promotor, supervisor o administrador que lo registre:{" "}
+            <Link to={`/creditos/nuevo?socioId=${socio.id}`} className="link-btn" style={{ fontWeight: 700 }}>
+              + Registrar crédito de {socio.nombres}
+            </Link>
+          </div>
         </div>
       )}
 
