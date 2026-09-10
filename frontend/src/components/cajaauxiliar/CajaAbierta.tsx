@@ -4,10 +4,10 @@ import type {
   OrigenFondos,
 } from "../../types";
 import {
-  formatoQ,
   ORIGEN_FONDOS_BADGE_STYLE,
   ORIGEN_FONDOS_SHORT_LABEL,
 } from "../../types";
+import { formatearQuetzales } from "../../lib/formatters";
 import PanelNovedadesCampo from "./PanelNovedadesCampo";
 import NuevoMovimientoForm from "./NuevoMovimientoForm";
 import CobroCreditoVentanilla from "./CobroCreditoVentanilla";
@@ -225,12 +225,12 @@ export default function CajaAbierta({
                     </span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem" }}>
-                    <span>Cob: <strong style={{ color: "#059669" }}>{formatoQ(f.data.cobros)}</strong></span>
-                    <span>Col: <strong style={{ color: "#2563eb" }}>{formatoQ(f.data.colocacion)}</strong></span>
+                    <span>Cob: <strong style={{ color: "#059669" }}>{formatearQuetzales(f.data.cobros)}</strong></span>
+                    <span>Col: <strong style={{ color: "#2563eb" }}>{formatearQuetzales(f.data.colocacion)}</strong></span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem", marginTop: "0.15rem", borderTop: "1px dashed var(--line)", paddingTop: "0.15rem" }}>
                     <span style={{ color: "var(--ink-soft)" }}>Neto:</span>
-                    <strong style={{ color: neto >= 0 ? "#059669" : "#dc2626" }}>{formatoQ(neto)}</strong>
+                    <strong style={{ color: neto >= 0 ? "#059669" : "#dc2626" }}>{formatearQuetzales(neto)}</strong>
                   </div>
                 </div>
               );
@@ -254,22 +254,22 @@ export default function CajaAbierta({
         <div className="screen-kpis" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
           <div className="screen-kpi-tile">
             <span className="screen-kpi-label">SALDO INICIAL</span>
-            <span className="screen-kpi-value" style={{ fontSize: "1.05rem" }}>{formatoQ(detalle.dia.saldo_inicial)}</span>
+            <span className="screen-kpi-value" style={{ fontSize: "1.05rem" }}>{formatearQuetzales(detalle.dia.saldo_inicial)}</span>
             <span className="screen-kpi-sub">Apertura</span>
           </div>
           <div className="screen-kpi-tile">
             <span className="screen-kpi-label">TOTAL INGRESOS</span>
-            <span className="screen-kpi-value" style={{ color: "#059669", fontSize: "1.05rem" }}>{formatoQ(detalle.totalIngreso)}</span>
+            <span className="screen-kpi-value" style={{ color: "#059669", fontSize: "1.05rem" }}>{formatearQuetzales(detalle.totalIngreso)}</span>
             <span className="screen-kpi-sub">Cobros</span>
           </div>
           <div className="screen-kpi-tile">
             <span className="screen-kpi-label">TOTAL EGRESOS</span>
-            <span className="screen-kpi-value" style={{ color: "#d97706", fontSize: "1.05rem" }}>{formatoQ(detalle.totalEgreso)}</span>
+            <span className="screen-kpi-value" style={{ color: "#d97706", fontSize: "1.05rem" }}>{formatearQuetzales(detalle.totalEgreso)}</span>
             <span className="screen-kpi-sub">Colocación</span>
           </div>
           <div className="screen-kpi-tile accent">
             <span className="screen-kpi-label">SALDO ACTUAL</span>
-            <span className="screen-kpi-value" style={{ fontSize: "1.05rem" }}>{formatoQ(detalle.saldoActual)}</span>
+            <span className="screen-kpi-value" style={{ fontSize: "1.05rem" }}>{formatearQuetzales(detalle.saldoActual)}</span>
             <span className="screen-kpi-sub">En caja hoy</span>
           </div>
         </div>
@@ -398,12 +398,12 @@ export default function CajaAbierta({
                     <td style={{ fontSize: "0.78rem" }}>{m.beneficiario}</td>
                     <td className="mono" style={{ fontSize: "0.76rem" }}>{m.doc_no ?? "—"}</td>
                     <td className="mono" style={{ color: "#059669", fontWeight: 700, textAlign: "right", fontSize: "0.8rem" }}>
-                      {m.tipo === "INGRESO" ? formatoQ(m.monto) : ""}
+                      {m.tipo === "INGRESO" ? formatearQuetzales(m.monto) : ""}
                     </td>
                     <td className="mono" style={{ color: "#d97706", fontWeight: 700, textAlign: "right", fontSize: "0.8rem" }}>
-                      {m.tipo === "EGRESO" ? formatoQ(m.monto) : ""}
+                      {m.tipo === "EGRESO" ? formatearQuetzales(m.monto) : ""}
                     </td>
-                    <td className="mono" style={{ fontWeight: 700, textAlign: "right", fontSize: "0.8rem" }}>{formatoQ(m.saldo_acumulado)}</td>
+                    <td className="mono" style={{ fontWeight: 700, textAlign: "right", fontSize: "0.8rem" }}>{formatearQuetzales(m.saldo_acumulado)}</td>
                     <td style={{ fontSize: "0.74rem", color: "var(--ink-soft)" }}>{m.usuario_nombre}</td>
                   </tr>
                 ))}

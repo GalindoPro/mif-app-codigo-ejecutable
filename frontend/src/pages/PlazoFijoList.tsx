@@ -3,10 +3,9 @@ import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import {
   ESTADO_PLAZO_FIJO_LABEL,
-  formatoQ,
 } from "../types";
 import type { PlazoFijoContrato } from "../types";
-import { formatearDPI } from "../lib/formatters";
+import { formatearDPI, formatearQuetzales } from "../lib/formatters";
 
 export default function PlazoFijoList() {
   const [contratos, setContratos] = useState<PlazoFijoContrato[] | null>(null);
@@ -100,13 +99,13 @@ export default function PlazoFijoList() {
       <div className="screen-kpis" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
         <div className="screen-kpi-tile accent">
           <span className="screen-kpi-label">CAPITAL A PLAZO FIJO</span>
-          <span className="screen-kpi-value">{formatoQ(totalInversionActiva)}</span>
+          <span className="screen-kpi-value">{formatearQuetzales(totalInversionActiva)}</span>
           <span className="screen-kpi-sub">En certificados activos</span>
         </div>
         <div className="screen-kpi-tile">
           <span className="screen-kpi-label">INTERESES NETOS POR PAGAR</span>
           <span className="screen-kpi-value" style={{ color: "#d97706" }}>
-            {formatoQ(totalInteresesComprometidos)}
+            {formatearQuetzales(totalInteresesComprometidos)}
           </span>
           <span className="screen-kpi-sub">Proyectados al vencimiento</span>
         </div>
@@ -230,7 +229,7 @@ export default function PlazoFijoList() {
                     )}
                   </td>
                   <td className="mono" style={{ fontWeight: 700, color: "var(--accent)", textAlign: "right" }}>
-                    {formatoQ(c.monto_deposito)}
+                    {formatearQuetzales(c.monto_deposito)}
                   </td>
                   <td className="mono" style={{ fontSize: "0.8rem" }}>
                     {c.plazo_meses}m · {c.tasa_anual}%
@@ -247,7 +246,7 @@ export default function PlazoFijoList() {
                     </span>
                   </td>
                   <td className="mono" style={{ color: "#d97706", fontWeight: 600, textAlign: "right" }}>
-                    {formatoQ(c.interes_neto)}
+                    {formatearQuetzales(c.interes_neto)}
                   </td>
                   <td style={{ textAlign: "center" }}>
                     <span

@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { CATEGORIA_CAJA_CHICA_LABEL, formatoQ } from "../types";
+import { CATEGORIA_CAJA_CHICA_LABEL } from "../types";
+import { formatearQuetzales } from "../lib/formatters";
 import type { Agencia, CategoriaCajaChica, ListaCajaChica } from "../types";
 import CajaChicaReporteModal from "../components/CajaChicaReporteModal";
 
@@ -165,17 +166,17 @@ export default function CajaChica() {
           <div className="screen-kpis" style={{ margin: "0.4rem 0" }}>
             <div className="kpi-tile accent" style={{ padding: "0.5rem 0.85rem" }}>
               <span className="kpi-tile-label">Saldo Actual</span>
-              <span className="kpi-tile-value" style={{ color: "#10b981" }}>{formatoQ(resultado.saldoActual)}</span>
+              <span className="kpi-tile-value" style={{ color: "#10b981" }}>{formatearQuetzales(resultado.saldoActual)}</span>
               <span className="kpi-tile-sub">Fondo disponible</span>
             </div>
             <div className="kpi-tile" style={{ padding: "0.5rem 0.85rem" }}>
               <span className="kpi-tile-label">Total Ingresos</span>
-              <span className="kpi-tile-value">{formatoQ(resultado.totalIngresos)}</span>
+              <span className="kpi-tile-value">{formatearQuetzales(resultado.totalIngresos)}</span>
               <span className="kpi-tile-sub">Reposiciones registradas</span>
             </div>
             <div className="kpi-tile" style={{ padding: "0.5rem 0.85rem" }}>
               <span className="kpi-tile-label">Total Egresos</span>
-              <span className="kpi-tile-value" style={{ color: "#ef4444" }}>{formatoQ(resultado.totalEgresos)}</span>
+              <span className="kpi-tile-value" style={{ color: "#ef4444" }}>{formatearQuetzales(resultado.totalEgresos)}</span>
               <span className="kpi-tile-sub">Gastos comprobados</span>
             </div>
             <div className="kpi-tile" style={{ padding: "0.5rem 0.85rem" }}>
@@ -213,7 +214,7 @@ export default function CajaChica() {
                   <input id="repo-desc" value={repoDesc} onChange={(e) => setRepoDesc(e.target.value)} />
                 </div>
                 <button type="submit" className="btn" style={{ background: "#059669", marginTop: "0.3rem" }} disabled={repoGuardando}>
-                  {repoGuardando ? "Ingresando…" : `Confirmar ${formatoQ(Number(repoMonto) || 0)}`}
+                  {repoGuardando ? "Ingresando…" : `Confirmar ${formatearQuetzales(Number(repoMonto) || 0)}`}
                 </button>
               </form>
             ) : mostrarForm ? (
@@ -307,7 +308,7 @@ export default function CajaChica() {
                             {label}
                           </span>
                           <span className="mono" style={{ fontWeight: 700, color: "var(--ink)" }}>
-                            {formatoQ(c.total)}
+                            {formatearQuetzales(c.total)}
                           </span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
@@ -408,7 +409,7 @@ export default function CajaChica() {
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {c.tipo === "EGRESO" ? "−" : "+"} {formatoQ(c.monto)}
+                        {c.tipo === "EGRESO" ? "−" : "+"} {formatearQuetzales(c.monto)}
                       </td>
                       <td style={{ fontSize: "0.76rem", color: "var(--ink-soft)" }}>{c.usuario_nombre}</td>
                     </tr>

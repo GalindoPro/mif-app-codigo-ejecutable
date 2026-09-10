@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { DetalleCajaAuxiliar } from "../../types";
-import { formatoQ } from "../../types";
+import { formatearQuetzales } from "../../lib/formatters";
 import ActaArqueoModal from "./ActaArqueoModal";
 
 export interface CajaCerradaCardProps {
@@ -86,35 +86,35 @@ export default function CajaCerradaCard({
         <div className="screen-kpi-tile">
           <span className="screen-kpi-label">SALDO INICIAL</span>
           <span className="screen-kpi-value" style={{ fontSize: "1.05rem" }}>
-            {formatoQ(detalle.dia.saldo_inicial)}
+            {formatearQuetzales(detalle.dia.saldo_inicial)}
           </span>
           <span className="screen-kpi-sub">Apertura del turno</span>
         </div>
         <div className="screen-kpi-tile">
           <span className="screen-kpi-label">TOTAL INGRESOS</span>
           <span className="screen-kpi-value" style={{ color: "#059669", fontSize: "1.05rem" }}>
-            {formatoQ(detalle.totalIngreso)}
+            {formatearQuetzales(detalle.totalIngreso)}
           </span>
           <span className="screen-kpi-sub">Cobros y depósitos</span>
         </div>
         <div className="screen-kpi-tile">
           <span className="screen-kpi-label">TOTAL EGRESOS</span>
           <span className="screen-kpi-value" style={{ color: "#d97706", fontSize: "1.05rem" }}>
-            {formatoQ(detalle.totalEgreso)}
+            {formatearQuetzales(detalle.totalEgreso)}
           </span>
           <span className="screen-kpi-sub">Desembolsos y retiros</span>
         </div>
         <div className="screen-kpi-tile accent">
           <span className="screen-kpi-label">SALDO SEGÚN LIBRO</span>
           <span className="screen-kpi-value" style={{ fontSize: "1.05rem" }}>
-            {formatoQ(detalle.dia.saldo_final ?? detalle.saldoActual)}
+            {formatearQuetzales(detalle.dia.saldo_final ?? detalle.saldoActual)}
           </span>
           <span className="screen-kpi-sub">Libro de caja auxiliar</span>
         </div>
         <div className="screen-kpi-tile">
           <span className="screen-kpi-label">EFECTIVO CONTADO</span>
           <span className="screen-kpi-value" style={{ fontSize: "1.05rem" }}>
-            {formatoQ(totalContado)}
+            {formatearQuetzales(totalContado)}
           </span>
           <span className="screen-kpi-sub">Arqueo físico</span>
         </div>
@@ -135,8 +135,8 @@ export default function CajaCerradaCard({
             {diferencia === 0
               ? "Cuadrada (Q 0.00)"
               : diferencia > 0
-              ? `Sobrante ${formatoQ(diferencia)}`
-              : `Faltante ${formatoQ(Math.abs(diferencia))}`}
+              ? `Sobrante ${formatearQuetzales(diferencia)}`
+              : `Faltante ${formatearQuetzales(Math.abs(diferencia))}`}
           </span>
           <span className="screen-kpi-sub">
             {diferencia === 0 ? "Sin descuadre" : "Auditoría requerida"}
@@ -171,13 +171,13 @@ export default function CajaCerradaCard({
                 <td style={{ fontSize: "0.8rem" }}>{m.beneficiario || "—"}</td>
                 <td className="mono" style={{ fontSize: "0.78rem" }}>{m.doc_no ?? "—"}</td>
                 <td className="mono" style={{ color: "#059669", fontWeight: 700, textAlign: "right", fontSize: "0.8rem" }}>
-                  {m.tipo === "INGRESO" ? formatoQ(m.monto) : ""}
+                  {m.tipo === "INGRESO" ? formatearQuetzales(m.monto) : ""}
                 </td>
                 <td className="mono" style={{ color: "#d97706", fontWeight: 700, textAlign: "right", fontSize: "0.8rem" }}>
-                  {m.tipo === "EGRESO" ? formatoQ(m.monto) : ""}
+                  {m.tipo === "EGRESO" ? formatearQuetzales(m.monto) : ""}
                 </td>
                 <td className="mono" style={{ fontWeight: 700, textAlign: "right", fontSize: "0.8rem" }}>
-                  {formatoQ(m.saldo_acumulado)}
+                  {formatearQuetzales(m.saldo_acumulado)}
                 </td>
                 <td style={{ fontSize: "0.76rem", color: "var(--ink-soft)" }}>{m.usuario_nombre}</td>
               </tr>
