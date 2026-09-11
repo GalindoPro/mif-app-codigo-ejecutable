@@ -2,6 +2,7 @@ import { pool } from "../../db/pool";
 import { withTransaction } from "../../db/transaction";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { conflict } from "../../utils/errors";
+import { hoyGT } from "../../utils/financiero";
 
 export async function listar(params: { agenciaId: string | null; q?: string }) {
   const condiciones: string[] = [];
@@ -128,7 +129,7 @@ export async function reponerFondo(data: DatosReposicionCajaChica, usuarioId: st
   if (!data.numeroCheque || !data.numeroCheque.trim()) {
     throw conflict("El número de cheque o documento de reposición (No. CH.) es obligatorio.");
   }
-  const fecha = data.fecha || new Date().toISOString().slice(0, 10);
+  const fecha = data.fecha || hoyGT();
   const ch = data.numeroCheque.trim();
 
   // Validar anti-duplicados del cheque en caja chica

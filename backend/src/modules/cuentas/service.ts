@@ -3,6 +3,7 @@ import { pool } from "../../db/pool";
 import { withTransaction } from "../../db/transaction";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
+import { hoyGT } from "../../utils/financiero";
 
 // Prefijo del número de cuenta sugerido por tipo — solo una ayuda visual,
 // el usuario puede cambiarlo antes de guardar.
@@ -342,7 +343,7 @@ export async function registrarMovimientoConClient(
 
   const clienteMovimientoId = `srv-${cuentaId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const fechaMov = data.fecha || new Date().toISOString().slice(0, 10);
+  const fechaMov = data.fecha || hoyGT();
 
   const { rows } = await client.query(
     `insert into movimientos (cuenta_id, tipo, monto, fecha, numero_recibo, descripcion, usuario_id, cliente_movimiento_id)

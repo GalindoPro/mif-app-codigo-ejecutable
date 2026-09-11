@@ -1,7 +1,7 @@
 import { pool } from "../../db/pool";
 import { withTransaction } from "../../db/transaction";
 import { registrarAuditoria } from "../../utils/auditoria";
-import { redondear2 } from "../../utils/financiero";
+import { redondear2, hoyGT } from "../../utils/financiero";
 import { badRequest, notFound, conflict } from "../../utils/errors";
 
 export async function calcularExcedentes(
@@ -117,7 +117,7 @@ export async function aplicarExcedentes(id: string, usuarioId: string) {
   const exc = await obtenerExcedente(id);
   if (exc.estado === "APLICADO") throw badRequest("Este excedente ya fue aplicado");
 
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyGT();
 
   return withTransaction(async (client) => {
     for (const d of exc.detalle) {

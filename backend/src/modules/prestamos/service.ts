@@ -2,6 +2,7 @@ import { pool } from "../../db/pool";
 import { withTransaction } from "../../db/transaction";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
+import { hoyGT } from "../../utils/financiero";
 import * as cuentasService from "../cuentas/service";
 import { calcularAmortizacion } from "./amortizacion";
 import { calcularLiquidacionCredito, distribuirMontoCobro } from "./liquidacion";
@@ -205,7 +206,7 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
     const secuencial = String(totalRows[0].max_num + 1).padStart(4, "0");
     const codigo = `${codigoAgencia}-CR-${secuencial}`;
 
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = hoyGT();
     const origenFondos = data.origenFondos || "FONDOS_PROPIOS";
     const esMigracion = Boolean(data.esMigracion);
 
@@ -360,7 +361,7 @@ export async function cambiarEstado(
     let fechaAprobacion = actual.fecha_aprobacion;
     let fechaDesembolso = actual.fecha_desembolso;
     let fechaVencimiento = actual.fecha_vencimiento;
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = hoyGT();
     let nuevoSaldoCapital = actual.saldo_capital;
 
     if (nuevoEstado === "APROBADO") {
@@ -577,7 +578,7 @@ export async function obtenerLiquidacion(prestamoId: string, fechaLiquidacion?: 
     montoOriginal: Number(prestamo.monto_aprobado || prestamo.monto_solicitado),
     cuotaMensualEstimada: Number(prestamo.cuota_mensual) || 0,
     fechaUltimoPago,
-    fechaLiquidacion: fechaLiquidacion || new Date().toISOString().slice(0, 10),
+    fechaLiquidacion: fechaLiquidacion || hoyGT(),
     tipoAmortizacion: prestamo.tipo_amortizacion,
   });
 
@@ -781,7 +782,7 @@ export async function refinanciar(
       plazoMeses: data.nuevoPlazo,
       tasaInteresMensual: data.nuevaTasa,
       tipoAmortizacion: prestamo.tipo_amortizacion,
-      fechaInicio: new Date().toISOString().slice(0, 10),
+      fechaInicio: hoyGT(),
     });
 
     // Registrar el refinanciamiento
@@ -805,7 +806,7 @@ export async function refinanciar(
     );
 
     // Actualizar el préstamo con los nuevos términos
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = hoyGT();
     const { rows: vencRows } = await client.query(
       `select ($1::date + ($2 * interval '1 month'))::date as venc`,
       [hoy, data.nuevoPlazo],

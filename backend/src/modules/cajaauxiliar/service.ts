@@ -5,13 +5,14 @@ import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
 import * as cuentasService from "../cuentas/service";
 import { calcularLiquidacionCredito } from "../prestamos/liquidacion";
+import { hoyGT } from "../../utils/financiero";
 import { CATEGORIAS, CajaCategoria, DENOMINACIONES, categoriasDelGrupo } from "./categorias";
 
 // Tolerancia de redondeo entre lo calculado en el cliente y el recálculo oficial del servidor.
 const TOLERANCIA_LIQUIDACION = 0.01;
 
 function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return hoyGT();
 }
 
 function checarAgencia(agenciaId: string, agenciaVisible: string | null) {

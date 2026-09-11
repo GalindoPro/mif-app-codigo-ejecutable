@@ -1,10 +1,11 @@
 import { pool } from "../../db/pool";
+import { hoyGT } from "../../utils/financiero";
 
 export async function generarReporteRegulatorio(params: {
   agenciaId: string | null;
   fechaCorte?: string;
 }) {
-  const fechaCorte = params.fechaCorte || new Date().toISOString().slice(0, 10);
+  const fechaCorte = params.fechaCorte || hoyGT();
   const anio = fechaCorte.slice(0, 4);
   const agId = params.agenciaId;
 

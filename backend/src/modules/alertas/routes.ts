@@ -2,6 +2,7 @@ import { Router } from "express";
 import { pool } from "../../db/pool";
 import { requireAuth } from "../../middleware/auth";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { hoyGT } from "../../utils/financiero";
 
 export const alertasRouter = Router();
 
@@ -22,7 +23,7 @@ alertasRouter.get(
   "/",
   asyncHandler(async (_req, res) => {
     const alertas: AlertaItem[] = [];
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = hoyGT();
 
     // 1. Cajas auxiliares abiertas
     try {
