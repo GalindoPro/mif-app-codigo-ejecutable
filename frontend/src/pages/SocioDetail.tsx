@@ -19,6 +19,10 @@ interface Cuenta {
   tipo: string;
   estado: string;
   saldo_actual: string;
+  // Solo viene con valor cuando tipo === "AHORRO_PLAZO_FIJO": el detalle de
+  // plazo fijo vive en su propia tabla (plazo_fijo_contratos), con un id
+  // distinto al de esta cuenta.
+  plazo_fijo_contrato_id?: string | null;
 }
 
 interface PrestamoBrief {
@@ -683,11 +687,16 @@ export default function SocioDetail() {
                   {socio.cuentas.map((c) => {
                     const slug = TIPO_SLUG[c.tipo];
                     const esApor = c.tipo === "APORTACION";
+                    // Plazo fijo vive en su propia tabla de contrato, con un
+                    // id distinto al de esta cuenta — usar ese id, no c.id,
+                    // o el enlace lleva a un contrato que no existe (404).
+                    const idDetalle = c.tipo === "AHORRO_PLAZO_FIJO" ? c.plazo_fijo_contrato_id : c.id;
+                    const puedeVerDetalle = Boolean(slug && idDetalle);
                     return (
                       <tr key={c.id}>
                         <td className="mono" style={{ fontWeight: 600, padding: "4px 8px" }}>
-                          {slug ? (
-                            <Link to={`/ahorros/${slug}/${c.id}`}>{c.numero_cuenta}</Link>
+                          {puedeVerDetalle ? (
+                            <Link to={`/ahorros/${slug}/${idDetalle}`}>{c.numero_cuenta}</Link>
                           ) : (
                             c.numero_cuenta
                           )}
@@ -708,8 +717,8 @@ export default function SocioDetail() {
                           {formatearQuetzales(c.saldo_actual)}
                         </td>
                         <td style={{ textAlign: "center", padding: "4px 8px" }}>
-                          {slug ? (
-                            <Link to={`/ahorros/${slug}/${c.id}`} style={{ fontSize: "0.78rem", textDecoration: "none" }}>
+                          {puedeVerDetalle ? (
+                            <Link to={`/ahorros/${slug}/${idDetalle}`} style={{ fontSize: "0.78rem", textDecoration: "none" }}>
                               Ver →
                             </Link>
                           ) : (

@@ -62,3 +62,50 @@ describe("POST /api/socios — atomicidad socio + cuenta de aportación", () => 
     expect(cuentas[0].total).toBe(1);
   });
 });
+
+// Cubre el hallazgo: la ficha del socio enlazaba "Ver →" de una cuenta de
+// plazo fijo usando el id de la CUENTA, pero /ahorros/plazo-fijo/:id espera
+// el id del CONTRATO (plazo_fijo_contratos.id) — una tabla distinta con su
+// propio id. El enlace llevaba a un contrato que no existe -> 404.
+describe("GET /api/socios/:id — expone el id del contrato de plazo fijo por cuenta", () => {
+  let fx: Fixtures;
+
+  beforeEach(async () => {
+    fx = await resetDb();
+  });
+
+  it("incluye plazo_fijo_contrato_id (distinto del id de la cuenta) para cuentas AHORRO_PLAZO_FIJO", async () => {
+    const socio = await request(app)
+      .post("/api/socios")
+      .set("Authorization", `Bearer ${fx.tokens.CAJERO}`)
+      .send({
+        numeroAsociado: "TST-0003",
+        agenciaId: fx.agenciaId,
+        nombres: "Test Plazo Fijo Socio",
+        fechaIngreso: "2026-01-01",
+        montoAportacionInicial: 100,
+        reciboAportacionInicial: "REC-0001",
+      });
+
+    const contrato = await request(app)
+      .post("/api/plazo-fijo")
+      .set("Authorization", `Bearer ${fx.tokens.CAJERO}`)
+      .send({
+        agenciaId: fx.agenciaId,
+        socioId: socio.body.id,
+        montoDeposito: 5000,
+        plazoMeses: 6,
+        tasaAnual: 6.0,
+      });
+    expect(contrato.status).toBe(201);
+
+    const detalle = await request(app)
+      .get(`/api/socios/${socio.body.id}`)
+      .set("Authorization", `Bearer ${fx.tokens.CAJERO}`);
+
+    const cuentaPF = detalle.body.cuentas.find((c: any) => c.tipo === "AHORRO_PLAZO_FIJO");
+    expect(cuentaPF).toBeDefined();
+    expect(cuentaPF.plazo_fijo_contrato_id).toBe(contrato.body.id);
+    expect(cuentaPF.plazo_fijo_contrato_id).not.toBe(cuentaPF.id);
+  });
+});

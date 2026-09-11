@@ -113,9 +113,11 @@ export async function obtener(id: string, agenciaVisible: string | null) {
 
   const [{ rows: cuentas }, { rows: prestamos }] = await Promise.all([
     pool.query(
-      `select c.*, coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
+      `select c.*, coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual,
+              pf.id as plazo_fijo_contrato_id
        from cuentas c
        left join saldos_cuenta sc on sc.cuenta_id = c.id
+       left join plazo_fijo_contratos pf on pf.cuenta_id = c.id
        where c.socio_id = $1
        order by c.created_at`,
       [id],
