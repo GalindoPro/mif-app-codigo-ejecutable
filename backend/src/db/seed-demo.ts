@@ -28,6 +28,7 @@ import * as prestamosService from "../modules/prestamos/service";
 import * as cuentasService from "../modules/cuentas/service";
 import * as cajaAuxiliarService from "../modules/cajaauxiliar/service";
 import * as cajaChicaService from "../modules/cajachica/service";
+import * as plazofijoService from "../modules/plazofijo/service";
 import { DENOMINACIONES } from "../modules/cajaauxiliar/categorias";
 
 const MARCADOR = "(Demo)";
@@ -67,6 +68,7 @@ async function limpiarCorridaAnterior() {
   await pool.query(`delete from caja_movimientos_auxiliar where caja_dia_id = any($1)`, [diaIds]);
   await pool.query(`delete from caja_dias where id = any($1)`, [diaIds]);
   await pool.query(`delete from movimientos where cuenta_id = any($1)`, [cuentaIds]);
+  await pool.query(`delete from plazo_fijo_contratos where cuenta_id = any($1)`, [cuentaIds]);
   await pool.query(`delete from cuentas where id = any($1)`, [cuentaIds]);
   await pool.query(`delete from prestamos where id = any($1)`, [prestamoIds]);
   await pool.query(
@@ -260,9 +262,54 @@ async function main() {
   }
 
   // ---------------------------------------------------------------------
-  // 3) Sesión de caja auxiliar de hoy: desembolsos + cobros de cuota.
+  // 2.5) Plazo Fijo: 3 certificados con fechas distintas. Uno ya vencido
+  //      (Pedro) para liquidarlo hoy mismo dentro de la sesión de caja de
+  //      abajo; los otros dos quedan ACTIVOS para navegarlos en pantalla.
   // ---------------------------------------------------------------------
-  const dia = await cajaAuxiliarService.abrirDia(agencia.id, cajero.id, null, 60000);
+  const certificadoVencido = await plazofijoService.crear(
+    {
+      agenciaId: agencia.id,
+      socioId: sociosMigracion[1].socio.id, // Pedro Us Ixchop
+      montoDeposito: 3000,
+      plazoMeses: 6,
+      tasaAnual: 6.0,
+      fechaInicio: "2026-02-05", // vence ~2026-08-05, ya vencido hoy
+    },
+    admin.id,
+  );
+  console.log(`Plazo fijo certificado ${certificadoVencido.numero_certificacion} — Pedro Us Ixchop, Q3,000 (vencido, listo para liquidar)`);
+
+  const certificadoActivo1 = await plazofijoService.crear(
+    {
+      agenciaId: agencia.id,
+      socioId: sociosMigracion[4].socio.id, // Rosa Chocoj Mendoza
+      montoDeposito: 8000,
+      plazoMeses: 12,
+      tasaAnual: 14.0,
+      fechaInicio: "2026-03-10",
+    },
+    admin.id,
+  );
+  console.log(`Plazo fijo certificado ${certificadoActivo1.numero_certificacion} — Rosa Chocoj Mendoza, Q8,000 (activo)`);
+
+  const certificadoActivo2 = await plazofijoService.crear(
+    {
+      agenciaId: agencia.id,
+      socioId: sociosNuevos[3].socio.id, // Ana Poou Chach
+      montoDeposito: 5000,
+      plazoMeses: 6,
+      tasaAnual: 6.0,
+      fechaInicio: "2026-06-01",
+    },
+    admin.id,
+  );
+  console.log(`Plazo fijo certificado ${certificadoActivo2.numero_certificacion} — Ana Poou Chach, Q5,000 (activo)`);
+
+  // ---------------------------------------------------------------------
+  // 3) Sesión de caja auxiliar de hoy: desembolsos + cobros de cuota +
+  //    liquidación del plazo fijo vencido de Pedro.
+  // ---------------------------------------------------------------------
+  const dia = await cajaAuxiliarService.abrirDia(agencia.id, cajero.id, null, 100000);
   console.log(`Caja abierta: día ${dia.fecha}, saldo inicial Q${dia.saldo_inicial}`);
 
   for (const { prestamo, desembolsarHoy, crearAsp } of sociosNuevos) {
@@ -326,6 +373,16 @@ async function main() {
     );
   }
 
+  // Liquidación del plazo fijo vencido de Pedro, por el único camino válido
+  // hoy en día (Auxiliar de Caja, no el atajo directo que bloqueamos).
+  await cajaAuxiliarService.liquidarPlazoFijo(
+    dia.id,
+    { contratoId: certificadoVencido.id, reciboRetiro: "DEMO-RE-PF-001", incluirIntereses: true },
+    cajero.id,
+    null,
+  );
+  console.log(`Plazo fijo ${certificadoVencido.numero_certificacion} liquidado hoy vía Auxiliar de Caja (capital + interés neto)`);
+
   // Cierre de caja, cuadrado exacto contra lo acumulado en el sistema.
   const { rows: ultimoMov } = await pool.query(
     `select saldo_acumulado from caja_movimientos_auxiliar where caja_dia_id = $1 order by created_at desc limit 1`,
@@ -374,6 +431,69 @@ async function main() {
       null,
     );
     console.log(`Ahorro corriente ${cuenta.numero_cuenta} para ${elena.nombres}: depósito Q1000 (jul)`);
+  }
+
+  // ---------------------------------------------------------------------
+  // 4.5) Ahorro Programado (con cuota pactada) e Infanto Juvenil.
+  // ---------------------------------------------------------------------
+  {
+    const miguel = sociosNuevos[2].socio;
+    const { numeroCuenta } = await cuentasService.siguienteNumero(agencia.id, "AHORRO_PROGRAMADO");
+    const cuenta = await cuentasService.crear(
+      { tipo: "AHORRO_PROGRAMADO", agenciaId: agencia.id, socioId: miguel.id, numeroCuenta, saldoInicial: 0, cuotaPactada: 200 },
+      admin.id,
+    );
+    await cuentasService.registrarMovimiento(
+      cuenta.id,
+      { tipo: "DEPOSITO", monto: 200, fecha: "2026-07-15", numeroRecibo: "DEMO-PROG-001", descripcion: "Cuota programada julio" },
+      cajero.id,
+      null,
+    );
+    await cuentasService.registrarMovimiento(
+      cuenta.id,
+      { tipo: "DEPOSITO", monto: 200, fecha: "2026-08-15", numeroRecibo: "DEMO-PROG-002", descripcion: "Cuota programada agosto" },
+      cajero.id,
+      null,
+    );
+    console.log(`Ahorro programado ${cuenta.numero_cuenta} para ${miguel.nombres}: 2 cuotas de Q200 (jul, ago)`);
+  }
+  {
+    const diego = sociosMigracion[3].socio; // Diego Ramírez Coy
+    const { numeroCuenta } = await cuentasService.siguienteNumero(agencia.id, "AHORRO_PROGRAMADO");
+    const cuenta = await cuentasService.crear(
+      { tipo: "AHORRO_PROGRAMADO", agenciaId: agencia.id, socioId: diego.id, numeroCuenta, saldoInicial: 0, cuotaPactada: 150 },
+      admin.id,
+    );
+    for (const fecha of ["2026-05-01", "2026-06-01", "2026-07-01"]) {
+      await cuentasService.registrarMovimiento(
+        cuenta.id,
+        { tipo: "DEPOSITO", monto: 150, fecha, numeroRecibo: `DEMO-PROG-${fecha}`, descripcion: "Cuota programada" },
+        cajero.id,
+        null,
+      );
+    }
+    console.log(`Ahorro programado ${cuenta.numero_cuenta} para ${diego.nombres}: 3 cuotas de Q150 (may-jul)`);
+  }
+  {
+    const maria = sociosMigracion[0].socio; // María Xicay Tzul
+    const { numeroCuenta } = await cuentasService.siguienteNumero(agencia.id, "AHORRO_INFANTO_JUVENIL");
+    const cuenta = await cuentasService.crear(
+      { tipo: "AHORRO_INFANTO_JUVENIL", agenciaId: agencia.id, socioId: maria.id, numeroCuenta, saldoInicial: 0 },
+      admin.id,
+    );
+    await cuentasService.registrarMovimiento(
+      cuenta.id,
+      { tipo: "DEPOSITO", monto: 100, fecha: "2026-06-10", numeroRecibo: "DEMO-INF-001", descripcion: "Ahorro infantil" },
+      cajero.id,
+      null,
+    );
+    await cuentasService.registrarMovimiento(
+      cuenta.id,
+      { tipo: "DEPOSITO", monto: 100, fecha: "2026-08-10", numeroRecibo: "DEMO-INF-002", descripcion: "Ahorro infantil" },
+      cajero.id,
+      null,
+    );
+    console.log(`Ahorro infanto juvenil ${cuenta.numero_cuenta} para ${maria.nombres}: 2 depósitos de Q100 (jun, ago)`);
   }
 
   // ---------------------------------------------------------------------
