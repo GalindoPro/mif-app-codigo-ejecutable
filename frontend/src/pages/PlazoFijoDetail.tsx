@@ -15,11 +15,6 @@ export default function PlazoFijoDetail() {
 
   const [contrato, setContrato] = useState<PlazoFijoContrato | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [mensajeExito, setMensajeExito] = useState<string | null>(null);
-  const [liquidando, setLiquidando] = useState(false);
-  const [mostrarModal, setMostrarModal] = useState(false);
-  const [reciboRetiro, setReciboRetiro] = useState("");
-  const [incluirIntereses, setIncluirIntereses] = useState(false);
 
   const puedeLiquidar =
     usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA" || usuario?.rol === "SUPERVISOR" || usuario?.rol === "CAJERO";
@@ -34,42 +29,11 @@ export default function PlazoFijoDetail() {
 
   useEffect(cargar, [id]);
 
-  async function handleLiquidar(e: React.FormEvent) {
-    e.preventDefault();
-    if (!contrato || !id) return;
-    if (!reciboRetiro.trim()) {
-      setError("El número de recibo de egreso (RE. No.) es obligatorio.");
-      return;
-    }
-
-    setError(null);
-    setMensajeExito(null);
-    setLiquidando(true);
-
-    try {
-      await api.post(`/plazo-fijo/${id}/liquidar`, {
-        reciboRetiro: reciboRetiro.trim(),
-        incluirIntereses,
-      });
-      setMensajeExito("El certificado ha sido liquidado exitosamente.");
-      setMostrarModal(false);
-      setReciboRetiro("");
-      cargar();
-    } catch (err) {
-      setError(mensajeError(err));
-    } finally {
-      setLiquidando(false);
-    }
-  }
-
   if (error && !contrato) return <div className="alert error">{error}</div>;
   if (!contrato) return <p>Cargando detalle del certificado…</p>;
 
   const hoy = new Date().toISOString().slice(0, 10);
   const estaVencido = contrato.estado === "ACTIVO" && contrato.fecha_vencimiento <= hoy;
-  const montoALiquidarEstimado = incluirIntereses
-    ? Number(contrato.saldo_liquido_a_pagar)
-    : Number(contrato.monto_deposito);
 
   return (
     <div>
@@ -99,9 +63,13 @@ export default function PlazoFijoDetail() {
           </span>
 
           {puedeLiquidar && contrato.estado === "ACTIVO" && (
-            <button className="btn" onClick={() => setMostrarModal((v) => !v)} disabled={liquidando}>
-              {mostrarModal ? "Cancelar liquidación" : "💵 Liquidar y pagar certificado"}
-            </button>
+            <Link
+              to="/auxiliar-caja"
+              className="btn"
+              title="La liquidación se registra en Auxiliar de Caja, para que el efectivo entregado quede contabilizado"
+            >
+              💵 Ir a Auxiliar de Caja para liquidar
+            </Link>
           )}
 
           <button className="btn secondary" onClick={() => window.print()}>
@@ -111,103 +79,6 @@ export default function PlazoFijoDetail() {
       </div>
 
       {error && <div className="alert error">{error}</div>}
-      {mensajeExito && <div className="alert success">{mensajeExito}</div>}
-
-      {/* Formulario de Liquidación de Plazo Fijo */}
-      {mostrarModal && contrato.estado === "ACTIVO" && (
-        <form
-          className="card"
-          onSubmit={handleLiquidar}
-          style={{
-            maxWidth: 580,
-            marginBottom: "1.5rem",
-            border: "2px solid #059669",
-            background: "#f0fdf4",
-          }}
-        >
-          <h3 style={{ margin: "0 0 0.5rem", color: "#065f46" }}>
-            💵 Liquidación de Certificado Plazo Fijo No. {contrato.numero_certificacion}
-          </h3>
-          <p style={{ fontSize: "0.85rem", color: "#047857", margin: "0 0 1rem" }}>
-            Registra la cancelación y entrega de efectivo al socio. El número de recibo quedará protegido por el escudo
-            anti-duplicados.
-          </p>
-
-          <div className="field">
-            <label htmlFor="pf-recibo-retiro">
-              Número de Recibo / Comprobante de Retiro (<strong>RE. No.</strong>)
-            </label>
-            <input
-              id="pf-recibo-retiro"
-              placeholder="Ej. 882 o RE-4512"
-              value={reciboRetiro}
-              onChange={(e) => setReciboRetiro(e.target.value)}
-              required
-              style={{ fontWeight: 700, fontSize: "1rem" }}
-            />
-            <span className="hint">Número impreso en el talonario o boleta de egreso firmado por el socio</span>
-          </div>
-
-          <div className="field">
-            <label>Modalidad de Pago al Socio</label>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "0.25rem" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
-                <input
-                  type="radio"
-                  name="modalidad-pago"
-                  checked={!incluirIntereses}
-                  onChange={() => setIncluirIntereses(false)}
-                />
-                <span>
-                  <strong>Solo Capital:</strong> {formatearQuetzales(contrato.monto_deposito)} (Intereses ya retirados o pendientes)
-                </span>
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
-                <input
-                  type="radio"
-                  name="modalidad-pago"
-                  checked={incluirIntereses}
-                  onChange={() => setIncluirIntereses(true)}
-                />
-                <span>
-                  <strong>Capital + Interés Neto Líquido:</strong> {formatearQuetzales(contrato.saldo_liquido_a_pagar)}{" "}
-                  <span style={{ color: "#16a34a" }}>(+{formatearQuetzales(contrato.interes_neto)} interés neto)</span>
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <div
-            style={{
-              background: "#dcfce7",
-              border: "1px solid #86efac",
-              borderRadius: "8px",
-              padding: "0.75rem",
-              marginTop: "0.75rem",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <span style={{ color: "#166534", fontSize: "0.85rem" }}>Total a entregar al socio:</span>
-            <strong style={{ fontSize: "1.25rem", color: "#166534" }}>{formatearQuetzales(montoALiquidarEstimado)}</strong>
-          </div>
-
-          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
-            <button
-              type="submit"
-              className="btn"
-              style={{ background: "#059669", borderColor: "#059669" }}
-              disabled={liquidando}
-            >
-              {liquidando ? "Liquidando..." : `Confirmar entrega de ${formatearQuetzales(montoALiquidarEstimado)}`}
-            </button>
-            <button type="button" className="btn secondary" onClick={() => setMostrarModal(false)}>
-              Cancelar
-            </button>
-          </div>
-        </form>
-      )}
 
       <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", marginBottom: "1.5rem" }}>
         <div className="stat-card accent">

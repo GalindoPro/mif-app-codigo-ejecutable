@@ -240,112 +240,20 @@ export interface DatosLiquidarPlazoFijo {
   montoLiquidado?: number;
 }
 
+// Esta liquidación NUNCA debe hacerse por aquí: no exige caja abierta y no
+// registra el egreso de efectivo en auxiliar de caja, así que el dinero
+// entregado al socio quedaría sin contabilizar en la caja del día. El único
+// camino válido es POST /caja-auxiliar/:diaId/liquidar-plazo-fijo (ver
+// cajaauxiliar/service.ts:liquidarPlazoFijo).
 export async function liquidar(
-  id: string,
-  data: DatosLiquidarPlazoFijo | undefined,
-  usuarioId: string,
-  agenciaVisible: string | null,
-) {
-  const actual = await obtener(id, agenciaVisible);
-  if (actual.estado === "LIQUIDADO") throw badRequest("Este contrato ya ha sido liquidado");
-
-  const hoy = new Date().toISOString().slice(0, 10);
-  const recibo = data?.reciboRetiro?.trim() || actual.numero_certificacion || `LIQ-${Date.now()}`;
-
-  // Validar anti-duplicados si se especificó reciboRetiro
-  if (data?.reciboRetiro && data.reciboRetiro.trim()) {
-    const { rows: repetidoAux } = await pool.query(
-      `select fecha, doc_no, beneficiario, descripcion
-       from caja_movimientos_auxiliar
-       where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
-       limit 1`,
-      [actual.agencia_id, recibo],
-    );
-    if (repetidoAux[0]) {
-      const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
-      throw conflict(
-        `El número de recibo "${recibo}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}).`,
-      );
-    }
-    const { rows: repetidoPF } = await pool.query(
-      `select fecha_retiro, recibo_retiro, numero_certificacion
-       from plazo_fijo_contratos
-       where lower(trim(recibo_retiro)) = lower($1)
-       limit 1`,
-      [recibo],
-    );
-    if (repetidoPF[0]) {
-      const fechaStr = repetidoPF[0].fecha_retiro
-        ? new Date(repetidoPF[0].fecha_retiro).toLocaleDateString("es-GT")
-        : "";
-      throw conflict(
-        `El número de recibo "${recibo}" ya fue utilizado en la liquidación del certificado No. ${repetidoPF[0].numero_certificacion} el ${fechaStr}.`,
-      );
-    }
-  }
-
-  const montoALiquidar =
-    data?.montoLiquidado ??
-    (data?.incluirIntereses ? Number(actual.saldo_liquido_a_pagar) : Number(actual.monto_deposito));
-
-  const client = await pool.connect();
-  try {
-    await client.query("begin");
-
-    // 1. Actualizar contrato a liquidado
-    const { rows: pfRows } = await client.query(
-      `update plazo_fijo_contratos
-       set estado = 'LIQUIDADO',
-           fecha_retiro = $1,
-           recibo_retiro = $2,
-           monto_liquidado = $3,
-           updated_at = now()
-       where id = $4
-       returning *`,
-      [hoy, recibo, montoALiquidar, id],
-    );
-
-    // 2. Registrar movimiento de liquidación en la cuenta
-    const clienteMovId = `LIQ-PF-${id}-${Date.now()}`;
-    await client.query(
-      `insert into movimientos (cuenta_id, tipo, monto, fecha, descripcion, numero_recibo, usuario_id, cliente_movimiento_id)
-       values ($1, 'RETIRO', $2, $3, $4, $5, $6, $7)`,
-      [
-        actual.cuenta_id,
-        montoALiquidar,
-        hoy,
-        `Liquidación de certificado No. ${actual.numero_certificacion}`,
-        recibo,
-        usuarioId,
-        clienteMovId,
-      ],
-    );
-
-    await client.query("commit");
-
-    const liquidado = pfRows[0];
-
-    await registrarAuditoria({
-      entidad: "PlazoFijoContrato",
-      entidadId: id,
-      accion: "ACTUALIZAR",
-      usuarioId,
-      datosAnteriores: { estado: actual.estado },
-      datosNuevos: {
-        estado: liquidado.estado,
-        fecha_retiro: liquidado.fecha_retiro,
-        recibo_retiro: recibo,
-        monto_liquidado: montoALiquidar,
-      },
-    });
-
-    return liquidado;
-  } catch (err) {
-    await client.query("rollback");
-    throw err;
-  } finally {
-    client.release();
-  }
+  _id: string,
+  _data: DatosLiquidarPlazoFijo | undefined,
+  _usuarioId: string,
+  _agenciaVisible: string | null,
+): Promise<never> {
+  throw badRequest(
+    "La liquidación de plazo fijo debe registrarse desde Auxiliar de Caja (con la caja del día abierta), para que el efectivo entregado quede contabilizado.",
+  );
 }
 
 export function simular(params: ParametrosPlazoFijo) {
