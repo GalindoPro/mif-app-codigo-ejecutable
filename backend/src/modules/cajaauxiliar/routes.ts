@@ -4,7 +4,7 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { requireAuth, requireRole, agenciaVisible } from "../../middleware/auth";
 import { badRequest, forbidden } from "../../utils/errors";
 import * as service from "./service";
-import { CATEGORIA_KEYS } from "./categorias";
+import { CATEGORIA_MANUAL_KEYS } from "./categorias";
 
 export const cajaAuxiliarRouter = Router();
 cajaAuxiliarRouter.use(requireAuth);
@@ -81,7 +81,11 @@ cajaAuxiliarRouter.get(
 );
 
 const movimientoSchema = z.object({
-  categoria: z.enum(CATEGORIA_KEYS as [string, ...string[]]),
+  // Excluye a propósito las categorías de préstamo (abono/interés/mora) y la
+  // de desembolso: esas solo debe escribirlas el cobro de cuota / desembolso
+  // estructurado, que sí actualiza el crédito real — nunca este endpoint
+  // genérico de registro manual.
+  categoria: z.enum(CATEGORIA_MANUAL_KEYS as [string, ...string[]]),
   monto: z.number().positive("El monto debe ser mayor a cero"),
   beneficiario: z.string().optional(),
   socioId: z.string().uuid().optional(),

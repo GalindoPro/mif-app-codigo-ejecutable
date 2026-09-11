@@ -47,6 +47,12 @@ export interface CategoriaInfo {
   movimientoTipo?: "DEPOSITO" | "RETIRO";
   ingresosComifCategoria?: string;
   sinModuloReal?: boolean;
+  // Categorías que SOLO deben registrarse desde su flujo estructurado
+  // (cobro de cuota / desembolso), nunca a mano: ahí sí quedan ligadas al
+  // prestamo_id real, actualizan saldo_capital, y crean su registro en
+  // prestamo_pagos. Si se registran manualmente aquí, el efectivo queda
+  // contado en la caja del día, pero el crédito nunca se entera del pago.
+  usoInternoSolo?: boolean;
 }
 
 export const CATEGORIAS: Record<CajaCategoria, CategoriaInfo> = {
@@ -183,6 +189,7 @@ export const CATEGORIAS: Record<CajaCategoria, CategoriaInfo> = {
     grupoContador: "prestamo",
     descripcion: "Abono sobre préstamo hipotecario",
     ingresosComifCategoria: "ABONO_PRESTAMO",
+    usoInternoSolo: true,
   },
   INTERES_PRESTAMO_HIPOTECARIO: {
     seccion: "PROPIO",
@@ -190,6 +197,7 @@ export const CATEGORIAS: Record<CajaCategoria, CategoriaInfo> = {
     grupoContador: "prestamo",
     descripcion: "Interés hipotecario",
     ingresosComifCategoria: "INTERES_PRESTAMO",
+    usoInternoSolo: true,
   },
   MORA_PRESTAMO_HIPOTECARIO: {
     seccion: "PROPIO",
@@ -197,6 +205,7 @@ export const CATEGORIAS: Record<CajaCategoria, CategoriaInfo> = {
     grupoContador: "prestamo",
     descripcion: "Mora sobre préstamo hipotecario",
     ingresosComifCategoria: "MORA_PRESTAMO",
+    usoInternoSolo: true,
   },
   ABONO_PRESTAMO_FIDUCIARIO: {
     seccion: "PROPIO",
@@ -204,6 +213,7 @@ export const CATEGORIAS: Record<CajaCategoria, CategoriaInfo> = {
     grupoContador: "prestamo",
     descripcion: "Abono sobre préstamo fiduciario",
     ingresosComifCategoria: "ABONO_PRESTAMO_FIDUCIARIO",
+    usoInternoSolo: true,
   },
   INTERES_PRESTAMO_FIDUCIARIO: {
     seccion: "PROPIO",
@@ -211,6 +221,7 @@ export const CATEGORIAS: Record<CajaCategoria, CategoriaInfo> = {
     grupoContador: "prestamo",
     descripcion: "Interés fiduciario",
     ingresosComifCategoria: "INTERES_FIDUCIARIO",
+    usoInternoSolo: true,
   },
   MORA_PRESTAMO_FIDUCIARIO: {
     seccion: "PROPIO",
@@ -218,6 +229,7 @@ export const CATEGORIAS: Record<CajaCategoria, CategoriaInfo> = {
     grupoContador: "prestamo",
     descripcion: "Mora sobre préstamo fiduciario",
     ingresosComifCategoria: "MORA_PRESTAMO",
+    usoInternoSolo: true,
   },
 
   COLOCACION_PRESTAMO: {
@@ -226,6 +238,7 @@ export const CATEGORIAS: Record<CajaCategoria, CategoriaInfo> = {
     grupoContador: "colocacion",
     descripcion: "Colocación de préstamo (desembolso)",
     sinModuloReal: true,
+    usoInternoSolo: true,
   },
   EGRESO_VARIO: {
     seccion: "PROPIO",
@@ -243,6 +256,10 @@ export const CATEGORIAS: Record<CajaCategoria, CategoriaInfo> = {
 };
 
 export const CATEGORIA_KEYS = Object.keys(CATEGORIAS) as CajaCategoria[];
+
+// Categorías permitidas para el registro MANUAL de movimientos (excluye las
+// que solo debe escribir el propio código del cobro de cuota / desembolso).
+export const CATEGORIA_MANUAL_KEYS = CATEGORIA_KEYS.filter((k) => !CATEGORIAS[k].usoInternoSolo);
 
 export function categoriasDelGrupo(grupo: string): CajaCategoria[] {
   return CATEGORIA_KEYS.filter((k) => CATEGORIAS[k].grupoContador === grupo);
