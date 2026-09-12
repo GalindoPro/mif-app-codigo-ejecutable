@@ -32,7 +32,7 @@ export default function CreditoForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const puedeElegirAgencia = usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA";
+  const puedeElegirAgencia = usuario?.rol === "GERENCIA";
 
   const [agencias, setAgencias] = useState<Agencia[]>([]);
   const [agenciaId, setAgenciaId] = useState(usuario?.agenciaId ?? "");

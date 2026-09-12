@@ -10,7 +10,7 @@ cajaChicaRouter.use(requireAuth);
 
 cajaChicaRouter.get(
   "/",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
   asyncHandler(async (req, res) => {
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
     res.json(await service.listar({ agenciaId: agenciaVisible(req), q }));
@@ -19,7 +19,7 @@ cajaChicaRouter.get(
 
 cajaChicaRouter.get(
   "/reporte",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
   asyncHandler(async (req, res) => {
     const visible = agenciaVisible(req);
     const agenciaId = (visible || req.query.agenciaId) as string;
@@ -61,7 +61,7 @@ const crearSchema = z.object({
 
 cajaChicaRouter.post(
   "/",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
   asyncHandler(async (req, res) => {
     const data = crearSchema.parse(req.body);
     const visible = agenciaVisible(req);
@@ -81,7 +81,7 @@ const reponerFondoSchema = z.object({
 
 cajaChicaRouter.post(
   "/reponer-fondo",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
   asyncHandler(async (req, res) => {
     const data = reponerFondoSchema.parse(req.body);
     const visible = agenciaVisible(req);
@@ -90,3 +90,48 @@ cajaChicaRouter.post(
   }),
 );
 
+const editarSchema = z.object({
+  fecha: z.string().min(1).optional(),
+  numeroDocumento: z.string().optional(),
+  beneficiario: z.string().min(2).optional(),
+  descripcion: z.string().min(2).optional(),
+  tipo: z.enum(["INGRESO", "EGRESO"]).optional(),
+  categoria: z.enum(CATEGORIAS_CAJA_CHICA).optional(),
+  monto: z.number().positive("El monto debe ser mayor a cero").optional(),
+  motivo: z.string().min(10, "El motivo de la corrección es obligatorio (mínimo 10 caracteres)"),
+});
+
+cajaChicaRouter.patch(
+  "/:id",
+  requireRole("GERENCIA", "CAJERO", "CAJA_CHICA"),
+  asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const data = editarSchema.parse(req.body);
+    const { motivo, ...updates } = data;
+
+    // Verificar permisos operativos (GERENCIA salta esto)
+    if (req.user!.rol !== "GERENCIA") {
+      const { pool } = await import("../../db/pool");
+      const { rows } = await pool.query(
+        "select usuario_id, created_at from caja_chica_comprobantes where id = $1",
+        [id]
+      );
+      if (!rows[0]) throw badRequest("El registro no existe");
+      const reg = rows[0];
+      
+      // Debe ser el mismo usuario
+      if (reg.usuario_id !== req.user!.id) {
+        throw forbidden("No autorizado: Solo puedes editar tus propios registros");
+      }
+      
+      // Debe ser del mismo día (hoy localmente o created_at)
+      const hoy = new Date().toISOString().slice(0, 10);
+      const fechaRegistro = new Date(reg.created_at).toISOString().slice(0, 10);
+      if (hoy !== fechaRegistro) {
+        throw forbidden("No autorizado: Solo puedes editar registros creados el día de hoy");
+      }
+    }
+
+    res.json(await service.editar(id, updates, req.user!.id, motivo));
+  }),
+);

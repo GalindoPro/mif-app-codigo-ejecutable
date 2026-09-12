@@ -22,13 +22,7 @@ export const GRUPOS = [
 
 export function categoriasDeGrupo(seccion: "BI" | "PROPIO", tipo: "INGRESO" | "EGRESO"): CajaCategoria[] {
   return CATEGORIA_AUXILIAR_KEYS.filter(
-    (k) =>
-      CATEGORIAS_AUXILIAR[k].seccion === seccion &&
-      CATEGORIAS_AUXILIAR[k].tipo === tipo &&
-      // Cobro de cuota, mora, interés y desembolso solo se registran desde su
-      // propia pantalla (quedan ligados al crédito real); aquí no se ofrecen
-      // para no crear un cobro "fantasma" que el crédito nunca reciba.
-      !CATEGORIAS_AUXILIAR[k].usoInternoSolo,
+    (k) => CATEGORIAS_AUXILIAR[k].seccion === seccion && CATEGORIAS_AUXILIAR[k].tipo === tipo,
   );
 }
 

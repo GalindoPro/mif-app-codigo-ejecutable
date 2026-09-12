@@ -2,22 +2,23 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { CATEGORIA_CAJA_CHICA_LABEL } from "../types";
-import { formatearQuetzales } from "../lib/formatters";
-import type { Agencia, CategoriaCajaChica, ListaCajaChica } from "../types";
+import { CATEGORIA_CAJA_CHICA_LABEL, formatoQ } from "../types";
+import type { Agencia, CategoriaCajaChica, ListaCajaChica, CajaChicaComprobante } from "../types";
 import CajaChicaReporteModal from "../components/CajaChicaReporteModal";
+import CajaChicaEditModal from "../components/CajaChicaEditModal";
 
 const CATEGORIAS = Object.entries(CATEGORIA_CAJA_CHICA_LABEL) as [CategoriaCajaChica, string][];
 
 export default function CajaChica() {
   const { usuario } = useAuth();
-  const puedeElegirAgencia = usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA";
+  const puedeElegirAgencia = usuario?.rol === "GERENCIA";
 
   const [q, setQ] = useState("");
   const [resultado, setResultado] = useState<ListaCajaChica | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [mostrarReporte, setMostrarReporte] = useState(false);
+  const [editarRegistro, setEditarRegistro] = useState<CajaChicaComprobante | null>(null);
   const [agencias, setAgencias] = useState<Agencia[]>([]);
 
   const [agenciaId, setAgenciaId] = useState(usuario?.agenciaId ?? "");
@@ -166,17 +167,17 @@ export default function CajaChica() {
           <div className="screen-kpis" style={{ margin: "0.4rem 0" }}>
             <div className="kpi-tile accent" style={{ padding: "0.5rem 0.85rem" }}>
               <span className="kpi-tile-label">Saldo Actual</span>
-              <span className="kpi-tile-value" style={{ color: "#10b981" }}>{formatearQuetzales(resultado.saldoActual)}</span>
+              <span className="kpi-tile-value" style={{ color: "#10b981" }}>{formatoQ(resultado.saldoActual)}</span>
               <span className="kpi-tile-sub">Fondo disponible</span>
             </div>
             <div className="kpi-tile" style={{ padding: "0.5rem 0.85rem" }}>
               <span className="kpi-tile-label">Total Ingresos</span>
-              <span className="kpi-tile-value">{formatearQuetzales(resultado.totalIngresos)}</span>
+              <span className="kpi-tile-value">{formatoQ(resultado.totalIngresos)}</span>
               <span className="kpi-tile-sub">Reposiciones registradas</span>
             </div>
             <div className="kpi-tile" style={{ padding: "0.5rem 0.85rem" }}>
               <span className="kpi-tile-label">Total Egresos</span>
-              <span className="kpi-tile-value" style={{ color: "#ef4444" }}>{formatearQuetzales(resultado.totalEgresos)}</span>
+              <span className="kpi-tile-value" style={{ color: "#ef4444" }}>{formatoQ(resultado.totalEgresos)}</span>
               <span className="kpi-tile-sub">Gastos comprobados</span>
             </div>
             <div className="kpi-tile" style={{ padding: "0.5rem 0.85rem" }}>
@@ -214,7 +215,7 @@ export default function CajaChica() {
                   <input id="repo-desc" value={repoDesc} onChange={(e) => setRepoDesc(e.target.value)} />
                 </div>
                 <button type="submit" className="btn" style={{ background: "#059669", marginTop: "0.3rem" }} disabled={repoGuardando}>
-                  {repoGuardando ? "Ingresando…" : `Confirmar ${formatearQuetzales(Number(repoMonto) || 0)}`}
+                  {repoGuardando ? "Ingresando…" : `Confirmar ${formatoQ(Number(repoMonto) || 0)}`}
                 </button>
               </form>
             ) : mostrarForm ? (
@@ -308,7 +309,7 @@ export default function CajaChica() {
                             {label}
                           </span>
                           <span className="mono" style={{ fontWeight: 700, color: "var(--ink)" }}>
-                            {formatearQuetzales(c.total)}
+                            {formatoQ(c.total)}
                           </span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
@@ -366,7 +367,8 @@ export default function CajaChica() {
                     <th>Tipo</th>
                     <th>Categoría</th>
                     <th style={{ textAlign: "right" }}>Monto</th>
-                    <th>Usuario</th>
+                    <th>Registrado Por</th>
+                    <th style={{ textAlign: "center", width: "40px" }}>Acción</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -409,9 +411,21 @@ export default function CajaChica() {
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {c.tipo === "EGRESO" ? "−" : "+"} {formatearQuetzales(c.monto)}
+                        {c.tipo === "EGRESO" ? "−" : "+"} {formatoQ(c.monto)}
                       </td>
                       <td style={{ fontSize: "0.76rem", color: "var(--ink-soft)" }}>{c.usuario_nombre}</td>
+                      <td style={{ textAlign: "center" }}>
+                        {(usuario?.rol === "GERENCIA" || (c.usuario_id === usuario?.id && c.created_at.startsWith(new Date().toISOString().slice(0, 10)))) && (
+                          <button
+                            title="Corregir Registro"
+                            className="btn btn-icon"
+                            style={{ padding: "0.2rem", fontSize: "0.9rem" }}
+                            onClick={() => setEditarRegistro(c)}
+                          >
+                            ✏️
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -432,6 +446,17 @@ export default function CajaChica() {
           agencias={agencias}
           puedeElegirAgencia={puedeElegirAgencia}
           onClose={() => setMostrarReporte(false)}
+        />
+      )}
+
+      {editarRegistro && (
+        <CajaChicaEditModal
+          registro={editarRegistro}
+          onClose={() => setEditarRegistro(null)}
+          onSuccess={() => {
+            setEditarRegistro(null);
+            cargar();
+          }}
         />
       )}
     </div>

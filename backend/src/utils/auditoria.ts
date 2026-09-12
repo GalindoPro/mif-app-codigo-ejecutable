@@ -13,12 +13,13 @@ export async function registrarAuditoria(
     usuarioId: string;
     datosAnteriores?: unknown;
     datosNuevos?: unknown;
+    motivo?: string;
   },
   client: Pick<PoolClient, "query"> = pool,
 ) {
   await client.query(
-    `insert into auditoria (entidad, entidad_id, accion, usuario_id, datos_anteriores, datos_nuevos)
-     values ($1, $2, $3, $4, $5, $6)`,
+    `insert into auditoria (entidad, entidad_id, accion, usuario_id, datos_anteriores, datos_nuevos, motivo)
+     values ($1, $2, $3, $4, $5, $6, $7)`,
     [
       params.entidad,
       params.entidadId,
@@ -26,6 +27,7 @@ export async function registrarAuditoria(
       params.usuarioId,
       params.datosAnteriores ? JSON.stringify(params.datosAnteriores) : null,
       params.datosNuevos ? JSON.stringify(params.datosNuevos) : null,
+      params.motivo || null,
     ],
   );
 }

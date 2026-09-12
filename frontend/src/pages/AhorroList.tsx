@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
-import { TIPOS_AHORRO } from "../types";
-import { formatearQuetzales } from "../lib/formatters";
+import { formatoQ, TIPOS_AHORRO } from "../types";
 import type { Cuenta, ResumenCuentas } from "../types";
 
 export default function AhorroList() {
@@ -89,20 +88,20 @@ export default function AhorroList() {
       <div className="screen-kpis" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
         <div className="screen-kpi-tile accent">
           <span className="screen-kpi-label">SALDO TOTAL</span>
-          <span className="screen-kpi-value">{formatearQuetzales(saldoTotal)}</span>
+          <span className="screen-kpi-value">{formatoQ(saldoTotal)}</span>
           <span className="screen-kpi-sub">{resumen?.totalCuentas ?? totalCuentas} cuenta(s) activas</span>
         </div>
         <div className="screen-kpi-tile">
           <span className="screen-kpi-label">TOTAL DEPÓSITOS</span>
           <span className="screen-kpi-value" style={{ color: "#059669" }}>
-            {formatearQuetzales(resumen?.totalDepositos ?? 0)}
+            {formatoQ(resumen?.totalDepositos ?? 0)}
           </span>
           <span className="screen-kpi-sub">Ingresos acumulados</span>
         </div>
         <div className="screen-kpi-tile">
           <span className="screen-kpi-label">TOTAL RETIROS</span>
           <span className="screen-kpi-value" style={{ color: "#d97706" }}>
-            {formatearQuetzales(resumen?.totalRetiros ?? 0)}
+            {formatoQ(resumen?.totalRetiros ?? 0)}
           </span>
           <span className="screen-kpi-sub">Egresos acumulados</span>
         </div>
@@ -181,7 +180,7 @@ export default function AhorroList() {
                   </Link>
                 </td>
                 <td className="mono" style={{ fontWeight: 700, color: "var(--accent)", textAlign: "right" }}>
-                  {formatearQuetzales(c.saldo_actual)}
+                  {formatoQ(c.saldo_actual)}
                 </td>
                 <td style={{ textAlign: "center" }}>
                   <span className={`badge ${c.estado === "ACTIVA" ? "activo" : "inactivo"}`} style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}>

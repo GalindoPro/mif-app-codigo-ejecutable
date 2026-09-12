@@ -48,7 +48,7 @@ export default function Agencias() {
           <h1>Agencias</h1>
           <p>Cada agencia captura sus propios movimientos; este consolidado une todas en un solo sistema.</p>
         </div>
-        {usuario?.rol === "ADMIN" && (
+        {usuario?.rol === "GERENCIA" && (
           <button className="btn" onClick={() => setMostrarForm((v) => !v)}>
             {mostrarForm ? "Cancelar" : "+ Nueva agencia"}
           </button>

@@ -3,13 +3,12 @@ import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import type { Socio, EstadoPrestamo, TipoPrestamo } from "../types";
-import { PARENTESCOS_BENEFICIARIO } from "../types";
+import { PARENTESCOS_BENEFICIARIO, formatoQ } from "../types";
 import {
   formatearDPI,
   formatearTelefono,
   prepararTelefonoParaGuardar,
   capitalizarDescripcion,
-  formatearQuetzales,
 } from "../lib/formatters";
 import InputNombreAutoCompletar from "../components/InputNombreAutoCompletar";
 
@@ -19,10 +18,6 @@ interface Cuenta {
   tipo: string;
   estado: string;
   saldo_actual: string;
-  // Solo viene con valor cuando tipo === "AHORRO_PLAZO_FIJO": el detalle de
-  // plazo fijo vive en su propia tabla (plazo_fijo_contratos), con un id
-  // distinto al de esta cuenta.
-  plazo_fijo_contrato_id?: string | null;
 }
 
 interface PrestamoBrief {
@@ -215,7 +210,7 @@ export default function SocioDetail() {
         recibo: reciboApor.trim() || undefined,
       });
       setMostrarModalAportacion(false);
-      setMensajeExito(`¡Cuenta de Aportación ${data.numero_cuenta} creada con éxito con saldo de ${formatearQuetzales(monto)}! El socio ya puede aperturar cuentas de ahorro y créditos.`);
+      setMensajeExito(`¡Cuenta de Aportación ${data.numero_cuenta} creada con éxito con saldo de ${formatoQ(monto)}! El socio ya puede aperturar cuentas de ahorro y créditos.`);
       setTimeout(() => setMensajeExito(null), 6000);
       cargar();
     } catch (err) {
@@ -687,16 +682,11 @@ export default function SocioDetail() {
                   {socio.cuentas.map((c) => {
                     const slug = TIPO_SLUG[c.tipo];
                     const esApor = c.tipo === "APORTACION";
-                    // Plazo fijo vive en su propia tabla de contrato, con un
-                    // id distinto al de esta cuenta — usar ese id, no c.id,
-                    // o el enlace lleva a un contrato que no existe (404).
-                    const idDetalle = c.tipo === "AHORRO_PLAZO_FIJO" ? c.plazo_fijo_contrato_id : c.id;
-                    const puedeVerDetalle = Boolean(slug && idDetalle);
                     return (
                       <tr key={c.id}>
                         <td className="mono" style={{ fontWeight: 600, padding: "4px 8px" }}>
-                          {puedeVerDetalle ? (
-                            <Link to={`/ahorros/${slug}/${idDetalle}`}>{c.numero_cuenta}</Link>
+                          {slug ? (
+                            <Link to={`/ahorros/${slug}/${c.id}`}>{c.numero_cuenta}</Link>
                           ) : (
                             c.numero_cuenta
                           )}
@@ -714,11 +704,11 @@ export default function SocioDetail() {
                           </span>
                         </td>
                         <td className="mono" style={{ textAlign: "right", fontWeight: 700, padding: "4px 8px" }}>
-                          {formatearQuetzales(c.saldo_actual)}
+                          {formatoQ(c.saldo_actual)}
                         </td>
                         <td style={{ textAlign: "center", padding: "4px 8px" }}>
-                          {puedeVerDetalle ? (
-                            <Link to={`/ahorros/${slug}/${idDetalle}`} style={{ fontSize: "0.78rem", textDecoration: "none" }}>
+                          {slug ? (
+                            <Link to={`/ahorros/${slug}/${c.id}`} style={{ fontSize: "0.78rem", textDecoration: "none" }}>
                               Ver →
                             </Link>
                           ) : (

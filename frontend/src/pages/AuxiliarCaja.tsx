@@ -13,7 +13,7 @@ import HistorialCajasModal from "../components/cajaauxiliar/HistorialCajasModal"
 
 export default function AuxiliarCaja() {
   const { usuario } = useAuth();
-  const puedeElegirAgencia = usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA";
+  const puedeElegirAgencia = usuario?.rol === "GERENCIA";
 
   const [agencias, setAgencias] = useState<Agencia[]>([]);
   const [agenciaId, setAgenciaId] = useState(usuario?.agenciaId ?? "");
@@ -114,14 +114,16 @@ export default function AuxiliarCaja() {
         </div>
 
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-          <button
-            type="button"
-            className="btn secondary"
-            onClick={() => setMostrarHistorial(true)}
-            style={{ padding: "0.3rem 0.65rem", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.3rem" }}
-          >
-            <span>📅</span> Historial de Cajas
-          </button>
+          {usuario?.rol !== "CAJERO" && (
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={() => setMostrarHistorial(true)}
+              style={{ padding: "0.3rem 0.65rem", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.3rem" }}
+            >
+              <span>📅</span> Historial de Cajas
+            </button>
+          )}
           {puedeElegirAgencia && (
             <select
               value={agenciaId}

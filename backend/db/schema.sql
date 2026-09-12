@@ -1,8 +1,9 @@
 -- ============================================================================
 -- Esquema de base de datos — Sistema Integral MIF
--- Modela todo el dominio en uso: agencias, usuarios, socios, cuentas y
--- movimientos, plazo fijo, caja chica y auxiliar de caja, créditos y
--- amortización, garantías, excedentes, auditoría y sesiones.
+-- Fase 1: se modela TODO el dominio (para no rediseñar la base más adelante),
+-- aunque la API y el frontend de esta fase solo construyen Agencias, Usuarios
+-- y Socios. El resto de tablas (cuentas, movimientos, plazo fijo, caja chica,
+-- ingresos COMIF) quedan listas para las siguientes fases.
 --
 -- Este script es idempotente: se puede correr varias veces sin error.
 -- ============================================================================
@@ -123,6 +124,7 @@ create table if not exists auditoria (
   datos_anteriores jsonb,
   datos_nuevos     jsonb,
   usuario_id       uuid not null references usuarios(id),
+  motivo           text,
   fecha            timestamptz not null default now()
 );
 create index if not exists idx_auditoria_entidad on auditoria(entidad, entidad_id);
@@ -158,65 +160,6 @@ alter table socios add column if not exists edad integer;
 alter table socios add column if not exists dpi_beneficiario text;
 alter table socios add column if not exists telefono_beneficiario text;
 alter table socios add column if not exists parentesco_beneficiario text;
-
--- ---------------------------------------------------------------------------
--- Módulo de Créditos / Préstamos
--- ---------------------------------------------------------------------------
--- Va ANTES que "Cuentas y movimientos": la tabla cuentas tiene una FK opcional
--- prestamo_id -> prestamos(id) (cuenta de Ahorro sobre Préstamo), así que
--- prestamos debe existir primero al aplicar este archivo contra una base vacía.
-do $$ begin
-  create type tipo_prestamo as enum ('FIDUCIARIO', 'HIPOTECARIO');
-exception when duplicate_object then null; end $$;
-
-do $$ begin
-  create type estado_prestamo as enum ('SOLICITUD', 'APROBADO', 'DESEMBOLSADO', 'CANCELADO', 'RECHAZADO');
-exception when duplicate_object then null; end $$;
-
-do $$ begin
-  create type tipo_amortizacion as enum ('CUOTA_NIVELADA', 'SOBRE_SALDOS');
-exception when duplicate_object then null; end $$;
-
-create table if not exists prestamos (
-  id                    uuid primary key default gen_random_uuid(),
-  codigo                text not null unique,
-  socio_id              uuid not null references socios(id),
-  agencia_id            uuid not null references agencias(id),
-  promotor_id           uuid references usuarios(id),
-  tipo                  tipo_prestamo not null default 'FIDUCIARIO',
-  estado                estado_prestamo not null default 'SOLICITUD',
-  tipo_amortizacion     tipo_amortizacion not null default 'CUOTA_NIVELADA',
-  monto_solicitado      numeric(14,2) not null,
-  monto_aprobado        numeric(14,2),
-  tasa_interes_mensual  numeric(6,2) not null default 2.00,
-  plazo_meses           integer not null,
-  cuota_mensual         numeric(14,2) not null,
-  destino               text,
-  garantia              text,
-  observaciones         text,
-  fecha_solicitud       date not null default current_date,
-  fecha_aprobacion      date,
-  fecha_desembolso      date,
-  created_at            timestamptz not null default now(),
-  updated_at            timestamptz not null default now()
-);
-
-create index if not exists idx_prestamos_socio on prestamos(socio_id);
-create index if not exists idx_prestamos_agencia on prestamos(agencia_id);
-create index if not exists idx_prestamos_promotor on prestamos(promotor_id);
-create index if not exists idx_prestamos_estado on prestamos(estado);
-
-alter table prestamos add column if not exists saldo_capital numeric(14,2);
-alter table prestamos add column if not exists ubicacion_garantia text;
-alter table prestamos add column if not exists nombre_fiador text;
-alter table prestamos add column if not exists dpi_fiador text;
-alter table prestamos add column if not exists telefono_fiador text;
-alter table prestamos add column if not exists documento_desembolso text;
-alter table prestamos add column if not exists fecha_vencimiento date;
-alter table prestamos add column if not exists origen_fondos text not null default 'FONDOS_PROPIOS';
-alter table prestamos add column if not exists fecha_ultimo_pago_migracion date;
-alter table prestamos add column if not exists es_migracion boolean default false;
-alter table prestamos add column if not exists numero_credito_anterior text;
 
 -- ---------------------------------------------------------------------------
 -- Cuentas y movimientos
@@ -392,6 +335,62 @@ create table if not exists caja_arqueos (
   created_at      timestamptz not null default now()
 );
 
+-- ---------------------------------------------------------------------------
+-- Módulo de Créditos / Préstamos
+-- ---------------------------------------------------------------------------
+do $$ begin
+  create type tipo_prestamo as enum ('FIDUCIARIO', 'HIPOTECARIO');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type estado_prestamo as enum ('SOLICITUD', 'APROBADO', 'DESEMBOLSADO', 'CANCELADO', 'RECHAZADO');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type tipo_amortizacion as enum ('CUOTA_NIVELADA', 'SOBRE_SALDOS');
+exception when duplicate_object then null; end $$;
+
+create table if not exists prestamos (
+  id                    uuid primary key default gen_random_uuid(),
+  codigo                text not null unique,
+  socio_id              uuid not null references socios(id),
+  agencia_id            uuid not null references agencias(id),
+  promotor_id           uuid references usuarios(id),
+  tipo                  tipo_prestamo not null default 'FIDUCIARIO',
+  estado                estado_prestamo not null default 'SOLICITUD',
+  tipo_amortizacion     tipo_amortizacion not null default 'CUOTA_NIVELADA',
+  monto_solicitado      numeric(14,2) not null,
+  monto_aprobado        numeric(14,2),
+  tasa_interes_mensual  numeric(6,2) not null default 2.00,
+  plazo_meses           integer not null,
+  cuota_mensual         numeric(14,2) not null,
+  destino               text,
+  garantia              text,
+  observaciones         text,
+  fecha_solicitud       date not null default current_date,
+  fecha_aprobacion      date,
+  fecha_desembolso      date,
+  created_at            timestamptz not null default now(),
+  updated_at            timestamptz not null default now()
+);
+
+create index if not exists idx_prestamos_socio on prestamos(socio_id);
+create index if not exists idx_prestamos_agencia on prestamos(agencia_id);
+create index if not exists idx_prestamos_promotor on prestamos(promotor_id);
+create index if not exists idx_prestamos_estado on prestamos(estado);
+
+alter table prestamos add column if not exists saldo_capital numeric(14,2);
+alter table prestamos add column if not exists ubicacion_garantia text;
+alter table prestamos add column if not exists nombre_fiador text;
+alter table prestamos add column if not exists dpi_fiador text;
+alter table prestamos add column if not exists telefono_fiador text;
+alter table prestamos add column if not exists documento_desembolso text;
+alter table prestamos add column if not exists fecha_vencimiento date;
+alter table prestamos add column if not exists origen_fondos text not null default 'FONDOS_PROPIOS';
+alter table prestamos add column if not exists fecha_ultimo_pago_migracion date;
+alter table prestamos add column if not exists es_migracion boolean default false;
+alter table prestamos add column if not exists numero_credito_anterior text;
+
 create table if not exists prestamo_pagos (
   id                       uuid primary key default gen_random_uuid(),
   prestamo_id              uuid not null references prestamos(id),
@@ -419,112 +418,31 @@ alter table caja_movimientos_auxiliar add column if not exists origen_fondos tex
 alter table ingresos_comif add column if not exists origen_fondos text;
 
 -- ---------------------------------------------------------------------------
--- Configuración del sistema (tasas, reglas, parámetros financieros)
--- ---------------------------------------------------------------------------
-create table if not exists configuracion_sistema (
-  clave       text primary key,
-  valor       text not null,
-  descripcion text,
-  updated_at  timestamptz not null default now()
-);
-insert into configuracion_sistema (clave, valor, descripcion) values
-  ('tasa_interes_mensual_default', '2.0',  'Tasa de interés mensual por defecto (%)'),
-  ('dias_gracia_mora',             '4',    'Días de gracia antes de aplicar mora fija'),
-  ('mora_fija_por_cuota',         '25.0', 'Monto fijo de mora por cuota vencida (Q)'),
-  ('aportacion_minima',           '100.0','Aportación mínima para afiliarse como socio (Q)'),
-  ('isr_porcentaje_plazo_fijo',   '10.0', 'ISR aplicado a intereses de plazo fijo (%)'),
-  ('tasa_plazo_fijo_corto',       '6.0',  'Tasa anual para plazo fijo < 12 meses (%)'),
-  ('tasa_plazo_fijo_largo',       '14.0', 'Tasa anual para plazo fijo de 12+ meses (%)')
-on conflict (clave) do nothing;
-
--- ---------------------------------------------------------------------------
--- Refinanciamientos de créditos (D1)
--- ---------------------------------------------------------------------------
-create table if not exists refinanciamientos (
-  id                     uuid primary key default gen_random_uuid(),
-  prestamo_id            uuid not null references prestamos(id),
-  saldo_capital_anterior numeric(14,2) not null,
-  tasa_anterior          numeric(6,2)  not null,
-  plazo_anterior         integer       not null,
-  cuota_anterior         numeric(14,2) not null,
-  nueva_tasa             numeric(6,2)  not null,
-  nuevo_plazo            integer       not null,
-  nueva_cuota            numeric(14,2) not null,
-  observaciones          text,
-  usuario_id             uuid not null references usuarios(id),
-  created_at             timestamptz not null default now()
-);
-create index if not exists idx_refinanciamientos_prestamo on refinanciamientos(prestamo_id);
-
--- ---------------------------------------------------------------------------
--- Garantías hipotecarias (D2)
--- ---------------------------------------------------------------------------
-create table if not exists garantias_hipotecarias (
-  id               uuid primary key default gen_random_uuid(),
-  prestamo_id      uuid not null unique references prestamos(id) on delete cascade,
-  tipo_bien        text not null default 'INMUEBLE',
-  descripcion      text not null,
-  valor_tasacion   numeric(14,2),
-  direccion        text,
-  municipio        text,
-  departamento     text,
-  no_finca         text,
-  folio            text,
-  libro            text,
-  fecha_inscripcion      date,
-  fecha_vencimiento      date,
-  observaciones    text,
-  usuario_id       uuid not null references usuarios(id),
-  created_at       timestamptz not null default now(),
-  updated_at       timestamptz not null default now()
-);
-
--- ---------------------------------------------------------------------------
--- Sesiones activas (D4)
--- ---------------------------------------------------------------------------
-create table if not exists sesiones (
-  jti          text primary key,
-  usuario_id   uuid not null references usuarios(id) on delete cascade,
-  ip           text,
-  user_agent   text,
-  activa       boolean not null default true,
-  created_at   timestamptz not null default now(),
-  expires_at   timestamptz not null,
-  revocada_at  timestamptz,
-  revocada_por uuid references usuarios(id)
-);
-create index if not exists idx_sesiones_usuario on sesiones(usuario_id, activa);
-
--- ---------------------------------------------------------------------------
--- Excedentes cooperativos (Bloque C)
+-- Liquidación de Promotores (Cobros de Campo)
 -- ---------------------------------------------------------------------------
 do $$ begin
-  create type estado_excedente as enum ('CALCULADO', 'APLICADO', 'ANULADO');
+  create type estado_cobro_campo as enum ('PENDIENTE', 'LIQUIDADO', 'RECHAZADO');
 exception when duplicate_object then null; end $$;
 
-create table if not exists excedentes (
-  id          uuid primary key default gen_random_uuid(),
-  anio        integer not null,
-  agencia_id  uuid references agencias(id),
-  monto_total numeric(14,2) not null,
-  estado      estado_excedente not null default 'CALCULADO',
-  aplicado_at timestamptz,
-  creado_por  uuid references usuarios(id),
-  created_at  timestamptz not null default now(),
-  unique (anio, agencia_id)
+create table if not exists cobros_campo (
+  id                       uuid primary key default gen_random_uuid(),
+  promotor_id              uuid not null references usuarios(id),
+  agencia_id               uuid not null references agencias(id),
+  socio_id                 uuid not null references socios(id),
+  prestamo_id              uuid not null references prestamos(id),
+  fecha                    date not null default current_date,
+  numero_recibo_fisico     text not null,
+  monto                    numeric(14,2) not null,
+  estado                   estado_cobro_campo not null default 'PENDIENTE',
+  justificacion_edicion    text,
+  veces_editado            integer not null default 0,
+  caja_dia_id              uuid references caja_dias(id),
+  caja_movimiento_id       uuid references caja_movimientos_auxiliar(id),
+  prestamo_pago_id         uuid references prestamo_pagos(id),
+  created_at               timestamptz not null default now(),
+  updated_at               timestamptz not null default now(),
+  liquidado_at             timestamptz
 );
 
-create table if not exists excedentes_detalle (
-  id             uuid primary key default gen_random_uuid(),
-  excedente_id   uuid not null references excedentes(id) on delete cascade,
-  socio_id       uuid not null references socios(id),
-  total_aportacion numeric(14,2) not null,
-  porcentaje     numeric(8,4) not null,
-  monto_asignado numeric(14,2) not null,
-  cuenta_id      uuid references cuentas(id),
-  aplicado       boolean not null default false,
-  created_at     timestamptz not null default now()
-);
-create index if not exists idx_excedentes_detalle_excedente on excedentes_detalle(excedente_id);
-
-
+create index if not exists idx_cobros_campo_promotor on cobros_campo(promotor_id, estado);
+create index if not exists idx_cobros_campo_prestamo on cobros_campo(prestamo_id);

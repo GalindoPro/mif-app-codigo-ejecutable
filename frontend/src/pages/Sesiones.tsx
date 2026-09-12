@@ -155,7 +155,7 @@ export default function Sesiones() {
                         background:
                           u.rol === "PROMOTOR"
                             ? "#ede9fe"
-                            : u.rol === "ADMIN"
+                            : u.rol === "GERENCIA"
                               ? "#fee2e2"
                               : u.rol === "GERENCIA"
                                 ? "#e0e7ff"
@@ -163,7 +163,7 @@ export default function Sesiones() {
                         color:
                           u.rol === "PROMOTOR"
                             ? "#6d28d9"
-                            : u.rol === "ADMIN"
+                            : u.rol === "GERENCIA"
                               ? "#991b1b"
                               : u.rol === "GERENCIA"
                                 ? "#3730a3"

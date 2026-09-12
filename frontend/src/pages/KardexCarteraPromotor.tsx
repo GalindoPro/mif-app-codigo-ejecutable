@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
-import { formatearQuetzales } from "../lib/formatters";
-import type { KardexCarteraRespuesta, TipoPrestamo } from "../types";
+import { formatoQ } from "../types";
+import type { KardexCarteraRespuesta, TipoPrestamo, CobroCampo } from "../types";
+import { CobroCampoModal } from "../components/promotor/CobroCampoModal";
 
 export default function KardexCarteraPromotor() {
   const hoyMes = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
@@ -11,16 +12,35 @@ export default function KardexCarteraPromotor() {
   const [tabTipo, setTabTipo] = useState<"TODOS" | TipoPrestamo>("TODOS");
   const [busqueda, setBusqueda] = useState("");
   const [kardex, setKardex] = useState<KardexCarteraRespuesta | null>(null);
+  const [cobrosPendientes, setCobrosPendientes] = useState<CobroCampo[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandidoId, setExpandidoId] = useState<string | null>(null);
+  
+  const [modalCobroPrestamo, setModalCobroPrestamo] = useState<{
+    id: string;
+    socioId: string;
+    socioNombres: string;
+    cobroExistente?: CobroCampo;
+  } | null>(null);
+
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
   useEffect(() => {
     setPage(1);
     cargarKardex();
+    cargarCobrosPendientes();
   }, [mes, tabTipo]);
+
+  async function cargarCobrosPendientes() {
+    try {
+      const { data } = await api.get<CobroCampo[]>("/cobros-campo/pendientes");
+      setCobrosPendientes(data);
+    } catch (err) {
+      console.error("Error cargando cobros de campo:", err);
+    }
+  }
 
   async function cargarKardex() {
     setCargando(true);
@@ -208,7 +228,7 @@ export default function KardexCarteraPromotor() {
               title="Total Cartera Activa Viva"
             >
               <span className="label" style={{ fontSize: "0.64rem", display: "block" }}>💼 Cartera Viva ({kardex.resumen.totalCreditos})</span>
-              <span className="value mono" style={{ fontSize: "0.98rem", whiteSpace: "nowrap" }}>{formatearQuetzales(kardex.resumen.totalCarteraViva)}</span>
+              <span className="value mono" style={{ fontSize: "0.98rem", whiteSpace: "nowrap" }}>{formatoQ(kardex.resumen.totalCarteraViva)}</span>
             </div>
 
             <div
@@ -218,7 +238,7 @@ export default function KardexCarteraPromotor() {
               title="Filtrar créditos hipotecarios"
             >
               <span className="label" style={{ fontSize: "0.64rem", display: "block" }}>🏡 Hipotecarios ({kardex.resumen.countHipotecarios})</span>
-              <span className="value mono" style={{ fontSize: "0.98rem", whiteSpace: "nowrap" }}>{formatearQuetzales(kardex.resumen.totalColocadoHipotecario)}</span>
+              <span className="value mono" style={{ fontSize: "0.98rem", whiteSpace: "nowrap" }}>{formatoQ(kardex.resumen.totalColocadoHipotecario)}</span>
             </div>
 
             <div
@@ -228,13 +248,13 @@ export default function KardexCarteraPromotor() {
               title="Filtrar créditos fiduciarios"
             >
               <span className="label" style={{ fontSize: "0.64rem", display: "block" }}>🤝 Fiduciarios ({kardex.resumen.countFiduciarios})</span>
-              <span className="value mono" style={{ fontSize: "0.98rem", whiteSpace: "nowrap" }}>{formatearQuetzales(kardex.resumen.totalColocadoFiduciario)}</span>
+              <span className="value mono" style={{ fontSize: "0.98rem", whiteSpace: "nowrap" }}>{formatoQ(kardex.resumen.totalColocadoFiduciario)}</span>
             </div>
 
             <div className="stat-card" style={{ padding: "0.35rem 0.65rem" }}>
               <span className="label" style={{ fontSize: "0.64rem", display: "block" }}>💵 Cobrado en {mes}</span>
               <span className="value mono" style={{ fontSize: "0.98rem", color: "#16a34a", whiteSpace: "nowrap" }}>
-                {formatearQuetzales(kardex.resumen.totalCobradoMes)}
+                {formatoQ(kardex.resumen.totalCobradoMes)}
               </span>
             </div>
 
@@ -427,22 +447,22 @@ export default function KardexCarteraPromotor() {
                                         <td className="mono">{pg.fecha}</td>
                                         <td className="mono">{pg.numero_recibo || "—"}</td>
                                         <td className="mono" style={{ textAlign: "right" }}>
-                                          {formatearQuetzales(pg.abono_capital)}
+                                          {formatoQ(pg.abono_capital)}
                                         </td>
                                         <td className="mono" style={{ textAlign: "right" }}>
-                                          {formatearQuetzales(pg.interes)}
+                                          {formatoQ(pg.interes)}
                                         </td>
                                         <td className="mono" style={{ textAlign: "right" }}>
-                                          {formatearQuetzales(pg.mora)}
+                                          {formatoQ(pg.mora)}
                                         </td>
                                         <td
                                           className="mono"
                                           style={{ textAlign: "right", fontWeight: 700, color: "#16a34a" }}
                                         >
-                                          {formatearQuetzales(pg.total_pagado)}
+                                          {formatoQ(pg.total_pagado)}
                                         </td>
                                         <td className="mono" style={{ textAlign: "right", fontWeight: 700 }}>
-                                          {formatearQuetzales(pg.saldo_capital_restante)}
+                                          {formatoQ(pg.saldo_capital_restante)}
                                         </td>
                                       </tr>
                                     ))}
@@ -473,7 +493,7 @@ export default function KardexCarteraPromotor() {
                             </span>
                           </td>
                           <td className="mono" style={{ textAlign: "right", fontWeight: 600 }}>
-                            {formatearQuetzales(montoOriginal)}
+                            {formatoQ(montoOriginal)}
                           </td>
                           <td
                             className="mono"
@@ -483,10 +503,10 @@ export default function KardexCarteraPromotor() {
                               color: saldoActual > 0 ? "#b45309" : "#15803d",
                             }}
                           >
-                            {formatearQuetzales(saldoActual)}
+                            {formatoQ(saldoActual)}
                           </td>
                           <td className="mono" style={{ textAlign: "right" }}>
-                            {formatearQuetzales(p.cuota_mensual)}
+                            {formatoQ(p.cuota_mensual)}
                           </td>
                           <td style={{ textAlign: "center" }}>
                             {p.estadoCuotaMes === "CANCELADO" ? (
@@ -495,7 +515,7 @@ export default function KardexCarteraPromotor() {
                               </span>
                             ) : p.estadoCuotaMes === "AL_DIA" ? (
                               <span className="badge activo" style={{ fontSize: "0.68rem", padding: "0.12rem 0.35rem" }}>
-                                🟢 Al día ({formatearQuetzales(p.totalPagadoMes)})
+                                🟢 Al día ({formatoQ(p.totalPagadoMes)})
                               </span>
                             ) : (
                               <span className="badge danger" style={{ fontSize: "0.68rem", padding: "0.12rem 0.35rem" }}>
@@ -503,11 +523,43 @@ export default function KardexCarteraPromotor() {
                               </span>
                             )}
                           </td>
-                          <td style={{ textAlign: "center" }}>
+                          <td style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "0.2rem", alignItems: "center" }}>
+                            {(() => {
+                              const cobroPendiente = cobrosPendientes.find(c => c.prestamo_id === p.id);
+                              if (cobroPendiente) {
+                                return (
+                                  <>
+                                    <span className="badge warning" style={{ fontSize: "0.6rem", padding: "0.1rem 0.2rem", background: "var(--accent-light)", color: "var(--accent)" }}>
+                                      ⏳ En tránsito
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className="btn secondary"
+                                      style={{ fontSize: "0.65rem", padding: "0.15rem 0.25rem", whiteSpace: "nowrap" }}
+                                      onClick={() => setModalCobroPrestamo({ id: p.id, socioId: p.socio_id, socioNombres: p.socio_nombres || "Socio Desconocido", cobroExistente: cobroPendiente })}
+                                    >
+                                      ✏️ Editar
+                                    </button>
+                                  </>
+                                );
+                              } else if (p.estadoCuotaMes !== "CANCELADO") {
+                                return (
+                                  <button
+                                    type="button"
+                                    className="btn primary"
+                                    style={{ fontSize: "0.65rem", padding: "0.15rem 0.25rem", whiteSpace: "nowrap" }}
+                                    onClick={() => setModalCobroPrestamo({ id: p.id, socioId: p.socio_id, socioNombres: p.socio_nombres || "Socio Desconocido" })}
+                                  >
+                                    💰 Cobro Campo
+                                  </button>
+                                );
+                              }
+                              return null;
+                            })()}
                             <button
                               type="button"
                               className="btn secondary"
-                              style={{ fontSize: "0.7rem", padding: "0.18rem 0.35rem", whiteSpace: "nowrap" }}
+                              style={{ fontSize: "0.7rem", padding: "0.18rem 0.35rem", whiteSpace: "nowrap", marginTop: "0.2rem" }}
                               onClick={() => setExpandidoId(p.id)}
                             >
                               👁️ Pagos ({p.pagos.length})
@@ -608,7 +660,7 @@ export default function KardexCarteraPromotor() {
                 Cartera Activa Viva
               </span>
               <strong className="mono" style={{ fontSize: "0.88rem", color: "#0f172a" }}>
-                {formatearQuetzales(kardex.resumen.totalCarteraViva)}
+                {formatoQ(kardex.resumen.totalCarteraViva)}
               </strong>
             </div>
 
@@ -617,7 +669,7 @@ export default function KardexCarteraPromotor() {
                 Hipotecarios ({kardex.resumen.countHipotecarios})
               </span>
               <strong className="mono" style={{ fontSize: "0.88rem", color: "#0f172a" }}>
-                {formatearQuetzales(kardex.resumen.totalColocadoHipotecario)}
+                {formatoQ(kardex.resumen.totalColocadoHipotecario)}
               </strong>
             </div>
 
@@ -626,7 +678,7 @@ export default function KardexCarteraPromotor() {
                 Fiduciarios ({kardex.resumen.countFiduciarios})
               </span>
               <strong className="mono" style={{ fontSize: "0.88rem", color: "#0f172a" }}>
-                {formatearQuetzales(kardex.resumen.totalColocadoFiduciario)}
+                {formatoQ(kardex.resumen.totalColocadoFiduciario)}
               </strong>
             </div>
 
@@ -635,7 +687,7 @@ export default function KardexCarteraPromotor() {
                 Cobrado en {mes}
               </span>
               <strong className="mono" style={{ fontSize: "0.88rem", color: "#16a34a" }}>
-                {formatearQuetzales(kardex.resumen.totalCobradoMes)}
+                {formatoQ(kardex.resumen.totalCobradoMes)}
               </strong>
             </div>
 
@@ -701,9 +753,9 @@ export default function KardexCarteraPromotor() {
                       )}
                     </td>
                     <td style={{ padding: "2px 3px" }}>{p.plazo_meses} m</td>
-                    <td className="mono" style={{ padding: "2px 3px" }}>{formatearFechaCorta(p.fecha_vencimiento)}</td>
+                    <td className="mono" style={{ padding: "2px 3px" }}>{p.fecha_vencimiento || "—"}</td>
                     <td className="mono" style={{ textAlign: "right", padding: "2px 3px" }}>
-                      {formatearQuetzales(montoOriginal)}
+                      {formatoQ(montoOriginal)}
                     </td>
                     <td
                       className="mono"
@@ -714,13 +766,13 @@ export default function KardexCarteraPromotor() {
                         padding: "2px 3px",
                       }}
                     >
-                      {formatearQuetzales(saldoActual)}
+                      {formatoQ(saldoActual)}
                     </td>
                     <td className="mono" style={{ textAlign: "right", padding: "2px 3px" }}>
-                      {formatearQuetzales(p.cuota_mensual)}
+                      {formatoQ(p.cuota_mensual)}
                     </td>
                     <td className="mono" style={{ textAlign: "right", color: "#16a34a", fontWeight: 700, padding: "2px 3px" }}>
-                      {p.totalPagadoMes > 0 ? formatearQuetzales(p.totalPagadoMes) : "—"}
+                      {p.totalPagadoMes > 0 ? formatoQ(p.totalPagadoMes) : "—"}
                     </td>
                     <td style={{ textAlign: "center", padding: "2px 3px" }}>
                       {p.estadoCuotaMes === "CANCELADO" ? (
@@ -749,14 +801,14 @@ export default function KardexCarteraPromotor() {
                     TOTALES CARTERA LISTADA ({itemsFiltrados.length} créditos):
                   </td>
                   <td className="mono" style={{ textAlign: "right", padding: "3px 4px" }}>
-                    {formatearQuetzales(totalMontoOriginal)}
+                    {formatoQ(totalMontoOriginal)}
                   </td>
                   <td className="mono" style={{ textAlign: "right", padding: "3px 4px" }}>
-                    {formatearQuetzales(totalSaldoCapital)}
+                    {formatoQ(totalSaldoCapital)}
                   </td>
                   <td style={{ padding: "3px 4px" }}>—</td>
                   <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "3px 4px" }}>
-                    {formatearQuetzales(totalCobrado)}
+                    {formatoQ(totalCobrado)}
                   </td>
                   <td style={{ padding: "3px 4px" }}>—</td>
                 </tr>
@@ -797,6 +849,20 @@ export default function KardexCarteraPromotor() {
           </div>
         </div>
       </div>
+
+      {modalCobroPrestamo && (
+        <CobroCampoModal
+          prestamoId={modalCobroPrestamo.id}
+          socioId={modalCobroPrestamo.socioId}
+          socioNombres={modalCobroPrestamo.socioNombres}
+          cobroExistente={modalCobroPrestamo.cobroExistente}
+          onClose={() => setModalCobroPrestamo(null)}
+          onSuccess={() => {
+            setModalCobroPrestamo(null);
+            cargarCobrosPendientes();
+          }}
+        />
+      )}
     </div>
   );
 }

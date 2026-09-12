@@ -2,7 +2,6 @@ import { pool } from "../../db/pool";
 import { withTransaction } from "../../db/transaction";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
-import { hoyGT } from "../../utils/financiero";
 import * as cuentasService from "../cuentas/service";
 import { calcularAmortizacion } from "./amortizacion";
 import { calcularLiquidacionCredito, distribuirMontoCobro } from "./liquidacion";
@@ -18,16 +17,11 @@ export async function siguienteCodigo(agenciaId: string): Promise<string> {
   const { rows: agencias } = await pool.query(`select codigo from agencias where id = $1`, [agenciaId]);
   const codigoAgencia = agencias[0]?.codigo ?? "MIF";
 
-  // Se toma el máximo número ya usado (no count(*)): un count(*) genera un
-  // código duplicado en cuanto hay un hueco en la secuencia, por ejemplo tras
-  // borrar un crédito de prueba o si una migración entró con un correlativo
-  // fuera de orden.
   const { rows } = await pool.query(
-    `select coalesce(max(nullif(regexp_replace(codigo, '\\D', '', 'g'), '')::int), 0) as max_num
-     from prestamos where agencia_id = $1`,
+    `select count(*)::int as total from prestamos where agencia_id = $1`,
     [agenciaId],
   );
-  const secuencial = String(rows[0].max_num + 1).padStart(4, "0");
+  const secuencial = String(rows[0].total + 1).padStart(4, "0");
   return `${codigoAgencia}-CR-${secuencial}`;
 }
 
@@ -199,14 +193,13 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
     const { rows: agencias } = await client.query(`select codigo from agencias where id = $1`, [data.agenciaId]);
     const codigoAgencia = agencias[0]?.codigo ?? "MIF";
     const { rows: totalRows } = await client.query(
-      `select coalesce(max(nullif(regexp_replace(codigo, '\\D', '', 'g'), '')::int), 0) as max_num
-       from prestamos where agencia_id = $1`,
+      `select count(*)::int as total from prestamos where agencia_id = $1`,
       [data.agenciaId],
     );
-    const secuencial = String(totalRows[0].max_num + 1).padStart(4, "0");
+    const secuencial = String(totalRows[0].total + 1).padStart(4, "0");
     const codigo = `${codigoAgencia}-CR-${secuencial}`;
 
-    const hoy = hoyGT();
+    const hoy = new Date().toISOString().slice(0, 10);
     const origenFondos = data.origenFondos || "FONDOS_PROPIOS";
     const esMigracion = Boolean(data.esMigracion);
 
@@ -277,23 +270,26 @@ export async function crear(data: DatosCrearPrestamo, usuarioId: string) {
 
     const prestamo = rows[0];
 
-    // Si se solicitó, abrir automáticamente la cuenta de Ahorro sobre Préstamo dentro de la transacción.
-    // Si esto falla, debe revertirse también la creación del crédito (no tragarse el error).
+    // Si se solicitó, abrir automáticamente la cuenta de Ahorro sobre Préstamo dentro de la transacción
     if (data.crearCuentaAhorroSobrePrestamo) {
-      const { numeroCuenta } = await cuentasService.siguienteNumero(data.agenciaId, "AHORRO_SOBRE_PRESTAMO");
-      await client.query(
-        `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, observaciones_apertura, prestamo_id, creado_por_id)
-         values ($1, 'AHORRO_SOBRE_PRESTAMO', $2, $3, 0, $4, $5, $6)
-         on conflict do nothing`,
-        [
-          numeroCuenta,
-          data.socioId,
-          data.agenciaId,
-          `Cuenta de ahorro en garantía vinculada al crédito ${prestamo.codigo}`,
-          prestamo.id,
-          usuarioId,
-        ],
-      );
+      try {
+        const { numeroCuenta } = await cuentasService.siguienteNumero(data.agenciaId, "AHORRO_SOBRE_PRESTAMO");
+        await client.query(
+          `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, observaciones_apertura, prestamo_id, creado_por_id)
+           values ($1, 'AHORRO_SOBRE_PRESTAMO', $2, $3, 0, $4, $5, $6)
+           on conflict do nothing`,
+          [
+            numeroCuenta,
+            data.socioId,
+            data.agenciaId,
+            `Cuenta de ahorro en garantía vinculada al crédito ${prestamo.codigo}`,
+            prestamo.id,
+            usuarioId,
+          ],
+        );
+      } catch (err) {
+        console.error("Error al crear automáticamente cuenta de ahorro sobre préstamo:", err);
+      }
     }
 
     await registrarAuditoria({
@@ -339,15 +335,6 @@ export async function cambiarEstado(
     if (actual.estado === "RECHAZADO" && nuevoEstado !== "RECHAZADO") {
       throw conflict("El préstamo fue RECHAZADO por el comité. Debe crearse una nueva solicitud.");
     }
-    // El paso a DESEMBOLSADO nunca se hace por este endpoint genérico: no
-    // exige caja abierta, no registra el egreso de efectivo en auxiliar de
-    // caja, y no acredita la cuenta de Ahorro sobre Préstamo si aplica. El
-    // único camino válido es POST /caja-auxiliar/:diaId/desembolso-credito.
-    if (nuevoEstado === "DESEMBOLSADO" && actual.estado !== "DESEMBOLSADO") {
-      throw badRequest(
-        "El desembolso debe registrarse desde Auxiliar de Caja (con la caja del día abierta), para que el efectivo entregado quede contabilizado. Este endpoint no puede marcar un crédito como desembolsado directamente.",
-      );
-    }
 
     if (nuevoEstado === "CANCELADO") {
       const saldo = Number(actual.saldo_capital);
@@ -361,7 +348,7 @@ export async function cambiarEstado(
     let fechaAprobacion = actual.fecha_aprobacion;
     let fechaDesembolso = actual.fecha_desembolso;
     let fechaVencimiento = actual.fecha_vencimiento;
-    const hoy = hoyGT();
+    const hoy = new Date().toISOString().slice(0, 10);
     let nuevoSaldoCapital = actual.saldo_capital;
 
     if (nuevoEstado === "APROBADO") {
@@ -578,7 +565,7 @@ export async function obtenerLiquidacion(prestamoId: string, fechaLiquidacion?: 
     montoOriginal: Number(prestamo.monto_aprobado || prestamo.monto_solicitado),
     cuotaMensualEstimada: Number(prestamo.cuota_mensual) || 0,
     fechaUltimoPago,
-    fechaLiquidacion: fechaLiquidacion || hoyGT(),
+    fechaLiquidacion: fechaLiquidacion || new Date().toISOString().slice(0, 10),
     tipoAmortizacion: prestamo.tipo_amortizacion,
   });
 
@@ -744,129 +731,3 @@ export async function listarFiadores(filtros: FiltrosFiadores) {
   return rows;
 }
 
-export interface DatosRefinanciar {
-  nuevaTasa: number;
-  nuevoPlazo: number;
-  observaciones?: string;
-}
-
-export async function refinanciar(
-  prestamoId: string,
-  data: DatosRefinanciar,
-  usuarioId: string,
-  agenciaVisibleParam: string | null,
-) {
-  if (data.nuevaTasa <= 0) throw badRequest("La nueva tasa debe ser mayor a cero");
-  if (data.nuevoPlazo < 1) throw badRequest("El nuevo plazo debe ser de al menos 1 mes");
-
-  return withTransaction(async (client) => {
-    const { rows: pRows } = await client.query(
-      `select * from prestamos where id = $1`,
-      [prestamoId],
-    );
-    const prestamo = pRows[0];
-    if (!prestamo) throw notFound("Préstamo no encontrado");
-    if (agenciaVisibleParam && prestamo.agencia_id !== agenciaVisibleParam) {
-      throw forbidden("Ese préstamo pertenece a otra agencia");
-    }
-    if (prestamo.estado !== "DESEMBOLSADO") {
-      throw badRequest(`Solo se pueden refinanciar préstamos desembolsados (estado actual: ${prestamo.estado})`);
-    }
-    if (Number(prestamo.saldo_capital) <= 0) {
-      throw badRequest("El préstamo ya está saldado; no requiere refinanciamiento");
-    }
-
-    // Calcular nueva cuota con el saldo actual como nuevo monto
-    const nuevaSim = calcularAmortizacion({
-      monto: Number(prestamo.saldo_capital),
-      plazoMeses: data.nuevoPlazo,
-      tasaInteresMensual: data.nuevaTasa,
-      tipoAmortizacion: prestamo.tipo_amortizacion,
-      fechaInicio: hoyGT(),
-    });
-
-    // Registrar el refinanciamiento
-    await client.query(
-      `insert into refinanciamientos
-         (prestamo_id, saldo_capital_anterior, tasa_anterior, plazo_anterior, cuota_anterior,
-          nueva_tasa, nuevo_plazo, nueva_cuota, observaciones, usuario_id)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [
-        prestamoId,
-        prestamo.saldo_capital,
-        prestamo.tasa_interes_mensual,
-        prestamo.plazo_meses,
-        prestamo.cuota_mensual,
-        data.nuevaTasa,
-        data.nuevoPlazo,
-        nuevaSim.cuotaMensualEstimada,
-        data.observaciones ?? null,
-        usuarioId,
-      ],
-    );
-
-    // Actualizar el préstamo con los nuevos términos
-    const hoy = hoyGT();
-    const { rows: vencRows } = await client.query(
-      `select ($1::date + ($2 * interval '1 month'))::date as venc`,
-      [hoy, data.nuevoPlazo],
-    );
-
-    const notaRefinanciamiento = `[REFINANCIAMIENTO ${hoy}] Tasa anterior: ${prestamo.tasa_interes_mensual}%, Plazo anterior: ${prestamo.plazo_meses} meses, Cuota anterior: Q${Number(prestamo.cuota_mensual).toFixed(2)}.`;
-    const obsActualizada = prestamo.observaciones
-      ? `${prestamo.observaciones}\n${notaRefinanciamiento}`
-      : notaRefinanciamiento;
-
-    const { rows } = await client.query(
-      `update prestamos set
-         tasa_interes_mensual = $1,
-         plazo_meses = $2,
-         cuota_mensual = $3,
-         fecha_vencimiento = $4,
-         observaciones = $5,
-         updated_at = now()
-       where id = $6
-       returning *`,
-      [
-        data.nuevaTasa,
-        data.nuevoPlazo,
-        nuevaSim.cuotaMensualEstimada,
-        vencRows[0]?.venc ?? null,
-        obsActualizada,
-        prestamoId,
-      ],
-    );
-
-    await registrarAuditoria({
-      entidad: "Prestamo",
-      entidadId: prestamoId,
-      accion: "ACTUALIZAR",
-      usuarioId,
-      datosAnteriores: {
-        tasa_interes_mensual: prestamo.tasa_interes_mensual,
-        plazo_meses: prestamo.plazo_meses,
-        cuota_mensual: prestamo.cuota_mensual,
-      },
-      datosNuevos: {
-        tasa_interes_mensual: data.nuevaTasa,
-        plazo_meses: data.nuevoPlazo,
-        cuota_mensual: nuevaSim.cuotaMensualEstimada,
-        tipo: "REFINANCIAMIENTO",
-      },
-    });
-
-    return { prestamo: rows[0], simulacion: nuevaSim };
-  });
-}
-
-export async function listarRefinanciamientos(prestamoId: string) {
-  const { rows } = await pool.query(
-    `select r.*, u.nombre as usuario_nombre
-     from refinanciamientos r
-     join usuarios u on u.id = r.usuario_id
-     where r.prestamo_id = $1
-     order by r.created_at desc`,
-    [prestamoId],
-  );
-  return rows;
-}

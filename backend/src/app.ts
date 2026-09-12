@@ -16,6 +16,7 @@ import { plazoFijoRouter } from "./modules/plazofijo/routes";
 import { auditoriaRouter } from "./modules/auditoria/routes";
 import { alertasRouter } from "./modules/alertas/routes";
 import { sesionesRouter } from "./modules/sesiones/routes";
+import { cobrosCampoRouter } from "./modules/cobroscampo/routes";
 
 export const app = express();
 
@@ -52,6 +53,7 @@ app.use("/api/plazo-fijo", plazoFijoRouter);
 app.use("/api/auditoria", auditoriaRouter);
 app.use("/api/alertas", alertasRouter);
 app.use("/api/sesiones", sesionesRouter);
+app.use("/api/cobros-campo", cobrosCampoRouter);
 
 app.use((_req, res) => res.status(404).json({ error: "Ruta no encontrada" }));
 app.use(errorHandler);

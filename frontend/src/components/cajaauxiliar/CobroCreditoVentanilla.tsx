@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Link } from "react-router-dom";
 import { api, mensajeError } from "../../lib/api";
-import { useAuth } from "../../context/AuthContext";
 import BuscadorSocio from "../BuscadorSocio";
-import ReciboCobroCreditoModal, { type DatosReciboCobro } from "../ReciboCobroCreditoModal";
-import { formatearQuetzales } from "../../lib/formatters";
+import {
+  formatoQ,
+} from "../../types";
 import type { ResultadoLiquidacion } from "../../lib/liquidacionCredito";
 import { distribuirMontoCobro } from "../../lib/liquidacionCredito";
 import type {
@@ -33,9 +32,6 @@ export default function CobroCreditoVentanilla({
   const [prestamos, setPrestamos] = useState<Prestamo[]>([]);
   const [prestamo, setPrestamo] = useState<Prestamo | null>(null);
   const [cargandoPrestamos, setCargandoPrestamos] = useState(false);
-
-  const { usuario } = useAuth();
-  const [reciboModal, setReciboModal] = useState<DatosReciboCobro | null>(null);
 
   const [liquidacion, setLiquidacion] = useState<ResultadoLiquidacion | null>(null);
   const [cargandoLiquidacion, setCargandoLiquidacion] = useState(false);
@@ -194,13 +190,7 @@ export default function CobroCreditoVentanilla({
     setError(null);
     setGuardando(true);
     try {
-      const { data } = await api.post<{
-        pago: { numero_recibo?: string };
-        cajaMovimiento: { contador?: number };
-        saldoCapitalRestante?: number;
-        ahorroSobrePrestamoAcreditado?: number;
-        cuentaAsp?: { id: string; numero_cuenta: string };
-      }>(`/caja-auxiliar/${diaId}/cobro-credito`, {
+      await api.post(`/caja-auxiliar/${diaId}/cobro-credito`, {
         prestamoId: prestamo.id,
         socioId: socio.id,
         abonoCapital: capNum,
@@ -212,34 +202,11 @@ export default function CobroCreditoVentanilla({
         cuentaDebitoId: usarDebitoAhorro && cuentaDebitoSeleccionada ? cuentaDebitoSeleccionada : undefined,
       });
 
-      const aspPrev = cuentasDebito.find((c) => c.tipo === "AHORRO_SOBRE_PRESTAMO")?.saldo_actual;
-      const saldoAspTotal = (Number(aspPrev) || 0) + aspNum;
-
-      setReciboModal({
-        numeroRecibo: docNo || data.pago?.numero_recibo || String(data.cajaMovimiento?.contador || "—"),
-        fecha: new Date().toLocaleDateString("es-GT"),
-        hora: new Date().toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" }),
-        socioNombre: socio.nombres,
-        socioNumero: socio.numero_asociado,
-        socioDpi: socio.dpi,
-        socioTelefono: socio.telefono,
-        creditoCodigo: prestamo.codigo,
-        creditoTipo: prestamo.tipo,
-        numeroCreditoAnterior: prestamo.numero_credito_anterior,
-        origenFondos,
-        agenciaNombre: prestamo.agencia_nombre || "Agencia MIF COOP",
-        saldoCapitalAnterior: saldoActual,
-        abonoCapital: capNum,
-        interes: intNum,
-        mora: morNum,
-        ahorroSobrePrestamo: aspNum,
-        totalPagado: totalCobro,
-        saldoCapitalRestante: data.saldoCapitalRestante ?? saldoNuevo,
-        cuentaAspNumero: data.cuentaAsp?.numero_cuenta,
-        saldoAspAcumulado: aspNum > 0 ? saldoAspTotal : undefined,
-        cajeroNombre: usuario?.nombre || "Cajero en Turno",
-        formaPago: usarDebitoAhorro ? "DÉBITO DE CUENTA" : "EFECTIVO",
-      });
+      setDocNo("");
+      setSocio(null);
+      setPrestamo(null);
+      setMontoEntregadoInput("");
+      onCobrado();
     } catch (err) {
       setError(mensajeError(err));
     } finally {
@@ -270,16 +237,7 @@ export default function CobroCreditoVentanilla({
 
       {socio && !cargandoPrestamos && prestamos.length === 0 && (
         <div className="alert warning" style={{ marginTop: "0.5rem" }}>
-          <div>
-            El socio <strong>{socio.nombres}</strong> no tiene préstamos activos para cobro.
-          </div>
-          <div style={{ fontSize: "0.82rem", marginTop: "0.4rem" }}>
-            ¿Tiene un crédito físico preexistente que aún no está en el sistema, o necesita solicitar uno nuevo? Pide a un
-            promotor, supervisor o administrador que lo registre:{" "}
-            <Link to={`/creditos/nuevo?socioId=${socio.id}`} className="link-btn" style={{ fontWeight: 700 }}>
-              + Registrar crédito de {socio.nombres}
-            </Link>
-          </div>
+          El socio <strong>{socio.nombres}</strong> no tiene préstamos activos para cobro.
         </div>
       )}
 
@@ -295,7 +253,7 @@ export default function CobroCreditoVentanilla({
           >
             {prestamos.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.codigo} {p.numero_credito_anterior ? `[Ref: ${p.numero_credito_anterior}]` : ""} — {p.tipo} (Saldo: {formatearQuetzales(p.saldo_capital ?? p.monto_aprobado ?? p.monto_solicitado)})
+                {p.codigo} {p.numero_credito_anterior ? `[Ref: ${p.numero_credito_anterior}]` : ""} — {p.tipo} (Saldo: {formatoQ(p.saldo_capital ?? p.monto_aprobado ?? p.monto_solicitado)})
               </option>
             ))}
           </select>
@@ -431,17 +389,17 @@ export default function CobroCreditoVentanilla({
 
                 <div style={{ background: "var(--paper)", padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
                   <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.72rem" }}>Interés diario ({liquidacion.tasaInteresAnual}% anual)</span>
-                  <strong style={{ fontSize: "0.95rem", color: "#d97706" }}>{formatearQuetzales(liquidacion.interesDiario)} / día</strong>
+                  <strong style={{ fontSize: "0.95rem", color: "#d97706" }}>{formatoQ(liquidacion.interesDiario)} / día</strong>
                   <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)", display: "block" }}>
-                    ({formatearQuetzales(saldoActual)} × 24% / 365)
+                    ({formatoQ(saldoActual)} × 24% / 365)
                   </span>
                 </div>
 
                 <div style={{ background: "var(--paper)", padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
                   <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.72rem" }}>Interés acumulado ({liquidacion.diasTranscurridos}d)</span>
-                  <strong style={{ fontSize: "0.95rem", color: "#d97706" }}>{formatearQuetzales(liquidacion.interesDevengado)}</strong>
+                  <strong style={{ fontSize: "0.95rem", color: "#d97706" }}>{formatoQ(liquidacion.interesDevengado)}</strong>
                   <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)", display: "block" }}>
-                    {formatearQuetzales(liquidacion.interesDiario)} × {liquidacion.diasTranscurridos}d
+                    {formatoQ(liquidacion.interesDiario)} × {liquidacion.diasTranscurridos}d
                   </span>
                 </div>
 
@@ -457,7 +415,7 @@ export default function CobroCreditoVentanilla({
                     Recargo por mora
                   </span>
                   <strong style={{ fontSize: "0.95rem", color: liquidacion.estaEnMora ? "#b91c1c" : "var(--ink)" }}>
-                    {formatearQuetzales(liquidacion.moraFijaSugerida)}
+                    {formatoQ(liquidacion.moraFijaSugerida)}
                   </strong>
                   <span style={{ fontSize: "0.68rem", color: liquidacion.estaEnMora ? "#b91c1c" : "var(--ink-soft)", display: "block" }}>
                     {liquidacion.estaEnMora ? `(Q25 × ${Math.round(liquidacion.moraFijaSugerida / 25)} cuotas vencidas)` : "4 días gracia: Q 0.00"}
@@ -491,7 +449,7 @@ export default function CobroCreditoVentanilla({
                     setMontoEntregadoInput(String(tot));
                   }}
                 >
-                  📅 Cuota Oficial de la Tabla ({formatearQuetzales(liquidacion.cuotaProgramadaOficial || (liquidacion.cuotaCapitalBase ? liquidacion.cuotaCapitalBase + (liquidacion.interesMesCompleto || 0) : liquidacion.pagoMinimoSugerido))})
+                  📅 Cuota Oficial de la Tabla ({formatoQ(liquidacion.cuotaProgramadaOficial || (liquidacion.cuotaCapitalBase ? liquidacion.cuotaCapitalBase + (liquidacion.interesMesCompleto || 0) : liquidacion.pagoMinimoSugerido))})
                 </button>
 
                 <button
@@ -509,7 +467,7 @@ export default function CobroCreditoVentanilla({
                     setMontoEntregadoInput(String(tot));
                   }}
                 >
-                  ⚡ Liquidación a Hoy ({liquidacion.diasTranscurridos}d: {formatearQuetzales(Math.round((liquidacion.cuotaCapitalSugerida + liquidacion.interesDevengado + liquidacion.moraFijaSugerida) * 100) / 100)})
+                  ⚡ Liquidación a Hoy ({liquidacion.diasTranscurridos}d: {formatoQ(Math.round((liquidacion.cuotaCapitalSugerida + liquidacion.interesDevengado + liquidacion.moraFijaSugerida) * 100) / 100)})
                 </button>
 
                 <button
@@ -527,7 +485,7 @@ export default function CobroCreditoVentanilla({
                     setMontoEntregadoInput(String(tot));
                   }}
                 >
-                  🏁 Liquidar / Cancelar Total ({formatearQuetzales(liquidacion.saldoCancelacionTotal)})
+                  🏁 Liquidar / Cancelar Total ({formatoQ(liquidacion.saldoCancelacionTotal)})
                 </button>
               </div>
             )}
@@ -579,7 +537,7 @@ export default function CobroCreditoVentanilla({
             >
               <span style={{ fontSize: "0.95rem" }}>⚡</span>
               <span>
-                <strong>Abono Extraordinario:</strong> Excedente de <strong>{formatearQuetzales(excedenteMonto)}</strong> directo a Capital (Saldo nuevo: <strong>{formatearQuetzales(saldoNuevo)}</strong>).
+                <strong>Abono Extraordinario:</strong> Excedente de <strong>{formatoQ(excedenteMonto)}</strong> directo a Capital (Saldo nuevo: <strong>{formatoQ(saldoNuevo)}</strong>).
               </span>
             </div>
           )}
@@ -686,21 +644,18 @@ export default function CobroCreditoVentanilla({
             }}
           >
             <div>
-              <div style={{ fontSize: "0.95rem", color: "#166534", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
-                <span>Saldo capital: {formatearQuetzales(saldoActual)}</span>
-                <span style={{ fontSize: "1.1rem" }}>→</span>
-                <span style={{ fontSize: "1.15rem" }}>{formatearQuetzales(saldoNuevo)}</span>
+              <div style={{ fontSize: "0.82rem", color: "#166534" }}>
+                Saldo capital restante tras el pago: <strong>{formatoQ(saldoNuevo)}</strong>
                 {saldoNuevo === 0 && (
-                  <span style={{ marginLeft: "0.3rem", color: "#15803d", fontWeight: 700 }}>
+                  <span style={{ marginLeft: "0.5rem", color: "#15803d", fontWeight: 700 }}>
                     🎉 ¡Crédito Liquidado al 100%!
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: "0.75rem", color: "#166534" }}>Saldo anterior → saldo tras este pago</div>
             </div>
             <div style={{ textAlign: "right" }}>
               <span style={{ fontSize: "0.82rem", color: "#166534" }}>Total a ingresar a caja: </span>
-              <strong style={{ fontSize: "1.25rem", color: "#166534" }}>{formatearQuetzales(totalCobro)}</strong>
+              <strong style={{ fontSize: "1.25rem", color: "#166534" }}>{formatoQ(totalCobro)}</strong>
             </div>
           </div>
 
@@ -738,7 +693,7 @@ export default function CobroCreditoVentanilla({
                     {cuentasDebito.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.tipo === "AHORRO_SOBRE_PRESTAMO" ? "🛡️ [Ahorro sobre Préstamo] " : ""}
-                        {c.numero_cuenta} — Saldo disponible: {formatearQuetzales(c.saldo_actual)}
+                        {c.numero_cuenta} — Saldo disponible: {formatoQ(c.saldo_actual)}
                       </option>
                     ))}
                   </select>
@@ -765,21 +720,11 @@ export default function CobroCreditoVentanilla({
               {guardando
                 ? "Registrando cobro…"
                 : usarDebitoAhorro
-                ? `🛡️ Cobrar con Débito de Ahorro ${formatearQuetzales(totalCobro)}`
-                : `💵 Registrar Cobro de ${formatearQuetzales(totalCobro)} en Caja`}
+                ? `🛡️ Cobrar con Débito de Ahorro ${formatoQ(totalCobro)}`
+                : `💵 Registrar Cobro de ${formatoQ(totalCobro)} en Caja`}
             </button>
           </div>
         </>
-      )}
-
-      {reciboModal && (
-        <ReciboCobroCreditoModal
-          datos={reciboModal}
-          onClose={() => {
-            setReciboModal(null);
-            onCobrado();
-          }}
-        />
       )}
     </form>
   );

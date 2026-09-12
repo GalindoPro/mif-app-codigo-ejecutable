@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
+import { formatoQ } from "../types";
 import type { AportacionSocio } from "../types";
-import { formatearDPI, formatearQuetzales } from "../lib/formatters";
+import { formatearDPI } from "../lib/formatters";
 
 export default function AportacionesList() {
   const [aportaciones, setAportaciones] = useState<AportacionSocio[] | null>(null);
@@ -91,7 +92,7 @@ export default function AportacionesList() {
       <div className="screen-kpis" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
         <div className="screen-kpi-tile accent">
           <span className="screen-kpi-label">CAPITAL SOCIAL APORTADO</span>
-          <span className="screen-kpi-value">{formatearQuetzales(totalCapital)}</span>
+          <span className="screen-kpi-value">{formatoQ(totalCapital)}</span>
           <span className="screen-kpi-sub">Total en aportaciones</span>
         </div>
         <div className="screen-kpi-tile">
@@ -101,7 +102,7 @@ export default function AportacionesList() {
         </div>
         <div className="screen-kpi-tile">
           <span className="screen-kpi-label">APORTACIÓN PROMEDIO</span>
-          <span className="screen-kpi-value">{formatearQuetzales(promedioAportacion)}</span>
+          <span className="screen-kpi-value">{formatoQ(promedioAportacion)}</span>
           <span className="screen-kpi-sub">Por asociado activo</span>
         </div>
         <div className="screen-kpi-tile">
@@ -201,7 +202,7 @@ export default function AportacionesList() {
                   </div>
                 </td>
                 <td className="mono" style={{ fontWeight: 700, color: "var(--accent)", textAlign: "right" }}>
-                  {formatearQuetzales(a.total_aportaciones)}
+                  {formatoQ(a.total_aportaciones)}
                 </td>
                 <td>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>

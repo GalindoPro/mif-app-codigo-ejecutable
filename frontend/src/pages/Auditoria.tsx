@@ -9,6 +9,7 @@ interface RegistroAuditoria {
   datos_anteriores: Record<string, unknown> | null;
   datos_nuevos: Record<string, unknown> | null;
   fecha: string;
+  motivo?: string;
   usuario_nombre: string;
   usuario_rol: string;
 }
@@ -328,6 +329,23 @@ export default function Auditoria() {
                 Cerrar
               </button>
             </div>
+
+            {detalle.motivo && (
+              <div style={{
+                background: "rgba(234, 179, 8, 0.1)",
+                border: "1px solid rgba(234, 179, 8, 0.3)",
+                padding: "1rem",
+                borderRadius: "8px",
+                marginBottom: "1.5rem"
+              }}>
+                <h4 style={{ margin: "0 0 0.4rem", fontSize: "0.85rem", color: "#a16207" }}>
+                  Motivo de la Corrección:
+                </h4>
+                <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--ink)", lineHeight: 1.5 }}>
+                  {detalle.motivo}
+                </p>
+              </div>
+            )}
 
             <div style={{
               display: "grid",

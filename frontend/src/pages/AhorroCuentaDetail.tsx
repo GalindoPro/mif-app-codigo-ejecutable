@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
-import { TIPOS_AHORRO } from "../types";
-import { formatearQuetzales } from "../lib/formatters";
+import { formatoQ, TIPOS_AHORRO } from "../types";
 import type { CuentaConMovimientos } from "../types";
 
 export default function AhorroCuentaDetail() {
@@ -69,7 +68,7 @@ export default function AhorroCuentaDetail() {
         </div>
         <div className="stat-card accent" style={{ minWidth: 180 }}>
           <span className="label">Saldo actual</span>
-          <span className="value">{formatearQuetzales(cuenta.saldo_actual)}</span>
+          <span className="value">{formatoQ(cuenta.saldo_actual)}</span>
         </div>
       </div>
 
@@ -172,7 +171,7 @@ export default function AhorroCuentaDetail() {
                 <td className="mono">{new Date(m.fecha).toLocaleDateString("es-GT")}</td>
                 <td>{m.tipo === "DEPOSITO" ? "Depósito" : m.tipo === "RETIRO" ? "Retiro" : "Ajuste"}</td>
                 <td className={`mono movimiento-monto ${m.tipo === "RETIRO" ? "retiro" : "deposito"}`}>
-                  {m.tipo === "RETIRO" ? "−" : "+"} {formatearQuetzales(m.monto)}
+                  {m.tipo === "RETIRO" ? "−" : "+"} {formatoQ(m.monto)}
                 </td>
                 <td className="mono">{m.numero_recibo ?? "—"}</td>
                 <td>{m.usuario_nombre}</td>

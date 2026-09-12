@@ -1,7 +1,6 @@
 // Crea la agencia y el usuario administrador iniciales. Se puede correr una
 // sola vez después de aplicar db/schema.sql (npm run db:migrate && npm run db:seed).
 import "dotenv/config";
-import crypto from "crypto";
 import { pool } from "./pool";
 import { hashPassword } from "../utils/auth";
 
@@ -16,16 +15,13 @@ async function main() {
   console.log(`Agencia lista: ${agencia.nombre} (${agencia.id})`);
 
   const email = "admin@mif.coop";
-  // La contraseña nunca debe quedar fija en el código fuente. Se toma de
-  // SEED_PASSWORD si el operador la definió, o se genera una aleatoria que
-  // solo se muestra una vez en esta consola.
-  const passwordTemporal = process.env.SEED_PASSWORD || crypto.randomBytes(9).toString("base64url");
+  const passwordTemporal = "CambiaEsto123!";
   const passwordHash = await hashPassword(passwordTemporal);
 
   await pool.query(
     `insert into usuarios (nombre, email, password_hash, rol, agencia_id)
-     values ('Administrador MIF', $1, $2, 'ADMIN', null)
-     on conflict (email) do update set password_hash = excluded.password_hash`,
+     values ('Administrador MIF', $1, $2, 'GERENCIA', null)
+     on conflict (email) do update set password_hash = excluded.password_hash, rol = 'GERENCIA'`,
     [email, passwordHash],
   );
 
@@ -59,14 +55,23 @@ async function main() {
     [cajeroEmail, cajeroHash, agencia.id],
   );
 
+  const cajaChicaEmail = "cajachica@mif.coop";
+  const cajaChicaHash = await hashPassword(passwordTemporal);
+
+  await pool.query(
+    `insert into usuarios (nombre, email, password_hash, rol, agencia_id)
+     values ('Lucia Caja Chica Chajul', $1, $2, 'CAJA_CHICA', $3)
+     on conflict (email) do update set password_hash = excluded.password_hash`,
+    [cajaChicaEmail, cajaChicaHash, agencia.id],
+  );
+
   console.log("Usuarios listos:");
-  console.log(`  Admin:       ${email}`);
+  console.log(`  Gerencia:    ${email}`);
   console.log(`  Supervisor:  ${supervisorEmail}`);
   console.log(`  Cajero:      ${cajeroEmail}`);
+  console.log(`  Caja Chica:  ${cajaChicaEmail}`);
   console.log(`  Promotor:    ${promotorEmail}`);
-  console.log(`  Contraseña temporal para todos: ${passwordTemporal}`);
-  console.log("  ⚠️  Esta contraseña no se guarda en ningún archivo. Cópiala ahora");
-  console.log("     y cambia cada cuenta en su primer inicio de sesión.");
+  console.log(`  Contraseña para todos: ${passwordTemporal}`);
 
   await pool.end();
 }

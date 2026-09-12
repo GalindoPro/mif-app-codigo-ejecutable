@@ -2,9 +2,9 @@ import { useState } from "react";
 import { api, mensajeError } from "../../lib/api";
 import {
   DENOMINACIONES_GT,
+  formatoQ,
   labelDenominacion,
 } from "../../types";
-import { formatearQuetzales } from "../../lib/formatters";
 
 export interface DenominacionRowProps {
   valor: number;
@@ -32,7 +32,7 @@ export function DenominacionRow({
         style={{ width: 80 }}
         placeholder="0"
       />
-      <span className="mono sub">= {formatearQuetzales(subtotal)}</span>
+      <span className="mono sub">= {formatoQ(subtotal)}</span>
     </div>
   );
 }
@@ -95,16 +95,16 @@ export default function CierreCajaForm({
       <div className="stat-grid" style={{ marginTop: "1.25rem", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 200px))" }}>
         <div className="stat-card">
           <span className="label">Total contado</span>
-          <span className="value">{formatearQuetzales(totalContado)}</span>
+          <span className="value">{formatoQ(totalContado)}</span>
         </div>
         <div className="stat-card">
           <span className="label">Saldo esperado</span>
-          <span className="value">{formatearQuetzales(saldoEsperado)}</span>
+          <span className="value">{formatoQ(saldoEsperado)}</span>
         </div>
         <div className={`stat-card ${diferencia === 0 ? "accent" : ""}`}>
           <span className="label">Diferencia</span>
           <span className="value" style={{ color: diferencia === 0 ? undefined : "var(--danger)" }}>
-            {formatearQuetzales(diferencia)}
+            {formatoQ(diferencia)}
           </span>
         </div>
       </div>

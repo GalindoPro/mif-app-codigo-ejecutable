@@ -4,46 +4,15 @@ import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import {
   ESTADO_PRESTAMO_LABEL,
+  formatoQ,
   TIPO_PRESTAMO_LABEL,
   ORIGEN_FONDOS_LABEL,
   ORIGEN_FONDOS_BADGE_STYLE,
 } from "../types";
-import { formatearQuetzales } from "../lib/formatters";
 import type { EstadoPrestamo, Prestamo, PrestamoPago } from "../types";
-import { formatearDPI, formatearFechaLocal } from "../lib/formatters";
+import { formatearDPI } from "../lib/formatters";
 import type { ResultadoLiquidacion } from "../lib/liquidacionCredito";
 import ContratoPagareCreditoModal from "../components/ContratoPagareCreditoModal";
-
-interface GarantiaHipotecaria {
-  id: string;
-  tipo_bien: string;
-  descripcion: string;
-  valor_tasacion: number | null;
-  direccion: string | null;
-  municipio: string | null;
-  departamento: string | null;
-  no_finca: string | null;
-  folio: string | null;
-  libro: string | null;
-  fecha_inscripcion: string | null;
-  fecha_vencimiento: string | null;
-  observaciones: string | null;
-  registrado_por_nombre: string;
-}
-
-interface Refinanciamiento {
-  id: string;
-  saldo_capital_anterior: number;
-  tasa_anterior: number;
-  plazo_anterior: number;
-  cuota_anterior: number;
-  nueva_tasa: number;
-  nuevo_plazo: number;
-  nueva_cuota: number;
-  observaciones: string | null;
-  usuario_nombre: string;
-  created_at: string;
-}
 
 export default function CreditoDetail() {
   const { id } = useParams<{ id: string }>();
@@ -58,25 +27,7 @@ export default function CreditoDetail() {
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
 
-  // D2 — Garantías hipotecarias
-  const [garantia, setGarantia] = useState<GarantiaHipotecaria | null | undefined>(undefined);
-  const [mostrarFormGarantia, setMostrarFormGarantia] = useState(false);
-  const [garantiaForm, setGarantiaForm] = useState({
-    tipoBien: "INMUEBLE", descripcion: "", valorTasacion: "", direccion: "",
-    municipio: "", departamento: "", noFinca: "", folio: "", libro: "",
-    fechaInscripcion: "", fechaVencimiento: "", observaciones: "",
-  });
-  const [guardandoGarantia, setGuardandoGarantia] = useState(false);
-
-  // D1 — Refinanciamientos
-  const [refinanciamientos, setRefinanciamientos] = useState<Refinanciamiento[]>([]);
-  const [mostrarFormRefinanciar, setMostrarFormRefinanciar] = useState(false);
-  const [rfNuevaTasa, setRfNuevaTasa] = useState("");
-  const [rfNuevoPlazo, setRfNuevoPlazo] = useState("");
-  const [rfObservaciones, setRfObservaciones] = useState("");
-  const [guardandoRefinanciamiento, setGuardandoRefinanciamiento] = useState(false);
-
-  const puedeAprobar = usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA" || usuario?.rol === "SUPERVISOR";
+  const puedeAprobar = usuario?.rol === "GERENCIA" || usuario?.rol === "SUPERVISOR";
 
   function cargar() {
     if (!id) return;
@@ -94,65 +45,9 @@ export default function CreditoDetail() {
       .get<PrestamoPago[]>(`/prestamos/${id}/pagos`)
       .then(({ data }) => setPagos(data))
       .catch(() => {});
-
-    api.get<GarantiaHipotecaria | null>(`/garantias/${id}`)
-      .then(({ data }) => setGarantia(data))
-      .catch(() => setGarantia(null));
-
-    api.get<Refinanciamiento[]>(`/prestamos/${id}/refinanciamientos`)
-      .then(({ data }) => setRefinanciamientos(data))
-      .catch(() => {});
   }
 
   useEffect(cargar, [id]);
-
-  async function guardarGarantia() {
-    if (!id) return;
-    setGuardandoGarantia(true);
-    setError(null);
-    try {
-      await api.put(`/garantias/${id}`, {
-        ...garantiaForm,
-        valorTasacion: garantiaForm.valorTasacion ? Number(garantiaForm.valorTasacion) : null,
-        fechaInscripcion: garantiaForm.fechaInscripcion || null,
-        fechaVencimiento: garantiaForm.fechaVencimiento || null,
-      });
-      setMostrarFormGarantia(false);
-      setMensajeExito("Garantía hipotecaria guardada correctamente.");
-      setTimeout(() => setMensajeExito(null), 4000);
-      cargar();
-    } catch (err) {
-      setError(mensajeError(err));
-    } finally {
-      setGuardandoGarantia(false);
-    }
-  }
-
-  async function refinanciar() {
-    if (!id) return;
-    const tasa = Number(rfNuevaTasa);
-    const plazo = Math.round(Number(rfNuevoPlazo));
-    if (!tasa || tasa <= 0) { setError("Ingresa una tasa válida"); return; }
-    if (!plazo || plazo < 1) { setError("Ingresa un plazo válido"); return; }
-    setGuardandoRefinanciamiento(true);
-    setError(null);
-    try {
-      await api.post(`/prestamos/${id}/refinanciar`, {
-        nuevaTasa: tasa,
-        nuevoPlazo: plazo,
-        observaciones: rfObservaciones || undefined,
-      });
-      setMostrarFormRefinanciar(false);
-      setRfNuevaTasa(""); setRfNuevoPlazo(""); setRfObservaciones("");
-      setMensajeExito("Refinanciamiento registrado. Los nuevos términos están vigentes.");
-      setTimeout(() => setMensajeExito(null), 5000);
-      cargar();
-    } catch (err) {
-      setError(mensajeError(err));
-    } finally {
-      setGuardandoRefinanciamiento(false);
-    }
-  }
 
   async function cambiarEstado(nuevoEstado: EstadoPrestamo) {
     if (!id) return;
@@ -317,7 +212,7 @@ export default function CreditoDetail() {
       <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", marginBottom: "1.5rem" }}>
         <div className="stat-card accent">
           <span className="label">Cuota mensual</span>
-          <span className="value">{formatearQuetzales(prestamo.cuota_mensual)}</span>
+          <span className="value">{formatoQ(prestamo.cuota_mensual)}</span>
           <span className="sub">
             {prestamo.tipo_amortizacion === "CUOTA_NIVELADA" ? "Cuota fija nivelada" : "Sobre saldos"}
           </span>
@@ -325,7 +220,7 @@ export default function CreditoDetail() {
 
         <div className="stat-card">
           <span className="label">Monto del crédito</span>
-          <span className="value">{formatearQuetzales(montoMostrar)}</span>
+          <span className="value">{formatoQ(montoMostrar)}</span>
           <span className="sub">Plazo {prestamo.plazo_meses} meses</span>
         </div>
 
@@ -338,7 +233,7 @@ export default function CreditoDetail() {
         <div className="stat-card">
           <span className="label">Total de intereses</span>
           <span className="value" style={{ color: "#d97706" }}>
-            {prestamo.amortizacion ? formatearQuetzales(prestamo.amortizacion.totalIntereses) : "—"}
+            {prestamo.amortizacion ? formatoQ(prestamo.amortizacion.totalIntereses) : "—"}
           </span>
           <span className="sub">al finalizar el crédito</span>
         </div>
@@ -351,7 +246,7 @@ export default function CreditoDetail() {
               color: Number(prestamo.saldo_capital ?? montoMostrar) > 0 ? "var(--accent)" : "#16a34a",
             }}
           >
-            {formatearQuetzales(prestamo.saldo_capital ?? montoMostrar)}
+            {formatoQ(prestamo.saldo_capital ?? montoMostrar)}
           </span>
           <span className="sub">
             {prestamo.estado === "CANCELADO" ? "Crédito pagado al 100%" : "Deuda viva en cartera"}
@@ -406,17 +301,17 @@ export default function CreditoDetail() {
 
             <div style={{ background: "var(--paper)", padding: "0.6rem 0.8rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
               <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)", display: "block" }}>Interés diario ({liquidacion.tasaInteresAnual}% anual)</span>
-              <strong style={{ fontSize: "1.1rem", color: "#d97706" }}>{formatearQuetzales(liquidacion.interesDiario)} / día</strong>
+              <strong style={{ fontSize: "1.1rem", color: "#d97706" }}>{formatoQ(liquidacion.interesDiario)} / día</strong>
               <span style={{ fontSize: "0.7rem", color: "var(--ink-soft)", display: "block" }}>
-                ({formatearQuetzales(liquidacion.saldoCapital)} × 24% / 365)
+                ({formatoQ(liquidacion.saldoCapital)} × 24% / 365)
               </span>
             </div>
 
             <div style={{ background: "var(--paper)", padding: "0.6rem 0.8rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
               <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)", display: "block" }}>Interés acumulado hoy ({liquidacion.diasTranscurridos}d)</span>
-              <strong style={{ fontSize: "1.1rem", color: "#d97706" }}>{formatearQuetzales(liquidacion.interesDevengado)}</strong>
+              <strong style={{ fontSize: "1.1rem", color: "#d97706" }}>{formatoQ(liquidacion.interesDevengado)}</strong>
               <span style={{ fontSize: "0.7rem", color: "var(--ink-soft)", display: "block" }}>
-                {formatearQuetzales(liquidacion.interesDiario)} × {liquidacion.diasTranscurridos}d
+                {formatoQ(liquidacion.interesDiario)} × {liquidacion.diasTranscurridos}d
               </span>
             </div>
 
@@ -432,7 +327,7 @@ export default function CreditoDetail() {
                 Recargo de mora
               </span>
               <strong style={{ fontSize: "1.1rem", color: liquidacion.estaEnMora ? "#b91c1c" : "var(--ink)" }}>
-                {formatearQuetzales(liquidacion.moraFijaSugerida)}
+                {formatoQ(liquidacion.moraFijaSugerida)}
               </strong>
               <span style={{ fontSize: "0.7rem", color: liquidacion.estaEnMora ? "#b91c1c" : "var(--ink-soft)", display: "block" }}>
                 {liquidacion.estaEnMora ? `> 4 días de gracia (Q25 × ${liquidacion.cuotasVencidas})` : "4 días gracia: Q 0.00"}
@@ -443,7 +338,7 @@ export default function CreditoDetail() {
               <span style={{ fontSize: "0.74rem", color: "#065f46", display: "block", fontWeight: 700 }}>
                 Saldo Cancelación Total Hoy
               </span>
-              <strong style={{ fontSize: "1.15rem", color: "#047857" }}>{formatearQuetzales(liquidacion.saldoCancelacionTotal)}</strong>
+              <strong style={{ fontSize: "1.15rem", color: "#047857" }}>{formatoQ(liquidacion.saldoCancelacionTotal)}</strong>
               <span style={{ fontSize: "0.7rem", color: "#065f46", display: "block" }}>
                 Capital + Interés {liquidacion.diasTranscurridos}d + Mora
               </span>
@@ -633,19 +528,19 @@ export default function CreditoDetail() {
                     <td className="mono">{new Date(p.fecha).toLocaleDateString("es-GT")}</td>
                     <td className="mono">{p.numero_recibo ?? "—"}</td>
                     <td className="mono" style={{ color: "var(--accent)", fontWeight: 600 }}>
-                      {formatearQuetzales(p.abono_capital)}
+                      {formatoQ(p.abono_capital)}
                     </td>
                     <td className="mono" style={{ color: "#d97706" }}>
-                      {formatearQuetzales(p.interes)}
+                      {formatoQ(p.interes)}
                     </td>
                     <td className="mono" style={{ color: Number(p.mora) > 0 ? "#dc2626" : "inherit" }}>
-                      {formatearQuetzales(p.mora)}
+                      {formatoQ(p.mora)}
                     </td>
                     <td className="mono" style={{ fontWeight: 700 }}>
-                      {formatearQuetzales(p.total_pagado)}
+                      {formatoQ(p.total_pagado)}
                     </td>
                     <td className="mono" style={{ fontWeight: 600 }}>
-                      {formatearQuetzales(p.saldo_capital_restante)}
+                      {formatoQ(p.saldo_capital_restante)}
                     </td>
                     <td>{p.usuario_nombre ?? "—"}</td>
                   </tr>
@@ -667,7 +562,7 @@ export default function CreditoDetail() {
             </div>
             <div className="stat-card" style={{ padding: "0.5rem 1rem" }}>
               <span className="label">Total a pagar</span>
-              <span className="value" style={{ fontSize: "1.1rem" }}>{formatearQuetzales(prestamo.amortizacion.totalPagar)}</span>
+              <span className="value" style={{ fontSize: "1.1rem" }}>{formatoQ(prestamo.amortizacion.totalPagar)}</span>
             </div>
           </div>
 
@@ -691,185 +586,20 @@ export default function CreditoDetail() {
                     </td>
                     <td className="mono">{new Date(c.fechaPago).toLocaleDateString("es-GT")}</td>
                     <td className="mono" style={{ fontWeight: 600 }}>
-                      {formatearQuetzales(c.cuota)}
+                      {formatoQ(c.cuota)}
                     </td>
                     <td className="mono" style={{ color: "var(--accent)" }}>
-                      {formatearQuetzales(c.capital)}
+                      {formatoQ(c.capital)}
                     </td>
                     <td className="mono" style={{ color: "#d97706" }}>
-                      {formatearQuetzales(c.interes)}
+                      {formatoQ(c.interes)}
                     </td>
-                    <td className="mono">{formatearQuetzales(c.saldoRestante)}</td>
+                    <td className="mono">{formatoQ(c.saldoRestante)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-
-      {/* D2 — GARANTÍA HIPOTECARIA (solo para préstamos HIPOTECARIO) */}
-      {prestamo.tipo === "HIPOTECARIO" && (
-        <div className="card" style={{ marginTop: "1.25rem" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-            <h3 style={{ fontFamily: "inherit", fontSize: "1rem", margin: 0 }}>Garantía Hipotecaria</h3>
-            {puedeAprobar && (
-              <button className="btn secondary" style={{ fontSize: "0.82rem" }}
-                onClick={() => {
-                  if (garantia) {
-                    setGarantiaForm({
-                      tipoBien: garantia.tipo_bien, descripcion: garantia.descripcion,
-                      valorTasacion: garantia.valor_tasacion ? String(garantia.valor_tasacion) : "",
-                      direccion: garantia.direccion ?? "", municipio: garantia.municipio ?? "",
-                      departamento: garantia.departamento ?? "", noFinca: garantia.no_finca ?? "",
-                      folio: garantia.folio ?? "", libro: garantia.libro ?? "",
-                      fechaInscripcion: garantia.fecha_inscripcion ?? "",
-                      fechaVencimiento: garantia.fecha_vencimiento ?? "",
-                      observaciones: garantia.observaciones ?? "",
-                    });
-                  }
-                  setMostrarFormGarantia(true);
-                }}>
-                {garantia ? "✏️ Editar" : "+ Registrar garantía"}
-              </button>
-            )}
-          </div>
-
-          {garantia === undefined && <p style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Cargando…</p>}
-          {garantia === null && <p style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>No hay garantía hipotecaria registrada para este crédito.</p>}
-          {garantia && (
-            <dl style={{ display: "grid", gridTemplateColumns: "160px 1fr", rowGap: "0.45rem", fontSize: "0.85rem", margin: 0 }}>
-              <dt style={{ color: "var(--ink-soft)" }}>Tipo de bien</dt><dd style={{ margin: 0, fontWeight: 600 }}>{garantia.tipo_bien}</dd>
-              <dt style={{ color: "var(--ink-soft)" }}>Descripción</dt><dd style={{ margin: 0 }}>{garantia.descripcion}</dd>
-              {garantia.valor_tasacion && <><dt style={{ color: "var(--ink-soft)" }}>Valor tasación</dt><dd style={{ margin: 0, fontWeight: 700 }}>{formatearQuetzales(garantia.valor_tasacion)}</dd></>}
-              {garantia.no_finca && <><dt style={{ color: "var(--ink-soft)" }}>No. Finca</dt><dd style={{ margin: 0, fontFamily: "monospace" }}>{garantia.no_finca} · Folio {garantia.folio} · Libro {garantia.libro}</dd></>}
-              {garantia.municipio && <><dt style={{ color: "var(--ink-soft)" }}>Ubicación</dt><dd style={{ margin: 0 }}>{[garantia.direccion, garantia.municipio, garantia.departamento].filter(Boolean).join(", ")}</dd></>}
-              {garantia.fecha_inscripcion && <><dt style={{ color: "var(--ink-soft)" }}>Inscripción</dt><dd style={{ margin: 0, fontFamily: "monospace" }}>{formatearFechaLocal(garantia.fecha_inscripcion)}</dd></>}
-              {garantia.fecha_vencimiento && <><dt style={{ color: new Date(garantia.fecha_vencimiento) < new Date() ? "#dc2626" : "var(--ink-soft)" }}>Vence inscripción</dt><dd style={{ margin: 0, fontFamily: "monospace", color: new Date(garantia.fecha_vencimiento) < new Date() ? "#dc2626" : undefined, fontWeight: 700 }}>{formatearFechaLocal(garantia.fecha_vencimiento)}</dd></>}
-              {garantia.observaciones && <><dt style={{ color: "var(--ink-soft)" }}>Observaciones</dt><dd style={{ margin: 0 }}>{garantia.observaciones}</dd></>}
-            </dl>
-          )}
-
-          {/* Formulario inline de garantía */}
-          {mostrarFormGarantia && (
-            <div style={{ marginTop: "1rem", borderTop: "1px solid var(--line)", paddingTop: "1rem" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                {[
-                  ["Tipo de bien", "tipoBien"], ["Valor tasación (Q)", "valorTasacion"],
-                  ["No. Finca", "noFinca"], ["Folio", "folio"], ["Libro", "libro"],
-                  ["Municipio", "municipio"], ["Departamento", "departamento"],
-                  ["Fecha inscripción", "fechaInscripcion"], ["Fecha venc. inscripción", "fechaVencimiento"],
-                ].map(([label, key]) => (
-                  <div className="field" key={key} style={{ margin: 0 }}>
-                    <label style={{ fontSize: "0.8rem" }}>{label}</label>
-                    <input
-                      type={key.startsWith("fecha") ? "date" : key === "valorTasacion" ? "number" : "text"}
-                      value={(garantiaForm as Record<string, string>)[key]}
-                      onChange={(e) => setGarantiaForm({ ...garantiaForm, [key]: e.target.value })}
-                    />
-                  </div>
-                ))}
-                <div className="field" style={{ gridColumn: "1/-1", margin: 0 }}>
-                  <label style={{ fontSize: "0.8rem" }}>Descripción del bien *</label>
-                  <input value={garantiaForm.descripcion} onChange={(e) => setGarantiaForm({ ...garantiaForm, descripcion: e.target.value })} required />
-                </div>
-                <div className="field" style={{ gridColumn: "1/-1", margin: 0 }}>
-                  <label style={{ fontSize: "0.8rem" }}>Dirección / Aldea</label>
-                  <input value={garantiaForm.direccion} onChange={(e) => setGarantiaForm({ ...garantiaForm, direccion: e.target.value })} />
-                </div>
-                <div className="field" style={{ gridColumn: "1/-1", margin: 0 }}>
-                  <label style={{ fontSize: "0.8rem" }}>Observaciones</label>
-                  <input value={garantiaForm.observaciones} onChange={(e) => setGarantiaForm({ ...garantiaForm, observaciones: e.target.value })} />
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
-                <button className="btn" onClick={guardarGarantia} disabled={guardandoGarantia}>
-                  {guardandoGarantia ? "Guardando…" : "Guardar garantía"}
-                </button>
-                <button className="btn secondary" onClick={() => setMostrarFormGarantia(false)}>Cancelar</button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* D1 — REFINANCIAMIENTOS */}
-      {prestamo.estado === "DESEMBOLSADO" && (
-        <div className="card" style={{ marginTop: "1.25rem" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-            <h3 style={{ fontFamily: "inherit", fontSize: "1rem", margin: 0 }}>
-              Refinanciamientos ({refinanciamientos.length})
-            </h3>
-            {puedeAprobar && !mostrarFormRefinanciar && (
-              <button className="btn secondary" style={{ fontSize: "0.82rem" }} onClick={() => setMostrarFormRefinanciar(true)}>
-                + Refinanciar crédito
-              </button>
-            )}
-          </div>
-
-          {mostrarFormRefinanciar && (
-            <div style={{ background: "rgba(59,130,246,0.04)", border: "1px solid #bfdbfe", borderRadius: "8px", padding: "1rem", marginBottom: "1rem" }}>
-              <p style={{ margin: "0 0 0.75rem", fontSize: "0.85rem", color: "var(--ink-soft)" }}>
-                El refinanciamiento actualiza la tasa y el plazo del crédito tomando el <strong>saldo capital actual</strong> como nuevo monto base.
-                Los términos anteriores quedan registrados en el historial.
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                <div className="field" style={{ margin: 0 }}>
-                  <label style={{ fontSize: "0.8rem" }}>Nueva tasa mensual (%)</label>
-                  <input type="number" min="0.01" step="0.01" value={rfNuevaTasa} onChange={(e) => setRfNuevaTasa(e.target.value)} placeholder="2.00" />
-                </div>
-                <div className="field" style={{ margin: 0 }}>
-                  <label style={{ fontSize: "0.8rem" }}>Nuevo plazo (meses)</label>
-                  <input type="number" min="1" step="1" value={rfNuevoPlazo} onChange={(e) => setRfNuevoPlazo(e.target.value)} placeholder="12" />
-                </div>
-                <div className="field" style={{ gridColumn: "1/-1", margin: 0 }}>
-                  <label style={{ fontSize: "0.8rem" }}>Observaciones del refinanciamiento</label>
-                  <input value={rfObservaciones} onChange={(e) => setRfObservaciones(e.target.value)} placeholder="Motivo del refinanciamiento…" />
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
-                <button className="btn" style={{ background: "#2563eb", borderColor: "#2563eb" }} onClick={refinanciar} disabled={guardandoRefinanciamiento}>
-                  {guardandoRefinanciamiento ? "Procesando…" : "Confirmar refinanciamiento"}
-                </button>
-                <button className="btn secondary" onClick={() => setMostrarFormRefinanciar(false)}>Cancelar</button>
-              </div>
-            </div>
-          )}
-
-          {refinanciamientos.length > 0 ? (
-            <div className="table-wrap" style={{ border: "1px solid var(--line)" }}>
-              <table style={{ fontSize: "0.82rem", margin: 0 }}>
-                <thead>
-                  <tr style={{ background: "var(--paper-raised)" }}>
-                    <th style={{ padding: "5px 8px" }}>Fecha</th>
-                    <th style={{ padding: "5px 8px", textAlign: "right" }}>Saldo en ese momento</th>
-                    <th style={{ padding: "5px 8px" }}>Condiciones anteriores</th>
-                    <th style={{ padding: "5px 8px" }}>Nuevas condiciones</th>
-                    <th style={{ padding: "5px 8px" }}>Registrado por</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {refinanciamientos.map((r) => (
-                    <tr key={r.id}>
-                      <td className="mono" style={{ padding: "5px 8px" }}>{formatearFechaLocal(r.created_at)}</td>
-                      <td className="mono" style={{ textAlign: "right", padding: "5px 8px", fontWeight: 700 }}>{formatearQuetzales(r.saldo_capital_anterior)}</td>
-                      <td style={{ padding: "5px 8px", fontSize: "0.79rem" }}>
-                        Tasa {r.tasa_anterior}%/mes · {r.plazo_anterior}m · Cuota {formatearQuetzales(r.cuota_anterior)}
-                      </td>
-                      <td style={{ padding: "5px 8px", fontSize: "0.79rem", color: "#2563eb", fontWeight: 600 }}>
-                        Tasa {r.nueva_tasa}%/mes · {r.nuevo_plazo}m · Cuota {formatearQuetzales(r.nueva_cuota)}
-                      </td>
-                      <td style={{ padding: "5px 8px", fontSize: "0.79rem" }}>{r.usuario_nombre}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p style={{ color: "var(--ink-soft)", fontSize: "0.85rem", margin: 0 }}>
-              No hay refinanciamientos registrados para este crédito.
-            </p>
-          )}
         </div>
       )}
 

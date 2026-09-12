@@ -18,7 +18,7 @@ export default function SocioForm() {
   const { usuario } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const puedeElegirAgencia = usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA";
+  const puedeElegirAgencia = usuario?.rol === "GERENCIA";
 
   const [agencias, setAgencias] = useState<Agencia[]>([]);
   const [agenciaId, setAgenciaId] = useState(() => searchParams.get("agenciaId") || usuario?.agenciaId || "");

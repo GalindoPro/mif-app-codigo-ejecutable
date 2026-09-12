@@ -413,3 +413,44 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
   - Timer cancelado correctamente en `onMouseLeave` para evitar tooltips fantasma.
 - **Archivos Modificados:** `frontend/src/pages/Layout.tsx`, `frontend/src/styles/app.css`
 - **Sincronización Dual:** Downloads ↔ Documents completada.
+
+## 31. Reestructuración de Roles — Unión de ADMIN+GERENCIA y Nuevo Rol CAJA_CHICA
+
+- **Cambio principal:** El rol `ADMIN` fue eliminado. Todas sus funciones y permisos fueron absorbidos por `GERENCIA`. Solo existe un rol superior (Gerente General).
+- **Nuevo rol `CAJA_CHICA`:** Separado del cajero auxiliar. Accede únicamente a su módulo de Caja Chica y puede consultar/crear socios.
+- **Tabla de roles final:**
+  - `GERENCIA` — Control total: crear, editar, eliminar, usuarios, agencias, reinicio de sistema
+  - `SUPERVISOR` — Solo lectura: ve todo en tiempo real, no puede modificar nada
+  - `CAJERO` — Auxiliar de caja: ventanilla, cobros, consulta de socios y créditos
+  - `CAJA_CHICA` — Solo módulo de caja chica + consulta de socios
+  - `PROMOTOR` — Campo: socios, créditos, ahorros, kardex
+- **Archivos modificados (backend):** `types/models.ts`, `middleware/auth.ts`, `db/seed.ts`, todos los `modules/*/routes.ts`
+- **Archivos modificados (frontend):** `types.ts`, `Layout.tsx`, `Usuarios.tsx`, `Tablero.tsx`, `CreditosList.tsx`, `CajaChica.tsx`, `AuxiliarCaja.tsx`, `SocioForm.tsx`, `CreditoForm.tsx`, `PlazoFijoForm.tsx`, `PlazoFijoDetail.tsx`, `AhorroCuentaForm.tsx`, `LibroArqueoMensual.tsx`, `Agencias.tsx`, `Sesiones.tsx`, `CreditoDetail.tsx`
+- **Base de datos:** Enum `rol_usuario` actualizado con `CAJA_CHICA`. Usuario de prueba `cajachica@mif.coop` creado.
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+## 32. Sistema de Edición Operativa con Registro de Motivos (Auditoría)
+
+- **Objetivo:** Permitir a roles operativos (`CAJERO`, `CAJA_CHICA`) corregir equivocaciones de digitación en sus propios registros únicamente durante el transcurso del mismo día en el que los crearon.
+- **Auditoría Estricta:** 
+  - Se agregó la columna `motivo` (TEXT) en la tabla `auditoria`. Todo cambio operativo requiere obligatoriamente una explicación detallada (mínimo 10 caracteres) sobre por qué se modifica el registro.
+  - La bitácora de auditoría ahora muestra este motivo resaltado, permitiendo a gerencia o supervisión revisar el contexto de la corrección, además de los datos originales (Antes) y modificados (Después).
+- **Backend:**
+  - Rutas `PATCH /caja-chica/movimiento/:id` y `PATCH /caja-auxiliar/movimiento/:id`.
+  - Validación cruzada: `req.user.id === registro.usuario_id` y fecha de registro = fecha actual (solo si no es `GERENCIA`).
+- **Frontend:**
+  - En las tablas de Auxiliar de Caja y Caja Chica aparece un botón de corrección (✏️) solo bajo la condición mencionada.
+  - Se implementaron los modales `CajaChicaEditModal` y `AuxiliarCajaEditModal` (reutilizando helpers visuales de las vistas de creación pero acotados al registro existente).
+  - La vista global de `Auditoria.tsx` integra la visualización de `motivo` en su modal de detalles.
+## 33. Refactorización del Sistema de Recibos y Seguridad de Historial de Cierres
+
+- **Objetivo:** Eliminar los modales de recibo bloqueantes que interrumpían el flujo del cajero y establecer políticas estrictas de visualización de arqueos pasados.
+- **Historial de Recibos Diario (Mismo Día):**
+  - Los cajeros ya no son interrumpidos por un modal de impresión automático después de cada transacción (ej. cobro de crédito o desembolso). 
+  - Las transacciones se completan silenciosamente y el cajero es devuelto al flujo normal de forma inmediata.
+  - Se agregó un botón de reimpresión (🖨️) directamente en la tabla de movimientos del día (`CajaAbierta.tsx`), permitiendo visualizar e imprimir un formato estándar de ticket para cualquier movimiento sin afectar la operativa.
+- **Seguridad en el Historial de Cierres de Caja (Días Pasados):**
+  - **Restricción de Rol:** Se ocultó el botón "Historial de Cajas" para los usuarios con rol `CAJERO`.
+  - **Auditoría Backend:** Se agregaron verificaciones `requireRole("GERENCIA", "SUPERVISOR")` a los endpoints `/caja-auxiliar/historial` y `/caja-auxiliar/arqueos-mes`.
+  - **Propósito:** Evitar que el cajero operativo tenga acceso a métricas de cuadre o faltantes/sobrantes de días anteriores, mitigando riesgos de manipulación, delegando esta revisión exclusivamente a la gerencia.
+- **Sincronización Dual:** Downloads ↔ Documents completada.

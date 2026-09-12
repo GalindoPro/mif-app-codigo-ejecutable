@@ -6,7 +6,7 @@ import { asyncHandler } from "../../utils/asyncHandler";
 export const sesionesRouter = Router();
 
 sesionesRouter.use(requireAuth);
-sesionesRouter.use(requireRole("ADMIN", "GERENCIA", "SUPERVISOR"));
+sesionesRouter.use(requireRole("GERENCIA", "SUPERVISOR"));
 
 sesionesRouter.get(
   "/",

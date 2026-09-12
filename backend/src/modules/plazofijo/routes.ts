@@ -92,7 +92,7 @@ const liquidarSchema = z.object({
 
 plazoFijoRouter.post(
   "/:id/liquidar",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
   asyncHandler(async (req, res) => {
     const data = liquidarSchema.parse(req.body ?? {});
     const liquidado = await service.liquidar(req.params.id, data, req.user!.id, agenciaVisible(req));

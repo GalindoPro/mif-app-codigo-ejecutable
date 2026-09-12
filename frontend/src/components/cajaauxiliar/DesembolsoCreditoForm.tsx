@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { api, mensajeError } from "../../lib/api";
-import { formatearQuetzales } from "../../lib/formatters";
+import {
+  formatoQ,
+} from "../../types";
 import type {
   OrigenFondos,
   Prestamo,
@@ -120,7 +122,7 @@ export default function DesembolsoCreditoForm({
             >
               {prestamos.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.codigo} — {p.socio_nombres} ({p.tipo}) - {formatearQuetzales(p.monto_aprobado || p.monto_solicitado)}
+                  {p.codigo} — {p.socio_nombres} ({p.tipo}) - {formatoQ(p.monto_aprobado || p.monto_solicitado)}
                 </option>
               ))}
             </select>
@@ -216,7 +218,7 @@ export default function DesembolsoCreditoForm({
                 </div>
                 <div>
                   <span style={{ color: "var(--ink-soft)" }}>Cuota mensual pactada:</span>{" "}
-                  <strong>{formatearQuetzales(prestamo.cuota_mensual)}</strong>
+                  <strong>{formatoQ(prestamo.cuota_mensual)}</strong>
                 </div>
               </div>
 
@@ -235,7 +237,7 @@ export default function DesembolsoCreditoForm({
                     🛡️ Retención de Ahorro sobre Préstamo (Garantía Institucional)
                   </label>
                   <span className="badge" style={{ background: "#e0f2fe", color: "#0369a1", fontWeight: 700, fontSize: "0.75rem" }}>
-                    {montoAspRetenido > 0 ? `+ ${formatearQuetzales(montoAspRetenido)} a su cuenta` : "Sin retención"}
+                    {montoAspRetenido > 0 ? `+ ${formatoQ(montoAspRetenido)} a su cuenta` : "Sin retención"}
                   </span>
                 </div>
                 <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", margin: "0 0 0.6rem" }}>
@@ -244,8 +246,8 @@ export default function DesembolsoCreditoForm({
 
                 <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
                   {[
-                    { id: "5", label: `5% (${formatearQuetzales(montoAprobado * 0.05)})` },
-                    { id: "10", label: `10% (${formatearQuetzales(montoAprobado * 0.10)})` },
+                    { id: "5", label: `5% (${formatoQ(montoAprobado * 0.05)})` },
+                    { id: "10", label: `10% (${formatoQ(montoAprobado * 0.10)})` },
                     { id: "custom", label: "Monto personalizado (Q)" },
                     { id: "0", label: "0% (Sin retención)" },
                   ].map((op) => (
@@ -289,7 +291,7 @@ export default function DesembolsoCreditoForm({
                   <label>Monto total del préstamo aprobado</label>
                   <input
                     type="text"
-                    value={formatearQuetzales(montoAprobado)}
+                    value={formatoQ(montoAprobado)}
                     disabled
                     style={{ fontWeight: 700, fontSize: "1.05rem" }}
                   />
@@ -310,7 +312,7 @@ export default function DesembolsoCreditoForm({
 
               {saldoInsuficiente ? (
                 <div className="alert error" style={{ marginTop: "0.75rem" }}>
-                  ⚠️ Saldo insuficiente en caja: Se requieren {formatearQuetzales(efectivoNetoAEntregar)} en efectivo neto, pero la caja física solo tiene {formatearQuetzales(saldoCajaActual)}. Ingrese fondos antes de desembolsar.
+                  ⚠️ Saldo insuficiente en caja: Se requieren {formatoQ(efectivoNetoAEntregar)} en efectivo neto, pero la caja física solo tiene {formatoQ(saldoCajaActual)}. Ingrese fondos antes de desembolsar.
                 </div>
               ) : (
                 <div
@@ -328,18 +330,18 @@ export default function DesembolsoCreditoForm({
                   }}
                 >
                   <div style={{ fontSize: "0.82rem", color: "#1e40af" }}>
-                    <div>Monto Aprobado: <strong>{formatearQuetzales(montoAprobado)}</strong></div>
+                    <div>Monto Aprobado: <strong>{formatoQ(montoAprobado)}</strong></div>
                     {montoAspRetenido > 0 && (
                       <div style={{ color: "#0369a1" }}>
-                        🛡️ Ahorro Retenido: <strong>- {formatearQuetzales(montoAspRetenido)}</strong>
+                        🛡️ Ahorro Retenido: <strong>- {formatoQ(montoAspRetenido)}</strong>
                       </div>
                     )}
-                    <div>Saldo en caja tras entrega: <strong>{formatearQuetzales(saldoCajaActual - efectivoNetoAEntregar)}</strong></div>
+                    <div>Saldo en caja tras entrega: <strong>{formatoQ(saldoCajaActual - efectivoNetoAEntregar)}</strong></div>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <span style={{ fontSize: "0.82rem", color: "#1e40af" }}>Efectivo neto a entregar al socio: </span>
                     <div style={{ fontSize: "1.35rem", fontWeight: 800, color: "#1e40af" }}>
-                      {formatearQuetzales(efectivoNetoAEntregar)}
+                      {formatoQ(efectivoNetoAEntregar)}
                     </div>
                   </div>
                 </div>
@@ -352,7 +354,7 @@ export default function DesembolsoCreditoForm({
                   style={{ background: "#2563eb", borderColor: "#2563eb", fontWeight: 700 }}
                   disabled={guardando || saldoInsuficiente}
                 >
-                  {guardando ? "Desembolsando…" : `📤 Desembolsar y Entregar ${formatearQuetzales(efectivoNetoAEntregar)}`}
+                  {guardando ? "Desembolsando…" : `📤 Desembolsar y Entregar ${formatoQ(efectivoNetoAEntregar)}`}
                 </button>
               </div>
             </>

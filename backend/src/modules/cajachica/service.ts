@@ -1,8 +1,6 @@
 import { pool } from "../../db/pool";
-import { withTransaction } from "../../db/transaction";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { conflict } from "../../utils/errors";
-import { hoyGT } from "../../utils/financiero";
 
 export async function listar(params: { agenciaId: string | null; q?: string }) {
   const condiciones: string[] = [];
@@ -69,52 +67,45 @@ export interface DatosComprobante {
 }
 
 export async function crear(data: DatosComprobante, usuarioId: string) {
-  return withTransaction(async (client) => {
-    if (data.tipo === "EGRESO") {
-      // Serializa la validación de saldo por agencia: sin esto, dos egresos
-      // concurrentes podrían leer el mismo saldo disponible y ambos pasar la
-      // validación antes de que cualquiera de los dos quede insertado.
-      await client.query(`select pg_advisory_xact_lock(hashtext($1))`, [data.agenciaId]);
-
-      const { rows } = await client.query(
-        `select
-           coalesce(sum(case when tipo = 'INGRESO' then monto else 0 end), 0)
-           - coalesce(sum(case when tipo = 'EGRESO' then monto else 0 end), 0) as saldo
-         from caja_chica_comprobantes where agencia_id = $1`,
-        [data.agenciaId],
-      );
-      const saldo = Number(rows[0].saldo);
-      if (data.monto > saldo) {
-        throw conflict(`El egreso (Q ${data.monto.toFixed(2)}) es mayor que el saldo disponible en caja (Q ${saldo.toFixed(2)})`);
-      }
-    }
-
-    const { rows } = await client.query(
-      `insert into caja_chica_comprobantes (agencia_id, fecha, numero_documento, beneficiario, descripcion, tipo, categoria, monto, usuario_id)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       returning *`,
-      [
-        data.agenciaId,
-        data.fecha,
-        data.numeroDocumento ?? "DTE",
-        data.beneficiario,
-        data.descripcion,
-        data.tipo,
-        data.tipo === "EGRESO" ? data.categoria ?? null : null,
-        data.monto,
-        usuarioId,
-      ],
+  if (data.tipo === "EGRESO") {
+    const { rows } = await pool.query(
+      `select
+         coalesce(sum(case when tipo = 'INGRESO' then monto else 0 end), 0)
+         - coalesce(sum(case when tipo = 'EGRESO' then monto else 0 end), 0) as saldo
+       from caja_chica_comprobantes where agencia_id = $1`,
+      [data.agenciaId],
     );
-    const comprobante = rows[0];
-    await registrarAuditoria({
-      entidad: "CajaChicaComprobante",
-      entidadId: comprobante.id,
-      accion: "CREAR",
+    const saldo = Number(rows[0].saldo);
+    if (data.monto > saldo) {
+      throw conflict(`El egreso (Q ${data.monto.toFixed(2)}) es mayor que el saldo disponible en caja (Q ${saldo.toFixed(2)})`);
+    }
+  }
+
+  const { rows } = await pool.query(
+    `insert into caja_chica_comprobantes (agencia_id, fecha, numero_documento, beneficiario, descripcion, tipo, categoria, monto, usuario_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+     returning *`,
+    [
+      data.agenciaId,
+      data.fecha,
+      data.numeroDocumento ?? "DTE",
+      data.beneficiario,
+      data.descripcion,
+      data.tipo,
+      data.tipo === "EGRESO" ? data.categoria ?? null : null,
+      data.monto,
       usuarioId,
-      datosNuevos: comprobante,
-    });
-    return comprobante;
+    ],
+  );
+  const comprobante = rows[0];
+  await registrarAuditoria({
+    entidad: "CajaChicaComprobante",
+    entidadId: comprobante.id,
+    accion: "CREAR",
+    usuarioId,
+    datosNuevos: comprobante,
   });
+  return comprobante;
 }
 
 export interface DatosReposicionCajaChica {
@@ -129,7 +120,7 @@ export async function reponerFondo(data: DatosReposicionCajaChica, usuarioId: st
   if (!data.numeroCheque || !data.numeroCheque.trim()) {
     throw conflict("El número de cheque o documento de reposición (No. CH.) es obligatorio.");
   }
-  const fecha = data.fecha || hoyGT();
+  const fecha = data.fecha || new Date().toISOString().slice(0, 10);
   const ch = data.numeroCheque.trim();
 
   // Validar anti-duplicados del cheque en caja chica
@@ -301,3 +292,47 @@ export async function generarReporte(params: ParamsReporteCajaChica) {
   };
 }
 
+
+export async function editar(id: string, data: Partial<DatosComprobante>, usuarioId: string, motivo: string) {
+  const { rows: anteriores } = await pool.query(
+    "select * from caja_chica_comprobantes where id = $1",
+    [id]
+  );
+  if (!anteriores[0]) throw conflict("El comprobante no existe.");
+  const ant = anteriores[0];
+
+  const { rows } = await pool.query(
+    `update caja_chica_comprobantes
+     set fecha = coalesce($1, fecha),
+         numero_documento = coalesce($2, numero_documento),
+         beneficiario = coalesce($3, beneficiario),
+         descripcion = coalesce($4, descripcion),
+         tipo = coalesce($5, tipo),
+         categoria = coalesce($6, categoria),
+         monto = coalesce($7, monto)
+     where id = $8
+     returning *`,
+    [
+      data.fecha,
+      data.numeroDocumento,
+      data.beneficiario,
+      data.descripcion,
+      data.tipo,
+      data.categoria,
+      data.monto,
+      id
+    ]
+  );
+
+  const comprobante = rows[0];
+  await registrarAuditoria({
+    entidad: "CajaChicaComprobante",
+    entidadId: id,
+    accion: "ACTUALIZAR",
+    usuarioId,
+    datosAnteriores: ant,
+    datosNuevos: comprobante,
+    motivo
+  });
+  return comprobante;
+}

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { formatearQuetzales } from "../lib/formatters";
+import { formatoQ } from "../types";
 import type { ResumenDashboard } from "../types";
 
 export default function Tablero() {
@@ -116,7 +116,7 @@ export default function Tablero() {
 
   const { global, porAgencia } = resumen;
   const varias = porAgencia.length > 1;
-  const puedeGestionarDatos = usuario?.rol === "ADMIN" || usuario?.rol === "SUPERVISOR" || usuario?.rol === "GERENCIA";
+  const puedeGestionarDatos = usuario?.rol === "GERENCIA" || usuario?.rol === "SUPERVISOR";
 
   return (
     <div className="dashboard-container">
@@ -194,36 +194,36 @@ export default function Tablero() {
         {usuario?.rol !== "PROMOTOR" && (
           <Link to="/caja-chica" className="kpi-tile">
             <span className="kpi-tile-label">Caja chica</span>
-            <span className="kpi-tile-value">{formatearQuetzales(global.cajaChica)}</span>
+            <span className="kpi-tile-value">{formatoQ(global.cajaChica)}</span>
             <span className="kpi-tile-sub">Fondo disponible</span>
           </Link>
         )}
         <Link to="/ahorros/corriente" className="kpi-tile">
           <span className="kpi-tile-label">Ahorro corriente</span>
-          <span className="kpi-tile-value" style={{ color: "var(--accent)" }}>{formatearQuetzales(global.ahorroCorriente)}</span>
+          <span className="kpi-tile-value" style={{ color: "var(--accent)" }}>{formatoQ(global.ahorroCorriente)}</span>
           <span className="kpi-tile-sub">Disponible a la vista</span>
         </Link>
         <Link to="/ahorros/programado" className="kpi-tile">
           <span className="kpi-tile-label">Ahorro programado</span>
-          <span className="kpi-tile-value">{formatearQuetzales(global.ahorroProgramado)}</span>
+          <span className="kpi-tile-value">{formatoQ(global.ahorroProgramado)}</span>
           <span className="kpi-tile-sub">Cuota pactada</span>
         </Link>
         <Link to="/ahorros/infanto-juvenil" className="kpi-tile">
           <span className="kpi-tile-label">Ahorro infantil</span>
-          <span className="kpi-tile-value">{formatearQuetzales(global.ahorroInfantoJuvenil)}</span>
+          <span className="kpi-tile-value">{formatoQ(global.ahorroInfantoJuvenil)}</span>
           <span className="kpi-tile-sub">Infanto juvenil</span>
         </Link>
         <Link to="/ahorros/plazo-fijo" className="kpi-tile">
           <span className="kpi-tile-label">Ahorro Plazo Fijo</span>
           <span className="kpi-tile-value" style={{ color: "#f59e0b" }}>
-            {global.plazoFijo && global.plazoFijo.monto > 0 ? formatearQuetzales(global.plazoFijo.monto) : "Kardex PF"}
+            {global.plazoFijo && global.plazoFijo.monto > 0 ? formatoQ(global.plazoFijo.monto) : "Kardex PF"}
           </span>
           <span className="kpi-tile-sub">{global.plazoFijo?.count ?? 692} certificados</span>
         </Link>
         <Link to="/aportaciones" className="kpi-tile">
           <span className="kpi-tile-label">Aportaciones Capital</span>
           <span className="kpi-tile-value" style={{ color: "var(--accent)" }}>
-            {formatearQuetzales(global.aportaciones?.saldo ?? 11600)}
+            {formatoQ(global.aportaciones?.saldo ?? 11600)}
           </span>
           <span className="kpi-tile-sub">{global.aportaciones?.count ?? 117} socios aportantes</span>
         </Link>
@@ -236,7 +236,7 @@ export default function Tablero() {
           <Link to="/creditos" className="kpi-tile accent">
             <span className="kpi-tile-label">Cartera de Crédito</span>
             <span className="kpi-tile-value" style={{ color: "#38bdf8" }}>
-              {formatearQuetzales(global.carteraPrestamos?.saldo ?? 15210193.13)}
+              {formatoQ(global.carteraPrestamos?.saldo ?? 15210193.13)}
             </span>
             <span className="kpi-tile-sub">{global.carteraPrestamos?.count ?? 65} préstamos activos</span>
           </Link>
@@ -250,7 +250,7 @@ export default function Tablero() {
           <div className="dashboard-panel-card">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h3 style={{ margin: 0, fontSize: "0.88rem", fontWeight: 700, color: "var(--ink)" }}>
-                {usuario?.rol === "SUPERVISOR" || usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA"
+                {usuario?.rol === "SUPERVISOR" || usuario?.rol === "GERENCIA"
                   ? "🛡️ Panel de Supervisión y Control de Agencia"
                   : "⚡ Accesos Rápidos de Operación"}
               </h3>
@@ -260,7 +260,7 @@ export default function Tablero() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(115px, 1fr))", gap: "0.45rem" }}>
-              {usuario?.rol === "SUPERVISOR" || usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA" ? (
+              {usuario?.rol === "SUPERVISOR" || usuario?.rol === "GERENCIA" ? (
                 <>
                   <Link to="/libro-mensual-arqueos" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
                     📑 Libro Arqueos
@@ -325,9 +325,9 @@ export default function Tablero() {
                     {porAgencia.map((a) => (
                       <tr key={a.agenciaId}>
                         <td style={{ padding: "0.35rem 0.5rem", fontWeight: 600 }}>{a.agenciaNombre}</td>
-                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>{formatearQuetzales(a.cajaChica.saldo)}</td>
-                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>{formatearQuetzales(a.ahorroCorriente.saldoTotal)}</td>
-                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right", color: "#38bdf8" }}>{formatearQuetzales(a.carteraPrestamos?.saldo ?? 0)}</td>
+                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>{formatoQ(a.cajaChica.saldo)}</td>
+                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>{formatoQ(a.ahorroCorriente.saldoTotal)}</td>
+                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right", color: "#38bdf8" }}>{formatoQ(a.carteraPrestamos?.saldo ?? 0)}</td>
                         <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "center" }}>{a.totalSocios}</td>
                       </tr>
                     ))}
@@ -340,7 +340,7 @@ export default function Tablero() {
 
         {/* Panel Derecho: Monitoreo Estratégico de Servicios */}
         <div>
-          {(usuario?.rol === "SUPERVISOR" || usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA") && (
+          {(usuario?.rol === "SUPERVISOR" || usuario?.rol === "GERENCIA") && (
             <PanelGraficaServicios agenciaIdInicial={usuario?.agenciaId ?? undefined} />
           )}
         </div>
@@ -369,7 +369,7 @@ interface AnaliticaResponse {
 
 function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string }) {
   const { usuario } = useAuth();
-  const puedeElegirAgencia = usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA";
+  const puedeElegirAgencia = usuario?.rol === "GERENCIA";
   const [agencias, setAgencias] = useState<any[]>([]);
   const [agenciaId, setAgenciaId] = useState(agenciaIdInicial || usuario?.agenciaId || "");
   const [periodo, setPeriodo] = useState<"semana" | "mes" | "anio">("mes");
@@ -565,7 +565,7 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
             <div className="kpi-tile" style={{ minHeight: 52, padding: "0.4rem 0.6rem" }}>
               <span className="kpi-tile-label">Volumen Operado</span>
               <span className="kpi-tile-value mono" style={{ color: "var(--accent)", fontSize: "0.96rem", margin: "0.1rem 0" }}>
-                {formatearQuetzales(volumenTotalFiltro)}
+                {formatoQ(volumenTotalFiltro)}
               </span>
               <span className="kpi-tile-sub" style={{ fontSize: "0.65rem" }}>Flujo monetario</span>
             </div>
@@ -626,7 +626,7 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {formatearQuetzales(s.totalMonto)}
+                        {formatoQ(s.totalMonto)}
                       </strong>
                     </div>
                   </div>

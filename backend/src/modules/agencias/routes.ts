@@ -22,7 +22,7 @@ const crearSchema = z.object({
 
 agenciasRouter.post(
   "/",
-  requireRole("ADMIN"),
+  requireRole("GERENCIA"),
   asyncHandler(async (req, res) => {
     const data = crearSchema.parse(req.body);
     res.status(201).json(await service.crear(data));

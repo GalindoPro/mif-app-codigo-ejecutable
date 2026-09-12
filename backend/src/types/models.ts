@@ -1,4 +1,4 @@
-export type RolUsuario = "ADMIN" | "GERENCIA" | "SUPERVISOR" | "CAJERO" | "PROMOTOR";
+export type RolUsuario = "GERENCIA" | "SUPERVISOR" | "CAJERO" | "CAJA_CHICA" | "PROMOTOR";
 export type EstadoSocio = "ACTIVO" | "INACTIVO";
 export type Genero = "M" | "F";
 
@@ -133,3 +133,24 @@ export interface PlazoFijoContrato {
   updated_at: Date;
 }
 
+export type EstadoCobroCampo = "PENDIENTE" | "LIQUIDADO" | "RECHAZADO";
+
+export interface CobroCampo {
+  id: string;
+  promotor_id: string;
+  agencia_id: string;
+  socio_id: string;
+  prestamo_id: string;
+  fecha: string; // date
+  numero_recibo_fisico: string;
+  monto: number;
+  estado: EstadoCobroCampo;
+  justificacion_edicion?: string | null;
+  veces_editado: number;
+  caja_dia_id?: string | null;
+  caja_movimiento_id?: string | null;
+  prestamo_pago_id?: string | null;
+  created_at: Date;
+  updated_at: Date;
+  liquidado_at?: Date | null;
+}

@@ -4,7 +4,7 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { requireAuth, requireRole, agenciaVisible } from "../../middleware/auth";
 import { badRequest, forbidden } from "../../utils/errors";
 import * as service from "./service";
-import { CATEGORIA_MANUAL_KEYS } from "./categorias";
+import { CATEGORIA_KEYS } from "./categorias";
 
 export const cajaAuxiliarRouter = Router();
 cajaAuxiliarRouter.use(requireAuth);
@@ -20,6 +20,7 @@ cajaAuxiliarRouter.get(
 
 cajaAuxiliarRouter.get(
   "/historial",
+  requireRole("GERENCIA", "SUPERVISOR"),
   asyncHandler(async (req, res) => {
     const agenciaId = (req.query.agenciaId as string) || req.user?.agenciaId;
     if (!agenciaId) throw badRequest("Falta indicar la agencia");
@@ -39,13 +40,34 @@ cajaAuxiliarRouter.get(
 
 cajaAuxiliarRouter.get(
   "/arqueos-mes",
+  requireRole("GERENCIA", "SUPERVISOR"),
   asyncHandler(async (req, res) => {
     const agenciaId = (req.query.agenciaId as string) || req.user?.agenciaId || undefined;
     const mes = typeof req.query.mes === "string" ? req.query.mes : undefined;
     res.json(await service.arqueosMensuales(agenciaId, agenciaVisible(req), mes));
   }),
 );
+cajaAuxiliarRouter.get(
+  "/liquidaciones",
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
+  asyncHandler(async (req, res) => {
+    const agenciaId = (req.query.agenciaId as string) || req.user?.agenciaId;
+    if (!agenciaId) throw badRequest("Falta indicar la agencia");
+    res.json(await service.listarLiquidacionesPendientes(agenciaId, agenciaVisible(req)));
+  }),
+);
 
+cajaAuxiliarRouter.post(
+  "/liquidaciones/aprobar",
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
+  asyncHandler(async (req, res) => {
+    const { promotorId } = req.body;
+    if (!promotorId) throw badRequest("Falta promotorId");
+    const agenciaId = req.user!.agenciaId;
+    if (!agenciaId) throw badRequest("Cajero sin agencia");
+    res.json(await service.aprobarLiquidacion(agenciaId, promotorId, req.user!.id));
+  }),
+);
 
 const abrirSchema = z.object({
   agenciaId: z.string().uuid(),
@@ -54,7 +76,7 @@ const abrirSchema = z.object({
 
 cajaAuxiliarRouter.post(
   "/abrir",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
   asyncHandler(async (req, res) => {
     const data = abrirSchema.parse(req.body);
     const visible = agenciaVisible(req);
@@ -81,11 +103,7 @@ cajaAuxiliarRouter.get(
 );
 
 const movimientoSchema = z.object({
-  // Excluye a propósito las categorías de préstamo (abono/interés/mora) y la
-  // de desembolso: esas solo debe escribirlas el cobro de cuota / desembolso
-  // estructurado, que sí actualiza el crédito real — nunca este endpoint
-  // genérico de registro manual.
-  categoria: z.enum(CATEGORIA_MANUAL_KEYS as [string, ...string[]]),
+  categoria: z.enum(CATEGORIA_KEYS as [string, ...string[]]),
   monto: z.number().positive("El monto debe ser mayor a cero"),
   beneficiario: z.string().optional(),
   socioId: z.string().uuid().optional(),
@@ -96,7 +114,7 @@ const movimientoSchema = z.object({
 
 cajaAuxiliarRouter.post(
   "/:id/movimientos",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
   asyncHandler(async (req, res) => {
     const data = movimientoSchema.parse(req.body);
     res.status(201).json(
@@ -118,7 +136,7 @@ const cerrarSchema = z.object({
 
 cajaAuxiliarRouter.post(
   "/:id/cerrar",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
   asyncHandler(async (req, res) => {
     const data = cerrarSchema.parse(req.body);
     res.json(await service.cerrarDia(req.params.id, data.conteo, req.user!.id, agenciaVisible(req)));
@@ -139,7 +157,7 @@ const cobroCreditoSchema = z.object({
 
 cajaAuxiliarRouter.post(
   "/:id/cobro-credito",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
   asyncHandler(async (req, res) => {
     const data = cobroCreditoSchema.parse(req.body);
     res.status(201).json(
@@ -157,7 +175,7 @@ const desembolsoCreditoSchema = z.object({
 
 cajaAuxiliarRouter.post(
   "/:id/desembolso-credito",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
   asyncHandler(async (req, res) => {
     const data = desembolsoCreditoSchema.parse(req.body);
     res.status(201).json(
@@ -174,12 +192,55 @@ const liquidarPlazoFijoSchema = z.object({
 
 cajaAuxiliarRouter.post(
   "/:id/liquidar-plazo-fijo",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
   asyncHandler(async (req, res) => {
     const data = liquidarPlazoFijoSchema.parse(req.body);
     res.status(201).json(
       await service.liquidarPlazoFijo(req.params.id, data, req.user!.id, agenciaVisible(req)),
     );
+  }),
+);
+
+const editarMovimientoSchema = z.object({
+  seccion: z.enum(["BI", "PROPIO"]).optional(),
+  categoria: z.any().optional(),
+  tipo: z.enum(["INGRESO", "EGRESO"]).optional(),
+  monto: z.number().positive().optional(),
+  referencia: z.string().optional(),
+  descripcion: z.string().optional(),
+  motivo: z.string().min(10, "El motivo de la corrección es obligatorio (mínimo 10 caracteres)"),
+});
+
+cajaAuxiliarRouter.patch(
+  "/movimiento/:id",
+  requireRole("GERENCIA", "CAJERO"),
+  asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const data = editarMovimientoSchema.parse(req.body);
+    const { motivo, ...updates } = data;
+
+    // Verificar permisos operativos
+    if (req.user!.rol !== "GERENCIA") {
+      const { pool } = await import("../../db/pool");
+      const { rows } = await pool.query(
+        "select usuario_id, created_at from caja_movimientos_auxiliar where id = $1",
+        [id]
+      );
+      if (!rows[0]) throw badRequest("El registro no existe");
+      const reg = rows[0];
+      
+      if (reg.usuario_id !== req.user!.id) {
+        throw forbidden("No autorizado: Solo puedes editar tus propios registros");
+      }
+      
+      const hoy = new Date().toISOString().slice(0, 10);
+      const fechaRegistro = new Date(reg.created_at).toISOString().slice(0, 10);
+      if (hoy !== fechaRegistro) {
+        throw forbidden("No autorizado: Solo puedes editar registros creados el día de hoy");
+      }
+    }
+
+    res.json(await service.editar(id, updates, req.user!.id, motivo));
   }),
 );
 

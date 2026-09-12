@@ -6,7 +6,7 @@ import { asyncHandler } from "../../utils/asyncHandler";
 export const auditoriaRouter = Router();
 
 auditoriaRouter.use(requireAuth);
-auditoriaRouter.use(requireRole("ADMIN", "GERENCIA", "SUPERVISOR"));
+auditoriaRouter.use(requireRole("GERENCIA", "SUPERVISOR"));
 
 // Listar tipos de entidades registradas en la bitácora
 auditoriaRouter.get(
@@ -86,6 +86,7 @@ auditoriaRouter.get(
           a.datos_anteriores,
           a.datos_nuevos,
           a.fecha,
+          a.motivo,
           COALESCE(u.nombre, 'Sistema / Automático') AS usuario_nombre,
           COALESCE(u.rol::text, 'ADMIN') AS usuario_rol
         FROM auditoria a

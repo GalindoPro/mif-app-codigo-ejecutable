@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import { useEffect } from "react";
 import type { DetalleCajaAuxiliar } from "../../types";
-import { formatearQuetzales } from "../../lib/formatters";
+import { formatoQ } from "../../types";
 
 export interface ActaArqueoModalProps {
   agenciaNombre: string;
@@ -112,19 +112,19 @@ export default function ActaArqueoModal({
             <tbody>
               <tr style={{ borderBottom: "1px solid var(--line)" }}>
                 <td style={{ padding: "0.35rem 0" }}>Saldo Inicial Según Auxiliar:</td>
-                <td style={{ textAlign: "right", fontWeight: 600 }} className="mono">{formatearQuetzales(dia.saldo_inicial)}</td>
+                <td style={{ textAlign: "right", fontWeight: 600 }} className="mono">{formatoQ(dia.saldo_inicial)}</td>
               </tr>
               <tr style={{ borderBottom: "1px solid var(--line)" }}>
                 <td style={{ padding: "0.35rem 0", color: "#34d399" }}>(+) Total Ingresos del Día:</td>
-                <td style={{ textAlign: "right", fontWeight: 600, color: "#34d399" }} className="mono">{formatearQuetzales(detalle.totalIngreso)}</td>
+                <td style={{ textAlign: "right", fontWeight: 600, color: "#34d399" }} className="mono">{formatoQ(detalle.totalIngreso)}</td>
               </tr>
               <tr style={{ borderBottom: "1px solid var(--line)" }}>
                 <td style={{ padding: "0.35rem 0", color: "#f87171" }}>(-) Total Egresos del Día:</td>
-                <td style={{ textAlign: "right", fontWeight: 600, color: "#f87171" }} className="mono">{formatearQuetzales(detalle.totalEgreso)}</td>
+                <td style={{ textAlign: "right", fontWeight: 600, color: "#f87171" }} className="mono">{formatoQ(detalle.totalEgreso)}</td>
               </tr>
               <tr style={{ borderTop: "2px solid var(--line)", background: "var(--mono-bg)" }}>
                 <td style={{ padding: "0.5rem 0", fontWeight: 700 }}>(=) Saldo Final según Auxiliar de Caja:</td>
-                <td style={{ textAlign: "right", fontWeight: 800, fontSize: "0.95rem" }} className="mono">{formatearQuetzales(saldoEsperado)}</td>
+                <td style={{ textAlign: "right", fontWeight: 800, fontSize: "0.95rem" }} className="mono">{formatoQ(saldoEsperado)}</td>
               </tr>
             </tbody>
           </table>
@@ -155,13 +155,13 @@ export default function ActaArqueoModal({
                       <tr key={b} style={{ borderBottom: "1px solid #f8fafc" }}>
                         <td style={{ padding: "0.2rem 0" }}>Q {b.toFixed(2)}</td>
                         <td style={{ textAlign: "center", padding: "0.2rem 0" }} className="mono">{c}</td>
-                        <td style={{ textAlign: "right", padding: "0.2rem 0" }} className="mono">{formatearQuetzales(b * c)}</td>
+                        <td style={{ textAlign: "right", padding: "0.2rem 0" }} className="mono">{formatoQ(b * c)}</td>
                       </tr>
                     );
                   })}
                   <tr style={{ borderTop: "1px solid #cbd5e1", fontWeight: 700 }}>
                     <td colSpan={2} style={{ padding: "0.3rem 0" }}>Subtotal Billetes:</td>
-                    <td style={{ textAlign: "right", padding: "0.3rem 0" }} className="mono">{formatearQuetzales(totalBilletes)}</td>
+                    <td style={{ textAlign: "right", padding: "0.3rem 0" }} className="mono">{formatoQ(totalBilletes)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -185,13 +185,13 @@ export default function ActaArqueoModal({
                       <tr key={m} style={{ borderBottom: "1px solid #f8fafc" }}>
                         <td style={{ padding: "0.2rem 0" }}>Q {m.toFixed(2)}</td>
                         <td style={{ textAlign: "center", padding: "0.2rem 0" }} className="mono">{c}</td>
-                        <td style={{ textAlign: "right", padding: "0.2rem 0" }} className="mono">{formatearQuetzales(m * c)}</td>
+                        <td style={{ textAlign: "right", padding: "0.2rem 0" }} className="mono">{formatoQ(m * c)}</td>
                       </tr>
                     );
                   })}
                   <tr style={{ borderTop: "1px solid #cbd5e1", fontWeight: 700 }}>
                     <td colSpan={2} style={{ padding: "0.3rem 0" }}>Subtotal Monedas:</td>
-                    <td style={{ textAlign: "right", padding: "0.3rem 0" }} className="mono">{formatearQuetzales(totalMonedas)}</td>
+                    <td style={{ textAlign: "right", padding: "0.3rem 0" }} className="mono">{formatoQ(totalMonedas)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -211,7 +211,7 @@ export default function ActaArqueoModal({
             }}
           >
             <span>Total Efectivo Físico Arqueado:</span>
-            <strong className="mono" style={{ fontSize: "1rem" }}>{formatearQuetzales(totalContado)}</strong>
+            <strong className="mono" style={{ fontSize: "1rem" }}>{formatoQ(totalContado)}</strong>
           </div>
 
           <div
@@ -234,15 +234,15 @@ export default function ActaArqueoModal({
               {diferencia === 0
                 ? "CUADRADO EXACTO (Q 0.00)"
                 : (diferencia > 0
-                    ? `SOBRANTE: ${formatearQuetzales(diferencia)}`
-                    : `FALTANTE: ${formatearQuetzales(Math.abs(diferencia))}`)}
+                    ? `SOBRANTE: ${formatoQ(diferencia)}`
+                    : `FALTANTE: ${formatoQ(Math.abs(diferencia))}`)}
             </span>
           </div>
         </div>
 
         {/* Texto Legal Institucional */}
         <div style={{ fontSize: "0.76rem", color: "#334155", lineHeight: 1.4, textAlign: "justify", marginBottom: "1.75rem", borderTop: "1px solid #cbd5e1", paddingTop: "0.6rem" }}>
-          El día <strong style={{ textTransform: "capitalize" }}>{fechaStr}</strong> se practicó arqueo al Receptor Pagador en su presencia, presentándonos los documentos de soporte de ingresos y egresos para la debida revisión con el Auxiliar de Caja. De acuerdo al arqueo se determinó una diferencia de <strong>{formatearQuetzales(diferencia)}</strong>. Se devolvieron todos los comprobantes y documentos de forma íntegra a la persona encargada sin que haga falta ninguno, recibiéndolos en su entera satisfacción.
+          El día <strong style={{ textTransform: "capitalize" }}>{fechaStr}</strong> se practicó arqueo al Receptor Pagador en su presencia, presentándonos los documentos de soporte de ingresos y egresos para la debida revisión con el Auxiliar de Caja. De acuerdo al arqueo se determinó una diferencia de <strong>{formatoQ(diferencia)}</strong>. Se devolvieron todos los comprobantes y documentos de forma íntegra a la persona encargada sin que haga falta ninguno, recibiéndolos en su entera satisfacción.
         </div>
 
         {/* Cuadro Oficial de Firmas */}

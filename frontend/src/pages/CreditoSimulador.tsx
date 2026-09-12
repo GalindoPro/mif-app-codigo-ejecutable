@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
-import { formatearQuetzales } from "../lib/formatters";
+import { formatoQ } from "../types";
 import type { ResultadoSimulacion, TipoAmortizacion } from "../types";
 
 export default function CreditoSimulador() {
@@ -150,24 +150,24 @@ export default function CreditoSimulador() {
                 <span className="label">
                   {tipoAmortizacion === "CUOTA_NIVELADA" ? "Cuota mensual fija" : "Primera cuota mensual"}
                 </span>
-                <span className="value">{formatearQuetzales(resultado.cuotaMensualEstimada)}</span>
+                <span className="value">{formatoQ(resultado.cuotaMensualEstimada)}</span>
                 <span className="sub">a {resultado.plazoMeses} meses</span>
               </div>
               <div className="stat-card">
                 <span className="label">Capital solicitado</span>
-                <span className="value">{formatearQuetzales(resultado.monto)}</span>
+                <span className="value">{formatoQ(resultado.monto)}</span>
                 <span className="sub">Tasa {resultado.tasaInteresMensual}% mensual</span>
               </div>
               <div className="stat-card">
                 <span className="label">Total de intereses</span>
                 <span className="value" style={{ color: "#d97706" }}>
-                  {formatearQuetzales(resultado.totalIntereses)}
+                  {formatoQ(resultado.totalIntereses)}
                 </span>
                 <span className="sub">a lo largo del plazo</span>
               </div>
               <div className="stat-card">
                 <span className="label">Monto total a pagar</span>
-                <span className="value">{formatearQuetzales(resultado.totalPagar)}</span>
+                <span className="value">{formatoQ(resultado.totalPagar)}</span>
                 <span className="sub">Capital + Intereses</span>
               </div>
             </div>
@@ -175,8 +175,8 @@ export default function CreditoSimulador() {
             <div className="card" style={{ background: "var(--paper-raised)" }}>
               <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--ink-soft)" }}>
                 💡 <strong>Información para el Promotor:</strong> Este plan genera una cuota de{" "}
-                <strong>{formatearQuetzales(resultado.cuotaMensualEstimada)}</strong> al mes. El socio pagará un total de{" "}
-                <strong>{formatearQuetzales(resultado.totalIntereses)}</strong> por concepto de intereses.
+                <strong>{formatoQ(resultado.cuotaMensualEstimada)}</strong> al mes. El socio pagará un total de{" "}
+                <strong>{formatoQ(resultado.totalIntereses)}</strong> por concepto de intereses.
               </p>
             </div>
           </div>
@@ -206,15 +206,15 @@ export default function CreditoSimulador() {
                     </td>
                     <td className="mono">{new Date(c.fechaPago).toLocaleDateString("es-GT")}</td>
                     <td className="mono" style={{ fontWeight: 600 }}>
-                      {formatearQuetzales(c.cuota)}
+                      {formatoQ(c.cuota)}
                     </td>
                     <td className="mono" style={{ color: "var(--accent)" }}>
-                      {formatearQuetzales(c.capital)}
+                      {formatoQ(c.capital)}
                     </td>
                     <td className="mono" style={{ color: "#d97706" }}>
-                      {formatearQuetzales(c.interes)}
+                      {formatoQ(c.interes)}
                     </td>
-                    <td className="mono">{formatearQuetzales(c.saldoRestante)}</td>
+                    <td className="mono">{formatoQ(c.saldoRestante)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -1,16 +1,11 @@
 import { CuotaAmortizacion, TipoAmortizacion } from "../../types/models";
-import { redondear2, formatearFecha as formatearAFechaString, sumarMesesFinanciero } from "../../utils/financiero";
-
-export { sumarMesesFinanciero };
 
 export interface OpcionesSimulacion {
   monto: number;
   plazoMeses: number;
   tasaInteresMensual?: number; // default 2.0%
   tipoAmortizacion?: TipoAmortizacion; // default CUOTA_NIVELADA
-  // pg devuelve las columnas `date` como objetos Date, no como string; se
-  // acepta ambos tipos y se normaliza de inmediato en calcularAmortizacion.
-  fechaInicio?: string | Date;
+  fechaInicio?: string; // YYYY-MM-DD
 }
 
 export interface ResultadoSimulacion {
@@ -24,16 +19,34 @@ export interface ResultadoSimulacion {
   tabla: CuotaAmortizacion[];
 }
 
+function redondear2(val: number): number {
+  return Math.round((val + Number.EPSILON) * 100) / 100;
+}
+
+function formatearAFechaString(fecha: string | Date | undefined): string {
+  if (!fecha) return new Date().toISOString().slice(0, 10);
+  if (fecha instanceof Date) return fecha.toISOString().slice(0, 10);
+  return String(fecha).slice(0, 10);
+}
+
+export function sumarMesesFinanciero(fechaEntrada: string | Date | undefined, meses: number): string {
+  const fechaStr = formatearAFechaString(fechaEntrada);
+  const [año, mes, diaOriginal] = fechaStr.split("-").map(Number);
+  const totalMeses = mes - 1 + meses;
+  const targetAño = año + Math.floor(totalMeses / 12);
+  const targetMes = ((totalMeses % 12) + 12) % 12; // 0..11
+  const maxDiasMes = new Date(Date.UTC(targetAño, targetMes + 1, 0)).getUTCDate();
+  const diaFinal = Math.min(diaOriginal || 1, maxDiasMes);
+  const fecha = new Date(Date.UTC(targetAño, targetMes, diaFinal));
+  return fecha.toISOString().slice(0, 10);
+}
+
 export function calcularAmortizacion(opciones: OpcionesSimulacion): ResultadoSimulacion {
   const monto = Number(opciones.monto);
   const n = Math.max(1, Math.floor(Number(opciones.plazoMeses)));
   const tasaMensual = opciones.tasaInteresMensual !== undefined ? Number(opciones.tasaInteresMensual) : 2.0;
   const tipo = opciones.tipoAmortizacion ?? "CUOTA_NIVELADA";
-  // Normaliza a "YYYY-MM-DD" de una vez: si fechaInicio llega como objeto Date
-  // (columna `date` leída directo de Postgres) y se usa sin normalizar, la
-  // rama k===1 de abajo lo concatena con un string y produce "Invalid Date"
-  // -> NaN, que además contamina totalIntereses al sumarse cuota por cuota.
-  const fechaBase = formatearAFechaString(opciones.fechaInicio);
+  const fechaBase = opciones.fechaInicio || new Date().toISOString().slice(0, 10);
   const tasaAnual = tasaMensual * 12; // Ej. 24.0%
 
   const tabla: CuotaAmortizacion[] = [];

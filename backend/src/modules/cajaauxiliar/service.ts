@@ -4,15 +4,11 @@ import { withTransaction } from "../../db/transaction";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
 import * as cuentasService from "../cuentas/service";
-import { calcularLiquidacionCredito } from "../prestamos/liquidacion";
-import { hoyGT } from "../../utils/financiero";
 import { CATEGORIAS, CajaCategoria, DENOMINACIONES, categoriasDelGrupo } from "./categorias";
-
-// Tolerancia de redondeo entre lo calculado en el cliente y el recálculo oficial del servidor.
-const TOLERANCIA_LIQUIDACION = 0.01;
+import { calcularLiquidacionCredito, distribuirMontoCobro } from "../prestamos/liquidacion";
 
 function hoyISO(): string {
-  return hoyGT();
+  return new Date().toISOString().slice(0, 10);
 }
 
 function checarAgencia(agenciaId: string, agenciaVisible: string | null) {
@@ -484,44 +480,6 @@ export async function cobrarCuotaCredito(
       );
     }
 
-    // El cajero puede cobrar un interés/mora distinto al que calcula el
-    // sistema (el recibo físico manda: condonaciones, descuentos, acuerdos
-    // verbales con el socio, etc.). No se bloquea, pero queda registrado en
-    // auditoría cada vez que el monto cobrado no coincide con el cálculo
-    // oficial, para que un supervisor lo pueda revisar después.
-    const { rows: ultimoPagoRows } = await client.query(
-      `select fecha from prestamo_pagos where prestamo_id = $1 order by fecha desc, created_at desc limit 1`,
-      [prestamo.id],
-    );
-    const fechaUltimoPago =
-      ultimoPagoRows[0]?.fecha ||
-      prestamo.fecha_ultimo_pago_migracion ||
-      prestamo.fecha_desembolso ||
-      prestamo.fecha_solicitud ||
-      prestamo.created_at;
-
-    const liquidacionOficial = calcularLiquidacionCredito({
-      saldoCapital: saldoActualCapital,
-      tasaInteresMensual: Number(prestamo.tasa_interes_mensual) || 2.0,
-      plazoMeses: Number(prestamo.plazo_meses) || 12,
-      montoOriginal: Number(prestamo.monto_aprobado || prestamo.monto_solicitado),
-      cuotaMensualEstimada: Number(prestamo.cuota_mensual) || 0,
-      fechaUltimoPago,
-      fechaLiquidacion: dia.fecha,
-      tipoAmortizacion: prestamo.tipo_amortizacion,
-    });
-
-    const interesDifiere = Math.abs(interes - liquidacionOficial.interesDevengado) > TOLERANCIA_LIQUIDACION;
-    const moraDifiere = Math.abs(mora - liquidacionOficial.moraFijaSugerida) > TOLERANCIA_LIQUIDACION;
-    const diferenciaCalculoOficial = interesDifiere || moraDifiere
-      ? {
-          interesCobrado: interes,
-          interesCalculadoOficial: liquidacionOficial.interesDevengado,
-          moraCobrada: mora,
-          moraCalculadaOficial: liquidacionOficial.moraFijaSugerida,
-        }
-      : null;
-
     const nuevoSaldoCapital = Math.max(0, Math.round((saldoActualCapital - abonoCapital) * 100) / 100);
     const nuevoEstadoPrestamo = nuevoSaldoCapital === 0 ? "CANCELADO" : prestamo.estado;
 
@@ -772,10 +730,6 @@ export async function cobrarCuotaCredito(
         ahorroSobrePrestamo,
         cuentaAsp: cuentaAspInfo,
         nuevoSaldoCapital,
-        // Presente solo cuando el cajero cobró un interés/mora distinto al
-        // que calcula el sistema — así un supervisor lo puede filtrar en la
-        // bitácora de auditoría sin tener que revisar cobro por cobro.
-        diferenciaCalculoOficial,
       },
     });
 
@@ -786,7 +740,6 @@ export async function cobrarCuotaCredito(
       ahorroSobrePrestamoAcreditado: ahorroSobrePrestamo,
       cuentaAsp: cuentaAspInfo,
       prestamoCancelado: nuevoEstadoPrestamo === "CANCELADO",
-      diferenciaCalculoOficial,
     };
   });
 }
@@ -994,25 +947,16 @@ export async function desembolsarCredito(
     }
 
     // 4. Actualizar estado del préstamo a DESEMBOLSADO
-    // fecha_vencimiento también se fija aquí (no solo en migraciones): es el
-    // momento real en que empieza a correr el plazo de un crédito nuevo.
-    const { rows: vencRows } = await client.query(
-      `select ($1::date + ($2 * interval '1 month'))::date as venc`,
-      [dia.fecha, Number(prestamo.plazo_meses) || 12],
-    );
-    const fechaVencimiento = vencRows[0]?.venc ?? null;
-
     const { rows: prestamoActualizadoRows } = await client.query(
       `update prestamos
        set estado = 'DESEMBOLSADO',
            origen_fondos = $1,
            fecha_desembolso = $2,
-           fecha_vencimiento = $3,
-           saldo_capital = $4,
+           saldo_capital = $3,
            updated_at = now()
-       where id = $5
+       where id = $4
        returning *`,
-      [origenFondosFinal, dia.fecha, fechaVencimiento, montoDesembolso, prestamo.id],
+      [origenFondosFinal, dia.fecha, montoDesembolso, prestamo.id],
     );
 
     await registrarAuditoria({
@@ -1461,3 +1405,156 @@ export async function arqueosMensuales(
 }
 
 
+
+export interface DatosEdicionAuxiliar {
+  seccion?: string;
+  categoria?: CajaCategoria;
+  tipo?: "INGRESO" | "EGRESO";
+  monto?: number;
+  referencia?: string;
+  descripcion?: string;
+}
+
+export async function editar(id: string, data: DatosEdicionAuxiliar, usuarioId: string, motivo: string) {
+  const { rows: anteriores } = await pool.query(
+    "select * from caja_movimientos_auxiliar where id = $1",
+    [id]
+  );
+  if (!anteriores[0]) throw notFound("El movimiento no existe");
+  const ant = anteriores[0];
+
+  const { rows } = await pool.query(
+    `update caja_movimientos_auxiliar
+     set seccion = coalesce($1, seccion),
+         categoria = coalesce($2, categoria),
+         tipo = coalesce($3, tipo),
+         monto = coalesce($4, monto),
+         referencia = coalesce($5, referencia),
+         descripcion = coalesce($6, descripcion)
+     where id = $7
+     returning *`,
+    [
+      data.seccion,
+      data.categoria,
+      data.tipo,
+      data.monto,
+      data.referencia,
+      data.descripcion,
+      id
+    ]
+  );
+
+  const mov = rows[0];
+  await registrarAuditoria({
+    entidad: "CajaMovimientoAuxiliar",
+    entidadId: id,
+    accion: "ACTUALIZAR",
+    usuarioId,
+    datosAnteriores: ant,
+    datosNuevos: mov,
+    motivo
+  });
+  return mov;
+}
+
+// ---------------------------------------------------------------------------
+// Liquidación de Promotores
+// ---------------------------------------------------------------------------
+
+export async function listarLiquidacionesPendientes(agenciaId: string, agenciaVisible: string | null) {
+  checarAgencia(agenciaId, agenciaVisible);
+  const { rows } = await pool.query(
+    `
+    select 
+      u.id as promotor_id,
+      u.nombre as promotor_nombre,
+      count(c.id)::int as cantidad_recibos,
+      sum(c.monto)::numeric as total_efectivo,
+      json_agg(
+        json_build_object(
+          'id', c.id,
+          'socio_nombres', s.nombres,
+          'prestamo_codigo', p.codigo,
+          'fecha', c.fecha,
+          'numero_recibo_fisico', c.numero_recibo_fisico,
+          'monto', c.monto,
+          'justificacion_edicion', c.justificacion_edicion,
+          'veces_editado', c.veces_editado
+        ) order by c.created_at asc
+      ) as cobros
+    from cobros_campo c
+    join usuarios u on u.id = c.promotor_id
+    join socios s on s.id = c.socio_id
+    join prestamos p on p.id = c.prestamo_id
+    where c.agencia_id = $1 and c.estado = 'PENDIENTE'
+    group by u.id, u.nombre
+    `, [agenciaId]
+  );
+  return rows;
+}
+
+export async function aprobarLiquidacion(agenciaId: string, promotorId: string, usuarioId: string) {
+  // 1. Get current OPEN caja_dia for this agency
+  const { rows: diaRows } = await pool.query(`select id from caja_dias where agencia_id = $1 and estado = 'ABIERTO'`, [agenciaId]);
+  if (diaRows.length === 0) throw badRequest("No hay caja abierta para procesar liquidaciones.");
+  const diaId = diaRows[0].id;
+
+  // 2. Get pending cobros for this promoter
+  const { rows: cobros } = await pool.query(`
+    select c.*
+    from cobros_campo c
+    where c.promotor_id = $1 and c.agencia_id = $2 and c.estado = 'PENDIENTE'
+    order by c.created_at asc
+  `, [promotorId, agenciaId]);
+
+  if (cobros.length === 0) throw badRequest("Este promotor no tiene cobros pendientes de liquidar.");
+
+  let procesados = 0;
+  // 3. Process each cobro sequentially
+  for (const cobro of cobros) {
+    const { rows: prestamoInfoRows } = await pool.query(`select * from prestamos where id = $1`, [cobro.prestamo_id]);
+    const prestamo = prestamoInfoRows[0];
+    const { rows: pagosRows } = await pool.query(`select * from prestamo_pagos where prestamo_id = $1 order by fecha desc, created_at desc`, [cobro.prestamo_id]);
+    
+    const fechaUltimoPago = pagosRows.length > 0 ? pagosRows[0].fecha : prestamo.fecha_desembolso;
+    const liquidacion = calcularLiquidacionCredito({
+      saldoCapital: Number(prestamo.saldo_capital || prestamo.monto_aprobado),
+      tasaInteresMensual: Number(prestamo.tasa_interes_mensual),
+      plazoMeses: prestamo.plazo_meses,
+      montoOriginal: Number(prestamo.monto_aprobado),
+      cuotaMensualEstimada: Number(prestamo.cuota_mensual),
+      fechaUltimoPago,
+      tipoAmortizacion: prestamo.tipo_amortizacion,
+    });
+
+    const desglose = distribuirMontoCobro(Number(cobro.monto), liquidacion.moraFijaSugerida, liquidacion.interesDevengado, liquidacion.saldoCapital);
+
+    // Llamar la función robusta que hace toda la contabilidad
+    const mov = await cobrarCuotaCredito(
+      diaId,
+      {
+        prestamoId: cobro.prestamo_id,
+        socioId: cobro.socio_id,
+        abonoCapital: desglose.pagoCapital,
+        interes: desglose.pagoInteres,
+        mora: desglose.pagoMora,
+        ahorroSobrePrestamo: 0,
+        origenFondos: prestamo.origen_fondos || "FONDOS_PROPIOS",
+        docNo: cobro.numero_recibo_fisico, // Usar el número de recibo físico que digitó el promotor
+      },
+      usuarioId,
+      agenciaId,
+    );
+
+    // Marcar como liquidado, enlazando los IDs
+    await pool.query(`
+      update cobros_campo 
+      set estado = 'LIQUIDADO', liquidado_at = now(), caja_dia_id = $1, caja_movimiento_id = $2
+      where id = $3
+    `, [diaId, mov.cajaMovimiento.id, cobro.id]);
+
+    procesados++;
+  }
+
+  return { ok: true, procesados, mensaje: `Se liquidaron exitosamente ${procesados} cobros.` };
+}

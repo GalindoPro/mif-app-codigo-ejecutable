@@ -196,14 +196,21 @@ export default function Layout() {
         {/* ── NAV ── */}
         <nav className="nav">
 
-          {/* ── CAJERO ── */}
+          {/* ── CAJERO (Auxiliar de Caja) ── */}
           {usuario?.rol === "CAJERO" && (<>
             <Section label="Ventanilla y Caja" />
-            <NavItem to="/auxiliar-caja" icon="💵" label="Auxiliar de Caja" onClick={closeSidebar} />
-            <NavItem to="/caja-chica"    icon="📥" label="Caja Chica"       onClick={closeSidebar} />
+            <NavItem to="/auxiliar-caja" icon="💵" label="Auxiliar de Caja"   onClick={closeSidebar} />
             <Section label="Consultas y Cobros" />
             <NavItem to="/socios"   icon="👥" label="Consultar Socios"  onClick={closeSidebar} />
             <NavItem to="/creditos" icon="📄" label="Cobro de Créditos" onClick={closeSidebar} />
+          </>)}
+
+          {/* ── CAJA CHICA ── */}
+          {usuario?.rol === "CAJA_CHICA" && (<>
+            <Section label="Caja Chica" />
+            <NavItem to="/caja-chica" icon="📥" label="Caja Chica"       onClick={closeSidebar} />
+            <Section label="Socios" />
+            <NavItem to="/socios"   icon="👥" label="Consultar Socios" onClick={closeSidebar} />
           </>)}
 
           {/* ── PROMOTOR ── */}
@@ -233,8 +240,8 @@ export default function Layout() {
             <NavItem to="/ahorros/plazo-fijo" icon="📈" label="Plazo Fijo"           onClick={closeSidebar} />
           </>)}
 
-          {/* ── ADMIN / GERENCIA ── */}
-          {(usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA") && (<>
+          {/* ── GERENCIA (control total) ── */}
+          {usuario?.rol === "GERENCIA" && (<>
             <Section label="Control General" />
             <NavItem to="/tablero"         icon="📊" label="Tablero Global"        onClick={closeSidebar} />
             <NavItem to="/arqueos/mensual" icon="📑" label="Libro Mensual Arqueos" onClick={closeSidebar} />
@@ -262,7 +269,7 @@ export default function Layout() {
         </nav>
 
         {/* ── CONTROL DE DATOS (solo ADMIN) ── */}
-        {usuario?.rol === "ADMIN" && !collapsed && (
+        {usuario?.rol === "GERENCIA" && !collapsed && (
           <div style={{
             padding: "0.5rem 0.75rem",
             background: "rgba(2,132,199,0.07)",

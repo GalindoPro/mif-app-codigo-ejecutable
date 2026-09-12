@@ -3,7 +3,6 @@ import { pool } from "../../db/pool";
 import { withTransaction } from "../../db/transaction";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
-import { hoyGT } from "../../utils/financiero";
 
 // Prefijo del número de cuenta sugerido por tipo — solo una ayuda visual,
 // el usuario puede cambiarlo antes de guardar.
@@ -63,20 +62,14 @@ export async function resumen(params: { tipo: TipoCuentaAhorro; agenciaId: strin
   }
   const where = condiciones.join(" and ");
 
-  // saldo_total se calcula en una subconsulta aparte de los depósitos/retiros
-  // a propósito: unir cuentas con movimientos en la MISMA consulta multiplica
-  // (fan-out) cada fila de cuenta por su número de movimientos, así que sumar
-  // el saldo (un valor por cuenta, no por movimiento) ahí lo duplicaba tantas
-  // veces como movimientos tuviera esa cuenta.
   const { rows } = await pool.query(
     `select
-       (select count(distinct c.id)::int from cuentas c where ${where}) as total_cuentas,
-       (select coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0)
-        from cuentas c left join saldos_cuenta sc on sc.cuenta_id = c.id
-        where ${where}) as saldo_total,
+       count(distinct c.id)::int as total_cuentas,
+       coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0) as saldo_total,
        coalesce(sum(case when m.tipo = 'DEPOSITO' then m.monto else 0 end), 0) as total_depositos,
        coalesce(sum(case when m.tipo = 'RETIRO' then m.monto else 0 end), 0) as total_retiros
      from cuentas c
+     left join saldos_cuenta sc on sc.cuenta_id = c.id
      left join movimientos m on m.cuenta_id = c.id
      where ${where}`,
     valores,
@@ -91,11 +84,8 @@ export async function resumen(params: { tipo: TipoCuentaAhorro; agenciaId: strin
 }
 
 export async function siguienteNumero(agenciaId: string, tipo: TipoCuentaAhorro) {
-  // Máximo número ya usado, no count(*) (ver misma corrección en
-  // socios/service.ts y prestamos/service.ts: un hueco en la secuencia hace
-  // que count(*) genere un número que ya existe).
   const { rows } = await pool.query(
-    `select a.codigo, coalesce(max(nullif(regexp_replace(c.numero_cuenta, '\\D', '', 'g'), '')::int), 0) as max_num
+    `select a.codigo, count(c.id)::int as total
      from agencias a left join cuentas c on c.agencia_id = a.id and c.tipo = $2
      where a.id = $1
      group by a.codigo`,
@@ -104,7 +94,7 @@ export async function siguienteNumero(agenciaId: string, tipo: TipoCuentaAhorro)
   const fila = rows[0];
   if (!fila) throw notFound("Agencia no encontrada");
   const prefijo = PREFIJO_TIPO[tipo] ?? tipo;
-  const siguiente = String(fila.max_num + 1).padStart(4, "0");
+  const siguiente = String(fila.total + 1).padStart(4, "0");
   return { numeroCuenta: `${fila.codigo}-${prefijo}-${siguiente}` };
 }
 
@@ -275,11 +265,6 @@ export async function registrarMovimientoConClient(
   if (cuenta.estado !== "ACTIVA") throw badRequest("Esta cuenta está cerrada; no se pueden registrar movimientos");
 
   if (data.tipo === "RETIRO") {
-    if (cuenta.tipo === "APORTACION") {
-      throw badRequest(
-        "Las aportaciones de capital social no se pueden retirar directamente. El reembolso se tramita al dar de baja al socio con el jefe de agencia.",
-      );
-    }
     // REGLA CRÍTICA: Ahorro sobre Préstamo no se toca hasta que termine el pago del crédito
     if (cuenta.tipo === "AHORRO_SOBRE_PRESTAMO") {
       const { rows: prestamosActivos } = await client.query(
@@ -343,7 +328,7 @@ export async function registrarMovimientoConClient(
 
   const clienteMovimientoId = `srv-${cuentaId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const fechaMov = data.fecha || hoyGT();
+  const fechaMov = data.fecha || new Date().toISOString().slice(0, 10);
 
   const { rows } = await client.query(
     `insert into movimientos (cuenta_id, tipo, monto, fecha, numero_recibo, descripcion, usuario_id, cliente_movimiento_id)
@@ -370,45 +355,5 @@ export async function registrarMovimiento(
 ) {
   return withTransaction(async (client) => {
     return registrarMovimientoConClient(client, cuentaId, data, usuarioId, agenciaVisible);
-  });
-}
-
-export async function cerrar(cuentaId: string, usuarioId: string, agenciaVisibleParam: string | null) {
-  return withTransaction(async (client) => {
-    const { rows: ctaRows } = await client.query(
-      `select c.*, coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
-       from cuentas c
-       left join saldos_cuenta sc on sc.cuenta_id = c.id
-       where c.id = $1`,
-      [cuentaId],
-    );
-    const cuenta = ctaRows[0];
-    if (!cuenta) throw notFound("Cuenta no encontrada");
-    if (agenciaVisibleParam && cuenta.agencia_id !== agenciaVisibleParam) {
-      throw forbidden("Esa cuenta pertenece a otra agencia");
-    }
-    if (cuenta.estado === "CERRADA") throw conflict("Esta cuenta ya está cerrada.");
-    if (cuenta.tipo === "APORTACION") {
-      throw badRequest("Las cuentas de aportación no se cierran individualmente. El cierre se gestiona al dar de baja al socio.");
-    }
-    const saldo = Number(cuenta.saldo_actual);
-    if (saldo > 0.009) {
-      throw conflict(`No se puede cerrar la cuenta con saldo pendiente de Q ${saldo.toFixed(2)}. Primero registra un retiro por el total del saldo.`);
-    }
-    if (cuenta.tipo === "AHORRO_SOBRE_PRESTAMO") {
-      const { rows: prestamosActivos } = await client.query(
-        `select codigo from prestamos where id = $1 and estado not in ('CANCELADO', 'RECHAZADO') limit 1`,
-        [cuenta.prestamo_id],
-      );
-      if (prestamosActivos[0]) {
-        throw conflict(`La cuenta está en garantía del crédito activo "${prestamosActivos[0].codigo}". Cancela el préstamo antes de cerrar esta cuenta.`);
-      }
-    }
-    const { rows } = await client.query(
-      `update cuentas set estado = 'CERRADA', updated_at = now() where id = $1 returning *`,
-      [cuentaId],
-    );
-    await registrarAuditoria({ entidad: "Cuenta", entidadId: cuentaId, accion: "ACTUALIZAR", usuarioId, datosAnteriores: { estado: "ACTIVA" }, datosNuevos: { estado: "CERRADA" } });
-    return rows[0];
   });
 }

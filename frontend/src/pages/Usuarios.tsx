@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { ROL_LABEL } from "../types";
 import type { Agencia, RolUsuario, UsuarioItem } from "../types";
 
-const ROLES_DISPONIBLES: RolUsuario[] = ["ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO", "PROMOTOR"];
+const ROLES_DISPONIBLES: RolUsuario[] = ["GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA", "PROMOTOR"];
 
 export default function Usuarios() {
   const { usuario } = useAuth();
@@ -22,7 +22,7 @@ export default function Usuarios() {
   const [rol, setRol] = useState<RolUsuario>("PROMOTOR");
   const [agenciaId, setAgenciaId] = useState("");
 
-  const esAdmin = usuario?.rol === "ADMIN";
+  const esAdmin = usuario?.rol === "GERENCIA";
 
   function cargar() {
     api
@@ -99,7 +99,7 @@ export default function Usuarios() {
         <div className="stat-card">
           <span className="label">Administración y Control</span>
           <span className="value mono">
-            {usuarios?.filter((u) => u.rol === "ADMIN" || u.rol === "GERENCIA" || u.rol === "SUPERVISOR").length ?? 0}
+            {usuarios?.filter((u) => u.rol === "GERENCIA" || u.rol === "SUPERVISOR").length ?? 0}
           </span>
           <span className="sub">Admin, Gerencia y Jefes</span>
         </div>
@@ -224,21 +224,25 @@ export default function Usuarios() {
                       fontSize: "0.82rem",
                       fontWeight: 600,
                       background:
-                        u.rol === "PROMOTOR"
+                         u.rol === "PROMOTOR"
                           ? "#ede9fe"
-                          : u.rol === "ADMIN"
+                          : u.rol === "GERENCIA"
                             ? "#fee2e2"
-                            : u.rol === "GERENCIA"
+                            : u.rol === "SUPERVISOR"
                               ? "#e0e7ff"
-                              : "#e2e8f0",
+                              : u.rol === "CAJA_CHICA"
+                                ? "#fef3c7"
+                                : "#e2e8f0",
                       color:
                         u.rol === "PROMOTOR"
                           ? "#6d28d9"
-                          : u.rol === "ADMIN"
+                          : u.rol === "GERENCIA"
                             ? "#991b1b"
-                            : u.rol === "GERENCIA"
+                            : u.rol === "SUPERVISOR"
                               ? "#3730a3"
-                              : "#334155",
+                              : u.rol === "CAJA_CHICA"
+                                ? "#92400e"
+                                : "#334155",
                     }}
                   >
                     {ROL_LABEL[u.rol] ?? u.rol}

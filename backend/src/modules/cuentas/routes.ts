@@ -71,7 +71,7 @@ const crearSchema = z.object({
 
 cuentasRouter.post(
   "/",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO", "PROMOTOR"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "PROMOTOR"),
   asyncHandler(async (req, res) => {
     const data = crearSchema.parse(req.body);
     const visible = agenciaVisible(req);
@@ -90,17 +90,9 @@ const movimientoSchema = z.object({
 
 cuentasRouter.post(
   "/:id/movimientos",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
   asyncHandler(async (req, res) => {
     const data = movimientoSchema.parse(req.body);
     res.status(201).json(await service.registrarMovimiento(req.params.id, data, req.user!.id, agenciaVisible(req)));
-  }),
-);
-
-cuentasRouter.post(
-  "/:id/cerrar",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR"),
-  asyncHandler(async (req, res) => {
-    res.json(await service.cerrar(req.params.id, req.user!.id, agenciaVisible(req)));
   }),
 );

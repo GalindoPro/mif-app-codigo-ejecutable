@@ -112,7 +112,6 @@ const crearSchema = z.object({
 
 prestamosRouter.post(
   "/",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "PROMOTOR"),
   asyncHandler(async (req, res) => {
     const data = crearSchema.parse(req.body);
     if (req.user?.rol === "PROMOTOR" && !data.promotorId) {
@@ -138,7 +137,7 @@ const estadoSchema = z.object({
 
 prestamosRouter.patch(
   "/:id/estado",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR"),
+  requireRole("GERENCIA", "SUPERVISOR"),
   asyncHandler(async (req, res) => {
     const { estado, montoAprobado } = estadoSchema.parse(req.body);
     const actualizado = await service.cambiarEstado(
@@ -164,28 +163,6 @@ prestamosRouter.get(
   asyncHandler(async (req, res) => {
     const fecha = req.query.fecha as string | undefined;
     res.json(await service.obtenerLiquidacion(req.params.id, fecha));
-  }),
-);
-
-const refinanciarSchema = z.object({
-  nuevaTasa: z.number().positive("La nueva tasa debe ser mayor a cero"),
-  nuevoPlazo: z.number().int().min(1, "El plazo mínimo es 1 mes"),
-  observaciones: z.string().optional(),
-});
-
-prestamosRouter.post(
-  "/:id/refinanciar",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR"),
-  asyncHandler(async (req, res) => {
-    const data = refinanciarSchema.parse(req.body);
-    res.json(await service.refinanciar(req.params.id, data, req.user!.id, agenciaVisible(req)));
-  }),
-);
-
-prestamosRouter.get(
-  "/:id/refinanciamientos",
-  asyncHandler(async (req, res) => {
-    res.json(await service.listarRefinanciamientos(req.params.id));
   }),
 );
 

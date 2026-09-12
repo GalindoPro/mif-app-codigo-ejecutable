@@ -12,7 +12,7 @@ export default function AhorroCuentaForm() {
   const config = TIPOS_AHORRO.find((t) => t.slug === slug);
   const { usuario } = useAuth();
   const navigate = useNavigate();
-  const puedeElegirAgencia = usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA";
+  const puedeElegirAgencia = usuario?.rol === "GERENCIA";
 
   const [agencias, setAgencias] = useState<Agencia[]>([]);
   const [agenciaId, setAgenciaId] = useState(usuario?.agenciaId ?? "");

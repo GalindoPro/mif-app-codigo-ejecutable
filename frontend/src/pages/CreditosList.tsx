@@ -4,17 +4,17 @@ import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import {
   ESTADO_PRESTAMO_LABEL,
+  formatoQ,
   TIPO_PRESTAMO_LABEL,
   ORIGEN_FONDOS_SHORT_LABEL,
   ORIGEN_FONDOS_BADGE_STYLE,
 } from "../types";
 import type { EstadoPrestamo, Prestamo, FiadorItem } from "../types";
-import { formatearDPI, formatearTelefono, formatearQuetzales } from "../lib/formatters";
+import { formatearDPI, formatearTelefono } from "../lib/formatters";
 
 export default function CreditosList() {
   const { usuario } = useAuth();
   const puedeGestionar =
-    usuario?.rol === "ADMIN" ||
     usuario?.rol === "GERENCIA" ||
     usuario?.rol === "SUPERVISOR" ||
     usuario?.rol === "CAJERO";
@@ -99,12 +99,10 @@ export default function CreditosList() {
     }
   }
 
-  // Saldo vivo real (lo que los socios deben hoy), no el monto original
-  // colocado — mismo criterio que el Tablero y el Kardex de Cartera.
   const totalDesembolsado =
     prestamos
       ?.filter((p) => p.estado === "DESEMBOLSADO")
-      .reduce((acc, p) => acc + Number(p.saldo_capital ?? p.monto_aprobado ?? p.monto_solicitado), 0) ?? 0;
+      .reduce((acc, p) => acc + Number(p.monto_aprobado ?? p.monto_solicitado), 0) ?? 0;
 
   const pendientes = prestamos?.filter((p) => p.estado === "SOLICITUD").length ?? 0;
   const aprobados = prestamos?.filter((p) => p.estado === "APROBADO").length ?? 0;
@@ -199,7 +197,7 @@ export default function CreditosList() {
             >
               <div>
                 <span className="label" style={{ fontSize: "0.66rem", display: "block" }}>Cartera Activa ({desembolsados})</span>
-                <span className="value mono" style={{ fontSize: "1.05rem" }}>{formatearQuetzales(totalDesembolsado)}</span>
+                <span className="value mono" style={{ fontSize: "1.05rem" }}>{formatoQ(totalDesembolsado)}</span>
               </div>
               <span style={{ fontSize: "1.2rem", opacity: 0.8 }}>💼</span>
             </div>
@@ -387,11 +385,11 @@ export default function CreditosList() {
                         </div>
                       </td>
                       <td className="mono" style={{ textAlign: "right", fontWeight: 700 }}>
-                        {formatearQuetzales(p.monto_aprobado ?? p.monto_solicitado)}
+                        {formatoQ(p.monto_aprobado ?? p.monto_solicitado)}
                       </td>
                       <td className="mono">{p.plazo_meses}m</td>
                       <td className="mono" style={{ textAlign: "right", color: "var(--accent)" }}>
-                        {formatearQuetzales(p.cuota_mensual)}
+                        {formatoQ(p.cuota_mensual)}
                       </td>
                       <td style={{ fontSize: "0.78rem" }}>
                         {p.promotor_nombre ?? <span style={{ color: "var(--ink-soft)" }}>—</span>}
@@ -416,23 +414,31 @@ export default function CreditosList() {
                       {/* COLUMNA DE ACCIONES RÁPIDAS EN 1 FILA COMPACTA */}
                       <td style={{ textAlign: "center" }}>
                         <div style={{ display: "flex", gap: "0.25rem", justifyContent: "center", alignItems: "center", whiteSpace: "nowrap" }}>
-                          {/* El desembolso YA NO se hace desde aquí: este atajo marcaba el
-                              crédito como DESEMBOLSADO sin pasar por Auxiliar de Caja, así que
-                              el efectivo entregado nunca quedaba registrado en la caja del día.
-                              El único camino válido es Auxiliar de Caja (con la caja abierta). */}
+                          {/* ACCIÓN PARA ESTADO APROBADO: DESEMBOLSAR */}
                           {p.estado === "APROBADO" && puedeGestionar && (
-                            <Link
-                              to="/auxiliar-caja"
-                              className="btn secondary"
+                            <button
+                              type="button"
+                              className="btn"
                               style={{
+                                background: "#059669",
+                                borderColor: "#059669",
                                 fontSize: "0.72rem",
                                 padding: "0.18rem 0.45rem",
                                 fontWeight: 700,
                               }}
-                              title="El desembolso se registra en Auxiliar de Caja, para que el efectivo entregado quede contabilizado"
+                              disabled={estaProcesando}
+                              onClick={() =>
+                                setModalAccion({
+                                  prestamo: p,
+                                  nuevoEstado: "DESEMBOLSADO",
+                                  titulo: `💵 Confirmar Desembolso de ${p.codigo}`,
+                                  mensaje: `¿Deseas desembolsar y entregar ${formatoQ(p.monto_aprobado ?? p.monto_solicitado)} al socio ${p.socio_nombres}? El crédito entrará inmediatamente a cartera activa.`,
+                                  colorBoton: "#059669",
+                                })
+                              }
                             >
-                              💵 Ir a Auxiliar de Caja
-                            </Link>
+                              {estaProcesando ? "…" : "⚡ Desembolsar"}
+                            </button>
                           )}
 
                           {/* ACCIÓN PARA ESTADO SOLICITUD: APROBAR O RECHAZAR */}
@@ -728,7 +734,7 @@ export default function CreditosList() {
                             {f.prestamo_codigo}
                           </Link>
                           <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)" }}>
-                            {f.socio_nombre} · {formatearQuetzales(f.monto_aprobado ?? f.monto_solicitado)}
+                            {f.socio_nombre} · {formatoQ(f.monto_aprobado ?? f.monto_solicitado)}
                           </span>
                         </div>
                       </td>

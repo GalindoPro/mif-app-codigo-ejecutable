@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import type { Cuenta } from "../../types";
-import { formatearQuetzales } from "../../lib/formatters";
+import { formatoQ } from "../../types";
 
 export interface PanelNovedadesCampoProps {
   agenciaId: string;
@@ -74,7 +74,7 @@ export default function PanelNovedadesCampo({
               )}
               {c.cuota_pactada && (
                 <div style={{ marginTop: "0.25rem", color: "#059669", fontWeight: 600 }}>
-                  Cuota pactada: {formatearQuetzales(c.cuota_pactada)}
+                  Cuota pactada: {formatoQ(c.cuota_pactada)}
                 </div>
               )}
               {c.observaciones_apertura && (
@@ -85,7 +85,7 @@ export default function PanelNovedadesCampo({
             </div>
             <div style={{ marginTop: "0.6rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span className="mono" style={{ fontSize: "0.78rem", color: Number(c.saldo_actual) > 0 ? "#16a34a" : "#dc2626" }}>
-                Saldo: {formatearQuetzales(c.saldo_actual)}
+                Saldo: {formatoQ(c.saldo_actual)}
               </span>
               <button
                 type="button"

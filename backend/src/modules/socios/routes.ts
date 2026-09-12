@@ -102,7 +102,7 @@ const datosSocioSchema = z.object({
 
 sociosRouter.post(
   "/",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO", "PROMOTOR"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA", "PROMOTOR"),
   asyncHandler(async (req, res) => {
     const data = datosSocioSchema.parse(req.body);
     const visible = agenciaVisible(req);
@@ -118,7 +118,7 @@ const actualizarSchema = datosSocioSchema
 
 sociosRouter.patch(
   "/:id",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO", "PROMOTOR"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA", "PROMOTOR"),
   asyncHandler(async (req, res) => {
     const data = actualizarSchema.parse(req.body);
     res.json(await service.actualizar(req.params.id, data, req.user!.id, agenciaVisible(req)));
@@ -132,7 +132,7 @@ const abrirAportacionSchema = z.object({
 
 sociosRouter.post(
   "/:id/abrir-aportacion",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO", "PROMOTOR"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA", "PROMOTOR"),
   asyncHandler(async (req, res) => {
     const data = abrirAportacionSchema.parse(req.body || {});
     res.status(201).json(await service.abrirAportacionSocio(req.params.id, data.monto, data.recibo, req.user!.id));

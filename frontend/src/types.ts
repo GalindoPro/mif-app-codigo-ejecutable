@@ -1,4 +1,4 @@
-export type RolUsuario = "ADMIN" | "GERENCIA" | "SUPERVISOR" | "CAJERO" | "PROMOTOR";
+export type RolUsuario = "GERENCIA" | "SUPERVISOR" | "CAJERO" | "CAJA_CHICA" | "PROMOTOR";
 
 export interface UsuarioAutenticado {
   id: string;
@@ -90,11 +90,11 @@ export interface ListaSocios {
 }
 
 export const ROL_LABEL: Record<RolUsuario, string> = {
-  ADMIN: "Administrador",
-  GERENCIA: "Gerencia",
-  SUPERVISOR: "Jefe de agencia",
-  CAJERO: "Operador",
-  PROMOTOR: "Promotor de crédito",
+  GERENCIA: "Administrador",
+  SUPERVISOR: "Jefe de Agencia",
+  CAJERO: "Cajero Auxiliar",
+  CAJA_CHICA: "Operador Caja Chica",
+  PROMOTOR: "Promotor de Crédito",
 };
 
 export type TipoCuentaAhorro =
@@ -222,6 +222,7 @@ export interface CajaChicaComprobante {
   tipo: "INGRESO" | "EGRESO";
   categoria: CategoriaCajaChica | null;
   monto: string;
+  usuario_id: string;
   usuario_nombre: string;
   created_at: string;
 }
@@ -345,9 +346,6 @@ export interface CategoriaAuxiliarInfo {
   requiereCuenta?: TipoCuentaAhorro;
   requiereSocio?: boolean;
   sinModuloReal?: boolean;
-  // Solo debe registrarse desde su flujo estructurado (cobro de cuota /
-  // desembolso) — nunca desde el formulario manual de movimientos.
-  usoInternoSolo?: boolean;
 }
 
 export const CATEGORIAS_AUXILIAR: Record<CajaCategoria, CategoriaAuxiliarInfo> = {
@@ -412,14 +410,14 @@ export const CATEGORIAS_AUXILIAR: Record<CajaCategoria, CategoriaAuxiliarInfo> =
   INGRESO_ASOCIADO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Ingreso de asociado (cuota de ingreso)", requiereSocio: true },
   COMISION: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Comisión", requiereSocio: true },
 
-  ABONO_PRESTAMO_HIPOTECARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Abono sobre préstamo hipotecario", requiereSocio: true, usoInternoSolo: true },
-  INTERES_PRESTAMO_HIPOTECARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Interés hipotecario", requiereSocio: true, usoInternoSolo: true },
-  MORA_PRESTAMO_HIPOTECARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Mora sobre préstamo hipotecario", requiereSocio: true, usoInternoSolo: true },
-  ABONO_PRESTAMO_FIDUCIARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Abono sobre préstamo fiduciario", requiereSocio: true, usoInternoSolo: true },
-  INTERES_PRESTAMO_FIDUCIARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Interés fiduciario", requiereSocio: true, usoInternoSolo: true },
-  MORA_PRESTAMO_FIDUCIARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Mora sobre préstamo fiduciario", requiereSocio: true, usoInternoSolo: true },
+  ABONO_PRESTAMO_HIPOTECARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Abono sobre préstamo hipotecario", requiereSocio: true },
+  INTERES_PRESTAMO_HIPOTECARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Interés hipotecario", requiereSocio: true },
+  MORA_PRESTAMO_HIPOTECARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Mora sobre préstamo hipotecario", requiereSocio: true },
+  ABONO_PRESTAMO_FIDUCIARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Abono sobre préstamo fiduciario", requiereSocio: true },
+  INTERES_PRESTAMO_FIDUCIARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Interés fiduciario", requiereSocio: true },
+  MORA_PRESTAMO_FIDUCIARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Mora sobre préstamo fiduciario", requiereSocio: true },
 
-  COLOCACION_PRESTAMO: { seccion: "PROPIO", tipo: "EGRESO", descripcion: "Colocación de préstamo (desembolso)", requiereSocio: true, sinModuloReal: true, usoInternoSolo: true },
+  COLOCACION_PRESTAMO: { seccion: "PROPIO", tipo: "EGRESO", descripcion: "Colocación de préstamo (desembolso)", requiereSocio: true, sinModuloReal: true },
   EGRESO_VARIO: { seccion: "PROPIO", tipo: "EGRESO", descripcion: "Egreso vario" },
   INGRESO_VARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Ingreso vario", requiereSocio: true },
 };
@@ -464,6 +462,7 @@ export interface CajaMovimientoAuxiliar {
   monto: string;
   saldo_acumulado: string;
   origen_fondos?: OrigenFondos;
+  usuario_id: string;
   usuario_nombre: string;
   created_at: string;
 }
@@ -475,6 +474,10 @@ export interface DetalleCajaAuxiliar {
   totalEgreso: number;
   saldoActual: number;
   arqueo: { detalle: { valor: number; cantidad: number }[]; total_contado: string; diferencia: string } | null;
+}
+
+export function formatoQ(valor: string | number): string {
+  return `Q ${Number(valor).toLocaleString("es-GT", { minimumFractionDigits: 2 })}`;
 }
 
 export interface UsuarioItem {
@@ -715,3 +718,31 @@ export const ESTADO_PLAZO_FIJO_LABEL: Record<EstadoPlazoFijo, string> = {
   ACTIVO: "Vigente / Activo",
   LIQUIDADO: "Liquidado / Pagado",
 };
+
+// ---------------------------------------------------------------------------
+// Liquidación de Promotores (Cobros de Campo)
+// ---------------------------------------------------------------------------
+export type EstadoCobroCampo = "PENDIENTE" | "LIQUIDADO" | "RECHAZADO";
+
+export interface CobroCampo {
+  id: string;
+  promotor_id: string;
+  agencia_id: string;
+  socio_id: string;
+  socio_nombres?: string;
+  numero_asociado?: string;
+  prestamo_id: string;
+  prestamo_codigo?: string;
+  fecha: string;
+  numero_recibo_fisico: string;
+  monto: number;
+  estado: EstadoCobroCampo;
+  justificacion_edicion?: string | null;
+  veces_editado: number;
+  caja_dia_id?: string | null;
+  caja_movimiento_id?: string | null;
+  prestamo_pago_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  liquidado_at?: string | null;
+}

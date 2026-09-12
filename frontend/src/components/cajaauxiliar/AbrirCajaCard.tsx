@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { EstadoCajaAuxiliar } from "../../types";
-import { formatearQuetzales } from "../../lib/formatters";
+import { formatoQ } from "../../types";
 
 export interface AbrirCajaCardProps {
   estadoInfo: Extract<EstadoCajaAuxiliar, { estado: "SIN_ABRIR" }>;
@@ -53,7 +53,7 @@ export default function AbrirCajaCard({
           </p>
           <div className="stat-card accent" style={{ marginBottom: "1rem" }}>
             <span className="label">Saldo inicial de hoy</span>
-            <span className="value">{formatearQuetzales(estadoInfo.saldoSugerido ?? 0)}</span>
+            <span className="value">{formatoQ(estadoInfo.saldoSugerido ?? 0)}</span>
           </div>
           <button className="btn" disabled={cargando} onClick={() => onAbrir()}>
             {cargando ? "Abriendo…" : "Abrir caja de hoy"}

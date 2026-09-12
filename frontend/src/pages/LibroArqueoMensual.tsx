@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { formatoQ } from "../types";
 import type { Agencia } from "../types";
-import { formatearQuetzales } from "../lib/formatters";
 
 interface DiaArqueo {
   id: string;
@@ -36,7 +36,7 @@ interface ArqueoMensualResponse {
 
 export default function LibroArqueoMensual() {
   const { usuario } = useAuth();
-  const puedeElegirAgencia = usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA";
+  const puedeElegirAgencia = usuario?.rol === "GERENCIA";
 
   const [agencias, setAgencias] = useState<Agencia[]>([]);
   const [agenciaId, setAgenciaId] = useState(usuario?.agenciaId ?? "");
@@ -65,12 +65,7 @@ export default function LibroArqueoMensual() {
   }, [mes, mesNum, añoStr]);
 
   useEffect(() => {
-    api.get<Agencia[]>("/agencias").then(({ data }) => {
-      setAgencias(data);
-      // ADMIN/GERENCIA no tienen agencia propia (ven todas): sin esto, esta
-      // pantalla nunca consulta nada porque agenciaId se queda vacío.
-      setAgenciaId((actual) => actual || data[0]?.id || "");
-    });
+    api.get<Agencia[]>("/agencias").then(({ data }) => setAgencias(data));
   }, []);
 
   function cargar() {
@@ -459,7 +454,7 @@ export default function LibroArqueoMensual() {
                     Total Ingresos del Mes
                   </span>
                   <strong className="mono" style={{ fontSize: "0.9rem", color: "#16a34a" }}>
-                    + {formatearQuetzales(datos.resumen.totalIngresosMes)}
+                    + {formatoQ(datos.resumen.totalIngresosMes)}
                   </strong>
                 </div>
 
@@ -468,7 +463,7 @@ export default function LibroArqueoMensual() {
                     Total Egresos del Mes
                   </span>
                   <strong className="mono" style={{ fontSize: "0.9rem", color: "#dc2626" }}>
-                    − {formatearQuetzales(datos.resumen.totalEgresosMes)}
+                    − {formatoQ(datos.resumen.totalEgresosMes)}
                   </strong>
                 </div>
 
@@ -531,19 +526,19 @@ export default function LibroArqueoMensual() {
                               {d.cerrado_por_nombre || d.abierto_por_nombre || nombreCajero}
                             </td>
                             <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
-                              {formatearQuetzales(d.saldo_inicial)}
+                              {formatoQ(d.saldo_inicial)}
                             </td>
                             <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "2px 4px" }}>
-                              {formatearQuetzales(d.total_ingresos)}
+                              {formatoQ(d.total_ingresos)}
                             </td>
                             <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "2px 4px" }}>
-                              {formatearQuetzales(d.total_egresos)}
+                              {formatoQ(d.total_egresos)}
                             </td>
                             <td className="mono" style={{ textAlign: "right", fontWeight: 700, padding: "2px 4px" }}>
-                              {formatearQuetzales(esperado)}
+                              {formatoQ(esperado)}
                             </td>
                             <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
-                              {formatearQuetzales(contado)}
+                              {formatoQ(contado)}
                             </td>
                             <td
                               className="mono"
@@ -554,7 +549,7 @@ export default function LibroArqueoMensual() {
                                 padding: "2px 4px",
                               }}
                             >
-                              {dif === 0 ? "Q 0.00" : dif > 0 ? `+${formatearQuetzales(dif)}` : `-${formatearQuetzales(Math.abs(dif))}`}
+                              {dif === 0 ? "Q 0.00" : dif > 0 ? `+${formatoQ(dif)}` : `-${formatoQ(Math.abs(dif))}`}
                             </td>
                             <td style={{ textAlign: "center", padding: "2px 4px" }}>
                               <span
@@ -578,10 +573,10 @@ export default function LibroArqueoMensual() {
                         </td>
                         <td style={{ padding: "3px 4px" }}>—</td>
                         <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "3px 4px" }}>
-                          {formatearQuetzales(datos.resumen.totalIngresosMes)}
+                          {formatoQ(datos.resumen.totalIngresosMes)}
                         </td>
                         <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "3px 4px" }}>
-                          {formatearQuetzales(datos.resumen.totalEgresosMes)}
+                          {formatoQ(datos.resumen.totalEgresosMes)}
                         </td>
                         <td colSpan={2} style={{ padding: "3px 4px" }}></td>
                         <td
@@ -595,8 +590,8 @@ export default function LibroArqueoMensual() {
                           {datos.resumen.diasConDiferencia === 0
                             ? "Q 0.00"
                             : datos.resumen.totalSobrante > 0
-                            ? `+${formatearQuetzales(datos.resumen.totalSobrante)}`
-                            : `-${formatearQuetzales(datos.resumen.totalFaltante)}`}
+                            ? `+${formatoQ(datos.resumen.totalSobrante)}`
+                            : `-${formatoQ(datos.resumen.totalFaltante)}`}
                         </td>
                         <td style={{ textAlign: "center", padding: "3px 4px" }}>
                           {datos.resumen.diasConDiferencia === 0 ? "✓ CONFORME" : "REVISADO"}
