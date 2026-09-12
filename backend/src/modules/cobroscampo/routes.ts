@@ -32,7 +32,7 @@ cobrosCampoRouter.get("/pendientes", requireAuth, requireRole("PROMOTOR"), async
 // Registra un nuevo cobro de campo (solo Promotores)
 cobrosCampoRouter.post("/", requireAuth, requireRole("PROMOTOR"), async (req, res, next) => {
   try {
-    const { prestamo_id, socio_id, numero_recibo_fisico, monto } = req.body;
+    const { prestamo_id, socio_id, numero_recibo_fisico, monto, pago_capital, pago_interes, pago_mora, ahorro_prestamo } = req.body;
     const promotorId = req.user!.id;
     const agenciaId = req.user!.agenciaId;
 
@@ -46,11 +46,11 @@ cobrosCampoRouter.post("/", requireAuth, requireRole("PROMOTOR"), async (req, re
 
     const { rows } = await pool.query<CobroCampo>(`
       insert into cobros_campo 
-        (promotor_id, agencia_id, socio_id, prestamo_id, numero_recibo_fisico, monto)
+        (promotor_id, agencia_id, socio_id, prestamo_id, numero_recibo_fisico, monto, pago_capital, pago_interes, pago_mora, ahorro_prestamo)
       values
-        ($1, $2, $3, $4, $5, $6)
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       returning *
-    `, [promotorId, agenciaId, socio_id, prestamo_id, numero_recibo_fisico, monto]);
+    `, [promotorId, agenciaId, socio_id, prestamo_id, numero_recibo_fisico, monto, pago_capital || 0, pago_interes || 0, pago_mora || 0, ahorro_prestamo || 0]);
 
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -63,7 +63,7 @@ cobrosCampoRouter.post("/", requireAuth, requireRole("PROMOTOR"), async (req, re
 cobrosCampoRouter.patch("/:id", requireAuth, requireRole("PROMOTOR"), async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { monto, justificacion_edicion } = req.body;
+    const { monto, justificacion_edicion, pago_capital, pago_interes, pago_mora, ahorro_prestamo } = req.body;
     const promotorId = req.user!.id;
 
     if (!justificacion_edicion || justificacion_edicion.trim().length < 5) {
@@ -88,11 +88,15 @@ cobrosCampoRouter.patch("/:id", requireAuth, requireRole("PROMOTOR"), async (req
       set 
         monto = $1,
         justificacion_edicion = $2,
+        pago_capital = $3,
+        pago_interes = $4,
+        pago_mora = $5,
+        ahorro_prestamo = $6,
         veces_editado = veces_editado + 1,
         updated_at = now()
-      where id = $3 and promotor_id = $4
+      where id = $7 and promotor_id = $8
       returning *
-    `, [monto, justificacion_edicion, id, promotorId]);
+    `, [monto, justificacion_edicion, pago_capital || 0, pago_interes || 0, pago_mora || 0, ahorro_prestamo || 0, id, promotorId]);
 
     res.json(rows[0]);
   } catch (err) {

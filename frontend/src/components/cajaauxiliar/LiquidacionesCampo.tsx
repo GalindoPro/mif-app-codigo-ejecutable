@@ -112,7 +112,10 @@ export default function LiquidacionesCampo({ agenciaId, onLiquidado }: Liquidaci
                     <tr>
                       <th>Socio / Crédito</th>
                       <th>Recibo</th>
-                      <th style={{ textAlign: "right" }}>Monto</th>
+                      <th style={{ textAlign: "right" }}>Capital</th>
+                      <th style={{ textAlign: "right" }}>Int.</th>
+                      <th style={{ textAlign: "right" }}>Mora</th>
+                      <th style={{ textAlign: "right" }}>Total</th>
                       <th>Novedad</th>
                     </tr>
                   </thead>
@@ -121,6 +124,9 @@ export default function LiquidacionesCampo({ agenciaId, onLiquidado }: Liquidaci
                       <tr key={c.id}>
                         <td>{c.socio_nombres} <br/><span className="mono" style={{color: "var(--ink-soft)"}}>{c.prestamo_codigo}</span></td>
                         <td className="mono">{c.numero_recibo_fisico}</td>
+                        <td className="mono" style={{ textAlign: "right", color: "var(--ink-soft)" }}>{formatoQ(c.pago_capital || 0)}</td>
+                        <td className="mono" style={{ textAlign: "right", color: "var(--ink-soft)" }}>{formatoQ(c.pago_interes || 0)}</td>
+                        <td className="mono" style={{ textAlign: "right", color: "var(--ink-soft)" }}>{formatoQ(c.pago_mora || 0)}</td>
                         <td className="mono" style={{ textAlign: "right", fontWeight: 600 }}>{formatoQ(c.monto)}</td>
                         <td>
                           {c.veces_editado > 0 ? (

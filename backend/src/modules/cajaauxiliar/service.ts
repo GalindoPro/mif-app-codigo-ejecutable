@@ -1527,18 +1527,16 @@ export async function aprobarLiquidacion(agenciaId: string, promotorId: string, 
       tipoAmortizacion: prestamo.tipo_amortizacion,
     });
 
-    const desglose = distribuirMontoCobro(Number(cobro.monto), liquidacion.moraFijaSugerida, liquidacion.interesDevengado, liquidacion.saldoCapital);
-
-    // Llamar la función robusta que hace toda la contabilidad
+    // Usamos EXACTAMENTE el desglose ingresado por el promotor en campo.
     const mov = await cobrarCuotaCredito(
       diaId,
       {
         prestamoId: cobro.prestamo_id,
         socioId: cobro.socio_id,
-        abonoCapital: desglose.pagoCapital,
-        interes: desglose.pagoInteres,
-        mora: desglose.pagoMora,
-        ahorroSobrePrestamo: 0,
+        abonoCapital: Number(cobro.pago_capital),
+        interes: Number(cobro.pago_interes),
+        mora: Number(cobro.pago_mora),
+        ahorroSobrePrestamo: Number(cobro.ahorro_prestamo),
         origenFondos: prestamo.origen_fondos || "FONDOS_PROPIOS",
         docNo: cobro.numero_recibo_fisico, // Usar el número de recibo físico que digitó el promotor
       },

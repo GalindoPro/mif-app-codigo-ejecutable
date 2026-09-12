@@ -9,8 +9,9 @@ import {
   ORIGEN_FONDOS_SHORT_LABEL,
   ORIGEN_FONDOS_BADGE_STYLE,
 } from "../types";
-import type { EstadoPrestamo, Prestamo, FiadorItem } from "../types";
+import type { EstadoPrestamo, Prestamo, FiadorItem, CobroCampo } from "../types";
 import { formatearDPI, formatearTelefono } from "../lib/formatters";
+import { CobroCampoModal } from "../components/promotor/CobroCampoModal";
 
 export default function CreditosList() {
   const { usuario } = useAuth();
@@ -24,6 +25,8 @@ export default function CreditosList() {
   const [prestamos, setPrestamos] = useState<Prestamo[] | null>(null);
   const [fiadores, setFiadores] = useState<FiadorItem[] | null>(null);
   const [cargandoFiadores, setCargandoFiadores] = useState(false);
+  const [cobrosPendientes, setCobrosPendientes] = useState<CobroCampo[]>([]);
+  const [modalCobroPrestamo, setModalCobroPrestamo] = useState<{ id: string; socioId: string; socioNombres: string, cobroExistente?: CobroCampo } | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
@@ -53,6 +56,12 @@ export default function CreditosList() {
       })
       .then(({ data }) => setPrestamos(data))
       .catch((err) => setError(mensajeError(err)));
+
+    if (usuario?.rol === "PROMOTOR") {
+      api.get<CobroCampo[]>("/cobros-campo/pendientes")
+         .then(({ data }) => setCobrosPendientes(data))
+         .catch(err => console.error("Error cargando cobros de campo:", err));
+    }
   }
 
   function cargarFiadores() {
@@ -481,14 +490,44 @@ export default function CreditosList() {
                           {/* ACCIÓN PARA ESTADO DESEMBOLSADO: COBRAR O CANCELAR/LIQUIDAR */}
                           {p.estado === "DESEMBOLSADO" && (
                             <>
-                              <Link
-                                to="/caja-auxiliar"
-                                className="btn secondary"
-                                style={{ fontSize: "0.72rem", padding: "0.18rem 0.45rem", borderColor: "#10b981", color: "#10b981" }}
-                                title="Ir a Caja Auxiliar a registrar cobro de cuota"
-                              >
-                                💰 Cobrar
-                              </Link>
+                              {usuario?.rol === "PROMOTOR" ? (
+                                (() => {
+                                  const cobroPendiente = cobrosPendientes.find(c => c.prestamo_id === p.id);
+                                  if (cobroPendiente) {
+                                    return (
+                                      <button
+                                        type="button"
+                                        className="btn secondary"
+                                        style={{ fontSize: "0.72rem", padding: "0.18rem 0.45rem", borderColor: "#f59e0b", color: "#d97706" }}
+                                        onClick={() => setModalCobroPrestamo({ id: p.id, socioId: p.socio_id, socioNombres: p.socio_nombres || "Socio Desconocido", cobroExistente: cobroPendiente })}
+                                      >
+                                        ✏️ Editar Cobro
+                                      </button>
+                                    );
+                                  } else {
+                                    return (
+                                      <button
+                                        type="button"
+                                        className="btn secondary"
+                                        style={{ fontSize: "0.72rem", padding: "0.18rem 0.45rem", borderColor: "#10b981", color: "#10b981" }}
+                                        title="Registrar recibo de campo"
+                                        onClick={() => setModalCobroPrestamo({ id: p.id, socioId: p.socio_id, socioNombres: p.socio_nombres || "Socio Desconocido" })}
+                                      >
+                                        💰 Cobro Campo
+                                      </button>
+                                    );
+                                  }
+                                })()
+                              ) : (
+                                <Link
+                                  to="/caja-auxiliar"
+                                  className="btn secondary"
+                                  style={{ fontSize: "0.72rem", padding: "0.18rem 0.45rem", borderColor: "#10b981", color: "#10b981" }}
+                                  title="Ir a Caja Auxiliar a registrar cobro de cuota"
+                                >
+                                  💰 Cobrar
+                                </Link>
+                              )}
                               {puedeGestionar && (
                                 <button
                                   type="button"
@@ -879,6 +918,20 @@ export default function CreditosList() {
             </div>
           </div>
         </div>
+      )}
+
+      {modalCobroPrestamo && (
+        <CobroCampoModal
+          prestamoId={modalCobroPrestamo.id}
+          socioId={modalCobroPrestamo.socioId}
+          socioNombres={modalCobroPrestamo.socioNombres}
+          cobroExistente={modalCobroPrestamo.cobroExistente}
+          onClose={() => setModalCobroPrestamo(null)}
+          onSuccess={() => {
+            setModalCobroPrestamo(null);
+            cargar();
+          }}
+        />
       )}
     </div>
   );

@@ -736,6 +736,10 @@ export interface CobroCampo {
   fecha: string;
   numero_recibo_fisico: string;
   monto: number;
+  pago_capital: number;
+  pago_interes: number;
+  pago_mora: number;
+  ahorro_prestamo: number;
   estado: EstadoCobroCampo;
   justificacion_edicion?: string | null;
   veces_editado: number;
