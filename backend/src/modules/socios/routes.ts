@@ -42,10 +42,11 @@ sociosRouter.get(
   asyncHandler(async (req, res) => {
     const dpi = typeof req.query.dpi === "string" ? req.query.dpi : "";
     const socioId = typeof req.query.socioId === "string" ? req.query.socioId : undefined;
+    const tipo = (req.query.tipo as "SOCIO" | "BENEFICIARIO") || "SOCIO";
     if (!dpi) {
       return res.json({ valido: false, mensaje: "Se requiere el número de DPI" });
     }
-    res.json(await service.verificarDpi(dpi, socioId));
+    res.json(await service.verificarDpi(dpi, socioId, tipo));
   }),
 );
 
@@ -74,7 +75,6 @@ const datosSocioSchema = z.object({
   agenciaId: z.string().uuid(),
   nombres: z.string().min(3, "El nombre completo es obligatorio"),
   genero: z.enum(["M", "F"]).optional().nullable(),
-  edad: z.number().int().min(1).max(120).optional().nullable(),
   fechaIngreso: z.string().min(1, "La fecha de ingreso es obligatoria"),
   dpi: z
     .string()
@@ -128,6 +128,7 @@ sociosRouter.patch(
 const abrirAportacionSchema = z.object({
   monto: z.number().min(100, "Monto mínimo Q 100.00").optional().default(100),
   recibo: z.string().optional().nullable(),
+  cuotaIngreso: z.number().min(0).optional().nullable(),
 });
 
 sociosRouter.post(
@@ -135,7 +136,16 @@ sociosRouter.post(
   requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA", "PROMOTOR"),
   asyncHandler(async (req, res) => {
     const data = abrirAportacionSchema.parse(req.body || {});
-    res.status(201).json(await service.abrirAportacionSocio(req.params.id, data.monto, data.recibo, req.user!.id));
+    res.status(201).json(await service.abrirAportacionSocio(req.params.id, data.monto, data.recibo, req.user!.id, data.cuotaIngreso ?? undefined));
   }),
 );
 
+// GET /socios/sin-aportacion — socios sin cuenta de aportación o saldo < 100
+sociosRouter.get(
+  "/sin-aportacion",
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA", "PROMOTOR"),
+  asyncHandler(async (req, res) => {
+    const agenciaId = req.query.agenciaId as string | undefined;
+    res.json(await service.sociosSinAportacion(agenciaId || null, agenciaVisible(req)));
+  }),
+);

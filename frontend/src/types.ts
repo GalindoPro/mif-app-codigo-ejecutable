@@ -24,7 +24,6 @@ export interface Socio {
   agencia_codigo?: string;
   nombres: string;
   genero: "M" | "F" | null;
-  edad?: number | null;
   fecha_ingreso: string;
   estado: "ACTIVO" | "INACTIVO";
   dpi: string | null;
@@ -68,7 +67,6 @@ export interface AportacionSocio {
   numero_asociado: string;
   nombres: string;
   dpi: string | null;
-  edad: number | null;
   genero: "M" | "F" | null;
   fecha_ingreso: string;
   direccion: string | null;
@@ -563,13 +561,15 @@ export interface Prestamo {
   saldo_capital?: string | number | null;
   tasa_interes_mensual: string | number;
   plazo_meses: number;
-  cuota_mensual: string | number;
+  cuota_mensual: string;
+  cuotas_pagadas?: number;
   destino: string | null;
   garantia: string | null;
   ubicacion_garantia?: string | null;
   nombre_fiador?: string | null;
   dpi_fiador?: string | null;
   telefono_fiador?: string | null;
+  direccion_fiador?: string | null;
   documento_desembolso?: string | null;
   observaciones: string | null;
   fecha_solicitud: string;

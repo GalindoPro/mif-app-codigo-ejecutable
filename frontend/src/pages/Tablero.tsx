@@ -4,6 +4,7 @@ import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { formatoQ } from "../types";
 import type { ResumenDashboard } from "../types";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 
 export default function Tablero() {
   const { usuario } = useAuth();
@@ -15,6 +16,8 @@ export default function Tablero() {
   const [mostrarOpciones, setMostrarOpciones] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const [periodoAnalitica] = useState<"dia" | "mes">("dia");
+
   function cargarResumen(silencioso = false) {
     api
       .get<ResumenDashboard>("/dashboard/resumen")
@@ -24,11 +27,20 @@ export default function Tablero() {
       });
   }
 
+  function cargarAnalitica() {
+    api
+      .get("/caja-auxiliar/analitica-servicios", { params: { periodo: periodoAnalitica } })
+      .then(() => {})
+      .catch(console.error);
+  }
+
   // Actualización automática en tiempo real cada 10s y al recuperar foco
   useEffect(() => {
     cargarResumen(false);
+    cargarAnalitica();
     const interval = setInterval(() => {
       cargarResumen(true);
+      cargarAnalitica();
     }, 10000);
 
     const onFocus = () => {
@@ -44,7 +56,7 @@ export default function Tablero() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
     };
-  }, []);
+  }, [periodoAnalitica]);
 
   // Cerrar menú de opciones al hacer clic afuera
   useEffect(() => {
@@ -360,7 +372,7 @@ interface ServicioItem {
 }
 
 interface AnaliticaResponse {
-  periodo: "semana" | "mes" | "anio";
+  periodo: "dia" | "semana" | "mes" | "anio";
   totalOperaciones: number;
   volumenTotal: number;
   servicioTop: ServicioItem | null;
@@ -372,7 +384,7 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
   const puedeElegirAgencia = usuario?.rol === "GERENCIA";
   const [agencias, setAgencias] = useState<any[]>([]);
   const [agenciaId, setAgenciaId] = useState(agenciaIdInicial || usuario?.agenciaId || "");
-  const [periodo, setPeriodo] = useState<"semana" | "mes" | "anio">("mes");
+  const [periodo, setPeriodo] = useState<"dia" | "semana" | "mes" | "anio">("mes");
   const [filtroModulo, setFiltroModulo] = useState<"TODOS" | "AHORROS" | "CREDITOS" | "CAJA_CHICA" | "VENTANILLA">("TODOS");
   const [datos, setDatos] = useState<AnaliticaResponse | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -419,7 +431,7 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
     };
   }, [agenciaId, periodo]);
 
-  const periodoLabel = periodo === "semana" ? "Últimos 7 días" : periodo === "mes" ? "Últimos 30 días" : "Año actual";
+  const periodoLabel = periodo === "dia" ? "Día actual" : periodo === "semana" ? "Últimos 7 días" : periodo === "mes" ? "Últimos 30 días" : "Año actual";
 
   const serviciosFiltrados = !datos
     ? []
@@ -460,6 +472,14 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
           )}
 
           <div style={{ display: "inline-flex", background: "var(--mono-bg)", borderRadius: "6px", padding: "0.15rem", border: "1px solid var(--line)" }}>
+            <button
+              type="button"
+              className={`btn ${periodo === "dia" ? "" : "secondary"}`}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
+              onClick={() => setPeriodo("dia")}
+            >
+              Día
+            </button>
             <button
               type="button"
               className={`btn ${periodo === "semana" ? "" : "secondary"}`}
@@ -571,81 +591,52 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
             </div>
           </div>
 
-          {/* Gráfica de Barras Proporcionales de la Categoría */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", maxHeight: "200px", overflowY: "auto", paddingRight: "0.2rem" }}>
-            {serviciosFiltrados.map((s, idx) => {
-              const barColors = [
-                "linear-gradient(90deg, #0284c7, #38bdf8)",
-                "linear-gradient(90deg, #059669, #34d399)",
-                "linear-gradient(90deg, #7c3aed, #a78bfa)",
-                "linear-gradient(90deg, #ea580c, #fb923c)",
-                "linear-gradient(90deg, #0891b2, #22d3ee)",
-                "linear-gradient(90deg, #d97706, #fcd34d)",
-              ];
-              const bgGradient = barColors[idx % barColors.length];
-              const porcentajeRelativo = totalOperacionesFiltro > 0
-                ? Math.round((s.cantidad / totalOperacionesFiltro) * 1000) / 10
-                : 0;
+          {/* Gráficos de Recharts */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginTop: "1rem" }}>
+            <div style={{ background: "var(--mono-bg)", borderRadius: "6px", border: "1px solid var(--line)", padding: "1rem" }}>
+              <h4 style={{ margin: "0 0 1rem 0", fontSize: "0.85rem", color: "var(--ink-soft)" }}>Distribución de Operaciones</h4>
+              <div style={{ width: "100%", height: 220 }}>
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie
+                      data={serviciosFiltrados}
+                      dataKey="cantidad"
+                      nameKey="label"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                    >
+                      {serviciosFiltrados.map((_entry, index) => {
+                        const barColors = ["#0284c7", "#059669", "#7c3aed", "#ea580c", "#0891b2", "#d97706"];
+                        return <Cell key={`cell-${index}`} fill={barColors[index % barColors.length]} />;
+                      })}
+                    </Pie>
+                    <RechartsTooltip formatter={(value) => [`${value} op.`, "Operaciones"]} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
 
-              return (
-                <div
-                  key={s.categoria}
-                  style={{
-                    background: "var(--mono-bg)",
-                    padding: "0.4rem 0.65rem",
-                    borderRadius: "6px",
-                    border: "1px solid var(--line)",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
-                      <span style={{ fontSize: "1rem" }}>{s.icon}</span>
-                      <strong style={{ fontSize: "0.78rem", color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.label}</strong>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
-                      <span
-                        className="badge"
-                        style={{
-                          background: "var(--paper-raised)",
-                          color: "var(--ink-soft)",
-                          fontWeight: 700,
-                          fontSize: "0.66rem",
-                          border: "1px solid var(--line)",
-                          padding: "0.1rem 0.35rem",
-                        }}
-                      >
-                        {s.cantidad} op. ({porcentajeRelativo}%)
-                      </span>
-                      <strong
-                        className="mono"
-                        style={{
-                          fontSize: "0.82rem",
-                          color: "var(--accent)",
-                          minWidth: 80,
-                          textAlign: "right",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {formatoQ(s.totalMonto)}
-                      </strong>
-                    </div>
-                  </div>
-
-                  {/* Barra Visual Proporcional */}
-                  <div style={{ background: "var(--line)", height: "6px", borderRadius: "999px", overflow: "hidden" }}>
-                    <div
-                      style={{
-                        background: bgGradient,
-                        height: "100%",
-                        width: `${Math.max(porcentajeRelativo, 3)}%`,
-                        borderRadius: "999px",
-                        transition: "width 0.4s ease",
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+            <div style={{ background: "var(--mono-bg)", borderRadius: "6px", border: "1px solid var(--line)", padding: "1rem" }}>
+              <h4 style={{ margin: "0 0 1rem 0", fontSize: "0.85rem", color: "var(--ink-soft)" }}>Volumen Monetario (Q)</h4>
+              <div style={{ width: "100%", height: 220 }}>
+                <ResponsiveContainer>
+                  <BarChart data={serviciosFiltrados} layout="vertical" margin={{ left: 20 }}>
+                    <XAxis type="number" hide />
+                    <YAxis dataKey="label" type="category" width={100} tick={{ fontSize: 10 }} />
+                    <RechartsTooltip formatter={(value: any) => [formatoQ(Number(value) || 0), "Volumen"]} />
+                    <Bar dataKey="totalMonto" radius={[0, 4, 4, 0]}>
+                      {serviciosFiltrados.map((_entry, index) => {
+                        const barColors = ["#0284c7", "#059669", "#7c3aed", "#ea580c", "#0891b2", "#d97706"];
+                        return <Cell key={`cell-${index}`} fill={barColors[index % barColors.length]} />;
+                      })}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           </div>
         </>
       )}

@@ -6,6 +6,7 @@ import BuscadorCuenta from "../BuscadorCuenta";
 import {
   CATEGORIAS_AUXILIAR,
   CATEGORIA_AUXILIAR_KEYS,
+  formatoQ,
 } from "../../types";
 import type {
   CajaCategoria,
@@ -22,7 +23,13 @@ export const GRUPOS = [
 
 export function categoriasDeGrupo(seccion: "BI" | "PROPIO", tipo: "INGRESO" | "EGRESO"): CajaCategoria[] {
   return CATEGORIA_AUXILIAR_KEYS.filter(
-    (k) => CATEGORIAS_AUXILIAR[k].seccion === seccion && CATEGORIAS_AUXILIAR[k].tipo === tipo,
+    (k) =>
+      CATEGORIAS_AUXILIAR[k].seccion === seccion &&
+      CATEGORIAS_AUXILIAR[k].tipo === tipo &&
+      !k.includes("PRESTAMO") &&
+      !k.includes("HIPOTECARIO") &&
+      !k.includes("FIDUCIARIO") &&
+      k !== "INGRESO_ASOCIADO"
   );
 }
 
@@ -30,6 +37,180 @@ export interface NuevoMovimientoFormProps {
   agenciaId: string;
   diaId: string;
   onCreado: () => void;
+}
+
+interface SocioPendiente {
+  id: string;
+  nombres: string;
+  numero_asociado: string;
+  saldo_aportacion: number | null;
+}
+
+function PanelAportacionPendiente({
+  agenciaId,
+  onAportado,
+}: {
+  agenciaId: string;
+  onAportado: () => void;
+}) {
+  const [socios, setSocios] = useState<SocioPendiente[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [seleccionado, setSeleccionado] = useState<SocioPendiente | null>(null);
+  const [montoApor, setMontoApor] = useState("100");
+  const [reciboApor, setReciboApor] = useState("");
+  const [cuotaIngreso, setCuotaIngreso] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [exito, setExito] = useState<string | null>(null);
+
+  function cargarPendientes() {
+    setCargando(true);
+    api
+      .get<SocioPendiente[]>("/socios/sin-aportacion", { params: { agenciaId } })
+      .then(({ data }) => setSocios(data))
+      .catch(console.error)
+      .finally(() => setCargando(false));
+  }
+
+  useEffect(() => {
+    cargarPendientes();
+  }, [agenciaId]);
+
+  function abrirModal(s: SocioPendiente) {
+    setSeleccionado(s);
+    setMontoApor("100");
+    setReciboApor("");
+    setCuotaIngreso("");
+    setError(null);
+    setExito(null);
+  }
+
+  async function handleAportar(e: FormEvent) {
+    e.preventDefault();
+    if (!seleccionado) return;
+    const monto = Number(montoApor);
+    if (isNaN(monto) || monto < 100) {
+      setError("La aportacion minima es Q 100.00");
+      return;
+    }
+    const cuota = cuotaIngreso.trim() ? Number(cuotaIngreso) : undefined;
+    setGuardando(true);
+    setError(null);
+    try {
+      const { data } = await api.post(`/socios/${seleccionado.id}/abrir-aportacion`, {
+        monto,
+        recibo: reciboApor.trim() || undefined,
+        cuotaIngreso: cuota,
+      });
+      const msgCuota = data.cuotaIngresoRegistrada
+        ? ` + Cuota de ingreso ${formatoQ(cuota ?? 0)} registrada en caja.`
+        : "";
+      setExito(`Cuenta ${data.numero_cuenta} creada (${formatoQ(monto)}).${msgCuota}`);
+      setSeleccionado(null);
+      cargarPendientes();
+      onAportado();
+      setTimeout(() => setExito(null), 5000);
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  if (cargando) {
+    return (
+      <div style={{ padding: "1rem", fontSize: "0.82rem", color: "var(--ink-soft)", textAlign: "center" }}>
+        Cargando socios pendientes...
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {exito && (
+        <div className="alert success" style={{ marginBottom: "0.75rem", fontSize: "0.82rem" }}>
+          {exito}
+        </div>
+      )}
+
+      {socios.length === 0 ? (
+        <div style={{ background: "rgba(5,150,105,0.07)", border: "1px solid rgba(5,150,105,0.3)", borderRadius: "8px", padding: "1.25rem", textAlign: "center" }}>
+          <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>&#10003;</div>
+          <strong style={{ fontSize: "0.92rem", color: "#059669" }}>
+            Todos los socios tienen su Aportacion Estatutaria al dia
+          </strong>
+          <p style={{ margin: "0.4rem 0 0", fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+            No hay socios pendientes de apertura de cuenta de aportaciones en esta agencia.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "6px", padding: "0.6rem 0.85rem", marginBottom: "0.6rem", fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+            <strong style={{ color: "var(--ink)" }}>{socios.length} socio(s)</strong> sin Aportacion Estatutaria o con saldo menor a Q 100. Haz clic para aperturar.
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", maxHeight: "200px", overflowY: "auto" }}>
+            {socios.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => abrirModal(s)}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  background: seleccionado?.id === s.id ? "rgba(2,132,199,0.1)" : "var(--mono-bg)",
+                  border: seleccionado?.id === s.id ? "1px solid #0284c7" : "1px solid var(--line)",
+                  borderRadius: "6px",
+                  padding: "0.5rem 0.75rem",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "all 0.15s",
+                }}
+              >
+                <div>
+                  <strong style={{ fontSize: "0.85rem", color: "var(--ink)" }}>{s.nombres}</strong>
+                  <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)", marginLeft: "0.5rem" }}>{s.numero_asociado}</span>
+                </div>
+                <span style={{ fontSize: "0.72rem", background: s.saldo_aportacion !== null ? "rgba(245,158,11,0.15)" : "rgba(239,68,68,0.12)", color: s.saldo_aportacion !== null ? "#b45309" : "#991b1b", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "4px", padding: "0.15rem 0.4rem", whiteSpace: "nowrap" }}>
+                  {s.saldo_aportacion !== null ? `Saldo insuf. ${formatoQ(s.saldo_aportacion)}` : "Sin cuenta"}
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {seleccionado && (
+        <div style={{ marginTop: "0.85rem", background: "var(--paper-raised)", border: "1px solid #0284c7", borderRadius: "8px", padding: "1rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+            <strong style={{ fontSize: "0.9rem" }}>Aperturar Aportacion &mdash; {seleccionado.nombres}</strong>
+            <button type="button" className="btn secondary" style={{ padding: "0.15rem 0.4rem", fontSize: "0.78rem" }} onClick={() => setSeleccionado(null)}>x</button>
+          </div>
+          {error && <div className="alert error" style={{ marginBottom: "0.5rem", fontSize: "0.8rem" }}>{error}</div>}
+          <form onSubmit={handleAportar}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor="aportar-monto" style={{ fontSize: "0.8rem" }}>Monto Aportacion (Q)</label>
+                <input id="aportar-monto" type="number" min="100" step="0.01" value={montoApor} onChange={(e) => setMontoApor(e.target.value)} required style={{ fontWeight: 700, fontSize: "0.95rem" }} />
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor="aportar-cuota" style={{ fontSize: "0.8rem" }}>Cuota de Ingreso (Q)</label>
+                <input id="aportar-cuota" type="number" min="0" step="0.01" value={cuotaIngreso} onChange={(e) => setCuotaIngreso(e.target.value)} placeholder="Ej. 25.00" style={{ fontWeight: 600 }} />
+              </div>
+            </div>
+            <div className="field" style={{ marginTop: "0.6rem", marginBottom: "0.75rem" }}>
+              <label htmlFor="aportar-recibo" style={{ fontSize: "0.8rem" }}>No. de Recibo / Comprobante</label>
+              <input id="aportar-recibo" type="text" value={reciboApor} onChange={(e) => setReciboApor(e.target.value)} placeholder="Ej. REC-009842" />
+            </div>
+            <button type="submit" className="btn" style={{ width: "100%", background: "#059669", borderColor: "#059669", fontWeight: 700 }} disabled={guardando}>
+              {guardando ? "Creando cuenta..." : "Confirmar y Crear Aportacion"}
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function NuevoMovimientoForm({
@@ -45,6 +226,7 @@ export default function NuevoMovimientoForm({
 
   const [categoria, setCategoria] = useState<CajaCategoria>(opcionesGrupo[0]);
   const info = CATEGORIAS_AUXILIAR[categoria];
+  const esAportacion = categoria === "APORTACION";
 
   const [socio, setSocio] = useState<Socio | null>(null);
   const [socioManual, setSocioManual] = useState(false);
@@ -69,6 +251,15 @@ export default function NuevoMovimientoForm({
     setDocNo("");
   }
 
+  function cambiarCategoria(nueva: CajaCategoria) {
+    setCategoria(nueva);
+    setSocio(null);
+    setCuenta(null);
+    setBeneficiario("");
+    setDocNo("");
+    setError(null);
+  }
+
   useEffect(() => {
     if (info.seccion !== "BI") return;
     if (!beneficiario || beneficiario.length < 2) {
@@ -81,23 +272,14 @@ export default function NuevoMovimientoForm({
         .then(({ data }) => setSugerencias(data));
     }, 250);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [beneficiario, info.seccion]);
 
   async function enviar(e: FormEvent) {
     e.preventDefault();
     setError(null);
-
     const beneficiarioFinal = info.requiereCuenta ? undefined : socio ? socio.nombres : beneficiario;
-    if (!info.requiereCuenta && !beneficiarioFinal) {
-      setError("Indica el beneficiario");
-      return;
-    }
-    if (info.requiereCuenta && !cuenta) {
-      setError("Selecciona la cuenta");
-      return;
-    }
-
+    if (!info.requiereCuenta && !beneficiarioFinal) { setError("Indica el beneficiario"); return; }
+    if (info.requiereCuenta && !cuenta) { setError("Selecciona la cuenta"); return; }
     setGuardando(true);
     try {
       await api.post(`/caja-auxiliar/${diaId}/movimientos`, {
@@ -132,7 +314,7 @@ export default function NuevoMovimientoForm({
       <div className="form-grid">
         <div className="field" style={{ gridColumn: "1 / -1" }}>
           <label htmlFor="aux-categoria">Tipo de movimiento</label>
-          <select id="aux-categoria" value={categoria} onChange={(e) => setCategoria(e.target.value as CajaCategoria)}>
+          <select id="aux-categoria" value={categoria} onChange={(e) => cambiarCategoria(e.target.value as CajaCategoria)}>
             {opcionesGrupo.map((c) => (
               <option key={c} value={c}>
                 {CATEGORIAS_AUXILIAR[c].descripcion}
@@ -142,139 +324,94 @@ export default function NuevoMovimientoForm({
           </select>
         </div>
 
-        {info.requiereCuenta && (
+        {esAportacion && (
+          <div style={{ gridColumn: "1 / -1" }}>
+            <PanelAportacionPendiente agenciaId={agenciaId} onAportado={onCreado} />
+          </div>
+        )}
+
+        {!esAportacion && info.requiereCuenta && (
           <div className="field" style={{ gridColumn: "1 / -1" }}>
             <label>Cuenta del socio</label>
             <BuscadorCuenta tipo={info.requiereCuenta} agenciaId={agenciaId} seleccionada={cuenta} onSeleccionar={setCuenta} />
             {referenciaPreview && (
-              <span className="sub mono" style={{ marginTop: "0.35rem", display: "inline-block" }}>
-                Referencia: {referenciaPreview}
-              </span>
+              <span className="sub mono" style={{ marginTop: "0.35rem", display: "inline-block" }}>Referencia: {referenciaPreview}</span>
             )}
             {info.tipo === "EGRESO" && cuenta?.tipo === "AHORRO_SOBRE_PRESTAMO" && cuenta.prestamo_estado && cuenta.prestamo_estado !== "CANCELADO" && cuenta.prestamo_estado !== "RECHAZADO" && (
-              <div
-                style={{
-                  marginTop: "0.6rem",
-                  padding: "0.75rem 0.9rem",
-                  borderRadius: "8px",
-                  background: "#fee2e2",
-                  color: "#991b1b",
-                  border: "1px solid #ef4444",
-                  fontSize: "0.85rem",
-                  lineHeight: 1.45,
-                }}
-              >
-                🛑 <strong>Retiro bloqueado (Cuenta en garantía):</strong> Esta cuenta está asociada al crédito{" "}
-                <strong>{cuenta.prestamo_codigo || "activo"}</strong> ({cuenta.prestamo_estado}). Por política estatutaria de la cooperativa,
-                los fondos de <em>Ahorro sobre Préstamo</em> <strong>no se pueden tocar</strong> hasta que el crédito termine de pagarse por completo.
+              <div style={{ marginTop: "0.6rem", padding: "0.75rem 0.9rem", borderRadius: "8px", background: "#fee2e2", color: "#991b1b", border: "1px solid #ef4444", fontSize: "0.85rem", lineHeight: 1.45 }}>
+                <strong>Retiro bloqueado (Cuenta en garantia):</strong> Cuenta asociada al credito <strong>{cuenta.prestamo_codigo || "activo"}</strong> ({cuenta.prestamo_estado}). No se puede tocar hasta que el credito se pague.
               </div>
             )}
           </div>
         )}
 
-        {!info.requiereCuenta && info.seccion === "PROPIO" && info.requiereSocio && (
+        {!esAportacion && !info.requiereCuenta && info.seccion === "PROPIO" && info.requiereSocio && (
           <div className="field" style={{ gridColumn: "1 / -1" }}>
             <label>Socio / beneficiario</label>
             {!socioManual ? (
               <>
                 <BuscadorSocio agenciaId={agenciaId} seleccionado={socio} onSeleccionar={setSocio} />
-                <button type="button" className="link-btn" style={{ marginTop: "0.35rem" }} onClick={() => setSocioManual(true)}>
-                  No es socio / escribir el nombre manualmente
-                </button>
+                <button type="button" className="link-btn" style={{ marginTop: "0.35rem" }} onClick={() => setSocioManual(true)}>No es socio / escribir el nombre manualmente</button>
               </>
             ) : (
               <>
-                <input
-                  placeholder="Nombre del beneficiario"
-                  value={beneficiario}
-                  onChange={(e) => setBeneficiario(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="link-btn"
-                  style={{ marginTop: "0.35rem" }}
-                  onClick={() => {
-                    setSocioManual(false);
-                    setBeneficiario("");
-                  }}
-                >
-                  Buscar en socios
-                </button>
+                <input placeholder="Nombre del beneficiario" value={beneficiario} onChange={(e) => setBeneficiario(e.target.value)} />
+                <button type="button" className="link-btn" style={{ marginTop: "0.35rem" }} onClick={() => { setSocioManual(false); setBeneficiario(""); }}>Buscar en socios</button>
               </>
             )}
           </div>
         )}
 
-        {!info.requiereCuenta && info.seccion === "PROPIO" && !info.requiereSocio && (
+        {!esAportacion && !info.requiereCuenta && info.seccion === "PROPIO" && !info.requiereSocio && (
           <div className="field" style={{ gridColumn: "1 / -1" }}>
             <label htmlFor="aux-beneficiario">Beneficiario</label>
             <input id="aux-beneficiario" value={beneficiario} onChange={(e) => setBeneficiario(e.target.value)} />
           </div>
         )}
 
-        {info.seccion === "BI" && (
+        {!esAportacion && info.seccion === "BI" && (
           <>
             <div className="field" style={{ gridColumn: "1 / -1" }}>
               <label htmlFor="aux-beneficiario-bi">Beneficiario</label>
-              <input
-                id="aux-beneficiario-bi"
-                list="aux-beneficiarios-datalist"
-                value={beneficiario}
-                onChange={(e) => setBeneficiario(e.target.value)}
-              />
-              <datalist id="aux-beneficiarios-datalist">
-                {sugerencias.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
+              <input id="aux-beneficiario-bi" list="aux-beneficiarios-datalist" value={beneficiario} onChange={(e) => setBeneficiario(e.target.value)} />
+              <datalist id="aux-beneficiarios-datalist">{sugerencias.map((s) => <option key={s} value={s} />)}</datalist>
             </div>
             <div className="field">
-              <label htmlFor="aux-aut">Núm. de autorización BI</label>
+              <label htmlFor="aux-aut">Num. de autorizacion BI</label>
               <input id="aux-aut" placeholder="AUT:000000" value={referenciaAut} onChange={(e) => setReferenciaAut(e.target.value)} />
             </div>
           </>
         )}
 
-        {!info.requiereCuenta && (
-          <div className="field">
-            <label htmlFor="aux-doc">No. de documento</label>
-            <input id="aux-doc" value={docNo} onChange={(e) => setDocNo(e.target.value)} />
-          </div>
+        {!esAportacion && (
+          <>
+            {!info.requiereCuenta && (
+              <div className="field">
+                <label htmlFor="aux-doc">No. de documento</label>
+                <input id="aux-doc" value={docNo} onChange={(e) => setDocNo(e.target.value)} />
+              </div>
+            )}
+            {info.requiereCuenta && (
+              <div className="field">
+                <label htmlFor="aux-doc-cuenta">No. de recibo</label>
+                <input id="aux-doc-cuenta" value={docNo} onChange={(e) => setDocNo(e.target.value)} />
+              </div>
+            )}
+            <div className="field">
+              <label htmlFor="aux-monto">Monto</label>
+              <input id="aux-monto" type="number" min="0.01" step="0.01" value={monto} onChange={(e) => setMonto(e.target.value)} required />
+            </div>
+          </>
         )}
-        {info.requiereCuenta && (
-          <div className="field">
-            <label htmlFor="aux-doc-cuenta">No. de recibo</label>
-            <input id="aux-doc-cuenta" value={docNo} onChange={(e) => setDocNo(e.target.value)} />
-          </div>
-        )}
-
-        <div className="field">
-          <label htmlFor="aux-monto">Monto</label>
-          <input
-            id="aux-monto"
-            type="number"
-            min="0.01"
-            step="0.01"
-            value={monto}
-            onChange={(e) => setMonto(e.target.value)}
-            required
-          />
-        </div>
       </div>
 
       {error && <div className="alert error">{error}</div>}
 
-      {(() => {
-        const retiroBloqueado = Boolean(
-          info.tipo === "EGRESO" &&
-          cuenta?.tipo === "AHORRO_SOBRE_PRESTAMO" &&
-          cuenta.prestamo_estado &&
-          cuenta.prestamo_estado !== "CANCELADO" &&
-          cuenta.prestamo_estado !== "RECHAZADO"
-        );
+      {!esAportacion && (() => {
+        const retiroBloqueado = Boolean(info.tipo === "EGRESO" && cuenta?.tipo === "AHORRO_SOBRE_PRESTAMO" && cuenta.prestamo_estado && cuenta.prestamo_estado !== "CANCELADO" && cuenta.prestamo_estado !== "RECHAZADO");
         return (
           <button type="submit" className="btn" disabled={guardando || retiroBloqueado}>
-            {guardando ? "Guardando…" : retiroBloqueado ? "Retiro bloqueado por crédito activo" : `Registrar ${info.tipo === "INGRESO" ? "ingreso" : "egreso"}`}
+            {guardando ? "Guardando..." : retiroBloqueado ? "Retiro bloqueado por credito activo" : `Registrar ${info.tipo === "INGRESO" ? "ingreso" : "egreso"}`}
           </button>
         );
       })()}

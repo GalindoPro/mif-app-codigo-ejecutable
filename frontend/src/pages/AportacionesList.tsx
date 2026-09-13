@@ -156,7 +156,7 @@ export default function AportacionesList() {
               <th style={{ minWidth: 110 }}>NO. ASOCIADO</th>
               <th style={{ minWidth: 220 }}>NOMBRES DEL ASOCIADO</th>
               <th style={{ minWidth: 120 }}>DPI</th>
-              <th style={{ minWidth: 100 }}>GÉNERO / EDAD</th>
+              <th style={{ minWidth: 100 }}>GÉNERO</th>
               <th style={{ minWidth: 120, textAlign: "right" }}>CAPITAL APORTADO</th>
               <th style={{ minWidth: 220 }}>PERSONA BENEFICIARIA</th>
               <th style={{ minWidth: 100 }}>FECHA INGRESO</th>
@@ -198,7 +198,6 @@ export default function AportacionesList() {
                     >
                       {a.genero === "F" ? "F" : a.genero === "M" ? "M" : "—"}
                     </span>
-                    {a.edad && <span style={{ fontSize: "0.76rem", color: "var(--ink-soft)" }}>{a.edad}a</span>}
                   </div>
                 </td>
                 <td className="mono" style={{ fontWeight: 700, color: "var(--accent)", textAlign: "right" }}>

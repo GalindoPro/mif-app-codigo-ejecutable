@@ -128,7 +128,6 @@ async function main() {
     async function obtenerORegistrarSocio(
       nombre: string,
       dpi: string | null = null,
-      edad: number | null = null,
       genero: string = "M",
       fechaIngreso: string = "2026-01-02",
       asocNoPrefix: string = "CHAJ",
@@ -143,10 +142,10 @@ async function main() {
 
       const asocNo = `${asocNoPrefix}-${String(socioSeq++).padStart(5, "0")}`;
       const { rows } = await client.query(
-        `insert into socios (numero_asociado, agencia_id, nombres, dpi, edad, genero, fecha_ingreso, estado, creado_por_id)
-         values ($1, $2, $3, $4, $5, $6, $7, 'ACTIVO', $8)
+        `insert into socios (numero_asociado, agencia_id, nombres, dpi, genero, fecha_ingreso, estado, creado_por_id)
+         values ($1, $2, $3, $4, $5, $6, 'ACTIVO', $7)
          returning id`,
-        [asocNo, agencia.id, normNombre, cleanDpi, edad, genero, cleanFecha, adminUser.id],
+        [asocNo, agencia.id, normNombre, cleanDpi, genero, cleanFecha, adminUser.id],
       );
       const newId = rows[0].id;
       sociosMap.set(normNombre, newId);
@@ -161,7 +160,6 @@ async function main() {
       const socioId = await obtenerORegistrarSocio(
         s.nombre,
         s.dpi,
-        s.edad,
         s.genero,
         s.fecha_ingreso,
         s.numero_asociado,

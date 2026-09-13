@@ -141,7 +141,6 @@ export interface DatosSocio {
   agenciaId: string;
   nombres: string;
   genero?: "M" | "F" | null;
-  edad?: number | null;
   fechaIngreso: string;
   dpi?: string | null;
   direccion?: string | null;
@@ -170,56 +169,46 @@ export async function crear(data: DatosSocio, usuarioId: string): Promise<Socio>
     throw badRequest("La aportación inicial mínima de la cooperativa es de Q 100.00 para afiliarse como socio.");
   }
 
-  if (data.dpi && data.dpi.trim()) {
-    const rawDpi = data.dpi.replace(/\D/g, "");
-    if (rawDpi.length === 13) {
-      const { rows: dpiRepetido } = await pool.query(
-        `select dpi, nombres, numero_asociado from socios where regexp_replace(dpi, '[^0-9]', '', 'g') = $1 limit 1`,
-        [rawDpi],
-      );
-      if (dpiRepetido[0]) {
-        throw conflict(
-          `El DPI "${data.dpi.trim()}" ya está registrado para el socio "${dpiRepetido[0].nombres}" (Asociado: ${dpiRepetido[0].numero_asociado}).`,
-        );
-      }
-    }
+  // Validaciones Cruzadas (Socio y Beneficiario)
+  const dpiSocio = data.dpi?.trim();
+  const dpiBen = data.dpiBeneficiario?.trim();
+  const telSocio = data.telefono?.trim();
+  const telBen = data.telefonoBeneficiario?.trim();
+
+  // Auto-restricción: Un socio no puede ser su propio beneficiario (ni usar mismo DPI ni teléfono)
+  if (dpiSocio && dpiBen && dpiSocio === dpiBen) {
+    throw badRequest("El DPI del socio y el DPI/CUI del beneficiario no pueden ser iguales.");
+  }
+  if (telSocio && telBen && telSocio === telBen) {
+    throw badRequest("El teléfono del socio y el teléfono del beneficiario no pueden ser iguales.");
   }
 
-  // Validación de teléfono del socio (no repetible en todo el sistema)
-  if (data.telefono && data.telefono.trim()) {
-    const rawTel = data.telefono.replace(/\D/g, "");
-    const localTel = rawTel.startsWith("502") && rawTel.length > 8 ? rawTel.slice(3) : rawTel.slice(-8);
-    if (localTel.length === 8) {
-      const { rows: telRepetido } = await pool.query(
-        `select telefono, nombres, numero_asociado from socios where regexp_replace(telefono, '[^0-9]', '', 'g') like $1 limit 1`,
-        [`%${localTel}`],
-      );
-      if (telRepetido[0]) {
-        throw conflict(
-          `El teléfono "${data.telefono.trim()}" ya está registrado para el socio "${telRepetido[0].nombres}" (Asociado: ${telRepetido[0].numero_asociado}). No se permiten números de teléfono duplicados.`,
-        );
-      }
-    }
+  // DPI Socio
+  if (dpiSocio) {
+    const res = await verificarDpi(dpiSocio, undefined, "SOCIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El DPI "${dpiSocio}" ya está registrado en el sistema (${res.registrado?.rol}: ${res.registrado?.nombres}).`);
   }
 
-  // Validación de teléfono del beneficiario (no repetible con otro socio ni beneficiario)
-  if (data.telefonoBeneficiario && data.telefonoBeneficiario.trim()) {
-    const rawTelBen = data.telefonoBeneficiario.replace(/\D/g, "");
-    const localTelBen = rawTelBen.startsWith("502") && rawTelBen.length > 8 ? rawTelBen.slice(3) : rawTelBen.slice(-8);
-    if (localTelBen.length === 8) {
-      const { rows: telBenRepetido } = await pool.query(
-        `select nombres, numero_asociado, 'Socio' as tipo from socios where regexp_replace(telefono, '[^0-9]', '', 'g') like $1
-         union all
-         select coalesce(nombre_beneficiario, nombres) as nombres, numero_asociado, 'Beneficiario' as tipo from socios where regexp_replace(telefono_beneficiario, '[^0-9]', '', 'g') like $1
-         limit 1`,
-        [`%${localTelBen}`],
-      );
-      if (telBenRepetido[0]) {
-        throw conflict(
-          `El teléfono del beneficiario "${data.telefonoBeneficiario.trim()}" ya está registrado en el sistema (${telBenRepetido[0].tipo}: ${telBenRepetido[0].nombres}, Asociado: ${telBenRepetido[0].numero_asociado}).`,
-        );
-      }
-    }
+  // Teléfono Socio
+  if (telSocio) {
+    const res = await verificarTelefono(telSocio, undefined, "SOCIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El teléfono "${telSocio}" ya está registrado en el sistema (${res.registrado?.rol}: ${res.registrado?.nombres}).`);
+  }
+
+  // DPI Beneficiario
+  if (dpiBen) {
+    const res = await verificarDpi(dpiBen, undefined, "BENEFICIARIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El DPI/CUI del beneficiario "${dpiBen}" ya pertenece a un socio registrado (${res.registrado?.nombres}).`);
+  }
+
+  // Teléfono Beneficiario
+  if (telBen) {
+    const res = await verificarTelefono(telBen, undefined, "BENEFICIARIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El teléfono del beneficiario "${telBen}" ya pertenece a un socio registrado (${res.registrado?.nombres}).`);
   }
 
   // Validación obligatoria de número de boleta / recibo de pago
@@ -229,7 +218,7 @@ export async function crear(data: DatosSocio, usuarioId: string): Promise<Socio>
 
   const { rows } = await pool.query<Socio>(
     `insert into socios
-      (numero_asociado, agencia_id, nombres, genero, edad, fecha_ingreso, dpi, direccion, telefono, nombre_beneficiario, dpi_beneficiario, telefono_beneficiario, parentesco_beneficiario, creado_por_id)
+      (numero_asociado, agencia_id, nombres, genero, fecha_ingreso, dpi, direccion, telefono, nombre_beneficiario, dpi_beneficiario, telefono_beneficiario, parentesco_beneficiario, creado_por_id)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
      returning *`,
     [
@@ -237,7 +226,6 @@ export async function crear(data: DatosSocio, usuarioId: string): Promise<Socio>
       data.agenciaId,
       capitalizarNombre(data.nombres)!,
       data.genero ?? null,
-      data.edad ?? null,
       data.fechaIngreso,
       data.dpi ?? null,
       capitalizarDescripcion(data.direccion) ?? null,
@@ -270,32 +258,58 @@ export async function crear(data: DatosSocio, usuarioId: string): Promise<Socio>
   return socio;
 }
 
-export async function verificarDpi(dpi: string, socioIdActual?: string) {
+export async function verificarDpi(dpi: string, socioIdActual?: string, tipo: "SOCIO" | "BENEFICIARIO" = "SOCIO") {
   const rawDpi = dpi.replace(/\D/g, "");
   if (rawDpi.length !== 13) {
     return { valido: false, mensaje: "El DPI debe contener 13 dígitos numéricos" };
   }
   const params: unknown[] = [rawDpi];
-  let query = `select id, nombres, numero_asociado, dpi from socios where regexp_replace(dpi, '[^0-9]', '', 'g') = $1`;
+  
+  // 1. Verificar si coincide con DPI de algún SOCIO
+  let querySocio = `select id, nombres, numero_asociado, dpi from socios where regexp_replace(dpi, '[^0-9]', '', 'g') = $1`;
   if (socioIdActual) {
+    querySocio += ` and id != $2`;
     params.push(socioIdActual);
-    query += ` and id != $2`;
   }
-  query += ` limit 1`;
+  querySocio += ` limit 1`;
 
-  const { rows } = await pool.query(query, params);
-  if (rows[0]) {
+  const { rows: socioRows } = await pool.query(querySocio, params);
+  if (socioRows[0]) {
     return {
       valido: true,
       disponible: false,
-      socio: {
-        id: rows[0].id,
-        nombres: rows[0].nombres,
-        numeroAsociado: rows[0].numero_asociado,
-        dpi: rows[0].dpi,
+      registrado: {
+        id: socioRows[0].id,
+        nombres: socioRows[0].nombres,
+        numeroAsociado: socioRows[0].numero_asociado,
+        rol: "Socio registrado",
       },
     };
   }
+
+  // 2. Si se verifica SOCIO, también verificar que su DPI no esté ya como DPI de algún Beneficiario
+  if (tipo === "SOCIO") {
+    let queryBen = `select id, nombres, numero_asociado, nombre_beneficiario, dpi_beneficiario from socios where regexp_replace(dpi_beneficiario, '[^0-9]', '', 'g') = $1`;
+    if (socioIdActual) {
+      queryBen += ` and id != $2`;
+    }
+    queryBen += ` limit 1`;
+
+    const { rows: benRows } = await pool.query(queryBen, params);
+    if (benRows[0]) {
+      return {
+        valido: true,
+        disponible: false,
+        registrado: {
+          id: benRows[0].id,
+          nombres: benRows[0].nombre_beneficiario,
+          numeroAsociado: benRows[0].numero_asociado,
+          rol: `Beneficiario del socio ${benRows[0].nombres}`,
+        },
+      };
+    }
+  }
+
   return { valido: true, disponible: true };
 }
 
@@ -334,8 +348,8 @@ export async function verificarTelefono(
     };
   }
 
-  // 2. Si se verifica beneficiario, también verificar en beneficiarios registrados
-  if (tipo === "BENEFICIARIO") {
+  // 2. Si se verifica SOCIO, también verificar en beneficiarios registrados
+  if (tipo === "SOCIO") {
     let queryBen = `select id, nombres, numero_asociado, nombre_beneficiario, telefono_beneficiario from socios where regexp_replace(telefono_beneficiario, '[^0-9]', '', 'g') like $1`;
     const paramsBen: unknown[] = [`%${localTel}`];
     if (socioIdActual) {
@@ -351,7 +365,7 @@ export async function verificarTelefono(
         disponible: false,
         registrado: {
           id: benRows[0].id,
-          nombres: benRows[0].nombre_beneficiario || benRows[0].nombres,
+          nombres: benRows[0].nombre_beneficiario,
           numeroAsociado: benRows[0].numero_asociado,
           rol: `Beneficiario del socio ${benRows[0].nombres}`,
         },
@@ -362,11 +376,36 @@ export async function verificarTelefono(
   return { valido: true, disponible: true };
 }
 
+/**
+ * Retorna socios sin cuenta de APORTACION o con saldo_actual < 100
+ * para que el cajero los aperture directamente desde la ventanilla.
+ */
+export async function sociosSinAportacion(
+  agenciaIdParam: string | null,
+  agenciaVisible: string | null
+) {
+  const agenciaId = agenciaIdParam || agenciaVisible;
+  const { rows } = await pool.query(
+    `select
+       s.id, s.nombres, s.numero_asociado,
+       c.saldo_actual as saldo_aportacion
+     from socios s
+     left join cuentas c on c.socio_id = s.id and c.tipo = 'APORTACION' and c.estado = 'ACTIVA'
+     where s.estado = 'ACTIVO'
+       and ($1::uuid is null or s.agencia_id = $1::uuid)
+       and (c.id is null or c.saldo_actual < 100)
+     order by s.nombres asc`,
+    [agenciaId || null]
+  );
+  return rows;
+}
+
 export async function abrirAportacionSocio(
   socioId: string,
   monto: number = 100,
   recibo?: string | null,
-  usuarioId: string = ""
+  usuarioId: string = "",
+  cuotaIngreso?: number
 ) {
   const { rows: socioRows } = await pool.query(
     `select s.*, a.codigo as agencia_codigo from socios s join agencias a on a.id = s.agencia_id where s.id = $1`,
@@ -398,7 +437,48 @@ export async function abrirAportacionSocio(
     datosNuevos: { tipo: "APORTACION", saldo_inicial: montoApor, socio_id: socio.id },
   });
 
-  return cuentaRows[0];
+  // Si se registró cuota de ingreso y hay caja auxiliar abierta hoy, registrar el ingreso
+  if (cuotaIngreso && cuotaIngreso > 0) {
+    const { rows: diaRows } = await pool.query(
+      `select id, fecha, saldo_inicial, agencia_id from caja_dias
+       where agencia_id = $1 and estado = 'ABIERTO' and fecha = current_date
+       order by created_at desc limit 1`,
+      [socio.agencia_id]
+    );
+    if (diaRows[0]) {
+      const dia = diaRows[0];
+      // Obtener saldo acumulado actual
+      const { rows: saldoRows } = await pool.query(
+        `select saldo_acumulado from caja_movimientos_auxiliar where caja_dia_id = $1 order by created_at desc limit 1`,
+        [dia.id]
+      );
+      const saldoPrevio = saldoRows[0] ? Number(saldoRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
+      const saldoAcumulado = saldoPrevio + cuotaIngreso;
+
+      // Contador para INGRESO_ASOCIADO
+      const { rows: contRows } = await pool.query(
+        `select count(*)::int as total from caja_movimientos_auxiliar where agencia_id = $1 and categoria = 'INGRESO_ASOCIADO'`,
+        [socio.agencia_id]
+      );
+      const contador = contRows[0].total + 1;
+
+      await pool.query(
+        `insert into caja_movimientos_auxiliar (
+           caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador,
+           referencia, socio_id, beneficiario, descripcion, doc_no, monto, saldo_acumulado,
+           origen_fondos, usuario_id
+         ) values ($1, $2, $3, 'PROPIO', 'INGRESO_ASOCIADO', 'INGRESO', $4, $5, $6, $7, $8, $9, $10, $11, 'FONDOS_PROPIOS', $12)`,
+        [
+          dia.id, socio.agencia_id, dia.fecha, contador,
+          socio.numero_asociado, socio.id, socio.nombres,
+          `Cuota de ingreso nuevo asociado ${socio.nombres} (${socio.numero_asociado})`,
+          recibo ?? null, cuotaIngreso, saldoAcumulado, usuarioId || null
+        ]
+      );
+    }
+  }
+
+  return { ...cuentaRows[0], cuotaIngresoRegistrada: cuotaIngreso && cuotaIngreso > 0 };
 }
 
 export async function actualizar(
@@ -409,64 +489,56 @@ export async function actualizar(
 ): Promise<Socio> {
   const anterior = await obtener(id, agenciaVisibleParaUsuario);
 
-  if (data.dpi && data.dpi.trim()) {
-    const rawDpi = data.dpi.replace(/\D/g, "");
-    if (rawDpi.length === 13) {
-      const { rows: dpiRepetido } = await pool.query(
-        `select dpi, nombres, numero_asociado from socios 
-         where regexp_replace(dpi, '[^0-9]', '', 'g') = $1 and id != $2 limit 1`,
-        [rawDpi, id],
-      );
-      if (dpiRepetido[0]) {
-        throw conflict(
-          `El DPI "${data.dpi.trim()}" ya está registrado para el socio "${dpiRepetido[0].nombres}" (Asociado: ${dpiRepetido[0].numero_asociado}).`,
-        );
-      }
-    }
+  // Validaciones Cruzadas (Socio y Beneficiario)
+  const dpiSocio = data.dpi?.trim();
+  const dpiBen = data.dpiBeneficiario?.trim();
+  const telSocio = data.telefono?.trim();
+  const telBen = data.telefonoBeneficiario?.trim();
+
+  // Auto-restricción: Un socio no puede ser su propio beneficiario (ni usar mismo DPI ni teléfono)
+  const finalDpiSocio = dpiSocio ?? anterior.dpi;
+  const finalDpiBen = dpiBen ?? anterior.dpi_beneficiario;
+  if (finalDpiSocio && finalDpiBen && finalDpiSocio === finalDpiBen) {
+    throw badRequest("El DPI del socio y el DPI/CUI del beneficiario no pueden ser iguales.");
   }
 
-  if (data.telefono && data.telefono.trim()) {
-    const rawTel = data.telefono.replace(/\D/g, "");
-    const localTel = rawTel.startsWith("502") && rawTel.length > 8 ? rawTel.slice(3) : rawTel.slice(-8);
-    if (localTel.length === 8) {
-      const { rows: telRepetido } = await pool.query(
-        `select telefono, nombres, numero_asociado from socios 
-         where regexp_replace(telefono, '[^0-9]', '', 'g') like $1 and id != $2 limit 1`,
-        [`%${localTel}`, id],
-      );
-      if (telRepetido[0]) {
-        throw conflict(
-          `El teléfono "${data.telefono.trim()}" ya está registrado para el socio "${telRepetido[0].nombres}" (Asociado: ${telRepetido[0].numero_asociado}).`,
-        );
-      }
-    }
+  const finalTelSocio = telSocio ?? anterior.telefono;
+  const finalTelBen = telBen ?? anterior.telefono_beneficiario;
+  if (finalTelSocio && finalTelBen && finalTelSocio === finalTelBen) {
+    throw badRequest("El teléfono del socio y el teléfono del beneficiario no pueden ser iguales.");
   }
 
-  if (data.telefonoBeneficiario && data.telefonoBeneficiario.trim()) {
-    const rawTelBen = data.telefonoBeneficiario.replace(/\D/g, "");
-    const localTelBen = rawTelBen.startsWith("502") && rawTelBen.length > 8 ? rawTelBen.slice(3) : rawTelBen.slice(-8);
-    if (localTelBen.length === 8) {
-      const { rows: telBenRepetido } = await pool.query(
-        `select nombres, numero_asociado, 'Socio' as tipo from socios 
-         where regexp_replace(telefono, '[^0-9]', '', 'g') like $1 and id != $2
-         union all
-         select coalesce(nombre_beneficiario, nombres) as nombres, numero_asociado, 'Beneficiario' as tipo from socios 
-         where regexp_replace(telefono_beneficiario, '[^0-9]', '', 'g') like $1 and id != $2
-         limit 1`,
-        [`%${localTelBen}`, id],
-      );
-      if (telBenRepetido[0]) {
-        throw conflict(
-          `El teléfono del beneficiario "${data.telefonoBeneficiario.trim()}" ya está registrado en el sistema (${telBenRepetido[0].tipo}: ${telBenRepetido[0].nombres}, Asociado: ${telBenRepetido[0].numero_asociado}).`,
-        );
-      }
-    }
+  // DPI Socio
+  if (dpiSocio) {
+    const res = await verificarDpi(dpiSocio, id, "SOCIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El DPI "${dpiSocio}" ya está registrado en el sistema (${res.registrado?.rol}: ${res.registrado?.nombres}).`);
+  }
+
+  // Teléfono Socio
+  if (telSocio) {
+    const res = await verificarTelefono(telSocio, id, "SOCIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El teléfono "${telSocio}" ya está registrado en el sistema (${res.registrado?.rol}: ${res.registrado?.nombres}).`);
+  }
+
+  // DPI Beneficiario
+  if (dpiBen) {
+    const res = await verificarDpi(dpiBen, id, "BENEFICIARIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El DPI/CUI del beneficiario "${dpiBen}" ya pertenece a un socio registrado (${res.registrado?.nombres}).`);
+  }
+
+  // Teléfono Beneficiario
+  if (telBen) {
+    const res = await verificarTelefono(telBen, id, "BENEFICIARIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El teléfono del beneficiario "${telBen}" ya pertenece a un socio registrado (${res.registrado?.nombres}).`);
   }
 
   const campos: Record<string, unknown> = {
     nombres: data.nombres !== undefined ? (data.nombres ? capitalizarNombre(data.nombres) : data.nombres) : undefined,
     genero: data.genero,
-    edad: data.edad,
     fecha_ingreso: data.fechaIngreso,
     dpi: data.dpi,
     direccion: data.direccion !== undefined ? (data.direccion ? capitalizarDescripcion(data.direccion) : data.direccion) : undefined,
@@ -541,7 +613,7 @@ export async function listarAportaciones(params: { agenciaId: string | null; q?:
   const where = condiciones.length ? `where ${condiciones.join(" and ")}` : "";
 
   const query = `
-    select s.id as socio_id, s.numero_asociado, s.nombres, s.dpi, s.edad, s.genero, s.fecha_ingreso, s.direccion, s.telefono,
+    select s.id as socio_id, s.numero_asociado, s.nombres, s.dpi, s.genero, s.fecha_ingreso, s.direccion, s.telefono,
            s.nombre_beneficiario, s.dpi_beneficiario, s.telefono_beneficiario, s.parentesco_beneficiario, s.estado,
            a.nombre as agencia_nombre,
            coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0) as total_aportaciones

@@ -26,7 +26,6 @@ export default function SocioForm() {
   const [nombres, setNombres] = useState(() => searchParams.get("nombres") || "");
   const [genero, setGenero] = useState<"M" | "F" | "">("");
   const [dpi, setDpi] = useState(() => (searchParams.get("dpi") ? formatearDPI(searchParams.get("dpi")!) : ""));
-  const [edad, setEdad] = useState("");
   const [fechaIngreso, setFechaIngreso] = useState(() => new Date().toISOString().slice(0, 10));
   const [telefono, setTelefono] = useState(() => (searchParams.get("telefono") ? formatearTelefono(searchParams.get("telefono")!) : ""));
   const [direccion, setDireccion] = useState(() => searchParams.get("direccion") || "");
@@ -60,6 +59,13 @@ export default function SocioForm() {
   } | null>(null);
   const [verificandoTelefonoBen, setVerificandoTelefonoBen] = useState(false);
 
+  const [dpiDuplicadoBen, setDpiDuplicadoBen] = useState<{
+    nombres: string;
+    numeroAsociado: string;
+    rol?: string;
+  } | null>(null);
+  const [verificandoDpiBen, setVerificandoDpiBen] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -86,10 +92,13 @@ export default function SocioForm() {
           .get<{
             valido: boolean;
             disponible?: boolean;
+            registrado?: { nombres: string; numeroAsociado: string; rol?: string };
             socio?: { nombres: string; numeroAsociado: string };
           }>("/socios/verificar-dpi", { params: { dpi: rawDpi } })
           .then(({ data }) => {
-            if (data.disponible === false && data.socio) {
+            if (data.disponible === false && data.registrado) {
+              setDpiDuplicado(data.registrado);
+            } else if (data.disponible === false && data.socio) {
               setDpiDuplicado(data.socio);
             } else {
               setDpiDuplicado(null);
@@ -170,6 +179,43 @@ export default function SocioForm() {
     }
   }, [telefonoBeneficiario, esMenorBeneficiario]);
 
+  // Verificación en tiempo real de DPI del beneficiario (si NO es menor)
+  useEffect(() => {
+    if (esMenorBeneficiario) {
+      setDpiDuplicadoBen(null);
+      setVerificandoDpiBen(false);
+      return;
+    }
+    const rawDpi = limpiarDPI(dpiBeneficiario);
+    if (rawDpi.length === 13) {
+      setVerificandoDpiBen(true);
+      const timer = setTimeout(() => {
+        api
+          .get<{
+            valido: boolean;
+            disponible?: boolean;
+            registrado?: { nombres: string; numeroAsociado: string; rol: string };
+            socio?: { nombres: string; numeroAsociado: string };
+          }>("/socios/verificar-dpi", { params: { dpi: rawDpi, tipo: "BENEFICIARIO" } })
+          .then(({ data }) => {
+            if (data.disponible === false && data.registrado) {
+              setDpiDuplicadoBen(data.registrado);
+            } else if (data.disponible === false && data.socio) {
+              setDpiDuplicadoBen({ ...data.socio, rol: "Socio registrado" });
+            } else {
+              setDpiDuplicadoBen(null);
+            }
+          })
+          .catch(() => setDpiDuplicadoBen(null))
+          .finally(() => setVerificandoDpiBen(false));
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      setDpiDuplicadoBen(null);
+      setVerificandoDpiBen(false);
+    }
+  }, [dpiBeneficiario, esMenorBeneficiario]);
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (dpiDuplicado) {
@@ -186,8 +232,26 @@ export default function SocioForm() {
     }
     if (!esMenorBeneficiario && telefonoDuplicadoBen) {
       setError(
-        `El teléfono del beneficiario ya está registrado en el sistema (${telefonoDuplicadoBen.rol}: ${telefonoDuplicadoBen.nombres}, Asociado: ${telefonoDuplicadoBen.numeroAsociado}). Modifícalo antes de guardar.`
+        `El teléfono del beneficiario ya pertenece a un registro (${telefonoDuplicadoBen.rol || "Socio"}: ${telefonoDuplicadoBen.nombres}, Asociado: ${telefonoDuplicadoBen.numeroAsociado}). Modifícalo antes de guardar.`
       );
+      return;
+    }
+    if (!esMenorBeneficiario && dpiDuplicadoBen) {
+      setError(
+        `El DPI/CUI del beneficiario ya pertenece a un registro (${dpiDuplicadoBen.rol || "Socio"}: ${dpiDuplicadoBen.nombres}, Asociado: ${dpiDuplicadoBen.numeroAsociado}). Modifícalo antes de guardar.`
+      );
+      return;
+    }
+    const cleanDpi = dpi ? dpi.replace(/\D/g, "") : "";
+    const cleanDpiBen = dpiBeneficiario ? dpiBeneficiario.replace(/\D/g, "") : "";
+    if (cleanDpi && cleanDpiBen && cleanDpi === cleanDpiBen) {
+      setError("El DPI del socio y el DPI/CUI del beneficiario no pueden ser iguales.");
+      return;
+    }
+    const cleanTel = telefono ? telefono.replace(/\D/g, "") : "";
+    const cleanTelBen = telefonoBeneficiario ? telefonoBeneficiario.replace(/\D/g, "") : "";
+    if (cleanTel && cleanTelBen && cleanTel === cleanTelBen) {
+      setError("El teléfono del socio y el teléfono del beneficiario no pueden ser iguales.");
       return;
     }
     if (!reciboAportacion.trim()) {
@@ -209,7 +273,6 @@ export default function SocioForm() {
         nombres,
         genero: genero || undefined,
         dpi: dpi ? dpi.trim() : undefined,
-        edad: edad ? Number(edad) : undefined,
         fechaIngreso,
         telefono: prepararTelefonoParaGuardar(telefono),
         direccion: direccion || undefined,
@@ -322,21 +385,7 @@ export default function SocioForm() {
             </div>
           </div>
 
-          {/* Fila abajo: Edad a la izquierda, Fecha de ingreso a la derecha */}
-          <div className="field">
-            <label htmlFor="edad">Edad (años)</label>
-            <input
-              id="edad"
-              type="number"
-              min="1"
-              max="120"
-              value={edad}
-              onChange={(e) => setEdad(e.target.value)}
-              placeholder="Ej. 35"
-            />
-            <span className="hint">Ingreso manual (buena práctica en campo)</span>
-          </div>
-
+          {/* Fila abajo: Fecha de ingreso y Teléfono */}
           <div className="field">
             <label htmlFor="fecha">Fecha de ingreso</label>
             <input
@@ -569,7 +618,13 @@ export default function SocioForm() {
               }}
             />
             <div style={{ minHeight: "1.1rem", marginTop: "0.15rem" }}>
-              {esMenorBeneficiario ? (
+              {verificandoDpiBen && !esMenorBeneficiario ? (
+                <span className="hint">🔍 Verificando...</span>
+              ) : dpiDuplicadoBen && !esMenorBeneficiario ? (
+                <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                  🔴 DPI/CUI registrado ({dpiDuplicadoBen.nombres})
+                </span>
+              ) : esMenorBeneficiario ? (
                 <span className="hint" style={{ color: "#38bdf8" }}>
                   {rawDpiBenLength === 13 ? "✓ CUI válido (13 dígitos de partida)" : `${rawDpiBenLength}/13 dígitos numéricos del CUI`}
                 </span>
@@ -630,7 +685,7 @@ export default function SocioForm() {
               )}
               {!esMenorBeneficiario && telefonoDuplicadoBen && (
                 <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
-                  ⚠️ Teléfono ya registrado ({telefonoDuplicadoBen.rol}: {telefonoDuplicadoBen.nombres})
+                  🔴 Teléfono ya registrado ({telefonoDuplicadoBen.rol || "Socio"}: {telefonoDuplicadoBen.nombres})
                 </span>
               )}
               {esMenorBeneficiario && (

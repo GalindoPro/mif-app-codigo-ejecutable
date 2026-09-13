@@ -144,7 +144,6 @@ create table if not exists socios (
   dpi                  text unique,
   direccion            text,
   telefono             text,
-  edad                 integer,
   nombre_beneficiario  text,
   dpi_beneficiario     text,
   telefono_beneficiario text,
@@ -156,7 +155,6 @@ create table if not exists socios (
 create index if not exists idx_socios_agencia on socios(agencia_id);
 create index if not exists idx_socios_nombres on socios using gin (to_tsvector('spanish', nombres));
 
-alter table socios add column if not exists edad integer;
 alter table socios add column if not exists dpi_beneficiario text;
 alter table socios add column if not exists telefono_beneficiario text;
 alter table socios add column if not exists parentesco_beneficiario text;

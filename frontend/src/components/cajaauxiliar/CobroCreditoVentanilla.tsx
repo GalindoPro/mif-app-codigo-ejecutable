@@ -48,6 +48,12 @@ export default function CobroCreditoVentanilla({
   const [usarDebitoAhorro, setUsarDebitoAhorro] = useState(false);
   const [cuentaDebitoSeleccionada, setCuentaDebitoSeleccionada] = useState<string>("");
 
+  const [numeroCuota, setNumeroCuota] = useState("1");
+  const [cantidadCuotas, setCantidadCuotas] = useState("1");
+  const [saldoAnteriorReportado, setSaldoAnteriorReportado] = useState("");
+  const [saldoActualReportado, setSaldoActualReportado] = useState("");
+  const [descripcion, setDescripcion] = useState("");
+
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -89,6 +95,15 @@ export default function CobroCreditoVentanilla({
       setMontoEntregadoInput(String(capitalMes + interesMes));
       setLiquidacion(null);
     } finally {
+      // Pre-fill fields based on prestamo
+      setNumeroCuota(String((p.cuotas_pagadas || 0) + 1));
+      setCantidadCuotas("1");
+      setSaldoAnteriorReportado(String(
+        p.saldo_capital !== null && p.saldo_capital !== undefined
+          ? p.saldo_capital
+          : p.monto_aprobado || p.monto_solicitado
+      ));
+      setDescripcion("");
       setCargandoLiquidacion(false);
     }
   }
@@ -200,12 +215,18 @@ export default function CobroCreditoVentanilla({
         origenFondos,
         docNo: docNo || undefined,
         cuentaDebitoId: usarDebitoAhorro && cuentaDebitoSeleccionada ? cuentaDebitoSeleccionada : undefined,
+        numeroCuota: Number(numeroCuota) || undefined,
+        cantidadCuotas: Number(cantidadCuotas) || undefined,
+        saldoAnteriorReportado: Number(saldoAnteriorReportado) || undefined,
+        saldoActualReportado: Number(saldoActualReportado) || undefined,
+        descripcion: descripcion.trim() || undefined,
       });
 
       setDocNo("");
       setSocio(null);
       setPrestamo(null);
       setMontoEntregadoInput("");
+      setDescripcion("");
       onCobrado();
     } catch (err) {
       setError(mensajeError(err));
@@ -566,6 +587,58 @@ export default function CobroCreditoVentanilla({
             </button>
           </div>
 
+          {/* CONTROL DE CUOTA */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+            <div className="field">
+              <label htmlFor="num-cuota">Número de Cuota a pagar</label>
+              <input
+                id="num-cuota"
+                type="number"
+                min="1"
+                value={numeroCuota}
+                onChange={(e) => setNumeroCuota(e.target.value)}
+              />
+              <span className="hint">Cuota inicial</span>
+            </div>
+            <div className="field">
+              <label htmlFor="cant-cuotas">Cantidad de Cuotas a pagar</label>
+              <input
+                id="cant-cuotas"
+                type="number"
+                min="1"
+                value={cantidadCuotas}
+                onChange={(e) => setCantidadCuotas(e.target.value)}
+              />
+              <span className="hint">Cuántas cuotas abarca este pago</span>
+            </div>
+          </div>
+
+          {/* CONTROL DE SALDOS MANUALES */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+            <div className="field">
+              <label htmlFor="saldo-ant">Saldo Anterior (del Recibo)</label>
+              <input
+                id="saldo-ant"
+                type="number"
+                step="0.01"
+                value={saldoAnteriorReportado}
+                onChange={(e) => setSaldoAnteriorReportado(e.target.value)}
+              />
+              <span className="hint">Saldo antes del pago</span>
+            </div>
+            <div className="field">
+              <label htmlFor="saldo-act">Saldo Actual (del Recibo)</label>
+              <input
+                id="saldo-act"
+                type="number"
+                step="0.01"
+                value={saldoActualReportado}
+                onChange={(e) => setSaldoActualReportado(e.target.value)}
+              />
+              <span className="hint">Saldo después del pago</span>
+            </div>
+          </div>
+
           <div className="form-grid">
             <div className="field">
               <label htmlFor="abono-cap">Abono a Capital (Q)</label>
@@ -627,12 +700,34 @@ export default function CobroCreditoVentanilla({
               <label htmlFor="doc-no-recibo">No. de Recibo Oficial</label>
               <input
                 id="doc-no-recibo"
-                placeholder="Ej. 2257"
+                type="text"
+                placeholder="Ej. REC-2023-001 (Opcional)"
                 value={docNo}
                 onChange={(e) => setDocNo(e.target.value)}
-                required
               />
-              <span className="hint">Número impreso en el recibo entregado al socio</span>
+              <span className="hint">Si se emite recibo físico numerado</span>
+            </div>
+
+            <div className="field" style={{ gridColumn: "1 / -1" }}>
+              <label htmlFor="descripcion-cobro" style={{ color: "var(--ink)", fontWeight: 700 }}>Observación / Justificación</label>
+              <input
+                id="descripcion-cobro"
+                type="text"
+                placeholder="Ej. Atraso de dos meses, pago ajustado, etc."
+                value={descripcion}
+                onChange={(e) => setDescripcion(e.target.value)}
+                required={
+                  Number(mora) !== (liquidacion?.moraFijaSugerida || 0) ||
+                  Number(cantidadCuotas) > 1
+                }
+                style={{
+                  borderColor: (Number(mora) !== (liquidacion?.moraFijaSugerida || 0) || Number(cantidadCuotas) > 1) && !descripcion.trim() ? "#ef4444" : "var(--line)",
+                  background: (Number(mora) !== (liquidacion?.moraFijaSugerida || 0) || Number(cantidadCuotas) > 1) && !descripcion.trim() ? "rgba(239, 68, 68, 0.05)" : "var(--paper)"
+                }}
+              />
+              <span className="hint" style={{ color: (Number(mora) !== (liquidacion?.moraFijaSugerida || 0) || Number(cantidadCuotas) > 1) ? "#b91c1c" : "var(--ink-soft)" }}>
+                Obligatorio si se paga más de una cuota o si se modifica la mora sugerida.
+              </span>
             </div>
           </div>
 

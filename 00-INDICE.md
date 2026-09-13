@@ -16,8 +16,9 @@ Este documento registra el **avance real y completo** del sistema de la Cooperat
 
 2. **Módulo de Socios y Padrón de Aportaciones (`/socios` y `/aportaciones`):**
    - Basado en el libro oficial `caja/APORTACIONES 31-08-26.xlsx`.
-   - **Campos del asociado:** Nombres, DPI, Género (`M`/`F`), Edad (años), Dirección y Teléfono.
-   - **Datos de la persona beneficiaria:** Nombre completo, DPI y Teléfono de contacto.
+   - **Campos del asociado:** Nombres, DPI, Género (`M`/`F`), Dirección y Teléfono (el campo Edad fue eliminado globalmente a favor de utilizar la fecha de nacimiento extraída del DPI en el futuro).
+   - **Datos de la persona beneficiaria:** Nombre completo, Parentesco, DPI/CUI y Teléfono.
+   - **Reglas Globales de Unicidad:** Bloqueo cruzado estricto donde el DPI/CUI o teléfono de un asociado no puede repetirse en ningún otro asociado ni beneficiario, con auto-restricción para evitar que el asociado sea su propio beneficiario.
    - **Apertura automática de Aportaciones:** Creación de cuenta `CHAJUL-APOR-XXXX` para cada socio.
    - **Padrón de Aportaciones de Capital (`/aportaciones`):**
      - Métricas clave: Capital Social Total Aportado, Total de Asociados Inscritos, Aportación Promedio por Socio.

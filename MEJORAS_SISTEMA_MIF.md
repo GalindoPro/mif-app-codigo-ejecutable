@@ -454,3 +454,41 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
   - **Auditoría Backend:** Se agregaron verificaciones `requireRole("GERENCIA", "SUPERVISOR")` a los endpoints `/caja-auxiliar/historial` y `/caja-auxiliar/arqueos-mes`.
   - **Propósito:** Evitar que el cajero operativo tenga acceso a métricas de cuadre o faltantes/sobrantes de días anteriores, mitigando riesgos de manipulación, delegando esta revisión exclusivamente a la gerencia.
 - **Sincronización Dual:** Downloads ↔ Documents completada.
+
+## 34. Reglas Globales de Unicidad para Socios y Beneficiarios
+
+- **Objetivo:** Asegurar que los datos de DPI/CUI y teléfono sean únicos a nivel global en la plataforma, sin importar si pertenecen a un socio o a un beneficiario, para prevenir duplicidades y confusiones entre registros.
+- **Reglas Implementadas:**
+  1. Auto-restricción: Un socio no puede ser su propio beneficiario (ni compartir su DPI o teléfono consigo mismo).
+  2. Unicidad Cruzada: El DPI/CUI de un beneficiario no puede estar ya registrado como socio, y viceversa. Mismo control para el número de teléfono.
+  3. Los menores de edad como beneficiarios no exigen validación de teléfono (se permite usar el teléfono del padre o tutor como referencia opcional), pero sí exigen CUI único si se provee.
+- **Backend:**
+  - Los endpoints `GET /socios/verificar-dpi` y `GET /socios/verificar-telefono` aceptan el parámetro `tipo` (`SOCIO` o `BENEFICIARIO`) y retornan el tipo de registro duplicado (`rol`).
+  - Las transacciones de DB en `service.ts` (`registrar` y `actualizar`) realizan las validaciones asíncronas bloqueantes previas a la inserción/actualización de la base de datos.
+- **Frontend:**
+  - `SocioForm.tsx` y `SocioDetail.tsx` incluyen llamadas asíncronas en tiempo real (debounced) que muestran las alertas (`🔴 Registrado`) de validación bajo los inputs `DPI Beneficiario` y `Teléfono Beneficiario`.
+  - El botón de guardado previene la sumisión si se detecta alguna duplicidad cruzada.
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+## 35. Modificaciones a Ventanilla de Cobro de Crédito y Analítica del Supervisor
+
+- **Objetivo:** Refinar la UI de Ventanilla para los cobros y añadir gráficos interactivos al supervisor.
+- **Ventanilla de Cobro:**
+  - Se eliminaron las opciones manuales vinculadas a préstamos para obligar a usar el flujo 'Cobro Cuota'.
+  - Se incluyeron campos dinámicos para 'Número de Cuota', 'Cantidad de Cuotas', 'Saldo Anterior' y 'Saldo Actual'.
+  - El campo de justificación/observación se hizo **obligatorio** si se modifica la mora o se paga más de una cuota.
+  - Se actualizaron las firmas y queries del backend (`caja_movimientos_auxiliar`, `prestamos`) para registrar y avanzar el contador oficial de cuotas (`cuotas_pagadas`).
+- **Analítica de Dashboard (Tablero):**
+  - Se instaló la librería `recharts` para renderizar gráficos atractivos.
+  - Se añadió la opción de filtrar el volumen de servicios por 'Día' (además de semana, mes y año).
+  - Se implementó un panel visual con un **Gráfico de Pastel (Distribución de Operaciones)** y un **Gráfico de Barras (Volumen Monetario)** en la vista del Supervisor y Gerencia.
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+## 36. Unificación de la Cuota de Ingreso al Flujo de Apertura de Aportación
+
+- **Objetivo:** Eliminar la confusión entre la opción manual "Ingreso de asociado (cuota de ingreso)" del menú de Nuevo Movimiento y la operación real de registro de nuevos socios. Todo el flujo queda unificado en la ficha del socio.
+- **Cambio en el Menú Manual:** Se eliminó `INGRESO_ASOCIADO` del desplegable de "Tipo de Movimiento" en `NuevoMovimientoForm.tsx`. El cajero ya no puede registrar esta categoría de forma manual suelta.
+- **Extensión del Modal de Apertura de Aportación (SocioDetail.tsx):** Se añadió el campo **🎫 Cuota de Ingreso (Opcional)** con monto editable. Si el cajero ingresa un monto, el sistema lo registra automáticamente en `caja_movimientos_auxiliar` (categoría `INGRESO_ASOCIADO`) al confirmar la apertura. Si no hay caja abierta, el mensaje de éxito lo advierte.
+- **Backend:** Se extendió `abrirAportacionSocio` (service.ts + routes.ts) para aceptar `cuotaIngreso` y registrarlo en caja si hay turno abierto.
+- **Archivos Modificados:** `SocioDetail.tsx`, `NuevoMovimientoForm.tsx`, `socios/service.ts`, `socios/routes.ts`
+- **Sincronización Dual:** Downloads ↔ Documents completada.

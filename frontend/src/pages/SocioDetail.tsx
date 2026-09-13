@@ -3,7 +3,11 @@ import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import type { Socio, EstadoPrestamo, TipoPrestamo } from "../types";
-import { PARENTESCOS_BENEFICIARIO, formatoQ } from "../types";
+import {
+  PARENTESCOS_BENEFICIARIO,
+  PARENTESCOS_BENEFICIARIO_MENOR,
+  formatoQ,
+} from "../types";
 import {
   formatearDPI,
   formatearTelefono,
@@ -73,12 +77,12 @@ export default function SocioDetail() {
   const [mostrarModalAportacion, setMostrarModalAportacion] = useState(false);
   const [montoApor, setMontoApor] = useState("100");
   const [reciboApor, setReciboApor] = useState("");
+  const [cuotaIngresoApor, setCuotaIngresoApor] = useState("");
   const [abriendoApor, setAbriendoApor] = useState(false);
 
   const [form, setForm] = useState({
     nombres: "",
     genero: "" as "M" | "F" | "",
-    edad: "",
     dpi: "",
     direccion: "",
     telefono: "",
@@ -88,8 +92,19 @@ export default function SocioDetail() {
     telefonoBeneficiario: "",
   });
 
-  const [dpiDuplicado, setDpiDuplicado] = useState<{ nombres: string; numeroAsociado: string } | null>(null);
+  const [dpiDuplicado, setDpiDuplicado] = useState<{ nombres: string; numeroAsociado: string; rol?: string } | null>(null);
   const [verificandoDpi, setVerificandoDpi] = useState(false);
+
+  const [telefonoDuplicado, setTelefonoDuplicado] = useState<{ nombres: string; numeroAsociado: string; rol?: string } | null>(null);
+  const [verificandoTelefono, setVerificandoTelefono] = useState(false);
+
+  const [dpiDuplicadoBen, setDpiDuplicadoBen] = useState<{ nombres: string; numeroAsociado: string; rol?: string } | null>(null);
+  const [verificandoDpiBen, setVerificandoDpiBen] = useState(false);
+
+  const [telefonoDuplicadoBen, setTelefonoDuplicadoBen] = useState<{ nombres: string; numeroAsociado: string; rol?: string } | null>(null);
+  const [verificandoTelefonoBen, setVerificandoTelefonoBen] = useState(false);
+
+  const esMenorBeneficiario = form.parentescoBeneficiario && PARENTESCOS_BENEFICIARIO_MENOR.includes(form.parentescoBeneficiario as any);
 
   function cargar() {
     if (!id) return;
@@ -100,7 +115,6 @@ export default function SocioDetail() {
         setForm({
           nombres: data.nombres,
           genero: (data.genero as "M" | "F" | "") ?? "",
-          edad: data.edad ? String(data.edad) : "",
           dpi: data.dpi ? formatearDPI(data.dpi) : "",
           direccion: data.direccion ?? "",
           telefono: data.telefono ? formatearTelefono(data.telefono) : "",
@@ -130,10 +144,13 @@ export default function SocioDetail() {
           .get<{
             valido: boolean;
             disponible?: boolean;
+            registrado?: { nombres: string; numeroAsociado: string; rol?: string };
             socio?: { nombres: string; numeroAsociado: string };
           }>("/socios/verificar-dpi", { params: { dpi: rawDpi, socioId: id } })
           .then(({ data }) => {
-            if (data.disponible === false && data.socio) {
+            if (data.disponible === false && data.registrado) {
+              setDpiDuplicado(data.registrado);
+            } else if (data.disponible === false && data.socio) {
               setDpiDuplicado(data.socio);
             } else {
               setDpiDuplicado(null);
@@ -149,13 +166,152 @@ export default function SocioDetail() {
     }
   }, [form.dpi, editando, id]);
 
+  // Verificación Teléfono Socio
+  useEffect(() => {
+    if (!editando) {
+      setTelefonoDuplicado(null);
+      setVerificandoTelefono(false);
+      return;
+    }
+    const rawTel = form.telefono.replace(/\D/g, "");
+    const localTel = rawTel.startsWith("502") && rawTel.length > 8 ? rawTel.slice(3) : rawTel.slice(-8);
+    if (localTel.length === 8) {
+      setVerificandoTelefono(true);
+      const timer = setTimeout(() => {
+        api
+          .get<{
+            valido: boolean;
+            disponible?: boolean;
+            registrado?: { nombres: string; numeroAsociado: string; rol: string };
+          }>("/socios/verificar-telefono", { params: { telefono: localTel, socioId: id, tipo: "SOCIO" } })
+          .then(({ data }) => {
+            if (data.disponible === false && data.registrado) {
+              setTelefonoDuplicado(data.registrado);
+            } else {
+              setTelefonoDuplicado(null);
+            }
+          })
+          .catch(() => setTelefonoDuplicado(null))
+          .finally(() => setVerificandoTelefono(false));
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      setTelefonoDuplicado(null);
+      setVerificandoTelefono(false);
+    }
+  }, [form.telefono, editando, id]);
+
+  // Verificación DPI Beneficiario
+  useEffect(() => {
+    if (!editando || esMenorBeneficiario) {
+      setDpiDuplicadoBen(null);
+      setVerificandoDpiBen(false);
+      return;
+    }
+    const rawDpi = form.dpiBeneficiario.replace(/\D/g, "");
+    if (rawDpi.length === 13) {
+      setVerificandoDpiBen(true);
+      const timer = setTimeout(() => {
+        api
+          .get<{
+            valido: boolean;
+            disponible?: boolean;
+            registrado?: { nombres: string; numeroAsociado: string; rol: string };
+            socio?: { nombres: string; numeroAsociado: string };
+          }>("/socios/verificar-dpi", { params: { dpi: rawDpi, socioId: id, tipo: "BENEFICIARIO" } })
+          .then(({ data }) => {
+            if (data.disponible === false && data.registrado) {
+              setDpiDuplicadoBen(data.registrado);
+            } else if (data.disponible === false && data.socio) {
+              setDpiDuplicadoBen({ ...data.socio, rol: "Socio registrado" });
+            } else {
+              setDpiDuplicadoBen(null);
+            }
+          })
+          .catch(() => setDpiDuplicadoBen(null))
+          .finally(() => setVerificandoDpiBen(false));
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      setDpiDuplicadoBen(null);
+      setVerificandoDpiBen(false);
+    }
+  }, [form.dpiBeneficiario, editando, id, esMenorBeneficiario]);
+
+  // Verificación Teléfono Beneficiario
+  useEffect(() => {
+    if (!editando || esMenorBeneficiario) {
+      setTelefonoDuplicadoBen(null);
+      setVerificandoTelefonoBen(false);
+      return;
+    }
+    const rawTel = form.telefonoBeneficiario.replace(/\D/g, "");
+    const localTel = rawTel.startsWith("502") && rawTel.length > 8 ? rawTel.slice(3) : rawTel.slice(-8);
+    if (localTel.length === 8) {
+      setVerificandoTelefonoBen(true);
+      const timer = setTimeout(() => {
+        api
+          .get<{
+            valido: boolean;
+            disponible?: boolean;
+            registrado?: { nombres: string; numeroAsociado: string; rol: string };
+          }>("/socios/verificar-telefono", { params: { telefono: localTel, socioId: id, tipo: "BENEFICIARIO" } })
+          .then(({ data }) => {
+            if (data.disponible === false && data.registrado) {
+              setTelefonoDuplicadoBen(data.registrado);
+            } else {
+              setTelefonoDuplicadoBen(null);
+            }
+          })
+          .catch(() => setTelefonoDuplicadoBen(null))
+          .finally(() => setVerificandoTelefonoBen(false));
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      setTelefonoDuplicadoBen(null);
+      setVerificandoTelefonoBen(false);
+    }
+  }, [form.telefonoBeneficiario, editando, id, esMenorBeneficiario]);
+
   async function guardar(e: FormEvent) {
     e.preventDefault();
     if (!id) return;
     if (dpiDuplicado) {
       setError(
-        `El DPI ya está registrado para el socio ${dpiDuplicado.nombres} (${dpiDuplicado.numeroAsociado}). Modifícalo antes de guardar.`
+        `El DPI ya está registrado (${dpiDuplicado.rol || "Socio"}: ${dpiDuplicado.nombres}, Asociado: ${dpiDuplicado.numeroAsociado}). Modifícalo antes de guardar.`
       );
+      return;
+    }
+    if (telefonoDuplicado) {
+      setError(
+        `El teléfono ya está registrado (${telefonoDuplicado.rol || "Socio"}: ${telefonoDuplicado.nombres}, Asociado: ${telefonoDuplicado.numeroAsociado}). Modifícalo antes de guardar.`
+      );
+      return;
+    }
+    if (!esMenorBeneficiario && dpiDuplicadoBen) {
+      setError(
+        `El DPI/CUI del beneficiario ya pertenece a un registro (${dpiDuplicadoBen.rol || "Socio"}: ${dpiDuplicadoBen.nombres}, Asociado: ${dpiDuplicadoBen.numeroAsociado}). Modifícalo antes de guardar.`
+      );
+      return;
+    }
+    if (!esMenorBeneficiario && telefonoDuplicadoBen) {
+      setError(
+        `El teléfono del beneficiario ya pertenece a un registro (${telefonoDuplicadoBen.rol || "Socio"}: ${telefonoDuplicadoBen.nombres}, Asociado: ${telefonoDuplicadoBen.numeroAsociado}). Modifícalo antes de guardar.`
+      );
+      return;
+    }
+
+    const cleanDpi = form.dpi ? form.dpi.replace(/\D/g, "") : "";
+    const cleanDpiBen = form.dpiBeneficiario ? form.dpiBeneficiario.replace(/\D/g, "") : "";
+    if (cleanDpi && cleanDpiBen && cleanDpi === cleanDpiBen) {
+      setError("El DPI del socio y el DPI/CUI del beneficiario no pueden ser iguales.");
+      return;
+    }
+
+    const cleanTel = form.telefono ? form.telefono.replace(/\D/g, "") : "";
+    const cleanTelBen = form.telefonoBeneficiario ? form.telefonoBeneficiario.replace(/\D/g, "") : "";
+    if (cleanTel && cleanTelBen && cleanTel === cleanTelBen) {
+      setError("El teléfono del socio y el teléfono del beneficiario no pueden ser iguales.");
       return;
     }
     setGuardando(true);
@@ -164,7 +320,6 @@ export default function SocioDetail() {
       await api.patch(`/socios/${id}`, {
         nombres: form.nombres,
         genero: form.genero || undefined,
-        edad: form.edad ? Number(form.edad) : null,
         dpi: form.dpi ? form.dpi.trim() : undefined,
         direccion: form.direccion || undefined,
         telefono: prepararTelefonoParaGuardar(form.telefono),
@@ -202,15 +357,26 @@ export default function SocioDetail() {
       setError("La aportación estatutaria mínima es de Q 100.00.");
       return;
     }
+    const cuotaIngreso = cuotaIngresoApor.trim() ? Number(cuotaIngresoApor) : undefined;
+    if (cuotaIngreso !== undefined && (isNaN(cuotaIngreso) || cuotaIngreso < 0)) {
+      setError("La cuota de ingreso debe ser mayor a 0.");
+      return;
+    }
     setAbriendoApor(true);
     setError(null);
     try {
       const { data } = await api.post(`/socios/${id}/abrir-aportacion`, {
         monto,
         recibo: reciboApor.trim() || undefined,
+        cuotaIngreso: cuotaIngreso,
       });
       setMostrarModalAportacion(false);
-      setMensajeExito(`¡Cuenta de Aportación ${data.numero_cuenta} creada con éxito con saldo de ${formatoQ(monto)}! El socio ya puede aperturar cuentas de ahorro y créditos.`);
+      setCuotaIngresoApor("");
+      setReciboApor("");
+      const msgCuota = data.cuotaIngresoRegistrada
+        ? ` La cuota de ingreso de Q ${cuotaIngreso?.toFixed(2)} fue registrada en la caja del día.`
+        : cuotaIngreso && cuotaIngreso > 0 ? " (No hay caja abierta hoy: la cuota de ingreso no pudo registrarse en caja)" : "";
+      setMensajeExito(`¡Cuenta de Aportación ${data.numero_cuenta} creada con éxito con saldo de ${formatoQ(monto)}!${msgCuota} El socio ya puede aperturar cuentas de ahorro y créditos.`);
       setTimeout(() => setMensajeExito(null), 6000);
       cargar();
     } catch (err) {
@@ -424,7 +590,7 @@ export default function SocioDetail() {
                   {verificandoDpi && <span className="hint">🔍 Verificando disponibilidad...</span>}
                   {dpiDuplicado && (
                     <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
-                      ⚠️ Ya registrado para: {dpiDuplicado.nombres} ({dpiDuplicado.numeroAsociado})
+                      🔴 Registrado ({dpiDuplicado.rol || "Socio"}: {dpiDuplicado.nombres})
                     </span>
                   )}
                   {!verificandoDpi && !dpiDuplicado && form.dpi.replace(/\D/g, "").length === 13 && (
@@ -433,19 +599,6 @@ export default function SocioDetail() {
                     </span>
                   )}
                 </div>
-              </div>
-              <div className="field">
-                <label htmlFor="edit-edad">Edad (años)</label>
-                <input
-                  id="edit-edad"
-                  type="number"
-                  min="1"
-                  max="120"
-                  value={form.edad}
-                  onChange={(e) => setForm({ ...form, edad: e.target.value })}
-                  placeholder="Ej. 35"
-                />
-                <span className="hint">Ingreso manual (buena práctica en campo)</span>
               </div>
               <div className="field">
                 <label htmlFor="edit-telefono">Teléfono (WhatsApp)</label>
@@ -482,6 +635,19 @@ export default function SocioDetail() {
                       letterSpacing: "0.5px",
                     }}
                   />
+                </div>
+                <div style={{ minHeight: "1.1rem", marginTop: "0.15rem" }}>
+                  {verificandoTelefono && <span className="hint">🔍 Verificando teléfono...</span>}
+                  {telefonoDuplicado && (
+                    <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                      🔴 Registrado ({telefonoDuplicado.rol || "Socio"}: {telefonoDuplicado.nombres})
+                    </span>
+                  )}
+                  {!verificandoTelefono && !telefonoDuplicado && form.telefono.replace(/\D/g, "").length === 8 && (
+                    <span style={{ color: "#10b981", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                      ✓ Teléfono válido
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="field">
@@ -524,7 +690,21 @@ export default function SocioDetail() {
                   onChange={(e) => setForm({ ...form, dpiBeneficiario: formatearDPI(e.target.value) })}
                   maxLength={15}
                   placeholder="xxxx-xxxxx-xxxx"
+                  style={{ borderColor: dpiDuplicadoBen && !esMenorBeneficiario ? "var(--danger)" : undefined }}
                 />
+                <div style={{ minHeight: "1.1rem", marginTop: "0.15rem" }}>
+                  {verificandoDpiBen && !esMenorBeneficiario && <span className="hint">🔍 Verificando...</span>}
+                  {dpiDuplicadoBen && !esMenorBeneficiario && (
+                    <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                      🔴 Registrado ({dpiDuplicadoBen.rol || "Socio"}: {dpiDuplicadoBen.nombres})
+                    </span>
+                  )}
+                  {!verificandoDpiBen && !dpiDuplicadoBen && !esMenorBeneficiario && form.dpiBeneficiario.replace(/\D/g, "").length === 13 && (
+                    <span style={{ color: "#10b981", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                      ✓ DPI válido
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="field">
                 <label htmlFor="edit-tel-ben">Teléfono Beneficiario</label>
@@ -562,6 +742,19 @@ export default function SocioDetail() {
                     }}
                   />
                 </div>
+                <div style={{ minHeight: "1.1rem", marginTop: "0.15rem" }}>
+                  {verificandoTelefonoBen && !esMenorBeneficiario && <span className="hint">🔍 Verificando...</span>}
+                  {telefonoDuplicadoBen && !esMenorBeneficiario && (
+                    <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                      🔴 Registrado ({telefonoDuplicadoBen.rol || "Socio"}: {telefonoDuplicadoBen.nombres})
+                    </span>
+                  )}
+                  {!verificandoTelefonoBen && !telefonoDuplicadoBen && !esMenorBeneficiario && form.telefonoBeneficiario.replace(/\D/g, "").length === 8 && (
+                    <span style={{ color: "#10b981", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                      ✓ Teléfono válido
+                    </span>
+                  )}
+                </div>
               </div>
               <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
                 <button type="submit" className="btn" disabled={guardando}>
@@ -578,8 +771,6 @@ export default function SocioDetail() {
               <dd className="mono" style={{ margin: 0 }}>{new Date(socio.fecha_ingreso).toLocaleDateString("es-GT")}</dd>
               <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Género</dt>
               <dd style={{ margin: 0 }}>{socio.genero === "F" ? "Femenino" : socio.genero === "M" ? "Masculino" : "—"}</dd>
-              <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Edad</dt>
-              <dd className="mono" style={{ margin: 0 }}>{socio.edad ? `${socio.edad} años` : "—"}</dd>
               <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>DPI</dt>
               <dd className="mono" style={{ margin: 0 }}>{socio.dpi ? formatearDPI(socio.dpi) : "—"}</dd>
               <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Teléfono</dt>
@@ -803,6 +994,40 @@ export default function SocioDetail() {
                   onChange={(e) => setReciboApor(e.target.value)}
                   placeholder="Ej. REC-009842"
                 />
+              </div>
+
+              {/* CUOTA DE INGRESO */}
+              <div
+                style={{
+                  background: "rgba(191, 153, 3, 0.07)",
+                  border: "1px solid rgba(191, 153, 3, 0.3)",
+                  borderRadius: "8px",
+                  padding: "0.85rem",
+                  marginTop: "0.25rem",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginBottom: "0.5rem" }}>
+                  <span style={{ fontSize: "1rem" }}>🎫</span>
+                  <strong style={{ fontSize: "0.88rem", color: "var(--ink)" }}>Cuota de Ingreso (Opcional)</strong>
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label htmlFor="modal-cuota-ingreso" style={{ fontSize: "0.82rem" }}>
+                    Monto de la cuota de membresía (Q)
+                  </label>
+                  <input
+                    id="modal-cuota-ingreso"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={cuotaIngresoApor}
+                    onChange={(e) => setCuotaIngresoApor(e.target.value)}
+                    placeholder="Ej. 25.00 ó 50.00"
+                    style={{ fontSize: "1rem", fontWeight: 600 }}
+                  />
+                  <span className="hint" style={{ color: "var(--ink-soft)" }}>
+                    Pago único por inscripción al ingresar como socio. Se registrará automáticamente en la caja del día si hay turno abierto.
+                  </span>
+                </div>
               </div>
 
               <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1.25rem" }}>

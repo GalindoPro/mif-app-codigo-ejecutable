@@ -33,7 +33,7 @@ cajaAuxiliarRouter.get(
   "/analitica-servicios",
   asyncHandler(async (req, res) => {
     const agenciaId = (req.query.agenciaId as string) || req.user?.agenciaId || undefined;
-    const periodo = (req.query.periodo as "semana" | "mes" | "anio") || "mes";
+    const periodo = (req.query.periodo as "dia" | "semana" | "mes" | "anio") || "mes";
     res.json(await service.analiticaServicios(agenciaId, agenciaVisible(req), periodo));
   }),
 );
@@ -153,6 +153,11 @@ const cobroCreditoSchema = z.object({
   origenFondos: z.enum(["FONDOS_PROPIOS", "FEDERURAL", "CHN_GUATEMALA"]).optional(),
   docNo: z.string().optional(),
   cuentaDebitoId: z.string().uuid().optional(),
+  saldoAnteriorReportado: z.number().optional(),
+  saldoActualReportado: z.number().optional(),
+  numeroCuota: z.number().optional(),
+  cantidadCuotas: z.number().min(1).optional(),
+  descripcion: z.string().optional(),
 });
 
 cajaAuxiliarRouter.post(

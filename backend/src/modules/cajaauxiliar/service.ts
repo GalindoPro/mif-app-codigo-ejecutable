@@ -639,13 +639,15 @@ export async function cobrarCuotaCredito(
     const ref = `${prestamo.codigo}-CUOTA`;
     const detalleDebito = infoCuentaDebito ? ` (Cobrado con débito de cuenta ${infoCuentaDebito.numero_cuenta})` : "";
     const detalleAsp = ahorroSobrePrestamo > 0 ? `, Ahorro: Q${ahorroSobrePrestamo.toFixed(2)}` : "";
-    const descripcion = `Cobro cuota crédito ${prestamo.codigo} (Cap: Q${abonoCapital.toFixed(2)}, Int: Q${interes.toFixed(2)}${detalleAsp}${mora > 0 ? `, Mora: Q${mora.toFixed(2)}` : ""})${detalleDebito}`;
+    const baseDescripcion = `Cobro cuota crédito ${prestamo.codigo} (Cap: Q${abonoCapital.toFixed(2)}, Int: Q${interes.toFixed(2)}${detalleAsp}${mora > 0 ? `, Mora: Q${mora.toFixed(2)}` : ""})${detalleDebito}`;
+    const descripcion = data.descripcion ? `${baseDescripcion} - Obs: ${data.descripcion}` : baseDescripcion;
 
     const { rows: cajaMovRows } = await client.query(
       `insert into caja_movimientos_auxiliar (
          caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador,
-         referencia, socio_id, beneficiario, descripcion, doc_no, monto, saldo_acumulado, origen_fondos, usuario_id
-       ) values ($1, $2, $3, 'PROPIO', $4, 'INGRESO', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         referencia, socio_id, beneficiario, descripcion, doc_no, monto, saldo_acumulado, origen_fondos, usuario_id,
+         saldo_anterior_reportado, saldo_actual_reportado, numero_cuota
+       ) values ($1, $2, $3, 'PROPIO', $4, 'INGRESO', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        returning *`,
       [
         diaId,
@@ -662,6 +664,9 @@ export async function cobrarCuotaCredito(
         saldoAcumulado,
         origenFondosFinal,
         usuarioId,
+        data.saldoAnteriorReportado ?? null,
+        data.saldoActualReportado ?? null,
+        data.numeroCuota ?? null,
       ],
     );
     const cajaMov = cajaMovRows[0];
@@ -683,13 +688,17 @@ export async function cobrarCuotaCredito(
     }
 
     // 6. Actualizar préstamo (reducir saldo_capital y si llega a 0 cambiar a CANCELADO)
+    const cuotasIncremento = data.cantidadCuotas || 1;
+    const cuotaFinal = data.numeroCuota ? (data.numeroCuota + cuotasIncremento - 1) : (prestamo.cuotas_pagadas + cuotasIncremento);
+
     await client.query(
       `update prestamos
        set saldo_capital = $1,
            estado = $2,
+           cuotas_pagadas = $3,
            updated_at = now()
-       where id = $3`,
-      [nuevoSaldoCapital, nuevoEstadoPrestamo, prestamo.id],
+       where id = $4`,
+      [nuevoSaldoCapital, nuevoEstadoPrestamo, cuotaFinal, prestamo.id],
     );
 
     // 7. Registrar en prestamo_pagos
@@ -1160,7 +1169,7 @@ export async function liquidarPlazoFijo(
 export async function analiticaServicios(
   agenciaId: string | null | undefined,
   agenciaVisible: string | null,
-  periodo: "semana" | "mes" | "anio" = "mes",
+  periodo: "dia" | "semana" | "mes" | "anio" = "mes",
 ) {
   let filtroAgenciaAux = "";
   let filtroAgenciaCuentas = "";
@@ -1178,7 +1187,9 @@ export async function analiticaServicios(
   }
 
   let fechaInicioSql = "current_date - interval '30 days'";
-  if (periodo === "semana") {
+  if (periodo === "dia") {
+    fechaInicioSql = "current_date";
+  } else if (periodo === "semana") {
     fechaInicioSql = "current_date - interval '7 days'";
   } else if (periodo === "anio") {
     fechaInicioSql = "date_trunc('year', current_date)";
