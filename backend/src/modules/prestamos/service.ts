@@ -72,7 +72,11 @@ export async function listar(params: {
     select p.*,
            s.nombres as socio_nombres, s.numero_asociado, s.dpi as socio_dpi, s.telefono as socio_telefono,
            a.nombre as agencia_nombre, a.codigo as agencia_codigo,
-           u.nombre as promotor_nombre
+           u.nombre as promotor_nombre,
+           exists(
+             select 1 from cobros_campo cc
+             where cc.prestamo_id = p.id and cc.estado = 'PENDIENTE'
+           ) as tiene_cobro_campo_pendiente
     from prestamos p
     join socios s on s.id = p.socio_id
     join agencias a on a.id = p.agencia_id
@@ -90,7 +94,11 @@ export async function obtener(id: string, agenciaVisible: string | null) {
     select p.*,
            s.nombres as socio_nombres, s.numero_asociado, s.dpi as socio_dpi, s.telefono as socio_telefono, s.direccion as socio_direccion,
            a.nombre as agencia_nombre, a.codigo as agencia_codigo,
-           u.nombre as promotor_nombre, u.email as promotor_email
+           u.nombre as promotor_nombre, u.email as promotor_email,
+           exists(
+             select 1 from cobros_campo cc
+             where cc.prestamo_id = p.id and cc.estado = 'PENDIENTE'
+           ) as tiene_cobro_campo_pendiente
     from prestamos p
     join socios s on s.id = p.socio_id
     join agencias a on a.id = p.agencia_id
@@ -436,7 +444,11 @@ export async function obtenerKardexCartera(filtros: FiltrosKardexCartera) {
             s.nombres as socio_nombres, s.numero_asociado, s.telefono as socio_telefono,
             s.dpi as socio_dpi, s.direccion as socio_direccion,
             a.nombre as agencia_nombre, a.codigo as agencia_codigo,
-            u.nombre as promotor_nombre, u.email as promotor_email
+            u.nombre as promotor_nombre, u.email as promotor_email,
+            exists(
+              select 1 from cobros_campo cc
+              where cc.prestamo_id = p.id and cc.estado = 'PENDIENTE'
+            ) as tiene_cobro_campo_pendiente
      from prestamos p
      join socios s on s.id = p.socio_id
      join agencias a on a.id = p.agencia_id

@@ -581,6 +581,7 @@ export interface Prestamo {
   numero_credito_anterior?: string | null;
   created_at: string;
   amortizacion?: ResultadoSimulacion;
+  tiene_cobro_campo_pendiente?: boolean;
 }
 
 export interface FiadorItem {

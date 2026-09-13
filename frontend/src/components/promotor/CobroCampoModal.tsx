@@ -41,13 +41,18 @@ export function CobroCampoModal({ prestamoId, socioId, socioNombres, onClose, on
       const { data: prestamoData } = await api.get<Prestamo>(`/prestamos/${prestamoId}`);
       setPrestamo(prestamoData);
       
-      const { data: liquidacionData } = await api.get<ResultadoLiquidacion>(`/prestamos/${prestamoId}/liquidacion`);
-      setLiquidacion(liquidacionData);
+      const { data } = await api.get<{ prestamo: Prestamo; liquidacion: ResultadoLiquidacion }>(`/prestamos/${prestamoId}/liquidacion`);
+      setLiquidacion(data.liquidacion);
 
       if (!esEdicion) {
-        setAbonoCapital(String(liquidacionData.cuotaCapitalSugerida || 0));
-        setInteres(String(liquidacionData.interesDevengado || 0));
-        setMora(String(liquidacionData.moraFijaSugerida || 0));
+        const capSugerido = data.liquidacion.cuotaCapitalBase || data.liquidacion.cuotaCapitalSugerida;
+        const intSugerido = data.liquidacion.estaEnMora || data.liquidacion.cuotasVencidas > 0
+          ? data.liquidacion.interesDevengado
+          : (data.liquidacion.interesMesCompleto || data.liquidacion.interesDevengado);
+        
+        setAbonoCapital(String(capSugerido));
+        setInteres(String(intSugerido));
+        setMora(String(data.liquidacion.moraFijaSugerida));
       }
     } catch (err) {
       setError("No se pudo cargar la información del crédito.");
@@ -58,9 +63,14 @@ export function CobroCampoModal({ prestamoId, socioId, socioNombres, onClose, on
 
   function handleRestablecer() {
     if (liquidacion && !esEdicion) {
-      setAbonoCapital(String(liquidacion.cuotaCapitalSugerida || 0));
-      setInteres(String(liquidacion.interesDevengado || 0));
-      setMora(String(liquidacion.moraFijaSugerida || 0));
+      const capSugerido = liquidacion.cuotaCapitalBase || liquidacion.cuotaCapitalSugerida;
+      const intSugerido = liquidacion.estaEnMora || liquidacion.cuotasVencidas > 0
+        ? liquidacion.interesDevengado
+        : (liquidacion.interesMesCompleto || liquidacion.interesDevengado);
+        
+      setAbonoCapital(String(capSugerido));
+      setInteres(String(intSugerido));
+      setMora(String(liquidacion.moraFijaSugerida));
     }
   }
 

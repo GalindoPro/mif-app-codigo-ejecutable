@@ -219,9 +219,6 @@ export default function Layout() {
             <NavItem to="/promotor/cartera"  icon="📂" label="Kardex Cartera"       onClick={closeSidebar} />
             <NavItem to="/socios"            icon="👥" label="Socios en Campo"      onClick={closeSidebar} />
             <NavItem to="/creditos"          icon="📄" label="Créditos y Simulador" onClick={closeSidebar} />
-            <Section label="Captaciones" />
-            <NavItem to="/ahorros/corriente"  icon="💰" label="Cuentas de Ahorro"       onClick={closeSidebar} />
-            <NavItem to="/ahorros/plazo-fijo" icon="📈" label="Inversiones Plazo Fijo"  onClick={closeSidebar} />
           </>)}
 
           {/* ── SUPERVISOR ── */}

@@ -1528,3 +1528,16 @@ td a {
   }
 }
 
+
+/* Estilos para créditos con cobro pendiente de aprobación */
+.row-cobrado {
+  background-color: var(--paper-soft) !important;
+  opacity: 0.8;
+}
+.row-cobrado td {
+  color: var(--ink-soft) !important;
+}
+.row-cobrado .strikethrough-text {
+  text-decoration: line-through;
+}
+

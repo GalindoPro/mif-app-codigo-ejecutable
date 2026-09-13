@@ -350,7 +350,7 @@ export default function CreditosList() {
                 {prestamosPaginados.map((p) => {
                   const estaProcesando = procesandoId === p.id;
                   return (
-                    <tr key={p.id}>
+                    <tr key={p.id} className={(cobrosPendientes.find(c => c.prestamo_id === p.id) || p.tiene_cobro_campo_pendiente) ? "row-cobrado" : ""}>
                       <td className="mono" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
                         <Link to={`/creditos/${p.id}`}>{p.codigo}</Link>
                         {p.numero_credito_anterior && (
@@ -369,6 +369,7 @@ export default function CreditosList() {
                       <td>
                         <Link
                           to={`/creditos/${p.id}`}
+                          className={(cobrosPendientes.find(c => c.prestamo_id === p.id) || p.tiene_cobro_campo_pendiente) ? "strikethrough-text" : ""}
                           style={{ color: "inherit", textDecoration: "none", fontWeight: 600 }}
                         >
                           {p.socio_nombres}
@@ -394,11 +395,15 @@ export default function CreditosList() {
                         </div>
                       </td>
                       <td className="mono" style={{ textAlign: "right", fontWeight: 700 }}>
-                        {formatoQ(p.monto_aprobado ?? p.monto_solicitado)}
+                        <span className={(cobrosPendientes.find(c => c.prestamo_id === p.id) || p.tiene_cobro_campo_pendiente) ? "strikethrough-text" : ""}>
+                          {formatoQ(p.monto_aprobado ?? p.monto_solicitado)}
+                        </span>
                       </td>
                       <td className="mono">{p.plazo_meses}m</td>
                       <td className="mono" style={{ textAlign: "right", color: "var(--accent)" }}>
-                        {formatoQ(p.cuota_mensual)}
+                        <span className={(cobrosPendientes.find(c => c.prestamo_id === p.id) || p.tiene_cobro_campo_pendiente) ? "strikethrough-text" : ""}>
+                          {formatoQ(p.cuota_mensual)}
+                        </span>
                       </td>
                       <td style={{ fontSize: "0.78rem" }}>
                         {p.promotor_nombre ?? <span style={{ color: "var(--ink-soft)" }}>—</span>}
@@ -492,16 +497,16 @@ export default function CreditosList() {
                             <>
                               {usuario?.rol === "PROMOTOR" ? (
                                 (() => {
-                                  const cobroPendiente = cobrosPendientes.find(c => c.prestamo_id === p.id);
+                                  const cobroPendiente = cobrosPendientes.find(c => c.prestamo_id === p.id) || p.tiene_cobro_campo_pendiente;
                                   if (cobroPendiente) {
                                     return (
                                       <button
                                         type="button"
                                         className="btn secondary"
                                         style={{ fontSize: "0.72rem", padding: "0.18rem 0.45rem", borderColor: "#f59e0b", color: "#d97706" }}
-                                        onClick={() => setModalCobroPrestamo({ id: p.id, socioId: p.socio_id, socioNombres: p.socio_nombres || "Socio Desconocido", cobroExistente: cobroPendiente })}
+                                        disabled
                                       >
-                                        ✏️ Editar Cobro
+                                        ✓ Cobrado hoy
                                       </button>
                                     );
                                   } else {

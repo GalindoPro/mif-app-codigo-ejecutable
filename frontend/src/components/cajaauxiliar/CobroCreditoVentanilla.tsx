@@ -262,6 +262,13 @@ export default function CobroCreditoVentanilla({
 
       {prestamo && (
         <>
+          {prestamo.tiene_cobro_campo_pendiente && (
+            <div className="alert warning" style={{ marginTop: "1rem", marginBottom: "1rem" }}>
+              ⚠️ Este crédito ya tiene un pago de campo registrado hoy que está pendiente de ser liquidado/aprobado. No se puede realizar un cobro por ventanilla hasta que el cobro de campo se apruebe o rechace.
+            </div>
+          )}
+          {!prestamo.tiene_cobro_campo_pendiente && (
+            <>
           {prestamo.numero_credito_anterior && (
             <div
               style={{
@@ -724,6 +731,8 @@ export default function CobroCreditoVentanilla({
                 : `💵 Registrar Cobro de ${formatoQ(totalCobro)} en Caja`}
             </button>
           </div>
+            </>
+          )}
         </>
       )}
     </form>
