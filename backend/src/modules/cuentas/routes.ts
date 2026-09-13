@@ -58,16 +58,30 @@ cuentasRouter.get(
   }),
 );
 
-const crearSchema = z.object({
-  tipo: tipoSchema,
-  agenciaId: z.string().uuid(),
-  socioId: z.string().uuid(),
-  numeroCuenta: z.string().min(1),
-  saldoInicial: z.number().nonnegative().optional(),
-  cuotaPactada: z.number().positive().optional().nullable(),
-  observacionesApertura: z.string().optional().nullable(),
-  prestamoId: z.string().uuid().optional().nullable(),
-});
+const crearSchema = z
+  .object({
+    tipo: tipoSchema,
+    agenciaId: z.string().uuid(),
+    socioId: z.string().uuid(),
+    numeroCuenta: z.string().min(1),
+    saldoInicial: z.number().nonnegative().optional(),
+    cuotaPactada: z.number().positive().optional().nullable(),
+    observacionesApertura: z.string().optional().nullable(),
+    prestamoId: z.string().uuid().optional().nullable(),
+    titularMenorNombre: z.string().optional().nullable(),
+    titularMenorParentesco: z.string().optional().nullable(),
+    titularMenorCui: z.string().optional().nullable(),
+    titularMenorFechaNacimiento: z.string().optional().nullable(),
+  })
+  .refine(
+    (data) =>
+      data.tipo !== "AHORRO_INFANTO_JUVENIL" ||
+      (!!data.titularMenorNombre?.trim() && !!data.titularMenorParentesco?.trim()),
+    {
+      message: "Para Ahorro Infanto Juvenil debes indicar el nombre del menor y su parentesco con el socio responsable.",
+      path: ["titularMenorNombre"],
+    },
+  );
 
 cuentasRouter.post(
   "/",

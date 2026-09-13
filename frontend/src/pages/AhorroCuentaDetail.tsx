@@ -58,7 +58,11 @@ export default function AhorroCuentaDetail() {
     <div>
       <div className="page-head">
         <div>
-          <button className="link-btn" onClick={() => navigate(`/ahorros/${config.slug}`)} style={{ marginBottom: "0.5rem" }}>
+          <button
+            className="link-btn"
+            onClick={() => navigate(config.tipo === "APORTACION" ? "/aportaciones" : `/ahorros/${config.slug}`)}
+            style={{ marginBottom: "0.5rem" }}
+          >
             ← Volver a {config.titulo}
           </button>
           <h1>{cuenta.socio_nombres}</h1>
@@ -71,6 +75,35 @@ export default function AhorroCuentaDetail() {
           <span className="value">{formatoQ(cuenta.saldo_actual)}</span>
         </div>
       </div>
+
+      {cuenta.tipo === "AHORRO_INFANTO_JUVENIL" && (
+        <div
+          style={{
+            background: "rgba(14, 165, 233, 0.08)",
+            border: "1px solid rgba(14, 165, 233, 0.3)",
+            borderRadius: "8px",
+            padding: "0.85rem 1rem",
+            marginBottom: "1.25rem",
+            color: "#075985",
+          }}
+        >
+          <div style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span>🧒</span> Menor titular de la cuenta
+          </div>
+          {cuenta.titular_menor_nombre ? (
+            <p style={{ fontSize: "0.84rem", margin: "0.35rem 0 0", lineHeight: 1.4 }}>
+              <strong>{cuenta.titular_menor_nombre}</strong>
+              {cuenta.titular_menor_parentesco ? ` · ${cuenta.titular_menor_parentesco} de ${cuenta.socio_nombres}` : ""}
+              {cuenta.titular_menor_fecha_nacimiento ? ` · Nacimiento: ${new Date(cuenta.titular_menor_fecha_nacimiento).toLocaleDateString("es-GT")}` : ""}
+              {cuenta.titular_menor_cui ? ` · CUI: ${cuenta.titular_menor_cui}` : ""}
+            </p>
+          ) : (
+            <p style={{ fontSize: "0.84rem", margin: "0.35rem 0 0", lineHeight: 1.4 }}>
+              Esta cuenta no tiene registrados los datos del menor. {cuenta.socio_nombres} figura solo como responsable/tutor.
+            </p>
+          )}
+        </div>
+      )}
 
       {cuenta.tipo === "AHORRO_SOBRE_PRESTAMO" && (
         <div

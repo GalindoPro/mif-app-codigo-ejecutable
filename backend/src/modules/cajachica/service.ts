@@ -108,6 +108,33 @@ export async function crear(data: DatosComprobante, usuarioId: string) {
   return comprobante;
 }
 
+const DOC_PLACEHOLDER = "DTE";
+
+export async function obtenerUltimoDocumento(agenciaId: string, fecha: string) {
+  const { rows } = await pool.query(
+    `select numero_documento from caja_chica_comprobantes
+     where agencia_id = $1 and fecha = $2
+       and numero_documento is not null and trim(numero_documento) <> ''
+       and upper(trim(numero_documento)) <> $3
+     order by created_at desc limit 1`,
+    [agenciaId, fecha, DOC_PLACEHOLDER],
+  );
+  return { ultimoNumeroDocumento: rows[0]?.numero_documento ?? null };
+}
+
+export async function verificarNumeroDocumentoExiste(agenciaId: string, fecha: string, numeroDocumento: string) {
+  const doc = numeroDocumento.trim();
+  if (!doc || doc.toUpperCase() === DOC_PLACEHOLDER) return { existe: false };
+
+  const { rows } = await pool.query(
+    `select id from caja_chica_comprobantes
+     where agencia_id = $1 and fecha = $2 and lower(trim(numero_documento)) = lower($3)
+     limit 1`,
+    [agenciaId, fecha, doc],
+  );
+  return { existe: rows.length > 0 };
+}
+
 export interface DatosReposicionCajaChica {
   agenciaId: string;
   monto: number;

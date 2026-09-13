@@ -3,9 +3,11 @@ import type { FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { TIPOS_AHORRO } from "../types";
+import { TIPOS_AHORRO, PARENTESCOS_BENEFICIARIO_MENOR } from "../types";
 import type { Agencia, Socio, Prestamo } from "../types";
+import { formatearDPI } from "../lib/formatters";
 import BuscadorSocio from "../components/BuscadorSocio";
+import InputNombreAutoCompletar from "../components/InputNombreAutoCompletar";
 
 export default function AhorroCuentaForm() {
   const { slug } = useParams<{ slug: string }>();
@@ -28,8 +30,14 @@ export default function AhorroCuentaForm() {
   const [prestamosSocio, setPrestamosSocio] = useState<Prestamo[]>([]);
   const [prestamoSeleccionadoId, setPrestamoSeleccionadoId] = useState<string>("");
 
+  const [titularMenorNombre, setTitularMenorNombre] = useState("");
+  const [titularMenorParentesco, setTitularMenorParentesco] = useState("Hijo(a)");
+  const [titularMenorCui, setTitularMenorCui] = useState("");
+  const [titularMenorFechaNacimiento, setTitularMenorFechaNacimiento] = useState("");
+
   const esProgramadoOInfanto =
     config?.tipo === "AHORRO_PROGRAMADO" || config?.tipo === "AHORRO_INFANTO_JUVENIL";
+  const esInfanto = config?.tipo === "AHORRO_INFANTO_JUVENIL";
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -123,6 +131,14 @@ export default function AhorroCuentaForm() {
       );
       return;
     }
+    if (esInfanto && !titularMenorNombre.trim()) {
+      setError("Indica el nombre completo del menor titular de la cuenta.");
+      return;
+    }
+    if (esInfanto && !titularMenorParentesco.trim()) {
+      setError("Indica el parentesco del menor con el socio responsable.");
+      return;
+    }
     setError(null);
     setGuardando(true);
     try {
@@ -134,6 +150,10 @@ export default function AhorroCuentaForm() {
         saldoInicial: Number(saldoInicial) || 0,
         cuotaPactada: cuotaPactada ? Number(cuotaPactada) : undefined,
         prestamoId: prestamoSeleccionadoId || undefined,
+        titularMenorNombre: esInfanto ? titularMenorNombre.trim() : undefined,
+        titularMenorParentesco: esInfanto ? titularMenorParentesco.trim() : undefined,
+        titularMenorCui: esInfanto ? titularMenorCui.replace(/[^0-9-]/g, "") || undefined : undefined,
+        titularMenorFechaNacimiento: esInfanto ? titularMenorFechaNacimiento || undefined : undefined,
       });
       navigate(`/ahorros/${config!.slug}/${data.id}`);
     } catch (err) {
@@ -270,6 +290,76 @@ export default function AhorroCuentaForm() {
           )}
         </div>
 
+        {esInfanto && (
+          <div
+            style={{
+              background: "rgba(14, 165, 233, 0.08)",
+              border: "1px solid rgba(14, 165, 233, 0.3)",
+              borderRadius: "8px",
+              padding: "0.85rem 1rem",
+              marginBottom: "1rem",
+            }}
+          >
+            <div style={{ fontWeight: 700, color: "#0284c7", marginBottom: "0.6rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <span>🧒</span> Datos del menor titular de la cuenta
+            </div>
+            <p style={{ fontSize: "0.82rem", color: "var(--ink-soft)", margin: "0 0 0.75rem" }}>
+              {socio ? <strong>{socio.nombres}</strong> : "El socio"} figura como responsable/tutor de la cuenta, pero el ahorro pertenece al menor. Indica sus datos.
+            </p>
+
+            <div className="field" style={{ marginBottom: "0.6rem" }}>
+              <label htmlFor="menor-nombre">Nombre completo del menor</label>
+              <InputNombreAutoCompletar
+                id="menor-nombre"
+                value={titularMenorNombre}
+                onChange={setTitularMenorNombre}
+                placeholder="Ej. Juanito Tomás Sánchez Pérez"
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <div className="field" style={{ marginBottom: "0.6rem" }}>
+                <label htmlFor="menor-parentesco">Parentesco con el socio responsable</label>
+                <select
+                  id="menor-parentesco"
+                  value={titularMenorParentesco}
+                  onChange={(e) => setTitularMenorParentesco(e.target.value)}
+                >
+                  <option value="">Selecciona el parentesco…</option>
+                  {PARENTESCOS_BENEFICIARIO_MENOR.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field" style={{ marginBottom: "0.6rem" }}>
+                <label htmlFor="menor-fecha-nac">Fecha de nacimiento (opcional)</label>
+                <input
+                  id="menor-fecha-nac"
+                  type="date"
+                  value={titularMenorFechaNacimiento}
+                  onChange={(e) => setTitularMenorFechaNacimiento(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor="menor-cui">CUI del menor (RENAP) — opcional</label>
+              <input
+                id="menor-cui"
+                inputMode="numeric"
+                value={titularMenorCui}
+                onChange={(e) => setTitularMenorCui(formatearDPI(e.target.value.replace(/[^0-9-]/g, "")))}
+                maxLength={15}
+                placeholder="xxxx-xxxxx-xxxx (CUI de partida)"
+                style={{ fontFamily: "monospace", letterSpacing: "0.5px" }}
+              />
+              <span className="hint">Si aún no tiene CUI emitido, puedes dejarlo en blanco.</span>
+            </div>
+          </div>
+        )}
+
         <div className="field">
           <label htmlFor="numero">Número de cuenta</label>
           <input id="numero" value={numeroCuenta} onChange={(e) => setNumeroCuenta(e.target.value)} required />
@@ -348,7 +438,13 @@ export default function AhorroCuentaForm() {
           <button
             type="submit"
             className="btn"
-            disabled={guardando || !agenciaId || Boolean(cuentaExistente) || (saldoAportacion !== null && saldoAportacion < 100)}
+            disabled={
+              guardando ||
+              !agenciaId ||
+              Boolean(cuentaExistente) ||
+              (saldoAportacion !== null && saldoAportacion < 100) ||
+              (esInfanto && (!titularMenorNombre.trim() || !titularMenorParentesco.trim()))
+            }
           >
             {guardando ? "Guardando…" : "Abrir cuenta"}
           </button>

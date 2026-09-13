@@ -96,6 +96,21 @@ cajaAuxiliarRouter.get(
 );
 
 cajaAuxiliarRouter.get(
+  "/:diaId/ultimo-doc-no",
+  asyncHandler(async (req, res) => {
+    res.json(await service.obtenerUltimoDocNo(req.params.diaId, agenciaVisible(req)));
+  }),
+);
+
+cajaAuxiliarRouter.get(
+  "/:diaId/verificar-doc-no",
+  asyncHandler(async (req, res) => {
+    const docNo = typeof req.query.docNo === "string" ? req.query.docNo : "";
+    res.json(await service.verificarDocNoExiste(req.params.diaId, docNo, agenciaVisible(req)));
+  }),
+);
+
+cajaAuxiliarRouter.get(
   "/:id",
   asyncHandler(async (req, res) => {
     res.json(await service.detalle(req.params.id, agenciaVisible(req)));

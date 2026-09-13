@@ -123,6 +123,16 @@ prestamosRouter.post(
 );
 
 prestamosRouter.get(
+  "/pendientes-cobro",
+  asyncHandler(async (req, res) => {
+    const agenciaId = agenciaVisible(req) ?? (req.query.agenciaId as string) ?? null;
+    if (!agenciaId) return res.status(400).json({ error: "Agencia requerida" });
+    const limite = req.query.limite ? Number(req.query.limite) : 10;
+    res.json(await service.pendientesCobro(agenciaId, agenciaVisible(req), limite));
+  }),
+);
+
+prestamosRouter.get(
   "/:id",
   asyncHandler(async (req, res) => {
     const prestamo = await service.obtener(req.params.id, agenciaVisible(req));

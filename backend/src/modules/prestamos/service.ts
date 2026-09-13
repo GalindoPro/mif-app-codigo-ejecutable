@@ -89,6 +89,76 @@ export async function listar(params: {
   return rows;
 }
 
+export interface ItemPendienteCobro {
+  id: string;
+  codigo: string;
+  numero_credito_anterior: string | null;
+  socio_id: string;
+  socio_nombres: string;
+  numero_asociado: string;
+  saldo_capital: number;
+  cuota_mensual: number;
+  fecha_ultimo_pago: string;
+  fecha_proxima_cuota: string;
+  dias_atraso: number;
+  en_mora: boolean;
+}
+
+export async function pendientesCobro(agenciaId: string, agenciaVisible: string | null, limite = 10) {
+  if (agenciaVisible && agenciaId !== agenciaVisible) throw forbidden("No puedes consultar la cartera de otra agencia");
+
+  const { rows } = await pool.query(
+    `select
+       p.id, p.codigo, p.numero_credito_anterior, p.saldo_capital, p.monto_aprobado, p.monto_solicitado, p.cuota_mensual,
+       s.id as socio_id, s.nombres as socio_nombres, s.numero_asociado,
+       fb.fecha as fecha_ultimo_pago,
+       (fb.fecha + 30) as fecha_proxima_cuota,
+       greatest(0, (current_date - (fb.fecha + 30)))::int as dias_atraso
+     from prestamos p
+     join socios s on s.id = p.socio_id
+     join lateral (
+       select coalesce(
+         (select max(pp.fecha) from prestamo_pagos pp where pp.prestamo_id = p.id),
+         p.fecha_ultimo_pago_migracion,
+         p.fecha_desembolso
+       ) as fecha
+     ) fb on true
+     where p.agencia_id = $1 and p.estado = 'DESEMBOLSADO'
+       and not exists (select 1 from cobros_campo cc where cc.prestamo_id = p.id and cc.estado = 'PENDIENTE')`,
+    [agenciaId],
+  );
+
+  const items: ItemPendienteCobro[] = rows.map((r) => {
+    const diasAtraso = Number(r.dias_atraso) || 0;
+    return {
+      id: r.id,
+      codigo: r.codigo,
+      numero_credito_anterior: r.numero_credito_anterior,
+      socio_id: r.socio_id,
+      socio_nombres: r.socio_nombres,
+      numero_asociado: r.numero_asociado,
+      saldo_capital: Number(r.saldo_capital ?? r.monto_aprobado ?? r.monto_solicitado),
+      cuota_mensual: Number(r.cuota_mensual),
+      fecha_ultimo_pago: r.fecha_ultimo_pago,
+      fecha_proxima_cuota: r.fecha_proxima_cuota,
+      dias_atraso: diasAtraso,
+      en_mora: diasAtraso > 4,
+    };
+  });
+
+  const enMora = items
+    .filter((i) => i.en_mora)
+    .sort((a, b) => b.dias_atraso - a.dias_atraso)
+    .slice(0, limite);
+
+  const proximosAPagar = items
+    .filter((i) => !i.en_mora)
+    .sort((a, b) => new Date(a.fecha_proxima_cuota).getTime() - new Date(b.fecha_proxima_cuota).getTime())
+    .slice(0, limite);
+
+  return { proximosAPagar, enMora, totalEnMora: items.filter((i) => i.en_mora).length };
+}
+
 export async function obtener(id: string, agenciaVisible: string | null) {
   const query = `
     select p.*,

@@ -33,6 +33,31 @@ cajaChicaRouter.get(
   }),
 );
 
+cajaChicaRouter.get(
+  "/ultimo-documento",
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
+  asyncHandler(async (req, res) => {
+    const visible = agenciaVisible(req);
+    const agenciaId = (visible || (req.query.agenciaId as string)) as string;
+    if (!agenciaId) throw badRequest("Falta indicar la agencia");
+    const fecha = typeof req.query.fecha === "string" ? req.query.fecha : new Date().toISOString().slice(0, 10);
+    res.json(await service.obtenerUltimoDocumento(agenciaId, fecha));
+  }),
+);
+
+cajaChicaRouter.get(
+  "/verificar-documento",
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
+  asyncHandler(async (req, res) => {
+    const visible = agenciaVisible(req);
+    const agenciaId = (visible || (req.query.agenciaId as string)) as string;
+    if (!agenciaId) throw badRequest("Falta indicar la agencia");
+    const fecha = typeof req.query.fecha === "string" ? req.query.fecha : new Date().toISOString().slice(0, 10);
+    const numeroDocumento = typeof req.query.numeroDocumento === "string" ? req.query.numeroDocumento : "";
+    res.json(await service.verificarNumeroDocumentoExiste(agenciaId, fecha, numeroDocumento));
+  }),
+);
+
 const CATEGORIAS_CAJA_CHICA = [
   "SUMINISTROS_OFICINA",
   "CAFETERIA_LIMPIEZA",

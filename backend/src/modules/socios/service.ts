@@ -219,7 +219,7 @@ export async function crear(data: DatosSocio, usuarioId: string): Promise<Socio>
   const { rows } = await pool.query<Socio>(
     `insert into socios
       (numero_asociado, agencia_id, nombres, genero, fecha_ingreso, dpi, direccion, telefono, nombre_beneficiario, dpi_beneficiario, telefono_beneficiario, parentesco_beneficiario, creado_por_id)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
      returning *`,
     [
       data.numeroAsociado,

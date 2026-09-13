@@ -23,6 +23,100 @@ export interface CobroCreditoVentanillaProps {
   onCobrado: () => void;
 }
 
+interface ItemPendienteCobro {
+  id: string;
+  codigo: string;
+  numero_credito_anterior: string | null;
+  socio_id: string;
+  socio_nombres: string;
+  numero_asociado: string;
+  saldo_capital: number;
+  cuota_mensual: number;
+  fecha_ultimo_pago: string;
+  fecha_proxima_cuota: string;
+  dias_atraso: number;
+  en_mora: boolean;
+}
+
+function ListaPendientesCobro({
+  titulo,
+  icono,
+  items,
+  cargando,
+  colorAcento,
+  vacio,
+  onSeleccionar,
+  cargandoSocioId,
+}: {
+  titulo: string;
+  icono: string;
+  items: ItemPendienteCobro[];
+  cargando: boolean;
+  colorAcento: string;
+  vacio: string;
+  onSeleccionar: (item: ItemPendienteCobro) => void;
+  cargandoSocioId: string | null;
+}) {
+  return (
+    <div style={{ background: "var(--paper-raised)", border: "1px solid var(--line)", borderRadius: "8px", padding: "0.65rem 0.75rem" }}>
+      <div style={{ fontSize: "0.8rem", fontWeight: 700, color: colorAcento, marginBottom: "0.4rem" }}>
+        {icono} {titulo}
+      </div>
+      {cargando ? (
+        <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)", margin: 0 }}>Cargando…</p>
+      ) : items.length === 0 ? (
+        <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)", margin: 0 }}>{vacio}</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem", maxHeight: "220px", overflowY: "auto" }}>
+          {items.map((it) => (
+            <button
+              key={it.id}
+              type="button"
+              onClick={() => onSeleccionar(it)}
+              disabled={cargandoSocioId === it.socio_id}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "0.5rem",
+                background: "var(--paper)",
+                border: "1px solid var(--line)",
+                borderRadius: "6px",
+                padding: "0.4rem 0.6rem",
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {cargandoSocioId === it.socio_id ? "Cargando…" : it.socio_nombres}
+                </div>
+                <div style={{ fontSize: "0.7rem", color: "var(--ink-soft)" }}>
+                  {it.numero_asociado} · {it.codigo} · Saldo {formatoQ(it.saldo_capital)}
+                </div>
+              </div>
+              <span
+                style={{
+                  fontSize: "0.68rem",
+                  fontWeight: 700,
+                  whiteSpace: "nowrap",
+                  color: it.en_mora ? "#b91c1c" : "var(--ink-soft)",
+                  background: it.en_mora ? "rgba(239,68,68,0.12)" : "rgba(2,132,199,0.08)",
+                  border: it.en_mora ? "1px solid rgba(239,68,68,0.3)" : "1px solid rgba(2,132,199,0.2)",
+                  borderRadius: "4px",
+                  padding: "0.15rem 0.4rem",
+                }}
+              >
+                {it.en_mora ? `${it.dias_atraso}d atraso` : new Date(it.fecha_proxima_cuota).toLocaleDateString("es-GT")}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CobroCreditoVentanilla({
   agenciaId,
   diaId,
@@ -32,6 +126,11 @@ export default function CobroCreditoVentanilla({
   const [prestamos, setPrestamos] = useState<Prestamo[]>([]);
   const [prestamo, setPrestamo] = useState<Prestamo | null>(null);
   const [cargandoPrestamos, setCargandoPrestamos] = useState(false);
+
+  const [proximosAPagar, setProximosAPagar] = useState<ItemPendienteCobro[]>([]);
+  const [enMora, setEnMora] = useState<ItemPendienteCobro[]>([]);
+  const [cargandoPendientes, setCargandoPendientes] = useState(false);
+  const [socioIdCargando, setSocioIdCargando] = useState<string | null>(null);
 
   const [liquidacion, setLiquidacion] = useState<ResultadoLiquidacion | null>(null);
   const [cargandoLiquidacion, setCargandoLiquidacion] = useState(false);
@@ -105,6 +204,41 @@ export default function CobroCreditoVentanilla({
       ));
       setDescripcion("");
       setCargandoLiquidacion(false);
+    }
+  }
+
+  function cargarPendientesCobro() {
+    setCargandoPendientes(true);
+    api
+      .get<{ proximosAPagar: ItemPendienteCobro[]; enMora: ItemPendienteCobro[] }>("/prestamos/pendientes-cobro", {
+        params: { agenciaId, limite: 10 },
+      })
+      .then(({ data }) => {
+        setProximosAPagar(data.proximosAPagar);
+        setEnMora(data.enMora);
+      })
+      .catch(() => {
+        setProximosAPagar([]);
+        setEnMora([]);
+      })
+      .finally(() => setCargandoPendientes(false));
+  }
+
+  useEffect(() => {
+    cargarPendientesCobro();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agenciaId]);
+
+  async function seleccionarDesdeLista(item: ItemPendienteCobro) {
+    setSocioIdCargando(item.socio_id);
+    setError(null);
+    try {
+      const { data } = await api.get<Socio>(`/socios/${item.socio_id}`);
+      setSocio(data);
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setSocioIdCargando(null);
     }
   }
 
@@ -227,6 +361,7 @@ export default function CobroCreditoVentanilla({
       setPrestamo(null);
       setMontoEntregadoInput("");
       setDescripcion("");
+      cargarPendientesCobro();
       onCobrado();
     } catch (err) {
       setError(mensajeError(err));
@@ -252,7 +387,33 @@ export default function CobroCreditoVentanilla({
       <div className="field">
         <label>Socio que realiza el pago</label>
         <BuscadorSocio agenciaId={agenciaId} seleccionado={socio} onSeleccionar={setSocio} />
+        <span className="hint">Busca un asociado en específico por nombre o número, o elige uno de las listas de abajo.</span>
       </div>
+
+      {!socio && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.75rem", marginBottom: "1rem" }}>
+          <ListaPendientesCobro
+            titulo="Próximos a pagar"
+            icono="🕐"
+            items={proximosAPagar}
+            cargando={cargandoPendientes}
+            colorAcento="#0369a1"
+            vacio="No hay créditos próximos a vencer."
+            onSeleccionar={seleccionarDesdeLista}
+            cargandoSocioId={socioIdCargando}
+          />
+          <ListaPendientesCobro
+            titulo={`En mora / sin pagar${enMora.length ? ` (${enMora.length})` : ""}`}
+            icono="⚠️"
+            items={enMora}
+            cargando={cargandoPendientes}
+            colorAcento="#b91c1c"
+            vacio="No hay créditos en mora. 🎉"
+            onSeleccionar={seleccionarDesdeLista}
+            cargandoSocioId={socioIdCargando}
+          />
+        </div>
+      )}
 
       {cargandoPrestamos && <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>Buscando créditos activos…</p>}
 

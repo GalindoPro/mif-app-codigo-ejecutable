@@ -186,6 +186,10 @@ alter table cuentas add column if not exists cuota_pactada numeric(14,2);
 alter table cuentas add column if not exists observaciones_apertura text;
 alter table cuentas add column if not exists prestamo_id uuid references prestamos(id) on delete set null;
 alter table cuentas add column if not exists creado_por_id uuid references usuarios(id);
+alter table cuentas add column if not exists titular_menor_nombre text;
+alter table cuentas add column if not exists titular_menor_parentesco text;
+alter table cuentas add column if not exists titular_menor_cui text;
+alter table cuentas add column if not exists titular_menor_fecha_nacimiento date;
 
 -- El saldo de una cuenta NUNCA se guarda como campo fijo: se calcula sumando
 -- sus movimientos (ver vista saldos_cuenta más abajo). Esto reemplaza las

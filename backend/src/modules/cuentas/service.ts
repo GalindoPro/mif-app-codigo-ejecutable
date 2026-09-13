@@ -135,9 +135,22 @@ export interface DatosCuenta {
   cuotaPactada?: number | null;
   observacionesApertura?: string | null;
   prestamoId?: string | null;
+  titularMenorNombre?: string | null;
+  titularMenorParentesco?: string | null;
+  titularMenorCui?: string | null;
+  titularMenorFechaNacimiento?: string | null;
 }
 
 export async function crear(data: DatosCuenta, usuarioId: string) {
+  if (data.tipo === "AHORRO_INFANTO_JUVENIL") {
+    if (!data.titularMenorNombre || !data.titularMenorNombre.trim()) {
+      throw badRequest("Debes indicar el nombre completo del menor titular de la cuenta.");
+    }
+    if (!data.titularMenorParentesco || !data.titularMenorParentesco.trim()) {
+      throw badRequest("Debes indicar el parentesco del menor con el socio responsable de la cuenta.");
+    }
+  }
+
   return withTransaction(async (client) => {
     const { rows: aporRows } = await client.query(
       `select coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_aportacion
@@ -192,8 +205,8 @@ export async function crear(data: DatosCuenta, usuarioId: string) {
     }
 
     const { rows } = await client.query(
-      `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, cuota_pactada, observaciones_apertura, prestamo_id, creado_por_id)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, cuota_pactada, observaciones_apertura, prestamo_id, creado_por_id, titular_menor_nombre, titular_menor_parentesco, titular_menor_cui, titular_menor_fecha_nacimiento)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        returning *`,
       [
         data.numeroCuenta,
@@ -205,6 +218,10 @@ export async function crear(data: DatosCuenta, usuarioId: string) {
         data.observacionesApertura ?? null,
         data.prestamoId ?? null,
         usuarioId,
+        data.tipo === "AHORRO_INFANTO_JUVENIL" ? data.titularMenorNombre!.trim() : null,
+        data.tipo === "AHORRO_INFANTO_JUVENIL" ? data.titularMenorParentesco!.trim() : null,
+        data.tipo === "AHORRO_INFANTO_JUVENIL" ? (data.titularMenorCui?.trim() || null) : null,
+        data.tipo === "AHORRO_INFANTO_JUVENIL" ? (data.titularMenorFechaNacimiento || null) : null,
       ],
     );
     const cuenta = rows[0];

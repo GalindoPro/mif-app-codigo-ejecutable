@@ -415,6 +415,42 @@ export async function beneficiariosFrecuentes(agenciaId: string, q: string, agen
   return rows.map((r) => r.beneficiario);
 }
 
+export async function obtenerUltimoDocNo(diaId: string, agenciaVisible: string | null) {
+  const dia = await obtenerDiaCrudo(diaId, agenciaVisible);
+
+  const { rows: docRows } = await pool.query(
+    `select doc_no from caja_movimientos_auxiliar
+     where caja_dia_id = $1 and doc_no is not null and trim(doc_no) <> ''
+     order by created_at desc limit 1`,
+    [dia.id],
+  );
+  const { rows: refRows } = await pool.query(
+    `select referencia from caja_movimientos_auxiliar
+     where caja_dia_id = $1 and seccion = 'BI' and referencia is not null and trim(referencia) <> ''
+     order by created_at desc limit 1`,
+    [dia.id],
+  );
+
+  return {
+    ultimoDocNo: docRows[0]?.doc_no ?? null,
+    ultimoReferenciaAut: refRows[0]?.referencia ?? null,
+  };
+}
+
+export async function verificarDocNoExiste(diaId: string, docNo: string, agenciaVisible: string | null) {
+  const dia = await obtenerDiaCrudo(diaId, agenciaVisible);
+  const doc = docNo.trim();
+  if (!doc) return { existe: false };
+
+  const { rows } = await pool.query(
+    `select id from caja_movimientos_auxiliar
+     where caja_dia_id = $1 and lower(trim(doc_no)) = lower($2)
+     limit 1`,
+    [dia.id, doc],
+  );
+  return { existe: rows.length > 0 };
+}
+
 export interface DatosCobroCredito {
   prestamoId: string;
   socioId: string;

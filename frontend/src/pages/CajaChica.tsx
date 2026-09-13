@@ -30,6 +30,8 @@ export default function CajaChica() {
   const [monto, setMonto] = useState("");
   const [numeroDocumento, setNumeroDocumento] = useState("DTE");
   const [guardando, setGuardando] = useState(false);
+  const [docDuplicado, setDocDuplicado] = useState(false);
+  const [verificandoDoc, setVerificandoDoc] = useState(false);
 
   // Estados para Reposición de Fondo Fijo
   const [mostrarReposicion, setMostrarReposicion] = useState(false);
@@ -60,9 +62,47 @@ export default function CajaChica() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
+  useEffect(() => {
+    if (!mostrarForm || !agenciaId) return;
+    api
+      .get<{ ultimoNumeroDocumento: string | null }>("/caja-chica/ultimo-documento", { params: { agenciaId, fecha } })
+      .then(({ data }) => {
+        if (data.ultimoNumeroDocumento) {
+          setNumeroDocumento((prev) => (!prev || prev.toUpperCase() === "DTE" ? data.ultimoNumeroDocumento! : prev));
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mostrarForm, agenciaId]);
+
+  useEffect(() => {
+    if (!mostrarForm || !agenciaId) {
+      setDocDuplicado(false);
+      return;
+    }
+    const doc = numeroDocumento.trim();
+    if (!doc || doc.toUpperCase() === "DTE") {
+      setDocDuplicado(false);
+      return;
+    }
+    setVerificandoDoc(true);
+    const t = setTimeout(() => {
+      api
+        .get<{ existe: boolean }>("/caja-chica/verificar-documento", { params: { agenciaId, fecha, numeroDocumento: doc } })
+        .then(({ data }) => setDocDuplicado(data.existe))
+        .catch(() => setDocDuplicado(false))
+        .finally(() => setVerificandoDoc(false));
+    }, 450);
+    return () => clearTimeout(t);
+  }, [numeroDocumento, agenciaId, fecha, mostrarForm]);
+
   async function crear(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (docDuplicado) {
+      setError("El número de documento ya fue registrado hoy en Caja Chica. Corrígelo antes de continuar.");
+      return;
+    }
     setGuardando(true);
     try {
       await api.post("/caja-chica", {
@@ -270,9 +310,15 @@ export default function CajaChica() {
                 <div className="field" style={{ marginBottom: "0.3rem" }}>
                   <label htmlFor="cc-documento">No. de documento</label>
                   <input id="cc-documento" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} />
+                  {verificandoDoc && <span className="sub" style={{ fontSize: "0.72rem" }}>Verificando...</span>}
+                  {!verificandoDoc && docDuplicado && (
+                    <span style={{ color: "#dc2626", fontSize: "0.75rem", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
+                      Este número de documento ya fue registrado hoy en Caja Chica.
+                    </span>
+                  )}
                 </div>
-                <button type="submit" className="btn" disabled={guardando || !agenciaId} style={{ marginTop: "0.3rem" }}>
-                  {guardando ? "Guardando…" : "Guardar Comprobante"}
+                <button type="submit" className="btn" disabled={guardando || !agenciaId || docDuplicado} style={{ marginTop: "0.3rem" }}>
+                  {guardando ? "Guardando…" : docDuplicado ? "Documento duplicado: corrige el número" : "Guardar Comprobante"}
                 </button>
               </form>
             ) : (

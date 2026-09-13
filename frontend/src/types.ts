@@ -100,7 +100,8 @@ export type TipoCuentaAhorro =
   | "AHORRO_PROGRAMADO"
   | "AHORRO_INFANTO_JUVENIL"
   | "AHORRO_SOBRE_PRESTAMO"
-  | "AHORRO_PLAZO_FIJO";
+  | "AHORRO_PLAZO_FIJO"
+  | "APORTACION";
 
 export interface Cuenta {
   id: string;
@@ -124,6 +125,10 @@ export interface Cuenta {
   promotor_nombre?: string | null;
   promotor_email?: string | null;
   socio_telefono?: string | null;
+  titular_menor_nombre?: string | null;
+  titular_menor_parentesco?: string | null;
+  titular_menor_cui?: string | null;
+  titular_menor_fecha_nacimiento?: string | null;
   created_at: string;
 }
 
@@ -178,6 +183,12 @@ export const TIPOS_AHORRO: AhorroTipoConfig[] = [
     slug: "plazo-fijo",
     titulo: "Ahorro a Plazo Fijo",
     descripcion: "Certificados de depósito a plazo fijo (Kardex PF) con cálculo de intereses e ISR.",
+  },
+  {
+    tipo: "APORTACION",
+    slug: "aportacion",
+    titulo: "Aportación Estatutaria",
+    descripcion: "Capital social institucional del asociado.",
   },
 ];
 

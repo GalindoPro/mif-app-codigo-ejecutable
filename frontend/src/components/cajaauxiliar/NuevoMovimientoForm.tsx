@@ -238,6 +238,8 @@ export default function NuevoMovimientoForm({
   const [monto, setMonto] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [docNoDuplicado, setDocNoDuplicado] = useState(false);
+  const [verificandoDocNo, setVerificandoDocNo] = useState(false);
 
   function cambiarGrupo(nuevo: (typeof GRUPOS)[number]["key"]) {
     setGrupo(nuevo);
@@ -274,12 +276,41 @@ export default function NuevoMovimientoForm({
     return () => clearTimeout(t);
   }, [beneficiario, info.seccion]);
 
+  useEffect(() => {
+    api
+      .get<{ ultimoDocNo: string | null; ultimoReferenciaAut: string | null }>(`/caja-auxiliar/${diaId}/ultimo-doc-no`)
+      .then(({ data }) => {
+        if (data.ultimoDocNo) setDocNo((prev) => prev || data.ultimoDocNo!);
+        if (data.ultimoReferenciaAut) setReferenciaAut((prev) => prev || data.ultimoReferenciaAut!);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [diaId]);
+
+  useEffect(() => {
+    const doc = docNo.trim();
+    if (!doc) {
+      setDocNoDuplicado(false);
+      return;
+    }
+    setVerificandoDocNo(true);
+    const t = setTimeout(() => {
+      api
+        .get<{ existe: boolean }>(`/caja-auxiliar/${diaId}/verificar-doc-no`, { params: { docNo: doc } })
+        .then(({ data }) => setDocNoDuplicado(data.existe))
+        .catch(() => setDocNoDuplicado(false))
+        .finally(() => setVerificandoDocNo(false));
+    }, 450);
+    return () => clearTimeout(t);
+  }, [docNo, diaId]);
+
   async function enviar(e: FormEvent) {
     e.preventDefault();
     setError(null);
     const beneficiarioFinal = info.requiereCuenta ? undefined : socio ? socio.nombres : beneficiario;
     if (!info.requiereCuenta && !beneficiarioFinal) { setError("Indica el beneficiario"); return; }
     if (info.requiereCuenta && !cuenta) { setError("Selecciona la cuenta"); return; }
+    if (docNoDuplicado) { setError("El número de documento/recibo ya existe en la caja de hoy. Corrígelo antes de continuar."); return; }
     setGuardando(true);
     try {
       await api.post(`/caja-auxiliar/${diaId}/movimientos`, {
@@ -389,12 +420,24 @@ export default function NuevoMovimientoForm({
               <div className="field">
                 <label htmlFor="aux-doc">No. de documento</label>
                 <input id="aux-doc" value={docNo} onChange={(e) => setDocNo(e.target.value)} />
+                {verificandoDocNo && <span className="sub" style={{ fontSize: "0.72rem" }}>Verificando...</span>}
+                {!verificandoDocNo && docNoDuplicado && (
+                  <span style={{ color: "#dc2626", fontSize: "0.75rem", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
+                    Este número ya fue registrado en la caja de hoy.
+                  </span>
+                )}
               </div>
             )}
             {info.requiereCuenta && (
               <div className="field">
                 <label htmlFor="aux-doc-cuenta">No. de recibo</label>
                 <input id="aux-doc-cuenta" value={docNo} onChange={(e) => setDocNo(e.target.value)} />
+                {verificandoDocNo && <span className="sub" style={{ fontSize: "0.72rem" }}>Verificando...</span>}
+                {!verificandoDocNo && docNoDuplicado && (
+                  <span style={{ color: "#dc2626", fontSize: "0.75rem", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
+                    Este número ya fue registrado en la caja de hoy.
+                  </span>
+                )}
               </div>
             )}
             <div className="field">
@@ -410,8 +453,14 @@ export default function NuevoMovimientoForm({
       {!esAportacion && (() => {
         const retiroBloqueado = Boolean(info.tipo === "EGRESO" && cuenta?.tipo === "AHORRO_SOBRE_PRESTAMO" && cuenta.prestamo_estado && cuenta.prestamo_estado !== "CANCELADO" && cuenta.prestamo_estado !== "RECHAZADO");
         return (
-          <button type="submit" className="btn" disabled={guardando || retiroBloqueado}>
-            {guardando ? "Guardando..." : retiroBloqueado ? "Retiro bloqueado por credito activo" : `Registrar ${info.tipo === "INGRESO" ? "ingreso" : "egreso"}`}
+          <button type="submit" className="btn" disabled={guardando || retiroBloqueado || docNoDuplicado}>
+            {guardando
+              ? "Guardando..."
+              : retiroBloqueado
+                ? "Retiro bloqueado por credito activo"
+                : docNoDuplicado
+                  ? "Documento duplicado: corrige el número"
+                  : `Registrar ${info.tipo === "INGRESO" ? "ingreso" : "egreso"}`}
           </button>
         );
       })()}
