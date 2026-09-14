@@ -492,3 +492,26 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
 - **Backend:** Se extendió `abrirAportacionSocio` (service.ts + routes.ts) para aceptar `cuotaIngreso` y registrarlo en caja si hay turno abierto.
 - **Archivos Modificados:** `SocioDetail.tsx`, `NuevoMovimientoForm.tsx`, `socios/service.ts`, `socios/routes.ts`
 - **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 37. Vistas Integradas en Pantalla (Eliminación de Modales Flotantes) y Corrección Directa para Administrador (`/caja-chica`)
+
+- **Objetivo:** Eliminar pantallas flotantes (modales superpuestos con fondo oscuro) que provocaban desbordes e interferencia con el diálogo de impresión, e integrar la corrección de comprobantes para el rol de Administrador (`GERENCIA`) y cajeros autorizados directamente en el flujo natural de la página.
+- **Corrección de Comprobantes en Panel Lateral Izquierdo (✏️):**
+  - **Causa del fallo previo:** El componente de corrección utilizaba clases CSS `.modal` que no contaban con definición en la hoja de estilos global (`app.css`). Esto hacía que el formulario quedara descolocado e invisible en el fondo de la pantalla al hacer clic en ✏️, apareciendo desbordado al imprimir.
+  - **Integración Directa:** Se eliminó la ventana modal flotante. Al pulsar ✏️ en la tabla de comprobantes, el formulario `✏️ Corregir Comprobante` se abre directamente en el panel lateral izquierdo (reemplazando temporalmente el formulario de nuevo comprobante o el desglose por categorías), pre-llenando tipo, fecha, documento, beneficiario, descripción, categoría, monto exacto y el motivo obligatorio de corrección (mínimo 10 caracteres explicativos para la bitácora de auditoría).
+  - Incluye botones directos `💾 Guardar Corrección` (con mutación `PATCH /caja-chica/:id`) y `✕ Cancelar`.
+  - Habilitado para el rol `GERENCIA` (Administrador) sobre cualquier comprobante histórico, y para cajeros sobre sus propios comprobantes del día.
+- **Informe de Rendición de Gastos Directo en Pantalla:**
+  - Se eliminó el overlay modal flotante (`caja-chica-modal-overlay`).
+  - Al pulsar `📄 Informe de Gastos`, la pantalla de Caja Chica conmuta de forma directa y limpia a la vista completa del informe de rendición (`CajaChicaReporteView`), con botón superior `← Volver al Libro` para regresar al libro operativo en un clic.
+  - Incluye acceso inmediato a filtros rápidos (`Hoy`, `Esta Semana`, `Este Mes`, `Desde última reposición`), exportación a Excel CSV (`📥 Excel`) e impresión en PDF (`🖨️ Imprimir / Guardar PDF`).
+- **Blindaje Global de Impresión y Modales en CSS (`app.css`):**
+  - Se definieron estilos globales para `.modal` y `.modal-content` con `position: fixed`, centrado y `z-index: 9999` para evitar desbordes accidentales en el resto del sistema.
+  - En `@media print`, se declararon reglas estrictas para ocultar modales, menús, cabeceras y elementos no imprimibles (`display: none !important`), garantizando que los informes directos en pantalla (`.caja-chica-reporte-container`) se impriman al 100% limpios sin superposición de elementos de fondo.
+- **Archivos Modificados:**
+  - `frontend/src/pages/CajaChica.tsx`
+  - `frontend/src/components/CajaChicaReporteModal.tsx`
+  - `frontend/src/styles/app.css`
+- **Sincronización Dual:** Downloads ↔ Documents completada.

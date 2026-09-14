@@ -29,6 +29,9 @@ Este documento registra el **avance real y completo** del sistema de la Cooperat
    - Basado en `caja/Caja Chica 30-07-2026.xlsx`.
    - **Diseño de Pantalla Única (100vh Sin Scroll):** Arquitectura balanceada de 2 columnas. Columna izquierda con panel de gastos por categoría, barras de presupuesto y botones de acción. Columna derecha con buscador y tabla de comprobantes con cabecera fija (`sticky`) y scroll interno.
    - Registro de comprobantes de ingreso y egreso con categorías contables y documentos (DTE, factura, recibo).
+   - **Vistas Integradas en Pantalla (Sin Modales Flotantes):**
+     - **Informe de Rendición de Gastos:** Conmuta directamente a pantalla completa en la misma vista (`CajaChicaReporteView`) con botón `← Volver al Libro de Caja Chica`, filtros de período rápido, exportación a Excel (CSV) y generación de PDF limpia en 1 hoja carta sin superposición de elementos de fondo.
+     - **Corrección de Comprobantes para Administrador y Cajeros (✏️):** Formulario embebido directamente en el panel lateral izquierdo (reemplazando temporalmente el formulario de nuevo comprobante/reposición), habilitando al rol `GERENCIA` (Administrador) a editar comprobantes históricos con motivo de corrección de auditoría sin ventanas flotantes ni desbordes.
    - **Reposición del Fondo Fijo (`📥 Reponer Fondo (Cheque)`):**
      - Recarga oficial del saldo de caja chica mediante cheque emitido por la cooperativa (`No. CH.`, ej. *1290*, *2000*).
      - Validación anti-duplicados para evitar registrar dos veces el mismo cheque.

@@ -4,8 +4,7 @@ import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { CATEGORIA_CAJA_CHICA_LABEL, formatoQ } from "../types";
 import type { Agencia, CategoriaCajaChica, ListaCajaChica, CajaChicaComprobante } from "../types";
-import CajaChicaReporteModal from "../components/CajaChicaReporteModal";
-import CajaChicaEditModal from "../components/CajaChicaEditModal";
+import { CajaChicaReporteView } from "../components/CajaChicaReporteModal";
 
 const CATEGORIAS = Object.entries(CATEGORIA_CAJA_CHICA_LABEL) as [CategoriaCajaChica, string][];
 
@@ -40,6 +39,18 @@ export default function CajaChica() {
   const [repoFecha, setRepoFecha] = useState(() => new Date().toISOString().slice(0, 10));
   const [repoDesc, setRepoDesc] = useState("Reposición mensual de fondo fijo de caja chica");
   const [repoGuardando, setRepoGuardando] = useState(false);
+
+  // Estados para Corrección de Comprobante en Panel Izquierdo
+  const [editFecha, setEditFecha] = useState("");
+  const [editBeneficiario, setEditBeneficiario] = useState("");
+  const [editDescripcion, setEditDescripcion] = useState("");
+  const [editMonto, setEditMonto] = useState("");
+  const [editNumeroDocumento, setEditNumeroDocumento] = useState("");
+  const [editTipo, setEditTipo] = useState<"INGRESO" | "EGRESO">("EGRESO");
+  const [editCategoria, setEditCategoria] = useState<CategoriaCajaChica | "">("");
+  const [editMotivo, setEditMotivo] = useState("");
+  const [editGuardando, setEditGuardando] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   useEffect(() => {
     if (puedeElegirAgencia) api.get<Agencia[]>("/agencias").then(({ data }) => setAgencias(data));
@@ -155,11 +166,73 @@ export default function CajaChica() {
     }
   }
 
+  function iniciarEdicion(c: CajaChicaComprobante) {
+    setEditarRegistro(c);
+    setMostrarForm(false);
+    setMostrarReposicion(false);
+    setEditFecha(c.fecha.slice(0, 10));
+    setEditBeneficiario(c.beneficiario);
+    setEditDescripcion(c.descripcion);
+    setEditMonto(c.monto.toString());
+    setEditNumeroDocumento(c.numero_documento || "");
+    setEditTipo(c.tipo as "INGRESO" | "EGRESO");
+    setEditCategoria((c.categoria as CategoriaCajaChica) || "");
+    setEditMotivo("");
+    setEditError(null);
+  }
+
+  function cancelarEdicion() {
+    setEditarRegistro(null);
+    setEditError(null);
+  }
+
+  async function handleGuardarEdicion(e: FormEvent) {
+    e.preventDefault();
+    if (!editarRegistro) return;
+    if (editMotivo.trim().length < 10) {
+      setEditError("El motivo de la corrección es obligatorio (mínimo 10 caracteres explicativos).");
+      return;
+    }
+    setEditError(null);
+    setEditGuardando(true);
+    try {
+      await api.patch(`/caja-chica/${editarRegistro.id}`, {
+        fecha: editFecha,
+        beneficiario: editBeneficiario,
+        descripcion: editDescripcion,
+        tipo: editTipo,
+        categoria: editTipo === "EGRESO" && editCategoria ? editCategoria : undefined,
+        monto: Number(editMonto),
+        numeroDocumento: editNumeroDocumento || undefined,
+        motivo: editMotivo,
+      });
+      setEditarRegistro(null);
+      cargar();
+    } catch (err) {
+      setEditError(mensajeError(err));
+    } finally {
+      setEditGuardando(false);
+    }
+  }
+
   const totalEgresosCategorias = resultado?.totalesPorCategoria.reduce((acc, c) => acc + Number(c.total), 0) ?? 1;
+
+  if (mostrarReporte) {
+    return (
+      <div className="screen-container" style={{ overflowY: "auto" }}>
+        <CajaChicaReporteView
+          agenciaId={agenciaId || agencias[0]?.id || ""}
+          agencias={agencias}
+          puedeElegirAgencia={puedeElegirAgencia}
+          onClose={() => setMostrarReporte(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="screen-container">
-      <div className={mostrarReporte ? "no-print" : ""}>
+      <div>
         {/* CABECERA COMPACTA DE 1 LÍNEA */}
         <div className="screen-header">
           <div>
@@ -183,6 +256,7 @@ export default function CajaChica() {
               onClick={() => {
                 setMostrarReposicion((v) => !v);
                 setMostrarForm(false);
+                setEditarRegistro(null);
               }}
             >
               {mostrarReposicion ? "Cancelar reposición" : "📥 Reponer Fondo (Cheque)"}
@@ -193,6 +267,7 @@ export default function CajaChica() {
               onClick={() => {
                 setMostrarForm((v) => !v);
                 setMostrarReposicion(false);
+                setEditarRegistro(null);
               }}
             >
               {mostrarForm ? "Cancelar" : "+ Nuevo comprobante"}
@@ -232,7 +307,93 @@ export default function CajaChica() {
         <div className="screen-split-layout">
           {/* PANEL IZQUIERDO: EGRESOS POR CATEGORÍA O FORMULARIOS DE ACCIÓN */}
           <div className="screen-panel scrollable">
-            {mostrarReposicion ? (
+            {editarRegistro ? (
+              <form onSubmit={handleGuardarEdicion} style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--line)", paddingBottom: "0.4rem" }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: "0.95rem", color: "var(--accent)" }}>✏️ Corregir Comprobante</h3>
+                    <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
+                      {usuario?.rol === "GERENCIA" ? "Auditoría de Administrador" : "Modificación del día"} · Doc: {editarRegistro.numero_documento || "DTE"}
+                    </span>
+                  </div>
+                  <button type="button" className="link-btn" onClick={cancelarEdicion}>✕ Cancelar</button>
+                </div>
+
+                {editError && <div className="alert error" style={{ padding: "0.4rem 0.6rem", fontSize: "0.8rem", margin: "0.2rem 0" }}>{editError}</div>}
+
+                <div className="field" style={{ marginBottom: "0.25rem" }}>
+                  <label style={{ fontSize: "0.78rem" }}>Tipo de Comprobante</label>
+                  <select value={editTipo} onChange={(e) => setEditTipo(e.target.value as "INGRESO" | "EGRESO")}>
+                    <option value="EGRESO">Egreso (Gasto)</option>
+                    <option value="INGRESO">Ingreso (Reintegro / Reposición)</option>
+                  </select>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem", marginBottom: "0.25rem" }}>
+                  <div className="field">
+                    <label style={{ fontSize: "0.78rem" }}>Fecha</label>
+                    <input type="date" required value={editFecha} onChange={(e) => setEditFecha(e.target.value)} />
+                  </div>
+                  <div className="field">
+                    <label style={{ fontSize: "0.78rem" }}>No. Documento</label>
+                    <input type="text" value={editNumeroDocumento} onChange={(e) => setEditNumeroDocumento(e.target.value)} placeholder="Ej. DTE / 1234" />
+                  </div>
+                </div>
+
+                <div className="field" style={{ marginBottom: "0.25rem" }}>
+                  <label style={{ fontSize: "0.78rem" }}>Beneficiario / Proveedor</label>
+                  <input type="text" required minLength={2} value={editBeneficiario} onChange={(e) => setEditBeneficiario(e.target.value)} />
+                </div>
+
+                <div className="field" style={{ marginBottom: "0.25rem" }}>
+                  <label style={{ fontSize: "0.78rem" }}>Concepto / Descripción</label>
+                  <input type="text" required minLength={2} value={editDescripcion} onChange={(e) => setEditDescripcion(e.target.value)} />
+                </div>
+
+                {editTipo === "EGRESO" && (
+                  <div className="field" style={{ marginBottom: "0.25rem" }}>
+                    <label style={{ fontSize: "0.78rem" }}>Categoría de Gasto</label>
+                    <select required value={editCategoria} onChange={(e) => setEditCategoria(e.target.value as CategoriaCajaChica)}>
+                      <option value="" disabled>Seleccione categoría</option>
+                      {CATEGORIAS.map(([val, label]) => (
+                        <option key={val} value={val}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="field" style={{ marginBottom: "0.35rem" }}>
+                  <label style={{ fontSize: "0.78rem" }}>Monto Exacto (Q)</label>
+                  <input type="number" required min="0.01" step="0.01" value={editMonto} onChange={(e) => setEditMonto(e.target.value)} style={{ fontWeight: 700 }} />
+                </div>
+
+                <div style={{ padding: "0.5rem 0.65rem", background: "rgba(234, 179, 8, 0.12)", border: "1px solid rgba(234, 179, 8, 0.3)", borderRadius: "6px", marginBottom: "0.4rem" }}>
+                  <div className="field" style={{ marginBottom: 0 }}>
+                    <label style={{ color: "#a16207", fontWeight: 700, fontSize: "0.76rem" }}>
+                      Motivo de la Corrección (Obligatorio, mín. 10 caracteres)
+                    </label>
+                    <textarea
+                      required
+                      minLength={10}
+                      rows={2}
+                      value={editMotivo}
+                      onChange={(e) => setEditMotivo(e.target.value)}
+                      placeholder="Ej: Se ajustó el monto según factura física autorizada"
+                      style={{ fontSize: "0.78rem", marginTop: "0.2rem" }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "0.4rem" }}>
+                  <button type="submit" className="btn" disabled={editGuardando} style={{ flex: 1, fontSize: "0.82rem", padding: "0.45rem" }}>
+                    {editGuardando ? "Guardando..." : "💾 Guardar Corrección"}
+                  </button>
+                  <button type="button" className="btn secondary" onClick={cancelarEdicion} disabled={editGuardando} style={{ fontSize: "0.82rem", padding: "0.45rem 0.75rem" }}>
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            ) : mostrarReposicion ? (
               <form onSubmit={handleReponerFondo} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <h3 style={{ margin: 0, fontSize: "0.95rem", color: "#10b981" }}>📥 Reposición Fondo Fijo</h3>
@@ -466,7 +627,7 @@ export default function CajaChica() {
                             title="Corregir Registro"
                             className="btn btn-icon"
                             style={{ padding: "0.2rem", fontSize: "0.9rem" }}
-                            onClick={() => setEditarRegistro(c)}
+                            onClick={() => iniciarEdicion(c)}
                           >
                             ✏️
                           </button>
@@ -485,26 +646,6 @@ export default function CajaChica() {
           </div>
         </div>
       </div>
-
-      {mostrarReporte && (
-        <CajaChicaReporteModal
-          agenciaId={agenciaId || agencias[0]?.id || ""}
-          agencias={agencias}
-          puedeElegirAgencia={puedeElegirAgencia}
-          onClose={() => setMostrarReporte(false)}
-        />
-      )}
-
-      {editarRegistro && (
-        <CajaChicaEditModal
-          registro={editarRegistro}
-          onClose={() => setEditarRegistro(null)}
-          onSuccess={() => {
-            setEditarRegistro(null);
-            cargar();
-          }}
-        />
-      )}
     </div>
   );
 }

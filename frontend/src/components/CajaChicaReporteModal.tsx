@@ -170,36 +170,25 @@ export default function CajaChicaReporteModal({
 
   return (
     <div
-      className="caja-chica-modal-overlay"
+      className="caja-chica-reporte-container"
       style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.75)",
-        zIndex: 9999,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start",
-        overflowY: "auto",
-        padding: "1rem 0.5rem",
+        width: "100%",
+        padding: "0.5rem 0 2rem",
       }}
     >
       <div
-        className="card caja-chica-modal-card"
+        className="card caja-chica-reporte-card"
         style={{
           width: "100%",
-          maxWidth: "1050px",
+          maxWidth: "1150px",
           background: "var(--paper)",
           borderRadius: "10px",
-          boxShadow: "0 20px 40px -10px rgba(0, 0, 0, 0.5)",
           border: "1px solid var(--line)",
           padding: "1.2rem",
-          margin: "auto",
+          margin: "0 auto",
         }}
       >
-        {/* Cabecera del Modal (no-print) */}
+        {/* Cabecera del Informe (no-print) */}
         <div
           className="no-print"
           style={{
@@ -213,21 +202,41 @@ export default function CajaChicaReporteModal({
             flexWrap: "wrap",
           }}
         >
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-              <span style={{ fontSize: "1.3rem" }}>📄</span>
-              <h2 style={{ margin: 0, fontSize: "1.2rem" }}>Informe de Rendición de Gastos de Caja Chica</h2>
-            </div>
-            <p style={{ margin: "0.15rem 0 0", fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-              Liquidación y cuadre optimizado para 1 página carta.
-            </p>
-          </div>
-
-          <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <button
               type="button"
               className="btn secondary"
-              style={{ padding: "0.35rem 0.75rem", fontSize: "0.82rem" }}
+              style={{
+                padding: "0.42rem 0.85rem",
+                fontSize: "0.85rem",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                gap: "0.3rem",
+                cursor: "pointer",
+                borderColor: "var(--line)",
+              }}
+              onClick={onClose}
+              title="Volver al libro de caja chica"
+            >
+              ← Volver al Libro
+            </button>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <span style={{ fontSize: "1.3rem" }}>📄</span>
+                <h2 style={{ margin: 0, fontSize: "1.2rem" }}>Informe de Rendición de Gastos de Caja Chica</h2>
+              </div>
+              <p style={{ margin: "0.15rem 0 0", fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+                Liquidación y cuadre oficial de auditoría cooperativa — optimizado para 1 página carta.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn secondary"
+              style={{ padding: "0.42rem 0.85rem", fontSize: "0.82rem" }}
               onClick={exportarCSV}
               disabled={!reporte || reporte.egresos.length === 0}
               title="Descargar datos en Excel CSV"
@@ -237,21 +246,12 @@ export default function CajaChicaReporteModal({
             <button
               type="button"
               className="btn"
-              style={{ padding: "0.35rem 0.85rem", fontSize: "0.82rem" }}
+              style={{ padding: "0.42rem 0.95rem", fontSize: "0.82rem", background: "var(--accent)" }}
               onClick={() => window.print()}
               disabled={!reporte}
               title="Imprimir informe en 1 hoja o guardar en PDF"
             >
               🖨️ Imprimir / Guardar PDF
-            </button>
-            <button
-              type="button"
-              className="btn secondary"
-              style={{ padding: "0.35rem 0.65rem", fontSize: "0.9rem" }}
-              onClick={onClose}
-              title="Cerrar ventana"
-            >
-              ✕
             </button>
           </div>
         </div>
@@ -745,3 +745,5 @@ export default function CajaChicaReporteModal({
     </div>
   );
 }
+
+export { CajaChicaReporteModal as CajaChicaReporteView };

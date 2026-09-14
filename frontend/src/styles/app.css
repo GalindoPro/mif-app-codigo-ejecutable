@@ -1490,7 +1490,17 @@ td a {
     break-inside: avoid !important;
   }
 
-  /* Modal de Informe de Caja Chica optimizado para imprimir */
+  /* Ocultar modales, overlays y paneles no imprimibles al imprimir */
+  .modal,
+  .modal-overlay,
+  .no-print,
+  .sidebar,
+  .app-header {
+    display: none !important;
+  }
+
+  /* Contenedores de reportes directos en pantalla optimizados para imprimir */
+  .caja-chica-reporte-container,
   .caja-chica-modal-overlay,
   .arqueo-modal-overlay {
     position: absolute !important;
@@ -1502,6 +1512,7 @@ td a {
     width: 100% !important;
   }
 
+  .caja-chica-reporte-card,
   .caja-chica-modal-card,
   .arqueo-modal-card {
     max-width: 100% !important;
@@ -1526,6 +1537,31 @@ td a {
     opacity: 1 !important;
     visibility: visible !important;
   }
+}
+
+/* Modales estándar del sistema */
+.modal {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(2px);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.modal-content {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 500px;
+  color: var(--ink);
 }
 
 
