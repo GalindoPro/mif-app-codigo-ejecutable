@@ -20,6 +20,48 @@ import ReciboMovimientoModal from "./ReciboMovimientoModal";
 import type { CajaMovimientoAuxiliar } from "../../types";
 import { useAuth } from "../../context/AuthContext";
 
+function renderRolBadge(rol?: string) {
+  if (!rol) return null;
+  switch (rol) {
+    case "CAJA_CHICA":
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(16, 185, 129, 0.15)", color: "#059669", fontWeight: 600 }}>
+          📥 Caja Chica
+        </span>
+      );
+    case "CAJERO":
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(37, 99, 235, 0.15)", color: "#2563eb", fontWeight: 600 }}>
+          💵 Cajero
+        </span>
+      );
+    case "GERENCIA":
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(147, 51, 234, 0.15)", color: "#9333ea", fontWeight: 600 }}>
+          🛡️ Admin
+        </span>
+      );
+    case "SUPERVISOR":
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(217, 119, 6, 0.15)", color: "#d97706", fontWeight: 600 }}>
+          👁️ Supervisor
+        </span>
+      );
+    case "PROMOTOR":
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(100, 116, 139, 0.15)", color: "#64748b", fontWeight: 600 }}>
+          📂 Promotor
+        </span>
+      );
+    default:
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(100, 116, 139, 0.1)", color: "var(--ink-soft)", fontWeight: 500 }}>
+          {rol}
+        </span>
+      );
+  }
+}
+
 export interface CajaAbiertaProps {
   agenciaId: string;
   detalle: DetalleCajaAuxiliar;
@@ -174,25 +216,27 @@ export default function CajaAbierta({
               + Nuevo Mov.
             </button>
           </div>
-          <button
-            type="button"
-            className="btn secondary"
-            style={{
-              width: "100%",
-              marginTop: "0.4rem",
-              padding: "0.35rem 0.5rem",
-              fontSize: "0.76rem",
-              justifyContent: "center",
-              borderColor: "rgba(220, 38, 38, 0.4)",
-              color: "#ef4444",
-            }}
-            onClick={() => {
-              cerrarTodosFormularios();
-              setMostrarCierre(!mostrarCierre);
-            }}
-          >
-            🔒 Cerrar Caja del Día
-          </button>
+          {usuario?.rol !== "CAJA_CHICA" && (
+            <button
+              type="button"
+              className="btn secondary"
+              style={{
+                width: "100%",
+                marginTop: "0.4rem",
+                padding: "0.35rem 0.5rem",
+                fontSize: "0.76rem",
+                justifyContent: "center",
+                borderColor: "rgba(220, 38, 38, 0.4)",
+                color: "#ef4444",
+              }}
+              onClick={() => {
+                cerrarTodosFormularios();
+                setMostrarCierre(!mostrarCierre);
+              }}
+            >
+              🔒 Cerrar Caja del Día
+            </button>
+          )}
         </div>
 
         {/* CONSOLIDADO DE FONDOS INSTITUCIONALES */}
@@ -359,7 +403,7 @@ export default function CajaAbierta({
               />
             )}
 
-            {mostrarCierre && (
+            {mostrarCierre && usuario?.rol !== "CAJA_CHICA" && (
               <CierreCajaForm
                 diaId={detalle.dia.id}
                 saldoEsperado={detalle.saldoActual}
@@ -423,7 +467,12 @@ export default function CajaAbierta({
                       {m.tipo === "EGRESO" ? formatoQ(m.monto) : ""}
                     </td>
                     <td className="mono" style={{ fontWeight: 700, textAlign: "right", fontSize: "0.8rem" }}>{formatoQ(m.saldo_acumulado)}</td>
-                    <td style={{ fontSize: "0.74rem", color: "var(--ink-soft)" }}>{m.usuario_nombre}</td>
+                    <td style={{ fontSize: "0.74rem", color: "var(--ink-soft)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
+                        <span>{m.usuario_nombre}</span>
+                        {renderRolBadge(m.usuario_rol)}
+                      </div>
+                    </td>
                     <td style={{ textAlign: "center" }}>
                       <div style={{ display: "flex", gap: "0.2rem", justifyContent: "center" }}>
                         <button

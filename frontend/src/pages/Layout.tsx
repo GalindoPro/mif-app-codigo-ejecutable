@@ -207,10 +207,11 @@ export default function Layout() {
 
           {/* ── CAJA CHICA ── */}
           {usuario?.rol === "CAJA_CHICA" && (<>
-            <Section label="Caja Chica" />
-            <NavItem to="/caja-chica" icon="📥" label="Caja Chica"       onClick={closeSidebar} />
+            <Section label="Caja y Ventanilla" />
+            <NavItem to="/auxiliar-caja" icon="💵" label="Auxiliar de Caja" onClick={closeSidebar} />
+            <NavItem to="/caja-chica"    icon="📥" label="Caja Chica"       onClick={closeSidebar} />
             <Section label="Socios" />
-            <NavItem to="/socios"   icon="👥" label="Consultar Socios" onClick={closeSidebar} />
+            <NavItem to="/socios"        icon="👥" label="Consultar Socios" onClick={closeSidebar} />
           </>)}
 
           {/* ── PROMOTOR ── */}

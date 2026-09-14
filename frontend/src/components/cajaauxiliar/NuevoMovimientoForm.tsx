@@ -239,6 +239,15 @@ export default function NuevoMovimientoForm({
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [docNoDuplicado, setDocNoDuplicado] = useState(false);
+  const [infoDuplicado, setInfoDuplicado] = useState<{
+    existe: boolean;
+    modulo?: string;
+    fecha?: string;
+    beneficiario?: string;
+    descripcion?: string;
+    usuario?: string;
+    usuarioRol?: string;
+  } | null>(null);
   const [verificandoDocNo, setVerificandoDocNo] = useState(false);
 
   function cambiarGrupo(nuevo: (typeof GRUPOS)[number]["key"]) {
@@ -291,14 +300,29 @@ export default function NuevoMovimientoForm({
     const doc = docNo.trim();
     if (!doc) {
       setDocNoDuplicado(false);
+      setInfoDuplicado(null);
       return;
     }
     setVerificandoDocNo(true);
     const t = setTimeout(() => {
       api
-        .get<{ existe: boolean }>(`/caja-auxiliar/${diaId}/verificar-doc-no`, { params: { docNo: doc } })
-        .then(({ data }) => setDocNoDuplicado(data.existe))
-        .catch(() => setDocNoDuplicado(false))
+        .get<{
+          existe: boolean;
+          modulo?: string;
+          fecha?: string;
+          beneficiario?: string;
+          descripcion?: string;
+          usuario?: string;
+          usuarioRol?: string;
+        }>(`/caja-auxiliar/${diaId}/verificar-doc-no`, { params: { docNo: doc } })
+        .then(({ data }) => {
+          setDocNoDuplicado(data.existe);
+          setInfoDuplicado(data.existe ? data : null);
+        })
+        .catch(() => {
+          setDocNoDuplicado(false);
+          setInfoDuplicado(null);
+        })
         .finally(() => setVerificandoDocNo(false));
     }, 450);
     return () => clearTimeout(t);
@@ -421,10 +445,15 @@ export default function NuevoMovimientoForm({
                 <label htmlFor="aux-doc">No. de documento</label>
                 <input id="aux-doc" value={docNo} onChange={(e) => setDocNo(e.target.value)} />
                 {verificandoDocNo && <span className="sub" style={{ fontSize: "0.72rem" }}>Verificando...</span>}
-                {!verificandoDocNo && docNoDuplicado && (
-                  <span style={{ color: "#dc2626", fontSize: "0.75rem", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
-                    Este número ya fue registrado en la caja de hoy.
-                  </span>
+                {!verificandoDocNo && infoDuplicado && (
+                  <div style={{ background: "rgba(220, 38, 38, 0.1)", border: "1px solid #ef4444", borderRadius: "6px", padding: "0.4rem 0.6rem", marginTop: "0.3rem", fontSize: "0.76rem", color: "#dc2626" }}>
+                    <strong>⚠️ Documento ya utilizado:</strong>
+                    <div>Registrado en: <strong>{infoDuplicado.modulo}</strong> {infoDuplicado.fecha ? `el ${new Date(infoDuplicado.fecha).toLocaleDateString("es-GT")}` : ""}</div>
+                    {infoDuplicado.beneficiario && <div>Beneficiario: {infoDuplicado.beneficiario}</div>}
+                    {infoDuplicado.usuario && (
+                      <div>Por: <strong>{infoDuplicado.usuario}</strong> {infoDuplicado.usuarioRol ? `(${infoDuplicado.usuarioRol})` : ""}</div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -433,10 +462,15 @@ export default function NuevoMovimientoForm({
                 <label htmlFor="aux-doc-cuenta">No. de recibo</label>
                 <input id="aux-doc-cuenta" value={docNo} onChange={(e) => setDocNo(e.target.value)} />
                 {verificandoDocNo && <span className="sub" style={{ fontSize: "0.72rem" }}>Verificando...</span>}
-                {!verificandoDocNo && docNoDuplicado && (
-                  <span style={{ color: "#dc2626", fontSize: "0.75rem", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
-                    Este número ya fue registrado en la caja de hoy.
-                  </span>
+                {!verificandoDocNo && infoDuplicado && (
+                  <div style={{ background: "rgba(220, 38, 38, 0.1)", border: "1px solid #ef4444", borderRadius: "6px", padding: "0.4rem 0.6rem", marginTop: "0.3rem", fontSize: "0.76rem", color: "#dc2626" }}>
+                    <strong>⚠️ Recibo ya utilizado:</strong>
+                    <div>Registrado en: <strong>{infoDuplicado.modulo}</strong> {infoDuplicado.fecha ? `el ${new Date(infoDuplicado.fecha).toLocaleDateString("es-GT")}` : ""}</div>
+                    {infoDuplicado.beneficiario && <div>Beneficiario: {infoDuplicado.beneficiario}</div>}
+                    {infoDuplicado.usuario && (
+                      <div>Por: <strong>{infoDuplicado.usuario}</strong> {infoDuplicado.usuarioRol ? `(${infoDuplicado.usuarioRol})` : ""}</div>
+                    )}
+                  </div>
                 )}
               </div>
             )}

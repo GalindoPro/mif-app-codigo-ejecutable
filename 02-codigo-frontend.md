@@ -250,6 +250,7 @@ import { useAuth } from "./context/AuthContext";
 function InicioRedirect() {
   const { usuario } = useAuth();
   if (usuario?.rol === "CAJERO") return <Navigate to="/auxiliar-caja" replace />;
+  if (usuario?.rol === "CAJA_CHICA") return <Navigate to="/caja-chica" replace />;
   if (usuario?.rol === "PROMOTOR") return <Navigate to="/promotor/cartera" replace />;
   return <Navigate to="/tablero" replace />;
 }
@@ -257,6 +258,7 @@ function InicioRedirect() {
 function TableroRouteGuard() {
   const { usuario } = useAuth();
   if (usuario?.rol === "CAJERO") return <Navigate to="/auxiliar-caja" replace />;
+  if (usuario?.rol === "CAJA_CHICA") return <Navigate to="/caja-chica" replace />;
   if (usuario?.rol === "PROMOTOR") return <Navigate to="/promotor/cartera" replace />;
   return <Tablero />;
 }
@@ -328,7 +330,7 @@ createRoot(document.getElementById("root")!).render(
 ## `frontend/src/types.ts` {#frontendsrctypests}
 
 ```ts
-export type RolUsuario = "ADMIN" | "GERENCIA" | "SUPERVISOR" | "CAJERO" | "PROMOTOR";
+export type RolUsuario = "GERENCIA" | "SUPERVISOR" | "CAJERO" | "CAJA_CHICA" | "PROMOTOR";
 
 export interface UsuarioAutenticado {
   id: string;
@@ -354,7 +356,6 @@ export interface Socio {
   agencia_codigo?: string;
   nombres: string;
   genero: "M" | "F" | null;
-  edad?: number | null;
   fecha_ingreso: string;
   estado: "ACTIVO" | "INACTIVO";
   dpi: string | null;
@@ -398,7 +399,6 @@ export interface AportacionSocio {
   numero_asociado: string;
   nombres: string;
   dpi: string | null;
-  edad: number | null;
   genero: "M" | "F" | null;
   fecha_ingreso: string;
   direccion: string | null;
@@ -420,11 +420,11 @@ export interface ListaSocios {
 }
 
 export const ROL_LABEL: Record<RolUsuario, string> = {
-  ADMIN: "Administrador",
-  GERENCIA: "Gerencia",
-  SUPERVISOR: "Jefe de agencia",
-  CAJERO: "Operador",
-  PROMOTOR: "Promotor de crédito",
+  GERENCIA: "Administrador",
+  SUPERVISOR: "Jefe de Agencia",
+  CAJERO: "Cajero Auxiliar",
+  CAJA_CHICA: "Operador Caja Chica",
+  PROMOTOR: "Promotor de Crédito",
 };
 
 export type TipoCuentaAhorro =
@@ -432,7 +432,8 @@ export type TipoCuentaAhorro =
   | "AHORRO_PROGRAMADO"
   | "AHORRO_INFANTO_JUVENIL"
   | "AHORRO_SOBRE_PRESTAMO"
-  | "AHORRO_PLAZO_FIJO";
+  | "AHORRO_PLAZO_FIJO"
+  | "APORTACION";
 
 export interface Cuenta {
   id: string;
@@ -456,6 +457,10 @@ export interface Cuenta {
   promotor_nombre?: string | null;
   promotor_email?: string | null;
   socio_telefono?: string | null;
+  titular_menor_nombre?: string | null;
+  titular_menor_parentesco?: string | null;
+  titular_menor_cui?: string | null;
+  titular_menor_fecha_nacimiento?: string | null;
   created_at: string;
 }
 
@@ -511,6 +516,12 @@ export const TIPOS_AHORRO: AhorroTipoConfig[] = [
     titulo: "Ahorro a Plazo Fijo",
     descripcion: "Certificados de depósito a plazo fijo (Kardex PF) con cálculo de intereses e ISR.",
   },
+  {
+    tipo: "APORTACION",
+    slug: "aportacion",
+    titulo: "Aportación Estatutaria",
+    descripcion: "Capital social institucional del asociado.",
+  },
 ];
 
 export type CategoriaCajaChica =
@@ -552,7 +563,9 @@ export interface CajaChicaComprobante {
   tipo: "INGRESO" | "EGRESO";
   categoria: CategoriaCajaChica | null;
   monto: string;
+  usuario_id: string;
   usuario_nombre: string;
+  usuario_rol?: string;
   created_at: string;
 }
 
@@ -791,7 +804,9 @@ export interface CajaMovimientoAuxiliar {
   monto: string;
   saldo_acumulado: string;
   origen_fondos?: OrigenFondos;
+  usuario_id: string;
   usuario_nombre: string;
+  usuario_rol?: string;
   created_at: string;
 }
 
@@ -891,13 +906,15 @@ export interface Prestamo {
   saldo_capital?: string | number | null;
   tasa_interes_mensual: string | number;
   plazo_meses: number;
-  cuota_mensual: string | number;
+  cuota_mensual: string;
+  cuotas_pagadas?: number;
   destino: string | null;
   garantia: string | null;
   ubicacion_garantia?: string | null;
   nombre_fiador?: string | null;
   dpi_fiador?: string | null;
   telefono_fiador?: string | null;
+  direccion_fiador?: string | null;
   documento_desembolso?: string | null;
   observaciones: string | null;
   fecha_solicitud: string;
@@ -909,6 +926,7 @@ export interface Prestamo {
   numero_credito_anterior?: string | null;
   created_at: string;
   amortizacion?: ResultadoSimulacion;
+  tiene_cobro_campo_pendiente?: boolean;
 }
 
 export interface FiadorItem {
@@ -1046,6 +1064,38 @@ export const ESTADO_PLAZO_FIJO_LABEL: Record<EstadoPlazoFijo, string> = {
   ACTIVO: "Vigente / Activo",
   LIQUIDADO: "Liquidado / Pagado",
 };
+
+// ---------------------------------------------------------------------------
+// Liquidación de Promotores (Cobros de Campo)
+// ---------------------------------------------------------------------------
+export type EstadoCobroCampo = "PENDIENTE" | "LIQUIDADO" | "RECHAZADO";
+
+export interface CobroCampo {
+  id: string;
+  promotor_id: string;
+  agencia_id: string;
+  socio_id: string;
+  socio_nombres?: string;
+  numero_asociado?: string;
+  prestamo_id: string;
+  prestamo_codigo?: string;
+  fecha: string;
+  numero_recibo_fisico: string;
+  monto: number;
+  pago_capital: number;
+  pago_interes: number;
+  pago_mora: number;
+  ahorro_prestamo: number;
+  estado: EstadoCobroCampo;
+  justificacion_edicion?: string | null;
+  veces_editado: number;
+  caja_dia_id?: string | null;
+  caja_movimiento_id?: string | null;
+  prestamo_pago_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  liquidado_at?: string | null;
+}
 ```
 
 ## `frontend/src/components/BuscadorCuenta.tsx` {#frontendsrccomponentsbuscadorcuentatsx}
@@ -3739,6 +3789,48 @@ import { CajaChicaReporteView } from "../components/CajaChicaReporteModal";
 
 const CATEGORIAS = Object.entries(CATEGORIA_CAJA_CHICA_LABEL) as [CategoriaCajaChica, string][];
 
+function renderRolBadge(rol?: string) {
+  if (!rol) return null;
+  switch (rol) {
+    case "CAJA_CHICA":
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(16, 185, 129, 0.15)", color: "#059669", fontWeight: 600 }}>
+          📥 Caja Chica
+        </span>
+      );
+    case "CAJERO":
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(37, 99, 235, 0.15)", color: "#2563eb", fontWeight: 600 }}>
+          💵 Cajero
+        </span>
+      );
+    case "GERENCIA":
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(147, 51, 234, 0.15)", color: "#9333ea", fontWeight: 600 }}>
+          🛡️ Admin
+        </span>
+      );
+    case "SUPERVISOR":
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(217, 119, 6, 0.15)", color: "#d97706", fontWeight: 600 }}>
+          👁️ Supervisor
+        </span>
+      );
+    case "PROMOTOR":
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(100, 116, 139, 0.15)", color: "#64748b", fontWeight: 600 }}>
+          📂 Promotor
+        </span>
+      );
+    default:
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(100, 116, 139, 0.1)", color: "var(--ink-soft)", fontWeight: 500 }}>
+          {rol}
+        </span>
+      );
+  }
+}
+
 export default function CajaChica() {
   const { usuario } = useAuth();
   const puedeElegirAgencia = usuario?.rol === "GERENCIA";
@@ -3761,6 +3853,15 @@ export default function CajaChica() {
   const [numeroDocumento, setNumeroDocumento] = useState("DTE");
   const [guardando, setGuardando] = useState(false);
   const [docDuplicado, setDocDuplicado] = useState(false);
+  const [infoDocDuplicado, setInfoDocDuplicado] = useState<{
+    existe: boolean;
+    modulo?: string;
+    fecha?: string;
+    beneficiario?: string;
+    descripcion?: string;
+    usuario?: string;
+    usuarioRol?: string;
+  } | null>(null);
   const [verificandoDoc, setVerificandoDoc] = useState(false);
 
   // Estados para Reposición de Fondo Fijo
@@ -3820,19 +3921,35 @@ export default function CajaChica() {
   useEffect(() => {
     if (!mostrarForm || !agenciaId) {
       setDocDuplicado(false);
+      setInfoDocDuplicado(null);
       return;
     }
     const doc = numeroDocumento.trim();
     if (!doc || doc.toUpperCase() === "DTE") {
       setDocDuplicado(false);
+      setInfoDocDuplicado(null);
       return;
     }
     setVerificandoDoc(true);
     const t = setTimeout(() => {
       api
-        .get<{ existe: boolean }>("/caja-chica/verificar-documento", { params: { agenciaId, fecha, numeroDocumento: doc } })
-        .then(({ data }) => setDocDuplicado(data.existe))
-        .catch(() => setDocDuplicado(false))
+        .get<{
+          existe: boolean;
+          modulo?: string;
+          fecha?: string;
+          beneficiario?: string;
+          descripcion?: string;
+          usuario?: string;
+          usuarioRol?: string;
+        }>("/caja-chica/verificar-documento", { params: { agenciaId, fecha, numeroDocumento: doc } })
+        .then(({ data }) => {
+          setDocDuplicado(data.existe);
+          setInfoDocDuplicado(data.existe ? data : null);
+        })
+        .catch(() => {
+          setDocDuplicado(false);
+          setInfoDocDuplicado(null);
+        })
         .finally(() => setVerificandoDoc(false));
     }, 450);
     return () => clearTimeout(t);
@@ -4203,10 +4320,15 @@ export default function CajaChica() {
                   <label htmlFor="cc-documento">No. de documento</label>
                   <input id="cc-documento" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} />
                   {verificandoDoc && <span className="sub" style={{ fontSize: "0.72rem" }}>Verificando...</span>}
-                  {!verificandoDoc && docDuplicado && (
-                    <span style={{ color: "#dc2626", fontSize: "0.75rem", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
-                      Este número de documento ya fue registrado hoy en Caja Chica.
-                    </span>
+                  {!verificandoDoc && infoDocDuplicado && (
+                    <div style={{ background: "rgba(220, 38, 38, 0.1)", border: "1px solid #ef4444", borderRadius: "6px", padding: "0.4rem 0.6rem", marginTop: "0.3rem", fontSize: "0.76rem", color: "#dc2626" }}>
+                      <strong>⚠️ Documento ya registrado:</strong>
+                      <div>Registrado en: <strong>{infoDocDuplicado.modulo}</strong> {infoDocDuplicado.fecha ? `el ${new Date(infoDocDuplicado.fecha).toLocaleDateString("es-GT")}` : ""}</div>
+                      {infoDocDuplicado.beneficiario && <div>Beneficiario: {infoDocDuplicado.beneficiario}</div>}
+                      {infoDocDuplicado.usuario && (
+                        <div>Por: <strong>{infoDocDuplicado.usuario}</strong> {infoDocDuplicado.usuarioRol ? `(${infoDocDuplicado.usuarioRol})` : ""}</div>
+                      )}
+                    </div>
                   )}
                 </div>
                 <button type="submit" className="btn" disabled={guardando || !agenciaId || docDuplicado} style={{ marginTop: "0.3rem" }}>
@@ -4351,7 +4473,12 @@ export default function CajaChica() {
                       >
                         {c.tipo === "EGRESO" ? "−" : "+"} {formatoQ(c.monto)}
                       </td>
-                      <td style={{ fontSize: "0.76rem", color: "var(--ink-soft)" }}>{c.usuario_nombre}</td>
+                      <td style={{ fontSize: "0.76rem", color: "var(--ink-soft)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
+                          <span>{c.usuario_nombre}</span>
+                          {renderRolBadge(c.usuario_rol)}
+                        </div>
+                      </td>
                       <td style={{ textAlign: "center" }}>
                         {(usuario?.rol === "GERENCIA" || (c.usuario_id === usuario?.id && c.created_at.startsWith(new Date().toISOString().slice(0, 10)))) && (
                           <button
@@ -4385,60 +4512,355 @@ export default function CajaChica() {
 ## `frontend/src/pages/Layout.tsx` {#frontendsrcpageslayouttsx}
 
 ```tsx
+import { useState, useRef, useCallback } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ROL_LABEL, TIPOS_AHORRO } from "../types";
+import { api, mensajeError } from "../lib/api";
+
+// ── TOOLTIP GLOBAL (portal-style via fixed position) ──
+interface TooltipState {
+  text: string;
+  x: number;
+  y: number;
+}
 
 export default function Layout() {
   const { usuario, logout } = useAuth();
   const navigate = useNavigate();
+  const [reseteando, setReseteando] = useState(false);
+  const [recargando, setRecargando] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const tooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const closeSidebar = () => setSidebarOpen(false);
+
+  // Show tooltip after 300ms delay
+  const showTooltip = useCallback((e: React.MouseEvent<HTMLAnchorElement>, label: string) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (tooltipTimer.current) clearTimeout(tooltipTimer.current);
+    tooltipTimer.current = setTimeout(() => {
+      setTooltip({
+        text: label,
+        x: rect.right + 10,
+        y: rect.top + rect.height / 2,
+      });
+    }, 300);
+  }, []);
+
+  const hideTooltip = useCallback(() => {
+    if (tooltipTimer.current) clearTimeout(tooltipTimer.current);
+    setTooltip(null);
+  }, []);
+
+  async function handleResetGlobal() {
+    const confirmado = window.confirm(
+      "⚠️ ¿Estás seguro de que deseas REINICIAR EL SISTEMA DESDE CERO?\n\n" +
+      "Esta acción vaciará todas las tablas (socios, créditos, ahorros, movimientos, cajas) para empezar limpio."
+    );
+    if (!confirmado) return;
+    setReseteando(true);
+    try {
+      const { data } = await api.post<{ ok: boolean; mensaje: string }>("/sistema/reset");
+      alert(data.mensaje);
+      window.location.reload();
+    } catch (err) {
+      alert(mensajeError(err));
+    } finally {
+      setReseteando(false);
+    }
+  }
+
+  async function handleRecargarGlobal() {
+    const confirmado = window.confirm(
+      "📥 ¿Deseas RECARGAR TODOS LOS DATOS EXISTENTES de los libros Excel?\n\n" +
+      "Esta acción restaurará la base de datos oficial:\n" +
+      "• 568 asociados con sus aportaciones\n" +
+      "• 65 préstamos de cartera viva\n" +
+      "• 692 certificados de plazo fijo"
+    );
+    if (!confirmado) return;
+    setRecargando(true);
+    try {
+      const { data } = await api.post<{ ok: boolean; mensaje: string }>("/sistema/recargar-datos");
+      alert(data.mensaje);
+      window.location.reload();
+    } catch (err) {
+      alert(mensajeError(err));
+    } finally {
+      setRecargando(false);
+    }
+  }
+
   const cls = ({ isActive }: { isActive: boolean }) => (isActive ? "active" : "");
 
+  const iniciales = usuario?.nombre
+    ? usuario.nombre.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
+    : "U";
+
+  // NavItem with universal tooltip
+  function NavItem({ to, icon, label, onClick }: { to: string; icon: string; label: string; onClick?: () => void }) {
+    return (
+      <NavLink
+        to={to}
+        className={cls}
+        onClick={onClick}
+        onMouseEnter={(e) => showTooltip(e, label)}
+        onMouseLeave={hideTooltip}
+      >
+        <span className="nav-icon">{icon}</span>
+        <span className="nav-label">{label}</span>
+      </NavLink>
+    );
+  }
+
+  function Section({ label }: { label: string }) {
+    return <div className="nav-section">{label}</div>;
+  }
+
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <span className="name">MIF</span>
-          <span className="sub">Sistema integral</span>
+    <div className={`shell${collapsed ? " sidebar-collapsed" : ""}`}>
+
+      {/* ── GLOBAL TOOLTIP (floating pill) ── */}
+      {tooltip && (
+        <div
+          style={{
+            position: "fixed",
+            left: tooltip.x,
+            top: tooltip.y,
+            transform: "translateY(-50%)",
+            zIndex: 9999,
+            pointerEvents: "none",
+            animation: "tooltip-in 0.12s ease forwards",
+          }}
+        >
+          {/* Arrow */}
+          <div style={{
+            position: "absolute",
+            left: -6,
+            top: "50%",
+            transform: "translateY(-50%)",
+            width: 0, height: 0,
+            borderTop: "5px solid transparent",
+            borderBottom: "5px solid transparent",
+            borderRight: "6px solid #162033",
+          }} />
+          {/* Pill */}
+          <div style={{
+            background: "#162033",
+            color: "#e2e8f0",
+            fontSize: "0.76rem",
+            fontWeight: 600,
+            padding: "0.3rem 0.75rem",
+            borderRadius: "8px",
+            whiteSpace: "nowrap",
+            border: "1px solid rgba(52,211,153,0.22)",
+            boxShadow: "0 6px 20px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.3)",
+            letterSpacing: "0.01em",
+          }}>
+            {tooltip.text}
+          </div>
         </div>
-        <nav className="nav">
-          <NavLink to="/tablero" className={cls}>
-            Tablero
-          </NavLink>
-          <NavLink to="/socios" className={cls}>
-            Socios
-          </NavLink>
-          <NavLink to="/auxiliar-caja" className={cls}>
-            Auxiliar de caja
-          </NavLink>
-          <NavLink to="/caja-chica" className={cls}>
-            Caja chica
-          </NavLink>
-          {TIPOS_AHORRO.map((t) => (
-            <NavLink key={t.slug} to={`/ahorros/${t.slug}`} className={cls}>
-              {t.titulo}
-            </NavLink>
-          ))}
-          {(usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA") && (
-            <NavLink to="/agencias" className={cls}>
-              Agencias
-            </NavLink>
-          )}
-        </nav>
-        <div className="sidebar-footer">
-          <div className="who">{usuario?.nombre}</div>
-          <div className="role">{usuario ? ROL_LABEL[usuario.rol] : ""}</div>
+      )}
+
+      {/* ── MOBILE TOP BAR ── */}
+      <div className="mobile-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <div style={{
+            width: 28, height: 28,
+            background: "linear-gradient(135deg, #047857 0%, #065f46 100%)",
+            color: "#fff", borderRadius: "7px",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontWeight: 900, fontSize: "0.9rem",
+          }}>M</div>
+          <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "var(--ink)" }}>MIF COOP</span>
+        </div>
+        <button className="hamburger-btn" onClick={() => setSidebarOpen(true)}>☰</button>
+      </div>
+
+      <div className={`sidebar-backdrop ${sidebarOpen ? "show" : ""}`} onClick={closeSidebar} />
+
+      {/* ══════════════════════════════════════════════
+           SIDEBAR COLLAPSIBLE ICON-RAIL
+      ══════════════════════════════════════════════ */}
+      <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
+
+        {/* ── BRAND + TOGGLE ── */}
+        <div className="brand">
           <button
-            className="link-btn"
-            onClick={() => {
-              logout();
-              navigate("/login", { replace: true });
-            }}
+            className="sidebar-toggle"
+            onClick={() => setCollapsed((c) => !c)}
+            title={collapsed ? "Expandir menú" : "Colapsar menú"}
           >
-            Cerrar sesión
+            <div className="sidebar-toggle-logo">M</div>
+            <div className="sidebar-toggle-text">
+              <span className="name">MIF COOP</span>
+              <span className="sub">Maya Inversiones Futuras</span>
+            </div>
+            <i className="sidebar-chevron">‹</i>
           </button>
+          <div className="agency-badge">
+            <span className="agency-badge-dot" />
+            <span className="agency-badge-text">Agencia Chajul · Activa</span>
+          </div>
+        </div>
+
+        {/* ── NAV ── */}
+        <nav className="nav">
+
+          {/* ── CAJERO (Auxiliar de Caja) ── */}
+          {usuario?.rol === "CAJERO" && (<>
+            <Section label="Ventanilla y Caja" />
+            <NavItem to="/auxiliar-caja" icon="💵" label="Auxiliar de Caja"   onClick={closeSidebar} />
+            <Section label="Consultas y Cobros" />
+            <NavItem to="/socios"   icon="👥" label="Consultar Socios"  onClick={closeSidebar} />
+            <NavItem to="/creditos" icon="📄" label="Cobro de Créditos" onClick={closeSidebar} />
+          </>)}
+
+          {/* ── CAJA CHICA ── */}
+          {usuario?.rol === "CAJA_CHICA" && (<>
+            <Section label="Caja y Ventanilla" />
+            <NavItem to="/auxiliar-caja" icon="💵" label="Auxiliar de Caja" onClick={closeSidebar} />
+            <NavItem to="/caja-chica"    icon="📥" label="Caja Chica"       onClick={closeSidebar} />
+            <Section label="Socios" />
+            <NavItem to="/socios"        icon="👥" label="Consultar Socios" onClick={closeSidebar} />
+          </>)}
+
+          {/* ── PROMOTOR ── */}
+          {usuario?.rol === "PROMOTOR" && (<>
+            <Section label="Gestión de Campo" />
+            <NavItem to="/promotor/cartera"  icon="📂" label="Kardex Cartera"       onClick={closeSidebar} />
+            <NavItem to="/socios"            icon="👥" label="Socios en Campo"      onClick={closeSidebar} />
+            <NavItem to="/creditos"          icon="📄" label="Créditos y Simulador" onClick={closeSidebar} />
+          </>)}
+
+          {/* ── SUPERVISOR ── */}
+          {usuario?.rol === "SUPERVISOR" && (<>
+            <Section label="Supervisión y Control" />
+            <NavItem to="/tablero"         icon="📊" label="Tablero y Analítica"    onClick={closeSidebar} />
+            <NavItem to="/arqueos/mensual" icon="📑" label="Libro Mensual Arqueos"  onClick={closeSidebar} />
+            <Section label="Cartera y Créditos" />
+            <NavItem to="/creditos"         icon="📄" label="Bandeja de Créditos"   onClick={closeSidebar} />
+            <NavItem to="/promotor/cartera" icon="📂" label="Kardex Cartera"        onClick={closeSidebar} />
+            <NavItem to="/auxiliar-caja"    icon="💵" label="Arqueos e Hist. Caja"  onClick={closeSidebar} />
+            <Section label="Padrón y Captaciones" />
+            <NavItem to="/socios"             icon="👥" label="Padrón de Socios"     onClick={closeSidebar} />
+            <NavItem to="/aportaciones"       icon="🏛️" label="Aportaciones Capital" onClick={closeSidebar} />
+            <NavItem to="/ahorros/corriente"  icon="💰" label="Cuentas de Ahorro"    onClick={closeSidebar} />
+            <NavItem to="/ahorros/plazo-fijo" icon="📈" label="Plazo Fijo"           onClick={closeSidebar} />
+          </>)}
+
+          {/* ── GERENCIA (control total) ── */}
+          {usuario?.rol === "GERENCIA" && (<>
+            <Section label="Control General" />
+            <NavItem to="/tablero"         icon="📊" label="Tablero Global"        onClick={closeSidebar} />
+            <NavItem to="/arqueos/mensual" icon="📑" label="Libro Mensual Arqueos" onClick={closeSidebar} />
+
+            <Section label="Operaciones" />
+            <NavItem to="/auxiliar-caja"    icon="💵" label="Auxiliar de Caja" onClick={closeSidebar} />
+            <NavItem to="/caja-chica"       icon="📥" label="Caja Chica"       onClick={closeSidebar} />
+            <NavItem to="/creditos"         icon="📄" label="Créditos"         onClick={closeSidebar} />
+            <NavItem to="/promotor/cartera" icon="📂" label="Kardex Cartera"   onClick={closeSidebar} />
+
+            <Section label="Socios y Captaciones" />
+            <NavItem to="/socios"       icon="👥" label="Socios"       onClick={closeSidebar} />
+            <NavItem to="/aportaciones" icon="🏛️" label="Aportaciones" onClick={closeSidebar} />
+            {TIPOS_AHORRO.map((t) => (
+              <NavItem key={t.slug} to={`/ahorros/${t.slug}`} icon="🏦" label={t.titulo} onClick={closeSidebar} />
+            ))}
+
+            <Section label="Administración" />
+            <NavItem to="/alertas"   icon="🔔" label="Panel de Alertas"      onClick={closeSidebar} />
+            <NavItem to="/usuarios"  icon="👤" label="Usuarios"              onClick={closeSidebar} />
+            <NavItem to="/agencias"  icon="🏢" label="Agencias"              onClick={closeSidebar} />
+            <NavItem to="/auditoria" icon="🔍" label="Bitácora de Auditoría" onClick={closeSidebar} />
+            <NavItem to="/sesiones"  icon="🛡️" label="Sesiones Activas"      onClick={closeSidebar} />
+          </>)}
+        </nav>
+
+        {/* ── CONTROL DE DATOS (solo ADMIN) ── */}
+        {usuario?.rol === "GERENCIA" && !collapsed && (
+          <div style={{
+            padding: "0.5rem 0.75rem",
+            background: "rgba(2,132,199,0.07)",
+            borderTop: "1px solid rgba(255,255,255,0.04)",
+            borderBottom: "1px solid rgba(255,255,255,0.04)",
+            flexShrink: 0,
+          }}>
+            <div style={{
+              fontSize: "0.56rem", fontWeight: 800, color: "rgba(56,189,248,0.6)",
+              textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.35rem",
+            }}>
+              ⚙️ Control de Datos
+            </div>
+            <div style={{ display: "flex", gap: "0.3rem" }}>
+              <button
+                type="button" onClick={handleRecargarGlobal}
+                disabled={recargando || reseteando}
+                style={{
+                  flex: 1, fontSize: "0.66rem", padding: "0.3rem 0.35rem",
+                  background: "rgba(2,132,199,0.15)", color: "#38bdf8",
+                  border: "1px solid rgba(56,189,248,0.2)", borderRadius: "6px",
+                  cursor: "pointer", fontWeight: 600,
+                  opacity: recargando || reseteando ? 0.5 : 1,
+                }}
+                title="Restaurar datos de Excel"
+              >{recargando ? "⏳ …" : "📥 Excel"}</button>
+              <button
+                type="button" onClick={handleResetGlobal}
+                disabled={reseteando || recargando}
+                style={{
+                  flex: 1, fontSize: "0.66rem", padding: "0.3rem 0.35rem",
+                  background: "rgba(220,38,38,0.15)", color: "#f87171",
+                  border: "1px solid rgba(248,113,113,0.2)", borderRadius: "6px",
+                  cursor: "pointer", fontWeight: 600,
+                  opacity: reseteando || recargando ? 0.5 : 1,
+                }}
+                title="Reiniciar sistema a cero"
+              >{reseteando ? "⏳ …" : "⚠️ Reset"}</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── FOOTER / USUARIO ── */}
+        <div className="sidebar-footer">
+          <div className="sidebar-footer-inner">
+            <div
+              title={usuario?.nombre}
+              style={{
+                width: 30, height: 30, borderRadius: "50%",
+                background: "linear-gradient(135deg, #059669, #047857)",
+                color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 700, fontSize: "0.75rem", flexShrink: 0,
+                boxShadow: "0 2px 8px rgba(5,150,105,0.4)", cursor: "default",
+              }}
+            >{iniciales}</div>
+
+            <div className="sidebar-footer-text">
+              <div className="who">{usuario?.nombre}</div>
+              <div className="role">{usuario ? ROL_LABEL[usuario.rol] : ""}</div>
+            </div>
+
+            <button
+              className="sidebar-footer-logout"
+              title="Cerrar sesión"
+              onClick={() => { logout(); navigate("/login", { replace: true }); }}
+              style={{
+                background: "rgba(239,68,68,0.12)",
+                border: "1px solid rgba(239,68,68,0.22)",
+                borderRadius: "6px", color: "#f87171", cursor: "pointer",
+                padding: "0.28rem 0.38rem", fontSize: "0.75rem",
+                flexShrink: 0, transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) => { (e.currentTarget.style.background = "rgba(239,68,68,0.28)"); }}
+              onMouseLeave={(e) => { (e.currentTarget.style.background = "rgba(239,68,68,0.12)"); }}
+            >⏏️</button>
+          </div>
         </div>
       </aside>
+
       <main className="content">
         <Outlet />
       </main>

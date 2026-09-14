@@ -18,7 +18,7 @@ export async function listar(params: { agenciaId: string | null; q?: string }) {
 
   const [{ rows: comprobantes }, { rows: totales }, { rows: porCategoria }] = await Promise.all([
     pool.query(
-      `select c.*, u.nombre as usuario_nombre
+      `select c.*, u.nombre as usuario_nombre, u.rol as usuario_rol
        from caja_chica_comprobantes c join usuarios u on u.id = c.usuario_id
        ${where}
        order by c.fecha desc, c.created_at desc
@@ -81,6 +81,40 @@ export async function crear(data: DatosComprobante, usuarioId: string) {
     }
   }
 
+  if (data.numeroDocumento && data.numeroDocumento.trim() && data.numeroDocumento.trim().toUpperCase() !== DOC_PLACEHOLDER) {
+    const doc = data.numeroDocumento.trim();
+    // 1. Checar en caja_chica_comprobantes
+    const { rows: repetidoCC } = await pool.query(
+      `select fecha, numero_documento, beneficiario, descripcion
+       from caja_chica_comprobantes
+       where agencia_id = $1 and lower(trim(numero_documento)) = lower($2)
+       limit 1`,
+      [data.agenciaId, doc],
+    );
+    if (repetidoCC[0]) {
+      const fechaStr = new Date(repetidoCC[0].fecha).toLocaleDateString("es-GT");
+      throw conflict(
+        `El número de documento "${doc}" ya fue registrado el ${fechaStr} en Caja Chica (${repetidoCC[0].descripcion} - ${repetidoCC[0].beneficiario}). No se permiten comprobantes duplicados.`
+      );
+    }
+
+    // 2. Checar en caja_movimientos_auxiliar
+    const { rows: repetidoAux } = await pool.query(
+      `select m.fecha, m.doc_no, m.beneficiario, m.descripcion, u.nombre as usuario_nombre
+       from caja_movimientos_auxiliar m
+       left join usuarios u on u.id = m.usuario_id
+       where m.agencia_id = $1 and lower(trim(m.doc_no)) = lower($2)
+       limit 1`,
+      [data.agenciaId, doc],
+    );
+    if (repetidoAux[0]) {
+      const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
+      throw conflict(
+        `El número de documento "${doc}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten documentos duplicados entre Caja Chica y Auxiliar de Caja.`
+      );
+    }
+  }
+
   const { rows } = await pool.query(
     `insert into caja_chica_comprobantes (agencia_id, fecha, numero_documento, beneficiario, descripcion, tipo, categoria, monto, usuario_id)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
@@ -126,13 +160,49 @@ export async function verificarNumeroDocumentoExiste(agenciaId: string, fecha: s
   const doc = numeroDocumento.trim();
   if (!doc || doc.toUpperCase() === DOC_PLACEHOLDER) return { existe: false };
 
-  const { rows } = await pool.query(
-    `select id from caja_chica_comprobantes
-     where agencia_id = $1 and fecha = $2 and lower(trim(numero_documento)) = lower($3)
+  // 1. Checar en caja_chica_comprobantes
+  const { rows: ccRows } = await pool.query(
+    `select c.fecha, c.numero_documento, c.beneficiario, c.descripcion, u.nombre as usuario_nombre, u.rol as usuario_rol
+     from caja_chica_comprobantes c
+     left join usuarios u on u.id = c.usuario_id
+     where c.agencia_id = $1 and lower(trim(c.numero_documento)) = lower($2)
      limit 1`,
-    [agenciaId, fecha, doc],
+    [agenciaId, doc],
   );
-  return { existe: rows.length > 0 };
+  if (ccRows[0]) {
+    return {
+      existe: true,
+      modulo: "Caja Chica",
+      fecha: ccRows[0].fecha,
+      beneficiario: ccRows[0].beneficiario,
+      descripcion: ccRows[0].descripcion,
+      usuario: ccRows[0].usuario_nombre,
+      usuarioRol: ccRows[0].usuario_rol,
+    };
+  }
+
+  // 2. Checar en caja_movimientos_auxiliar
+  const { rows: auxRows } = await pool.query(
+    `select m.fecha, m.doc_no, m.beneficiario, m.descripcion, u.nombre as usuario_nombre, u.rol as usuario_rol
+     from caja_movimientos_auxiliar m
+     left join usuarios u on u.id = m.usuario_id
+     where m.agencia_id = $1 and lower(trim(m.doc_no)) = lower($2)
+     limit 1`,
+    [agenciaId, doc],
+  );
+  if (auxRows[0]) {
+    return {
+      existe: true,
+      modulo: "Auxiliar de Caja",
+      fecha: auxRows[0].fecha,
+      beneficiario: auxRows[0].beneficiario,
+      descripcion: auxRows[0].descripcion,
+      usuario: auxRows[0].usuario_nombre,
+      usuarioRol: auxRows[0].usuario_rol,
+    };
+  }
+
+  return { existe: false };
 }
 
 export interface DatosReposicionCajaChica {
@@ -159,6 +229,17 @@ export async function reponerFondo(data: DatosReposicionCajaChica, usuarioId: st
   if (repetido[0]) {
     const fechaStr = new Date(repetido[0].fecha).toLocaleDateString("es-GT");
     throw conflict(`El cheque o recibo de reposición "${ch}" ya fue registrado el ${fechaStr} en Caja Chica.`);
+  }
+
+  // Validar también en caja_movimientos_auxiliar
+  const { rows: repetidoAux } = await pool.query(
+    `select fecha, doc_no, descripcion, beneficiario from caja_movimientos_auxiliar
+     where agencia_id = $1 and lower(trim(doc_no)) = lower($2) limit 1`,
+    [data.agenciaId, ch],
+  );
+  if (repetidoAux[0]) {
+    const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
+    throw conflict(`El documento "${ch}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten documentos duplicados entre Caja Chica y Auxiliar de Caja.`);
   }
 
   const { rows } = await pool.query(
@@ -270,7 +351,7 @@ export async function generarReporte(params: ParamsReporteCajaChica) {
 
   // 6. Consultar comprobantes del período con usuario
   const { rows: comprobantes } = await pool.query(
-    `select c.*, u.nombre as usuario_nombre
+    `select c.*, u.nombre as usuario_nombre, u.rol as usuario_rol
      from caja_chica_comprobantes c join usuarios u on u.id = c.usuario_id
      ${wherePeriodo}
      order by c.fecha asc, c.created_at asc`,

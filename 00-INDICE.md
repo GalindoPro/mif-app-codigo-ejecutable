@@ -9,7 +9,7 @@ Este documento registra el **avance real y completo** del sistema de la Cooperat
 ### ✅ Módulos Completados y Probados
 
 1. **Autenticación y Matriz de Roles:**
-   - Roles configurados: `ADMIN` (Administrador), `GERENCIA` (Gerencia), `SUPERVISOR` (Jefe de agencia), `CAJERO` (Operador) y `PROMOTOR` (Promotor de crédito).
+   - Roles configurados: `ADMIN` (Administrador), `GERENCIA` (Gerencia), `SUPERVISOR` (Jefe de agencia), `CAJERO` (Operador de ventanilla), `CAJA_CHICA` (Operador de caja chica y ventanilla auxiliar) y `PROMOTOR` (Promotor de crédito).
    - Control de permisos en Frontend y Backend: cada rol ve exclusivamente las opciones y tarjetas que le corresponden.
    - Gestión de usuarios y asignación de personal a agencias (`/usuarios`).
    - Base de datos conectada localmente a PostgreSQL 18 (`mif_dev`, usuario `galindo`).
@@ -29,12 +29,13 @@ Este documento registra el **avance real y completo** del sistema de la Cooperat
    - Basado en `caja/Caja Chica 30-07-2026.xlsx`.
    - **Diseño de Pantalla Única (100vh Sin Scroll):** Arquitectura balanceada de 2 columnas. Columna izquierda con panel de gastos por categoría, barras de presupuesto y botones de acción. Columna derecha con buscador y tabla de comprobantes con cabecera fija (`sticky`) y scroll interno.
    - Registro de comprobantes de ingreso y egreso con categorías contables y documentos (DTE, factura, recibo).
+   - **Trazabilidad de Roles:** Columna "Registrado Por" con insignias de rol (`[📥 Caja Chica]`, `[💵 Cajero]`, `[🛡️ Admin]`, `[👁️ Supervisor]`).
    - **Vistas Integradas en Pantalla (Sin Modales Flotantes):**
      - **Informe de Rendición de Gastos:** Conmuta directamente a pantalla completa en la misma vista (`CajaChicaReporteView`) con botón `← Volver al Libro de Caja Chica`, filtros de período rápido, exportación a Excel (CSV) y generación de PDF limpia en 1 hoja carta sin superposición de elementos de fondo.
      - **Corrección de Comprobantes para Administrador y Cajeros (✏️):** Formulario embebido directamente en el panel lateral izquierdo (reemplazando temporalmente el formulario de nuevo comprobante/reposición), habilitando al rol `GERENCIA` (Administrador) a editar comprobantes históricos con motivo de corrección de auditoría sin ventanas flotantes ni desbordes.
    - **Reposición del Fondo Fijo (`📥 Reponer Fondo (Cheque)`):**
      - Recarga oficial del saldo de caja chica mediante cheque emitido por la cooperativa (`No. CH.`, ej. *1290*, *2000*).
-     - Validación anti-duplicados para evitar registrar dos veces el mismo cheque.
+     - Validación anti-duplicados contra Caja Chica y Auxiliar de Caja para evitar registrar dos veces el mismo cheque.
      - Incremento inmediato del saldo disponible para gastos operativos.
    - Arqueo físico interactivo de billetes y monedas (Q200 a Q0.01) con cálculo de diferencia y saldo acumulado.
 
@@ -88,6 +89,10 @@ Este documento registra el **avance real y completo** del sistema de la Cooperat
    - **Panel de Novedades de Campo en Tiempo Real (`🔔 Novedades de Campo`):**
      - Visualización instantánea para el cajero de cuentas creadas por Promotores en campo con cuota pactada (Programado / Infanto-Juvenil) y justificación de apertura.
      - Botón directo para registrar el primer depósito sin tener que buscar o reescribir datos.
+   - **Operativa Multirrol y Trazabilidad:**
+     - Habilitado para el rol `CAJA_CHICA` en ventanilla (movimientos, cobro de cuotas, desembolsos y liquidación de plazo fijo).
+     - **Control de Arqueo Diario:** El botón `🔒 Cerrar Caja del Día` y el formulario de cierre quedan ocultos y bloqueados (403 Forbidden) para `CAJA_CHICA`, reservado exclusivamente para `CAJERO`, `SUPERVISOR` y `GERENCIA`.
+     - **Insignias de Rol:** Cada fila de la tabla de movimientos muestra el nombre del usuario y su rol (`[📥 Caja Chica]`, `[💵 Cajero]`, `[🛡️ Admin]`, `[👁️ Supervisor]`, `[📂 Promotor]`).
    - **Arqueo y Cierre Diario de Caja:** recuento interactivo de billetes y monedas (Q200 a Q0.01) con cálculo de diferencia (cuadrada, sobrante o faltante).
    - **Vista de Caja Cerrada y Acta Oficial de Arqueo (`🖨️ Imprimir Acta Oficial de Arqueo`):**
      - Basado en las hojas reales de auditoría `Arqueo Caja Ag Chaj...` de `Auxiliar de Caja COMIF CHAJUL 15-08-2026.xlsx`.
@@ -99,7 +104,7 @@ Este documento registra el **avance real y completo** del sistema de la Cooperat
 
 8. **Escudo Anti-Duplicados y Validación Cruzada en Tiempo Real:**
    - Previene el doble trabajo y los errores de digitación durante el uso de talonarios físicos de papel.
-   - **Bloqueo estricto de números de recibo / documento:** validación cruzada instantánea entre Auxiliar de Caja (`caja_movimientos_auxiliar`), Ahorros (`movimientos`) y Créditos (`prestamo_pagos`). Si un recibo ya se usó, el sistema lo bloquea y notifica: fecha, cuenta y nombre del socio original.
+   - **Bloqueo estricto de números de recibo / documento:** validación cruzada instantánea bidireccional entre Auxiliar de Caja (`caja_movimientos_auxiliar`), Caja Chica (`caja_chica_comprobantes`), Ahorros (`movimientos`) y Créditos (`prestamo_pagos`). Si un recibo ya se usó en cualquiera de estos módulos, el sistema lo bloquea y notifica en vivo: módulo de origen, fecha, beneficiario y usuario emisor con su rol.
    - **Bloqueo de número de cuenta y certificados:** previene registrar dos cuentas o certificados a plazo fijo con el mismo correlativo.
    - **Bloqueo de número de asociado y DPI:** previene duplicar socios en el padrón.
 

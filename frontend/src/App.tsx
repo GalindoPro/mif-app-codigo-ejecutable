@@ -32,6 +32,7 @@ import { useAuth } from "./context/AuthContext";
 function InicioRedirect() {
   const { usuario } = useAuth();
   if (usuario?.rol === "CAJERO") return <Navigate to="/auxiliar-caja" replace />;
+  if (usuario?.rol === "CAJA_CHICA") return <Navigate to="/caja-chica" replace />;
   if (usuario?.rol === "PROMOTOR") return <Navigate to="/promotor/cartera" replace />;
   return <Navigate to="/tablero" replace />;
 }
@@ -39,6 +40,7 @@ function InicioRedirect() {
 function TableroRouteGuard() {
   const { usuario } = useAuth();
   if (usuario?.rol === "CAJERO") return <Navigate to="/auxiliar-caja" replace />;
+  if (usuario?.rol === "CAJA_CHICA") return <Navigate to="/caja-chica" replace />;
   if (usuario?.rol === "PROMOTOR") return <Navigate to="/promotor/cartera" replace />;
   return <Tablero />;
 }

@@ -233,6 +233,7 @@ export interface CajaChicaComprobante {
   monto: string;
   usuario_id: string;
   usuario_nombre: string;
+  usuario_rol?: string;
   created_at: string;
 }
 
@@ -473,6 +474,7 @@ export interface CajaMovimientoAuxiliar {
   origen_fondos?: OrigenFondos;
   usuario_id: string;
   usuario_nombre: string;
+  usuario_rol?: string;
   created_at: string;
 }
 

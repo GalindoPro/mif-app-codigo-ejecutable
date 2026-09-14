@@ -8,6 +8,48 @@ import { CajaChicaReporteView } from "../components/CajaChicaReporteModal";
 
 const CATEGORIAS = Object.entries(CATEGORIA_CAJA_CHICA_LABEL) as [CategoriaCajaChica, string][];
 
+function renderRolBadge(rol?: string) {
+  if (!rol) return null;
+  switch (rol) {
+    case "CAJA_CHICA":
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(16, 185, 129, 0.15)", color: "#059669", fontWeight: 600 }}>
+          📥 Caja Chica
+        </span>
+      );
+    case "CAJERO":
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(37, 99, 235, 0.15)", color: "#2563eb", fontWeight: 600 }}>
+          💵 Cajero
+        </span>
+      );
+    case "GERENCIA":
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(147, 51, 234, 0.15)", color: "#9333ea", fontWeight: 600 }}>
+          🛡️ Admin
+        </span>
+      );
+    case "SUPERVISOR":
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(217, 119, 6, 0.15)", color: "#d97706", fontWeight: 600 }}>
+          👁️ Supervisor
+        </span>
+      );
+    case "PROMOTOR":
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(100, 116, 139, 0.15)", color: "#64748b", fontWeight: 600 }}>
+          📂 Promotor
+        </span>
+      );
+    default:
+      return (
+        <span style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem", borderRadius: "4px", background: "rgba(100, 116, 139, 0.1)", color: "var(--ink-soft)", fontWeight: 500 }}>
+          {rol}
+        </span>
+      );
+  }
+}
+
 export default function CajaChica() {
   const { usuario } = useAuth();
   const puedeElegirAgencia = usuario?.rol === "GERENCIA";
@@ -30,6 +72,15 @@ export default function CajaChica() {
   const [numeroDocumento, setNumeroDocumento] = useState("DTE");
   const [guardando, setGuardando] = useState(false);
   const [docDuplicado, setDocDuplicado] = useState(false);
+  const [infoDocDuplicado, setInfoDocDuplicado] = useState<{
+    existe: boolean;
+    modulo?: string;
+    fecha?: string;
+    beneficiario?: string;
+    descripcion?: string;
+    usuario?: string;
+    usuarioRol?: string;
+  } | null>(null);
   const [verificandoDoc, setVerificandoDoc] = useState(false);
 
   // Estados para Reposición de Fondo Fijo
@@ -89,19 +140,35 @@ export default function CajaChica() {
   useEffect(() => {
     if (!mostrarForm || !agenciaId) {
       setDocDuplicado(false);
+      setInfoDocDuplicado(null);
       return;
     }
     const doc = numeroDocumento.trim();
     if (!doc || doc.toUpperCase() === "DTE") {
       setDocDuplicado(false);
+      setInfoDocDuplicado(null);
       return;
     }
     setVerificandoDoc(true);
     const t = setTimeout(() => {
       api
-        .get<{ existe: boolean }>("/caja-chica/verificar-documento", { params: { agenciaId, fecha, numeroDocumento: doc } })
-        .then(({ data }) => setDocDuplicado(data.existe))
-        .catch(() => setDocDuplicado(false))
+        .get<{
+          existe: boolean;
+          modulo?: string;
+          fecha?: string;
+          beneficiario?: string;
+          descripcion?: string;
+          usuario?: string;
+          usuarioRol?: string;
+        }>("/caja-chica/verificar-documento", { params: { agenciaId, fecha, numeroDocumento: doc } })
+        .then(({ data }) => {
+          setDocDuplicado(data.existe);
+          setInfoDocDuplicado(data.existe ? data : null);
+        })
+        .catch(() => {
+          setDocDuplicado(false);
+          setInfoDocDuplicado(null);
+        })
         .finally(() => setVerificandoDoc(false));
     }, 450);
     return () => clearTimeout(t);
@@ -472,10 +539,15 @@ export default function CajaChica() {
                   <label htmlFor="cc-documento">No. de documento</label>
                   <input id="cc-documento" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} />
                   {verificandoDoc && <span className="sub" style={{ fontSize: "0.72rem" }}>Verificando...</span>}
-                  {!verificandoDoc && docDuplicado && (
-                    <span style={{ color: "#dc2626", fontSize: "0.75rem", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
-                      Este número de documento ya fue registrado hoy en Caja Chica.
-                    </span>
+                  {!verificandoDoc && infoDocDuplicado && (
+                    <div style={{ background: "rgba(220, 38, 38, 0.1)", border: "1px solid #ef4444", borderRadius: "6px", padding: "0.4rem 0.6rem", marginTop: "0.3rem", fontSize: "0.76rem", color: "#dc2626" }}>
+                      <strong>⚠️ Documento ya registrado:</strong>
+                      <div>Registrado en: <strong>{infoDocDuplicado.modulo}</strong> {infoDocDuplicado.fecha ? `el ${new Date(infoDocDuplicado.fecha).toLocaleDateString("es-GT")}` : ""}</div>
+                      {infoDocDuplicado.beneficiario && <div>Beneficiario: {infoDocDuplicado.beneficiario}</div>}
+                      {infoDocDuplicado.usuario && (
+                        <div>Por: <strong>{infoDocDuplicado.usuario}</strong> {infoDocDuplicado.usuarioRol ? `(${infoDocDuplicado.usuarioRol})` : ""}</div>
+                      )}
+                    </div>
                   )}
                 </div>
                 <button type="submit" className="btn" disabled={guardando || !agenciaId || docDuplicado} style={{ marginTop: "0.3rem" }}>
@@ -620,7 +692,12 @@ export default function CajaChica() {
                       >
                         {c.tipo === "EGRESO" ? "−" : "+"} {formatoQ(c.monto)}
                       </td>
-                      <td style={{ fontSize: "0.76rem", color: "var(--ink-soft)" }}>{c.usuario_nombre}</td>
+                      <td style={{ fontSize: "0.76rem", color: "var(--ink-soft)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
+                          <span>{c.usuario_nombre}</span>
+                          {renderRolBadge(c.usuario_rol)}
+                        </div>
+                      </td>
                       <td style={{ textAlign: "center" }}>
                         {(usuario?.rol === "GERENCIA" || (c.usuario_id === usuario?.id && c.created_at.startsWith(new Date().toISOString().slice(0, 10)))) && (
                           <button

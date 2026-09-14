@@ -49,7 +49,7 @@ cajaAuxiliarRouter.get(
 );
 cajaAuxiliarRouter.get(
   "/liquidaciones",
-  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
   asyncHandler(async (req, res) => {
     const agenciaId = (req.query.agenciaId as string) || req.user?.agenciaId;
     if (!agenciaId) throw badRequest("Falta indicar la agencia");
@@ -59,7 +59,7 @@ cajaAuxiliarRouter.get(
 
 cajaAuxiliarRouter.post(
   "/liquidaciones/aprobar",
-  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
   asyncHandler(async (req, res) => {
     const { promotorId } = req.body;
     if (!promotorId) throw badRequest("Falta promotorId");
@@ -76,7 +76,7 @@ const abrirSchema = z.object({
 
 cajaAuxiliarRouter.post(
   "/abrir",
-  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
   asyncHandler(async (req, res) => {
     const data = abrirSchema.parse(req.body);
     const visible = agenciaVisible(req);
@@ -92,6 +92,16 @@ cajaAuxiliarRouter.get(
     const q = typeof req.query.q === "string" ? req.query.q : "";
     if (!agenciaId) throw badRequest("Falta indicar la agencia");
     res.json(await service.beneficiariosFrecuentes(agenciaId, q, agenciaVisible(req)));
+  }),
+);
+
+cajaAuxiliarRouter.get(
+  "/verificar-documento",
+  asyncHandler(async (req, res) => {
+    const agenciaId = (req.query.agenciaId as string) || req.user?.agenciaId;
+    if (!agenciaId) throw badRequest("Falta indicar la agencia");
+    const docNo = typeof req.query.docNo === "string" ? req.query.docNo : "";
+    res.json(await service.verificarReciboExiste(agenciaId, docNo));
   }),
 );
 
@@ -129,7 +139,7 @@ const movimientoSchema = z.object({
 
 cajaAuxiliarRouter.post(
   "/:id/movimientos",
-  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
   asyncHandler(async (req, res) => {
     const data = movimientoSchema.parse(req.body);
     res.status(201).json(
@@ -177,7 +187,7 @@ const cobroCreditoSchema = z.object({
 
 cajaAuxiliarRouter.post(
   "/:id/cobro-credito",
-  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
   asyncHandler(async (req, res) => {
     const data = cobroCreditoSchema.parse(req.body);
     res.status(201).json(
@@ -195,7 +205,7 @@ const desembolsoCreditoSchema = z.object({
 
 cajaAuxiliarRouter.post(
   "/:id/desembolso-credito",
-  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
   asyncHandler(async (req, res) => {
     const data = desembolsoCreditoSchema.parse(req.body);
     res.status(201).json(
@@ -212,7 +222,7 @@ const liquidarPlazoFijoSchema = z.object({
 
 cajaAuxiliarRouter.post(
   "/:id/liquidar-plazo-fijo",
-  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
   asyncHandler(async (req, res) => {
     const data = liquidarPlazoFijoSchema.parse(req.body);
     res.status(201).json(
@@ -233,7 +243,7 @@ const editarMovimientoSchema = z.object({
 
 cajaAuxiliarRouter.patch(
   "/movimiento/:id",
-  requireRole("GERENCIA", "CAJERO"),
+  requireRole("GERENCIA", "CAJERO", "CAJA_CHICA"),
   asyncHandler(async (req, res) => {
     const id = req.params.id;
     const data = editarMovimientoSchema.parse(req.body);

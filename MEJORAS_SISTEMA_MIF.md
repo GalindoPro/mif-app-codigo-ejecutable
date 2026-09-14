@@ -515,3 +515,38 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
   - `frontend/src/components/CajaChicaReporteModal.tsx`
   - `frontend/src/styles/app.css`
 - **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 38. Habilitación de Auxiliar de Caja para Rol Caja Chica, Control de Arqueo Diario, Trazabilidad de Roles y Validación Cruzada Bidireccional de Comprobantes
+
+- **Objetivo:** Permitir que los usuarios con rol `CAJA_CHICA` puedan operar la ventanilla del Auxiliar de Caja (`/auxiliar-caja`) para cobros, depósitos, retiros y pagos, manteniendo restringido el arqueo de cierre diario exclusivamente a los cajeros y supervisores, incorporando trazabilidad con insignias de rol en todas las tablas y blindando el sistema contra la duplicación cruzada de números de recibos y comprobantes entre ambos módulos.
+- **Reglas Contables y Operativas Implementadas:**
+  1. **Acceso Operativo de Ventanilla para `CAJA_CHICA`:**
+     - El rol `CAJA_CHICA` ahora cuenta con permisos autorizados en el backend para: apertura de día (`/abrir`), creación de movimientos regulares (`/:id/movimientos`), cobros de crédito (`/:id/cobro-credito`), desembolsos (`/:id/desembolso-credito`), liquidaciones de certificados de plazo fijo (`/:id/liquidar-plazo-fijo`), consulta de liquidaciones de promotores (`/liquidaciones` y `/liquidaciones/aprobar`) y corrección de sus propios movimientos del día con motivo de auditoría (`PATCH /movimiento/:id`).
+  2. **Bloqueo Estricto de Arqueo y Cierre Diario de Caja:**
+     - El botón `🔒 Cerrar Caja del Día` y el formulario de arqueo físico quedan completamente ocultos en la interfaz de Auxiliar de Caja (`CajaAbierta.tsx`) cuando el usuario activo tiene rol `CAJA_CHICA`.
+     - En el backend, la ruta `POST /caja-auxiliar/:id/cerrar` mantiene la restricción inviolable `requireRole("GERENCIA", "SUPERVISOR", "CAJERO")`. Cualquier intento de cierre por `CAJA_CHICA` es rechazado con código `403 Forbidden`.
+  3. **Validación Cruzada Bidireccional de Recibos y Comprobantes en Tiempo Real:**
+     - **De Auxiliar hacia Caja Chica:** Antes de registrar un número de documento (`docNo`) en Auxiliar de Caja (ya sea en movimientos varios, cobro de préstamos, desembolsos o liquidación de plazo fijo), el sistema valida que no exista previamente en la tabla `caja_chica_comprobantes`.
+     - **De Caja Chica hacia Auxiliar:** Al capturar un número de comprobante o cheque de reposición en Caja Chica, el sistema valida que no exista en la tabla `caja_movimientos_auxiliar`.
+     - **Reactividad Debounced:** Al escribir el número de documento en los formularios (`NuevoMovimientoForm.tsx` y `CajaChica.tsx`), una consulta debounced en vivo detecta duplicados y despliega un cuadro de alerta rojo detallando el módulo de origen (`Auxiliar de Caja` o `Caja Chica`), fecha de emisión, beneficiario y usuario responsable, deshabilitando el botón de guardado.
+     - **Protección a Nivel Base de Datos:** En caso de concurrencia, las transacciones backend arrojan error `409 Conflict` con un mensaje descriptivo e impiden duplicidades en la base de datos.
+  4. **Trazabilidad Visual de Roles en Tablas:**
+     - Se integró el atributo `usuario_rol` en las consultas de movimientos de Auxiliar de Caja y comprobantes de Caja Chica.
+     - En las columnas "Registrado Por" de ambas tablas se renderizan insignias de rol coloreadas (`[📥 Caja Chica]`, `[💵 Cajero]`, `[🛡️ Admin]`, `[👁️ Supervisor]`, `[📂 Promotor]`) para identificar de inmediato quién registró cada transacción.
+  5. **Navegación y Redirección:**
+     - En la barra lateral (`Layout.tsx`), el menú para `CAJA_CHICA` incluye: `Auxiliar de Caja`, `Caja Chica` y `Consultar Socios`.
+     - Al iniciar sesión o intentar acceder a rutas generales, el sistema mantiene `/caja-chica` como pantalla inicial predeterminada para este rol.
+- **Archivos Modificados:**
+  - `backend/src/modules/cajaauxiliar/routes.ts`
+  - `backend/src/modules/cajaauxiliar/service.ts`
+  - `backend/src/modules/cajachica/service.ts`
+  - `frontend/src/types.ts`
+  - `frontend/src/pages/Layout.tsx`
+  - `frontend/src/App.tsx`
+  - `frontend/src/components/cajaauxiliar/CajaAbierta.tsx`
+  - `frontend/src/components/cajaauxiliar/NuevoMovimientoForm.tsx`
+  - `frontend/src/pages/CajaChica.tsx`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+

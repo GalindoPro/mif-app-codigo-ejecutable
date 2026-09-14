@@ -135,7 +135,7 @@ export async function detalle(id: string, agenciaVisible: string | null) {
   const dia = await obtenerDiaCrudo(id, agenciaVisible);
 
   const { rows: movimientos } = await pool.query(
-    `select m.*, u.nombre as usuario_nombre
+    `select m.*, u.nombre as usuario_nombre, u.rol as usuario_rol
      from caja_movimientos_auxiliar m join usuarios u on u.id = m.usuario_id
      where m.caja_dia_id = $1
      order by m.created_at asc`,
@@ -197,6 +197,21 @@ export async function crearMovimiento(
         const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
         throw conflict(
           `El número de documento/recibo "${doc}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten documentos duplicados.`,
+        );
+      }
+
+      // 1.1 Checar en caja_chica_comprobantes
+      const { rows: repetidoCC } = await client.query(
+        `select c.fecha, c.numero_documento, c.beneficiario, c.descripcion
+         from caja_chica_comprobantes c
+         where c.agencia_id = $1 and lower(trim(c.numero_documento)) = lower($2)
+         limit 1`,
+        [dia.agencia_id, doc],
+      );
+      if (repetidoCC[0]) {
+        const fechaStr = new Date(repetidoCC[0].fecha).toLocaleDateString("es-GT");
+        throw conflict(
+          `El número de documento "${doc}" ya fue registrado el ${fechaStr} en Caja Chica (${repetidoCC[0].descripcion} - ${repetidoCC[0].beneficiario}). No se permiten documentos duplicados entre Auxiliar de Caja y Caja Chica.`,
         );
       }
 
@@ -437,18 +452,98 @@ export async function obtenerUltimoDocNo(diaId: string, agenciaVisible: string |
   };
 }
 
-export async function verificarDocNoExiste(diaId: string, docNo: string, agenciaVisible: string | null) {
-  const dia = await obtenerDiaCrudo(diaId, agenciaVisible);
+export async function verificarReciboExiste(agenciaId: string, docNo: string) {
   const doc = docNo.trim();
   if (!doc) return { existe: false };
 
-  const { rows } = await pool.query(
-    `select id from caja_movimientos_auxiliar
-     where caja_dia_id = $1 and lower(trim(doc_no)) = lower($2)
+  // 1. Auxiliar de Caja
+  const { rows: auxRows } = await pool.query(
+    `select m.fecha, m.doc_no, m.beneficiario, m.descripcion, u.nombre as usuario_nombre, u.rol as usuario_rol
+     from caja_movimientos_auxiliar m
+     left join usuarios u on u.id = m.usuario_id
+     where m.agencia_id = $1 and lower(trim(m.doc_no)) = lower($2)
      limit 1`,
-    [dia.id, doc],
+    [agenciaId, doc],
   );
-  return { existe: rows.length > 0 };
+  if (auxRows[0]) {
+    return {
+      existe: true,
+      modulo: "Auxiliar de Caja",
+      fecha: auxRows[0].fecha,
+      beneficiario: auxRows[0].beneficiario,
+      descripcion: auxRows[0].descripcion,
+      usuario: auxRows[0].usuario_nombre,
+      usuarioRol: auxRows[0].usuario_rol,
+    };
+  }
+
+  // 2. Caja Chica
+  const { rows: ccRows } = await pool.query(
+    `select c.fecha, c.numero_documento, c.beneficiario, c.descripcion, u.nombre as usuario_nombre, u.rol as usuario_rol
+     from caja_chica_comprobantes c
+     left join usuarios u on u.id = c.usuario_id
+     where c.agencia_id = $1 and lower(trim(c.numero_documento)) = lower($2)
+     limit 1`,
+    [agenciaId, doc],
+  );
+  if (ccRows[0]) {
+    return {
+      existe: true,
+      modulo: "Caja Chica",
+      fecha: ccRows[0].fecha,
+      beneficiario: ccRows[0].beneficiario,
+      descripcion: ccRows[0].descripcion,
+      usuario: ccRows[0].usuario_nombre,
+      usuarioRol: ccRows[0].usuario_rol,
+    };
+  }
+
+  // 3. Pagos de préstamos
+  const { rows: ppRows } = await pool.query(
+    `select pp.fecha, pp.numero_recibo, p.codigo, s.nombres as socio_nombres
+     from prestamo_pagos pp
+     join prestamos p on p.id = pp.prestamo_id
+     join socios s on s.id = pp.socio_id
+     where pp.agencia_id = $1 and lower(trim(pp.numero_recibo)) = lower($2)
+     limit 1`,
+    [agenciaId, doc],
+  );
+  if (ppRows[0]) {
+    return {
+      existe: true,
+      modulo: "Cobro de Crédito",
+      fecha: ppRows[0].fecha,
+      beneficiario: ppRows[0].socio_nombres,
+      descripcion: `Crédito ${ppRows[0].codigo}`,
+    };
+  }
+
+  // 4. Movimientos de cuentas de ahorro/aportaciones
+  const { rows: movRows } = await pool.query(
+    `select m.fecha, m.numero_recibo, c.numero_cuenta, s.nombres as socio_nombres
+     from movimientos m
+     join cuentas c on c.id = m.cuenta_id
+     join socios s on s.id = c.socio_id
+     where c.agencia_id = $1 and lower(trim(m.numero_recibo)) = lower($2)
+     limit 1`,
+    [agenciaId, doc],
+  );
+  if (movRows[0]) {
+    return {
+      existe: true,
+      modulo: "Movimiento de Cuenta",
+      fecha: movRows[0].fecha,
+      beneficiario: movRows[0].socio_nombres,
+      descripcion: `Cuenta ${movRows[0].numero_cuenta}`,
+    };
+  }
+
+  return { existe: false };
+}
+
+export async function verificarDocNoExiste(diaId: string, docNo: string, agenciaVisible: string | null) {
+  const dia = await obtenerDiaCrudo(diaId, agenciaVisible);
+  return verificarReciboExiste(dia.agencia_id, docNo);
 }
 
 export interface DatosCobroCredito {
@@ -461,6 +556,11 @@ export interface DatosCobroCredito {
   origenFondos?: "FONDOS_PROPIOS" | "FEDERURAL" | "CHN_GUATEMALA";
   docNo?: string;
   cuentaDebitoId?: string;
+  saldoAnteriorReportado?: number;
+  saldoActualReportado?: number;
+  numeroCuota?: number;
+  cantidadCuotas?: number;
+  descripcion?: string;
 }
 
 export async function cobrarCuotaCredito(
@@ -549,6 +649,20 @@ export async function cobrarCuotaCredito(
         const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
         throw conflict(
           `El número de recibo/documento "${doc}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten documentos duplicados.`,
+        );
+      }
+
+      const { rows: repetidoCC } = await client.query(
+        `select c.fecha, c.numero_documento, c.beneficiario, c.descripcion
+         from caja_chica_comprobantes c
+         where c.agencia_id = $1 and lower(trim(c.numero_documento)) = lower($2)
+         limit 1`,
+        [dia.agencia_id, doc],
+      );
+      if (repetidoCC[0]) {
+        const fechaStr = new Date(repetidoCC[0].fecha).toLocaleDateString("es-GT");
+        throw conflict(
+          `El número de recibo/documento "${doc}" ya fue registrado el ${fechaStr} en Caja Chica (${repetidoCC[0].descripcion} - ${repetidoCC[0].beneficiario}). No se permiten comprobantes duplicados entre Auxiliar de Caja y Caja Chica.`,
         );
       }
 
@@ -874,6 +988,20 @@ export async function desembolsarCredito(
           `El número de comprobante/recibo "${doc}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten documentos duplicados.`,
         );
       }
+
+      const { rows: repetidoCC } = await client.query(
+        `select c.fecha, c.numero_documento, c.beneficiario, c.descripcion
+         from caja_chica_comprobantes c
+         where c.agencia_id = $1 and lower(trim(c.numero_documento)) = lower($2)
+         limit 1`,
+        [dia.agencia_id, doc],
+      );
+      if (repetidoCC[0]) {
+        const fechaStr = new Date(repetidoCC[0].fecha).toLocaleDateString("es-GT");
+        throw conflict(
+          `El número de comprobante/recibo "${doc}" ya fue registrado el ${fechaStr} en Caja Chica (${repetidoCC[0].descripcion} - ${repetidoCC[0].beneficiario}). No se permiten documentos duplicados entre Auxiliar de Caja y Caja Chica.`,
+        );
+      }
     }
 
     // 1. Contador de colocación
@@ -1100,6 +1228,20 @@ export async function liquidarPlazoFijo(
       const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
       throw conflict(
         `El número de recibo de retiro "${recibo}" ya fue registrado el ${fechaStr} en Auxiliar de Caja (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten recibos duplicados.`,
+      );
+    }
+
+    const { rows: repetidoCC } = await client.query(
+      `select c.fecha, c.numero_documento, c.beneficiario, c.descripcion
+       from caja_chica_comprobantes c
+       where c.agencia_id = $1 and lower(trim(c.numero_documento)) = lower($2)
+       limit 1`,
+      [dia.agencia_id, recibo],
+    );
+    if (repetidoCC[0]) {
+      const fechaStr = new Date(repetidoCC[0].fecha).toLocaleDateString("es-GT");
+      throw conflict(
+        `El número de recibo de retiro "${recibo}" ya fue registrado el ${fechaStr} en Caja Chica (${repetidoCC[0].descripcion} - ${repetidoCC[0].beneficiario}). No se permiten comprobantes duplicados entre Auxiliar de Caja y Caja Chica.`,
       );
     }
 
