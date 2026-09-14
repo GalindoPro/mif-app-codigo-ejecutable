@@ -116,10 +116,37 @@ import { cuentasRouter } from "./modules/cuentas/routes";
 import { cajaChicaRouter } from "./modules/cajachica/routes";
 import { cajaAuxiliarRouter } from "./modules/cajaauxiliar/routes";
 import { dashboardRouter } from "./modules/dashboard/routes";
+import { sistemaRouter } from "./modules/sistema/routes";
+import { prestamosRouter } from "./modules/prestamos/routes";
+import { plazoFijoRouter } from "./modules/plazofijo/routes";
+import { auditoriaRouter } from "./modules/auditoria/routes";
+import { alertasRouter } from "./modules/alertas/routes";
+import { sesionesRouter } from "./modules/sesiones/routes";
+import { cobrosCampoRouter } from "./modules/cobroscampo/routes";
 
 export const app = express();
 
-app.use(cors({ origin: process.env.CORS_ORIGIN?.split(",") ?? true, credentials: true }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+      try {
+        const hostname = new URL(origin).hostname;
+        if (hostname.endsWith(".vercel.app")) {
+          return callback(null, true);
+        }
+      } catch {}
+      const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map((s) => s.trim()) ?? [];
+      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
+    credentials: true,
+  }),
+);
 app.use(express.json());
 
 app.get("/health", (_req, res) => res.json({ ok: true, servicio: "mif-backend" }));
@@ -132,6 +159,13 @@ app.use("/api/cuentas", cuentasRouter);
 app.use("/api/caja-chica", cajaChicaRouter);
 app.use("/api/caja-auxiliar", cajaAuxiliarRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/sistema", sistemaRouter);
+app.use("/api/prestamos", prestamosRouter);
+app.use("/api/plazo-fijo", plazoFijoRouter);
+app.use("/api/auditoria", auditoriaRouter);
+app.use("/api/alertas", alertasRouter);
+app.use("/api/sesiones", sesionesRouter);
+app.use("/api/cobros-campo", cobrosCampoRouter);
 
 app.use((_req, res) => res.status(404).json({ error: "Ruta no encontrada" }));
 app.use(errorHandler);
@@ -3935,8 +3969,14 @@ main().catch((err) => {
 ```ts
 import { Pool } from "pg";
 
+const isLocal =
+  !process.env.DATABASE_URL ||
+  process.env.DATABASE_URL.includes("localhost") ||
+  process.env.DATABASE_URL.includes("127.0.0.1");
+
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: isLocal ? false : { rejectUnauthorized: false },
 });
 
 pool.on("error", (err) => {
@@ -3970,14 +4010,58 @@ async function main() {
 
   await pool.query(
     `insert into usuarios (nombre, email, password_hash, rol, agencia_id)
-     values ('Administrador MIF', $1, $2, 'ADMIN', null)
-     on conflict (email) do update set password_hash = excluded.password_hash`,
+     values ('Administrador MIF', $1, $2, 'GERENCIA', null)
+     on conflict (email) do update set password_hash = excluded.password_hash, rol = 'GERENCIA'`,
     [email, passwordHash],
   );
 
-  console.log("Usuario administrador listo:");
-  console.log(`  correo:      ${email}`);
-  console.log(`  contraseña:  ${passwordTemporal}  (cámbiala después del primer ingreso)`);
+  const promotorEmail = "promotor@mif.coop";
+  const promotorHash = await hashPassword(passwordTemporal);
+
+  await pool.query(
+    `insert into usuarios (nombre, email, password_hash, rol, agencia_id)
+     values ('Carlos Promotor Chajul', $1, $2, 'PROMOTOR', $3)
+     on conflict (email) do update set password_hash = excluded.password_hash`,
+    [promotorEmail, promotorHash, agencia.id],
+  );
+
+  const supervisorEmail = "supervisor@mif.coop";
+  const supervisorHash = await hashPassword(passwordTemporal);
+
+  await pool.query(
+    `insert into usuarios (nombre, email, password_hash, rol, agencia_id)
+     values ('Marta Supervisora Chajul', $1, $2, 'SUPERVISOR', $3)
+     on conflict (email) do update set password_hash = excluded.password_hash`,
+    [supervisorEmail, supervisorHash, agencia.id],
+  );
+
+  const cajeroEmail = "cajero@mif.coop";
+  const cajeroHash = await hashPassword(passwordTemporal);
+
+  await pool.query(
+    `insert into usuarios (nombre, email, password_hash, rol, agencia_id)
+     values ('Ana Cajera Chajul', $1, $2, 'CAJERO', $3)
+     on conflict (email) do update set password_hash = excluded.password_hash`,
+    [cajeroEmail, cajeroHash, agencia.id],
+  );
+
+  const cajaChicaEmail = "cajachica@mif.coop";
+  const cajaChicaHash = await hashPassword(passwordTemporal);
+
+  await pool.query(
+    `insert into usuarios (nombre, email, password_hash, rol, agencia_id)
+     values ('Lucia Caja Chica Chajul', $1, $2, 'CAJA_CHICA', $3)
+     on conflict (email) do update set password_hash = excluded.password_hash`,
+    [cajaChicaEmail, cajaChicaHash, agencia.id],
+  );
+
+  console.log("Usuarios listos:");
+  console.log(`  Gerencia:    ${email}`);
+  console.log(`  Supervisor:  ${supervisorEmail}`);
+  console.log(`  Cajero:      ${cajeroEmail}`);
+  console.log(`  Caja Chica:  ${cajaChicaEmail}`);
+  console.log(`  Promotor:    ${promotorEmail}`);
+  console.log(`  Contraseña para todos: ${passwordTemporal}`);
 
   await pool.end();
 }
@@ -4097,8 +4181,11 @@ export const conflict = (msg: string) => new AppError(409, msg);
 -- Tipos enumerados
 -- ---------------------------------------------------------------------------
 do $$ begin
-  create type rol_usuario as enum ('ADMIN', 'GERENCIA', 'SUPERVISOR', 'CAJERO');
+  create type rol_usuario as enum ('ADMIN', 'GERENCIA', 'SUPERVISOR', 'CAJERO', 'PROMOTOR');
 exception when duplicate_object then null; end $$;
+alter type rol_usuario add value if not exists 'PROMOTOR';
+alter type rol_usuario add value if not exists 'CAJA_CHICA';
+
 
 do $$ begin
   create type estado_socio as enum ('ACTIVO', 'INACTIVO');
@@ -4111,7 +4198,7 @@ exception when duplicate_object then null; end $$;
 do $$ begin
   create type tipo_cuenta as enum (
     'APORTACION', 'AHORRO_CORRIENTE', 'AHORRO_PROGRAMADO',
-    'AHORRO_INFANTO_JUVENIL', 'AHORRO_PLAZO_FIJO'
+    'AHORRO_INFANTO_JUVENIL', 'AHORRO_PLAZO_FIJO', 'AHORRO_SOBRE_PRESTAMO'
   );
 exception when duplicate_object then null; end $$;
 
@@ -4136,6 +4223,7 @@ do $$ begin
     'SERVICIOS_BI', 'DEPOSITO_BI', 'RETIRO_BI', 'REMESA_BI',
     'DEPOSITO_AHORRO_CORRIENTE', 'DEPOSITO_AHORRO_PROGRAMADO', 'DEPOSITO_AHORRO_INFANTO_JUVENIL',
     'RETIRO_AHORRO_CORRIENTE', 'RETIRO_AHORRO_PROGRAMADO', 'RETIRO_AHORRO_INFANTO_JUVENIL',
+    'DEPOSITO_AHORRO_SOBRE_PRESTAMO', 'RETIRO_AHORRO_SOBRE_PRESTAMO',
     'DEPOSITO_PLAZO_FIJO', 'RETIRO_PLAZO_FIJO',
     'APORTACION', 'INGRESO_ASOCIADO', 'COMISION',
     'ABONO_PRESTAMO_HIPOTECARIO', 'INTERES_PRESTAMO_HIPOTECARIO', 'MORA_PRESTAMO_HIPOTECARIO',
@@ -4143,6 +4231,9 @@ do $$ begin
     'COLOCACION_PRESTAMO', 'EGRESO_VARIO', 'INGRESO_VARIO'
   );
 exception when duplicate_object then null; end $$;
+alter type caja_categoria add value if not exists 'DEPOSITO_AHORRO_SOBRE_PRESTAMO';
+alter type caja_categoria add value if not exists 'RETIRO_AHORRO_SOBRE_PRESTAMO';
+
 
 do $$ begin
   create type estado_plazo_fijo as enum ('ACTIVO', 'LIQUIDADO');
@@ -4203,6 +4294,7 @@ create table if not exists auditoria (
   datos_anteriores jsonb,
   datos_nuevos     jsonb,
   usuario_id       uuid not null references usuarios(id),
+  motivo           text,
   fecha            timestamptz not null default now()
 );
 create index if not exists idx_auditoria_entidad on auditoria(entidad, entidad_id);
@@ -4223,6 +4315,9 @@ create table if not exists socios (
   direccion            text,
   telefono             text,
   nombre_beneficiario  text,
+  dpi_beneficiario     text,
+  telefono_beneficiario text,
+  parentesco_beneficiario text,
   creado_por_id        uuid references usuarios(id),
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
@@ -4230,22 +4325,41 @@ create table if not exists socios (
 create index if not exists idx_socios_agencia on socios(agencia_id);
 create index if not exists idx_socios_nombres on socios using gin (to_tsvector('spanish', nombres));
 
+alter table socios add column if not exists dpi_beneficiario text;
+alter table socios add column if not exists telefono_beneficiario text;
+alter table socios add column if not exists parentesco_beneficiario text;
+
 -- ---------------------------------------------------------------------------
 -- Cuentas y movimientos
 -- ---------------------------------------------------------------------------
 create table if not exists cuentas (
-  id            uuid primary key default gen_random_uuid(),
-  numero_cuenta text not null unique,
-  tipo          tipo_cuenta not null,
-  estado        estado_cuenta not null default 'ACTIVA',
-  socio_id      uuid not null references socios(id),
-  agencia_id    uuid not null references agencias(id),
-  saldo_inicial numeric(14,2) not null default 0,
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
+  id                     uuid primary key default gen_random_uuid(),
+  numero_cuenta          text not null unique,
+  tipo                   tipo_cuenta not null,
+  estado                 estado_cuenta not null default 'ACTIVA',
+  socio_id               uuid not null references socios(id),
+  agencia_id             uuid not null references agencias(id),
+  saldo_inicial          numeric(14,2) not null default 0,
+  cuota_pactada          numeric(14,2),
+  observaciones_apertura text,
+  prestamo_id            uuid,
+  creado_por_id          uuid references usuarios(id),
+  created_at             timestamptz not null default now(),
+  updated_at             timestamptz not null default now()
 );
 create index if not exists idx_cuentas_socio on cuentas(socio_id);
 create index if not exists idx_cuentas_agencia_tipo on cuentas(agencia_id, tipo);
+create index if not exists idx_cuentas_prestamo on cuentas(prestamo_id);
+
+alter type tipo_cuenta add value if not exists 'AHORRO_SOBRE_PRESTAMO';
+alter table cuentas add column if not exists cuota_pactada numeric(14,2);
+alter table cuentas add column if not exists observaciones_apertura text;
+alter table cuentas add column if not exists prestamo_id uuid;
+alter table cuentas add column if not exists creado_por_id uuid references usuarios(id);
+alter table cuentas add column if not exists titular_menor_nombre text;
+alter table cuentas add column if not exists titular_menor_parentesco text;
+alter table cuentas add column if not exists titular_menor_cui text;
+alter table cuentas add column if not exists titular_menor_fecha_nacimiento date;
 
 -- El saldo de una cuenta NUNCA se guarda como campo fijo: se calcula sumando
 -- sus movimientos (ver vista saldos_cuenta más abajo). Esto reemplaza las
@@ -4302,6 +4416,8 @@ create table if not exists plazo_fijo_contratos (
   updated_at             timestamptz not null default now()
 );
 create index if not exists idx_plazo_fijo_vencimiento on plazo_fijo_contratos(fecha_vencimiento);
+alter table plazo_fijo_contratos add column if not exists recibo_retiro text;
+alter table plazo_fijo_contratos add column if not exists monto_liquidado numeric(14,2);
 
 -- ---------------------------------------------------------------------------
 -- Caja chica
@@ -4390,6 +4506,126 @@ create table if not exists caja_arqueos (
   usuario_id      uuid not null references usuarios(id),
   created_at      timestamptz not null default now()
 );
+
+-- ---------------------------------------------------------------------------
+-- Módulo de Créditos / Préstamos
+-- ---------------------------------------------------------------------------
+do $$ begin
+  create type tipo_prestamo as enum ('FIDUCIARIO', 'HIPOTECARIO');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type estado_prestamo as enum ('SOLICITUD', 'APROBADO', 'DESEMBOLSADO', 'CANCELADO', 'RECHAZADO');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type tipo_amortizacion as enum ('CUOTA_NIVELADA', 'SOBRE_SALDOS');
+exception when duplicate_object then null; end $$;
+
+create table if not exists prestamos (
+  id                    uuid primary key default gen_random_uuid(),
+  codigo                text not null unique,
+  socio_id              uuid not null references socios(id),
+  agencia_id            uuid not null references agencias(id),
+  promotor_id           uuid references usuarios(id),
+  tipo                  tipo_prestamo not null default 'FIDUCIARIO',
+  estado                estado_prestamo not null default 'SOLICITUD',
+  tipo_amortizacion     tipo_amortizacion not null default 'CUOTA_NIVELADA',
+  monto_solicitado      numeric(14,2) not null,
+  monto_aprobado        numeric(14,2),
+  tasa_interes_mensual  numeric(6,2) not null default 2.00,
+  plazo_meses           integer not null,
+  cuota_mensual         numeric(14,2) not null,
+  destino               text,
+  garantia              text,
+  observaciones         text,
+  fecha_solicitud       date not null default current_date,
+  fecha_aprobacion      date,
+  fecha_desembolso      date,
+  created_at            timestamptz not null default now(),
+  updated_at            timestamptz not null default now()
+);
+
+create index if not exists idx_prestamos_socio on prestamos(socio_id);
+create index if not exists idx_prestamos_agencia on prestamos(agencia_id);
+create index if not exists idx_prestamos_promotor on prestamos(promotor_id);
+create index if not exists idx_prestamos_estado on prestamos(estado);
+
+alter table prestamos add column if not exists saldo_capital numeric(14,2);
+alter table prestamos add column if not exists ubicacion_garantia text;
+alter table prestamos add column if not exists nombre_fiador text;
+alter table prestamos add column if not exists dpi_fiador text;
+alter table prestamos add column if not exists telefono_fiador text;
+alter table prestamos add column if not exists documento_desembolso text;
+alter table prestamos add column if not exists fecha_vencimiento date;
+alter table prestamos add column if not exists origen_fondos text not null default 'FONDOS_PROPIOS';
+alter table prestamos add column if not exists fecha_ultimo_pago_migracion date;
+alter table prestamos add column if not exists es_migracion boolean default false;
+alter table prestamos add column if not exists numero_credito_anterior text;
+
+do $$ begin
+  alter table cuentas add constraint fk_cuentas_prestamo foreign key (prestamo_id) references prestamos(id) on delete set null;
+exception when duplicate_object then null; end $$;
+
+create table if not exists prestamo_pagos (
+  id                       uuid primary key default gen_random_uuid(),
+  prestamo_id              uuid not null references prestamos(id),
+  socio_id                 uuid not null references socios(id),
+  agencia_id               uuid not null references agencias(id),
+  caja_dia_id              uuid references caja_dias(id),
+  caja_movimiento_id       uuid references caja_movimientos_auxiliar(id),
+  fecha                    date not null default current_date,
+  numero_recibo            text,
+  abono_capital            numeric(14,2) not null default 0,
+  interes                  numeric(14,2) not null default 0,
+  mora                     numeric(14,2) not null default 0,
+  total_pagado             numeric(14,2) not null,
+  saldo_capital_restante   numeric(14,2) not null,
+  origen_fondos            text default 'FONDOS_PROPIOS',
+  usuario_id               uuid not null references usuarios(id),
+  created_at               timestamptz not null default now()
+);
+
+create index if not exists idx_prestamo_pagos_prestamo on prestamo_pagos(prestamo_id, fecha);
+create index if not exists idx_prestamo_pagos_socio on prestamo_pagos(socio_id);
+
+alter table prestamo_pagos add column if not exists origen_fondos text default 'FONDOS_PROPIOS';
+alter table caja_movimientos_auxiliar add column if not exists origen_fondos text;
+alter table ingresos_comif add column if not exists origen_fondos text;
+
+-- ---------------------------------------------------------------------------
+-- Liquidación de Promotores (Cobros de Campo)
+-- ---------------------------------------------------------------------------
+do $$ begin
+  create type estado_cobro_campo as enum ('PENDIENTE', 'LIQUIDADO', 'RECHAZADO');
+exception when duplicate_object then null; end $$;
+
+create table if not exists cobros_campo (
+  id                       uuid primary key default gen_random_uuid(),
+  promotor_id              uuid not null references usuarios(id),
+  agencia_id               uuid not null references agencias(id),
+  socio_id                 uuid not null references socios(id),
+  prestamo_id              uuid not null references prestamos(id),
+  fecha                    date not null default current_date,
+  numero_recibo_fisico     text not null,
+  monto                    numeric(14,2) not null,
+  pago_capital             numeric(14,2) not null default 0,
+  pago_interes             numeric(14,2) not null default 0,
+  pago_mora                numeric(14,2) not null default 0,
+  ahorro_prestamo          numeric(14,2) not null default 0,
+  estado                   estado_cobro_campo not null default 'PENDIENTE',
+  justificacion_edicion    text,
+  veces_editado            integer not null default 0,
+  caja_dia_id              uuid references caja_dias(id),
+  caja_movimiento_id       uuid references caja_movimientos_auxiliar(id),
+  prestamo_pago_id         uuid references prestamo_pagos(id),
+  created_at               timestamptz not null default now(),
+  updated_at               timestamptz not null default now(),
+  liquidado_at             timestamptz
+);
+
+create index if not exists idx_cobros_campo_promotor on cobros_campo(promotor_id, estado);
+create index if not exists idx_cobros_campo_prestamo on cobros_campo(prestamo_id);
 ```
 
 ## `backend/db/schema.supabase.sql` {#backenddbschemasupabasesql}

@@ -26,6 +26,12 @@ app.use(
       if (!origin || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
         return callback(null, true);
       }
+      try {
+        const hostname = new URL(origin).hostname;
+        if (hostname.endsWith(".vercel.app")) {
+          return callback(null, true);
+        }
+      } catch {}
       const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map((s) => s.trim()) ?? [];
       if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
         return callback(null, true);

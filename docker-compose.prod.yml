@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mif-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mif_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-mif_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en .env}
+      TZ: America/Guatemala
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    networks:
+      - mif-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mif_admin} -d ${POSTGRES_DB:-mif_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mif-backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mif_admin}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mif_prod}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET en .env}
+      JWT_EXPIRES_IN: 8h
+      TZ: America/Guatemala
+    networks:
+      - mif-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mif-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - mif-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  mif-network:
+    driver: bridge

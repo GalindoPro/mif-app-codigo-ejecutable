@@ -550,3 +550,49 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
   - `frontend/src/pages/CajaChica.tsx`
 - **Sincronización Dual:** Downloads ↔ Documents completada.
 
+---
+
+## 39. Preparación de Infraestructura Cloud para Producción (Supabase + Vercel + Render/Railway)
+
+- **Objetivo:** Adaptar el proyecto para operar en producción en la nube mediante un enlace web público accesible desde cualquier navegador o dispositivo móvil por los diferentes roles (gerencia, cajeros, supervisores, caja chica y promotores en campo), conectando la base de datos gestionada en Supabase (PostgreSQL), el backend en Render/Railway y el frontend SPA en Vercel.
+- **Ajustes Técnicos Implementados:**
+  1. **Compatibilidad con Supabase en `backend/src/db/pool.ts`:**
+     - Se añadió soporte SSL dinámico (`ssl: { rejectUnauthorized: false }`) para conexiones remotas hacia Supabase (Transaction Pooler y Session Pooler), manteniendo automáticamente `ssl: false` en entornos de desarrollo local (`localhost`).
+  2. **CORS Abierto para Vercel en `backend/src/app.ts`:**
+     - Se actualizó el middleware de CORS para autorizar nativamente peticiones provenientes de cualquier subdominio `*.vercel.app` además de las URLs definidas en la variable `CORS_ORIGIN`.
+  3. **Enrutamiento SPA en Vercel (`frontend/vercel.json`):**
+     - Se configuró la reescritura de URLs hacia `/index.html` para evitar errores `404 Not Found` al refrescar o acceder directamente a rutas internas (`/caja-chica`, `/auxiliar-caja`, `/creditos`, etc.).
+  4. **Blueprint de Despliegue en Render (`render.yaml`):**
+     - Se incorporó la configuración para desplegar el backend Express en Render.com con un solo clic, conectando `DATABASE_URL`, variables de entorno y comando de arranque en producción.
+- **Archivos Modificados / Creados:**
+  - `backend/src/db/pool.ts`
+  - `backend/src/app.ts`
+  - `frontend/vercel.json`
+  - `render.yaml`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 40. Migración y Aprovisionamiento Exitoso de Base de Datos en Supabase (PostgreSQL Cloud)
+
+- **Objetivo:** Ejecutar y validar la migración del esquema relacional completo del Sistema MIF y el aprovisionamiento inicial de datos en el clúster gestionado de PostgreSQL en Supabase (`SistemasAppComif`).
+- **Resolución de Dependencias Circulares en el Esquema (`backend/db/schema.sql`):**
+  - **Problema Detectado:** Al ejecutarse la migración en una base de datos limpia de Supabase, la sentencia `create table cuentas` fallaba con `error: relation "prestamos" does not exist`, debido a que la columna `prestamo_id` definía una clave foránea inline hacia `prestamos(id)`, la cual se creaba más adelante en el script.
+  - **Solución Idempotente:** Se separó la restricción foránea. La tabla `cuentas` ahora se crea con `prestamo_id uuid` simple, y la clave foránea `fk_cuentas_prestamo` se vincula de manera segura mediante un bloque PL/pgSQL posterior a la creación de `prestamos`:
+    ```sql
+    do $$ begin
+      alter table cuentas add constraint fk_cuentas_prestamo foreign key (prestamo_id) references prestamos(id) on delete set null;
+    exception when duplicate_object then null; end $$;
+    ```
+- **Ampliación de Enum de Roles:**
+  - Se agregó `alter type rol_usuario add value if not exists 'CAJA_CHICA';` en `schema.sql` para garantizar la compatibilidad con el nuevo rol operativo de caja chica en entornos nuevos.
+- **Aprovisionamiento Inicial (`db:seed`):**
+  - Se ejecutó `npm --prefix backend run db:seed` contra Supabase, creando con éxito la agencia principal (**Agencia Chajul**) y los 5 usuarios estándar del sistema (`admin@mif.coop`, `supervisor@mif.coop`, `cajero@mif.coop`, `cajachica@mif.coop`, `promotor@mif.coop`).
+  - Se verificó la creación de las 15 tablas del modelo de dominio: `agencias`, `auditoria`, `caja_arqueos`, `caja_chica_comprobantes`, `caja_dias`, `caja_movimientos_auxiliar`, `cobros_campo`, `cuentas`, `ingresos_comif`, `movimientos`, `plazo_fijo_contratos`, `prestamo_pagos`, `prestamos`, `socios`, `usuarios`.
+- **Archivos Modificados:**
+  - `backend/db/schema.sql`
+  - `01-codigo-backend.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+
+

@@ -241,9 +241,10 @@ Este documento registra el **avance real y completo** del sistema de la Cooperat
 
 | Rol | Correo electrónico | Contraseña | Enfoque |
 | :--- | :--- | :--- | :--- |
-| **Administrador** | `admin@mif.coop` | `CambiaEsto123!` | Configuración total, agencias, usuarios y reinicio. |
-| **Jefe de Agencia** | `supervisor@mif.coop` | `CambiaEsto123!` | Supervisión de agencia, aprobación de créditos y arqueos. |
-| **Cajero (Operador)** | `cajero@mif.coop` | `CambiaEsto123!` | Ventanilla de caja, depósitos, retiros y caja chica. |
+| **Administrador / Gerencia** | `admin@mif.coop` | `CambiaEsto123!` | Configuración total, agencias, usuarios y reinicio. |
+| **Jefe de Agencia / Supervisor** | `supervisor@mif.coop` | `CambiaEsto123!` | Supervisión de agencia, aprobación de créditos y arqueos. |
+| **Cajero (Operador)** | `cajero@mif.coop` | `CambiaEsto123!` | Ventanilla de caja, depósitos, retiros y cobros. |
+| **Caja Chica** | `cajachica@mif.coop` | `CambiaEsto123!` | Libro de caja chica, gastos operativos y ventanilla auxiliar. |
 | **Promotor de crédito** | `promotor@mif.coop` | `CambiaEsto123!` | Campo, prospectación de socios, créditos y ahorros. |
 
 ---
@@ -271,3 +272,7 @@ Todas las especificaciones operativas y estatutarias acordadas se encuentran doc
 17. **Liquidación Diaria de Créditos, Mora tras 4 Días de Gracia y Abonos Extraordinarios a Capital:** Liquidación exacta de intereses por días transcurridos (`Saldo × 24% / 365 × días`), recargo fijo de Q 25.00 a partir del 5to día de atraso (tras 4 días de gracia), y asignación automática de todo pago excedente directo a amortizar el Capital.
 18. **Arquitectura 100vh (Sin Scroll de Ventana) Completada en Todos los Módulos:** `AportacionesList.tsx`, `AhorroList.tsx`, `PlazoFijoList.tsx`, `AuxiliarCaja.tsx`, `CajaAbierta.tsx`, `CajaCerradaCard.tsx`, `CajaChica.tsx`, `CreditosList.tsx`, `KardexCarteraPromotor.tsx`, `SociosList.tsx`. Todas las pantallas del sistema utilizan `.screen-container` de altura exacta, `.screen-kpi-tile` horizontal, `.screen-split-layout`, `.table-scroll-container` (sticky header, scroll interno) y `.screen-footer` (paginación fija al pie). Fix de ADMIN/GERENCIA: `agenciaId` null auto-selecciona la primera agencia disponible al cargar `AuxiliarCaja`. Clases CSS nuevas en `app.css`: `.screen-kpi-tile`, `.screen-kpi-label`, `.screen-kpi-value`, `.screen-kpi-sub`.
 32. **Sistema de Edición Operativa con Registro de Motivos (Auditoría):** Permite a roles operativos (`CAJERO`, `CAJA_CHICA`) corregir equivocaciones de digitación en sus propios registros únicamente durante el transcurso del mismo día en el que los crearon. Todo cambio operativo requiere obligatoriamente una explicación detallada en el campo `motivo` de la tabla `auditoria`. Modales `CajaChicaEditModal` y `AuxiliarCajaEditModal` implementados. La Bitácora de Auditoría fue actualizada para mostrar el motivo de la corrección junto con los datos anteriores y nuevos.
+38. **Habilitación de Auxiliar de Caja para Caja Chica con Control de Cierre y Validación Cruzada:** Permite al rol `CAJA_CHICA` operar ventanilla en Auxiliar de Caja con bloqueo del botón de arqueo diario (`403 Forbidden`), trazabilidad con insignias de rol en tablas y validación debounced cruzada en tiempo real contra duplicados entre Auxiliar de Caja y Caja Chica.
+39. **Infraestructura Cloud de Producción (Supabase + Vercel + Render/Railway):** Soporte de SSL dinámico en PostgreSQL pool para conexiones a Supabase, CORS compatible con `*.vercel.app`, configuración de rutas SPA en `frontend/vercel.json` y blueprint `render.yaml` para despliegue automatizado del backend.
+40. **Migración y Aprovisionamiento Exitoso de Base de Datos en Supabase (PostgreSQL Cloud):** Esquema relacional de 15 tablas creado y probado en Supabase con resolución de claves foráneas diferidas e idempotentes, ampliación del enum de roles (`CAJA_CHICA`) y datos iniciales aprovisionados (Agencia Chajul y los 5 usuarios estándar).
+

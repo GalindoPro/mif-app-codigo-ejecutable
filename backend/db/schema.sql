@@ -15,6 +15,7 @@ do $$ begin
   create type rol_usuario as enum ('ADMIN', 'GERENCIA', 'SUPERVISOR', 'CAJERO', 'PROMOTOR');
 exception when duplicate_object then null; end $$;
 alter type rol_usuario add value if not exists 'PROMOTOR';
+alter type rol_usuario add value if not exists 'CAJA_CHICA';
 
 
 do $$ begin
@@ -172,7 +173,7 @@ create table if not exists cuentas (
   saldo_inicial          numeric(14,2) not null default 0,
   cuota_pactada          numeric(14,2),
   observaciones_apertura text,
-  prestamo_id            uuid references prestamos(id) on delete set null,
+  prestamo_id            uuid,
   creado_por_id          uuid references usuarios(id),
   created_at             timestamptz not null default now(),
   updated_at             timestamptz not null default now()
@@ -184,7 +185,7 @@ create index if not exists idx_cuentas_prestamo on cuentas(prestamo_id);
 alter type tipo_cuenta add value if not exists 'AHORRO_SOBRE_PRESTAMO';
 alter table cuentas add column if not exists cuota_pactada numeric(14,2);
 alter table cuentas add column if not exists observaciones_apertura text;
-alter table cuentas add column if not exists prestamo_id uuid references prestamos(id) on delete set null;
+alter table cuentas add column if not exists prestamo_id uuid;
 alter table cuentas add column if not exists creado_por_id uuid references usuarios(id);
 alter table cuentas add column if not exists titular_menor_nombre text;
 alter table cuentas add column if not exists titular_menor_parentesco text;
@@ -392,6 +393,10 @@ alter table prestamos add column if not exists origen_fondos text not null defau
 alter table prestamos add column if not exists fecha_ultimo_pago_migracion date;
 alter table prestamos add column if not exists es_migracion boolean default false;
 alter table prestamos add column if not exists numero_credito_anterior text;
+
+do $$ begin
+  alter table cuentas add constraint fk_cuentas_prestamo foreign key (prestamo_id) references prestamos(id) on delete set null;
+exception when duplicate_object then null; end $$;
 
 create table if not exists prestamo_pagos (
   id                       uuid primary key default gen_random_uuid(),
