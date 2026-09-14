@@ -350,7 +350,7 @@ async function main() {
     );
     console.log(
       `Cobro con diferencia deliberada en crédito ${prestamo.codigo}: interés cobrado Q${interesAjustado} vs. calculado Q${liquidacion.interesDevengado} ` +
-      `-> diferenciaCalculoOficial: ${resultado.diferenciaCalculoOficial ? "SÍ quedó marcada" : "no se marcó (revisar)"}`,
+      `-> diferenciaCalculoOficial: ${(resultado as any).diferenciaCalculoOficial ? "SÍ quedó marcada" : "no se marcó (revisar)"}`,
     );
   }
 

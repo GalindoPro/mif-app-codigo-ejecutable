@@ -49,7 +49,7 @@ const garantiaSchema = z.object({
 
 garantiasRouter.put(
   "/:prestamoId",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR"),
+  requireRole("GERENCIA", "SUPERVISOR"),
   asyncHandler(async (req, res) => {
     const data = garantiaSchema.parse(req.body);
     const visible = agenciaVisible(req);
@@ -103,7 +103,7 @@ garantiasRouter.put(
 
 garantiasRouter.delete(
   "/:prestamoId",
-  requireRole("ADMIN", "GERENCIA"),
+  requireRole("GERENCIA"),
   asyncHandler(async (req, res) => {
     const { rows } = await pool.query(
       `delete from garantias_hipotecarias where prestamo_id = $1 returning id`,

@@ -97,7 +97,8 @@ Código real y completo del backend (API en Node.js + TypeScript + PostgreSQL), 
     "declaration": false,
     "sourceMap": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/tests"]
 }
 ```
 
