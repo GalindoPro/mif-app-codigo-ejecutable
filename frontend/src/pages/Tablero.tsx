@@ -128,7 +128,7 @@ export default function Tablero() {
 
   const { global, porAgencia } = resumen;
   const varias = porAgencia.length > 1;
-  const puedeGestionarDatos = usuario?.rol === "GERENCIA" || usuario?.rol === "SUPERVISOR";
+  const puedeGestionarDatos = usuario?.rol === "ADMIN";
 
   return (
     <div className="dashboard-container">

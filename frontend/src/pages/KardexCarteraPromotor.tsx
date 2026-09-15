@@ -3,9 +3,11 @@ import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { formatoQ } from "../types";
 import type { KardexCarteraRespuesta, TipoPrestamo } from "../types";
+import { useAuth } from "../hooks/useAuth";
 
 export default function KardexCarteraPromotor() {
   const hoyMes = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+  const { usuario } = useAuth();
 
   const [mes, setMes] = useState(hoyMes);
   const [tabTipo, setTabTipo] = useState<"TODOS" | TipoPrestamo>("TODOS");
@@ -143,35 +145,39 @@ export default function KardexCarteraPromotor() {
           <Link to="/creditos/nuevo" className="btn">
             + Nueva Solicitud en Campo
           </Link>
-          <button
-            type="button"
-            className="btn secondary"
-            onClick={handleRecargarDatos}
-            disabled={recargando || reseteando}
-            style={{
-              fontSize: "0.82rem",
-              padding: "0.35rem 0.75rem",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.35rem",
-              borderColor: "rgba(2, 132, 199, 0.5)",
-              color: "#38bdf8",
-              background: "rgba(2, 132, 199, 0.1)",
-            }}
-            title="Restaurar los 65 préstamos y socios desde los archivos Excel"
-          >
-            {recargando ? "⏳ Recargando..." : "📥 Recargar Datos (Excel)"}
-          </button>
-          <button
-            type="button"
-            className="btn danger"
-            onClick={handleReset}
-            disabled={reseteando || recargando}
-            style={{ fontSize: "0.82rem", padding: "0.35rem 0.75rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
-            title="Borrar todos los datos y reiniciar el sistema limpio desde cero"
-          >
-            {reseteando ? "⏳ Reiniciando..." : "⚠️ Reiniciar a Cero"}
-          </button>
+          {usuario?.rol === "ADMIN" && (
+            <>
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={handleRecargarDatos}
+                disabled={recargando || reseteando}
+                style={{
+                  fontSize: "0.82rem",
+                  padding: "0.35rem 0.75rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  borderColor: "rgba(2, 132, 199, 0.5)",
+                  color: "#38bdf8",
+                  background: "rgba(2, 132, 199, 0.1)",
+                }}
+                title="Restaurar los 65 préstamos y socios desde los archivos Excel"
+              >
+                {recargando ? "⏳ Recargando..." : "📥 Recargar Datos (Excel)"}
+              </button>
+              <button
+                type="button"
+                className="btn danger"
+                onClick={handleReset}
+                disabled={reseteando || recargando}
+                style={{ fontSize: "0.82rem", padding: "0.35rem 0.75rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+                title="Borrar todos los datos y reiniciar el sistema limpio desde cero"
+              >
+                {reseteando ? "⏳ Reiniciando..." : "⚠️ Reiniciar a Cero"}
+              </button>
+            </>
+          )}
         </div>
       </div>
 

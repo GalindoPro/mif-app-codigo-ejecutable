@@ -11,7 +11,7 @@ sistemaRouter.use(requireAuth);
 
 sistemaRouter.post(
   "/reset",
-  requireRole("GERENCIA", "SUPERVISOR", "GERENCIA", "PROMOTOR", "CAJERO"),
+  requireRole("ADMIN"),
   asyncHandler(async (req, res) => {
     await pool.query(`
       TRUNCATE TABLE
@@ -51,7 +51,7 @@ sistemaRouter.post(
 
 sistemaRouter.post(
   "/recargar-datos",
-  requireRole("GERENCIA", "SUPERVISOR", "GERENCIA", "PROMOTOR", "CAJERO"),
+  requireRole("ADMIN"),
   asyncHandler(async (req, res) => {
     // 1. Limpiar datos previos
     await pool.query(`
