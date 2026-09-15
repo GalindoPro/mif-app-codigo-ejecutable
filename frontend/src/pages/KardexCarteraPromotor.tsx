@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { formatoQ } from "../types";
 import type { KardexCarteraRespuesta, TipoPrestamo } from "../types";
-import { useAuth } from "../hooks/useAuth";
+import { useAuth } from "../context/AuthContext";
 
 export default function KardexCarteraPromotor() {
   const hoyMes = new Date().toISOString().slice(0, 7); // 'YYYY-MM'

@@ -457,3 +457,30 @@ create table if not exists cobros_campo (
 
 create index if not exists idx_cobros_campo_promotor on cobros_campo(promotor_id, estado);
 create index if not exists idx_cobros_campo_prestamo on cobros_campo(prestamo_id);
+
+-- ---------------------------------------------------------------------------
+-- Google Drive Integración
+-- ---------------------------------------------------------------------------
+
+create table if not exists usuario_drive_tokens (
+  usuario_id      uuid primary key references usuarios(id) on delete cascade,
+  access_token    text not null,
+  refresh_token   text,
+  expiry_date     bigint,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
+create table if not exists drive_sync_queue (
+  id              uuid primary key default uuid_generate_v4(),
+  usuario_id      uuid not null references usuarios(id) on delete cascade,
+  nombre_archivo  text not null,
+  carpeta_destino text not null,
+  archivo_base64  text not null,
+  status          text not null default 'PENDING', -- PENDING, COMPLETED, FAILED
+  intentos        integer not null default 0,
+  error_mensaje   text,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+

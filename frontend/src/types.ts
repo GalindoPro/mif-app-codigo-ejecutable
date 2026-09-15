@@ -1,4 +1,4 @@
-export type RolUsuario = "GERENCIA" | "SUPERVISOR" | "CAJERO" | "CAJA_CHICA" | "PROMOTOR";
+export type RolUsuario = "ADMIN" | "GERENCIA" | "SUPERVISOR" | "CAJERO" | "CAJA_CHICA" | "PROMOTOR";
 
 export interface UsuarioAutenticado {
   id: string;
@@ -88,11 +88,12 @@ export interface ListaSocios {
 }
 
 export const ROL_LABEL: Record<RolUsuario, string> = {
-  GERENCIA: "Administrador",
-  SUPERVISOR: "Jefe de Agencia",
-  CAJERO: "Cajero Auxiliar",
-  CAJA_CHICA: "Operador Caja Chica",
-  PROMOTOR: "Promotor de Crédito",
+  ADMIN: "Administrador de Sistema",
+  GERENCIA: "Gerencia General",
+  SUPERVISOR: "Supervisor de Agencias",
+  CAJERO: "Cajero de Agencia",
+  CAJA_CHICA: "Administrador de Caja Chica",
+  PROMOTOR: "Promotor de Negocios",
 };
 
 export type TipoCuentaAhorro =

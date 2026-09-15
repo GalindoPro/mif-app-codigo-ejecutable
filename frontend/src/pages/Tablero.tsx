@@ -16,6 +16,8 @@ export default function Tablero() {
   const [mostrarOpciones, setMostrarOpciones] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const [driveConnected, setDriveConnected] = useState(false);
+
   const [periodoAnalitica] = useState<"dia" | "mes">("dia");
 
   function cargarResumen(silencioso = false) {
@@ -34,10 +36,41 @@ export default function Tablero() {
       .catch(console.error);
   }
 
+  async function verificarDrive() {
+    try {
+      const { data } = await api.get("/auth/me");
+      setDriveConnected(!!data.driveConnected);
+    } catch (e) {
+      console.error("Error al verificar estado de Google Drive", e);
+    }
+  }
+
+  async function handleConectarDrive() {
+    try {
+      const { data } = await api.get("/auth/google");
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (e) {
+      alert("Error al intentar conectar con Google Drive.");
+    }
+  }
+
+  // Si regresa de Google Drive con un query param, mostrar éxito
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("drive_connected") === "true") {
+      alert("¡Cuenta de Google Drive vinculada exitosamente! Los respaldos en PDF se guardarán en tu nube automáticamente.");
+      window.history.replaceState({}, document.title, "/");
+      setDriveConnected(true);
+    }
+  }, []);
+
   // Actualización automática en tiempo real cada 10s y al recuperar foco
   useEffect(() => {
-    cargarResumen(false);
+    cargarResumen();
     cargarAnalitica();
+    verificarDrive();
     const interval = setInterval(() => {
       cargarResumen(true);
       cargarAnalitica();
@@ -115,7 +148,7 @@ export default function Tablero() {
     try {
       const { data } = await api.post<{ ok: boolean; mensaje: string }>("/sistema/recargar-datos");
       setMensajeExito(data.mensaje);
-      cargarResumen(false);
+      cargarResumen();
     } catch (err) {
       setError(mensajeError(err));
     } finally {
@@ -142,8 +175,20 @@ export default function Tablero() {
               En Vivo · En Tiempo Real
             </span>
           </div>
-          <p>
-            Cooperativa Integral de Ahorro y Crédito "Maya Inversiones Futuras", R.L. {varias ? " · Todas las Agencias" : ""}
+          <p style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+            <span>Cooperativa Integral de Ahorro y Crédito "Maya Inversiones Futuras", R.L. {varias ? " · Todas las Agencias" : ""}</span>
+            {driveConnected ? (
+              <span style={{ fontSize: "0.75rem", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", padding: "0.2rem 0.6rem", borderRadius: "20px", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                ✅ Google Drive Conectado
+              </span>
+            ) : (
+              <button 
+                onClick={handleConectarDrive}
+                style={{ fontSize: "0.75rem", background: "#4285F4", color: "#fff", border: "none", padding: "0.2rem 0.6rem", borderRadius: "20px", display: "flex", alignItems: "center", gap: "0.3rem", cursor: "pointer", fontWeight: "bold" }}
+              >
+                ☁️ Conectar Google Drive para Respaldos
+              </button>
+            )}
           </p>
         </div>
 
