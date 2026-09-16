@@ -299,6 +299,7 @@ export interface ResumenAgencia {
   carteraPrestamos?: { count: number; saldo: number };
   plazoFijo?: { count: number; monto: number };
   aportaciones?: { count: number; saldo: number };
+  cuotasIngreso?: { count: number; monto: number };
   totalSocios: number;
   movimientosHoy: number;
 }
@@ -312,6 +313,7 @@ export interface ResumenDashboard {
     carteraPrestamos?: { count: number; saldo: number };
     plazoFijo?: { count: number; monto: number };
     aportaciones?: { count: number; saldo: number };
+    cuotasIngreso?: { count: number; monto: number };
     totalSocios: number;
     movimientosHoy: number;
   };

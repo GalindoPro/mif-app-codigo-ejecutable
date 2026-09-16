@@ -284,6 +284,13 @@ export default function Tablero() {
           </span>
           <span className="kpi-tile-sub">{global.aportaciones?.count ?? 117} socios aportantes</span>
         </Link>
+        <Link to="/auxiliar-caja" className="kpi-tile">
+          <span className="kpi-tile-label">Cuotas de Ingreso</span>
+          <span className="kpi-tile-value" style={{ color: "#10b981" }}>
+            {formatoQ(global.cuotasIngreso?.monto ?? 0)}
+          </span>
+          <span className="kpi-tile-sub">{global.cuotasIngreso?.count ?? 0} cuotas registradas</span>
+        </Link>
         <Link to="/socios" className="kpi-tile">
           <span className="kpi-tile-label">Socios activos</span>
           <span className="kpi-tile-value mono">{global.totalSocios}</span>
@@ -375,6 +382,7 @@ export default function Tablero() {
                       <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Caja chica</th>
                       <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Ahorro corriente</th>
                       <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Cartera Crédito</th>
+                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Cuotas Ingreso</th>
                       <th style={{ padding: "0.35rem 0.5rem", textAlign: "center" }}>Socios</th>
                     </tr>
                   </thead>
@@ -385,6 +393,7 @@ export default function Tablero() {
                         <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>{formatoQ(a.cajaChica.saldo)}</td>
                         <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>{formatoQ(a.ahorroCorriente.saldoTotal)}</td>
                         <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right", color: "#38bdf8" }}>{formatoQ(a.carteraPrestamos?.saldo ?? 0)}</td>
+                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right", color: "#10b981" }}>{formatoQ(a.cuotasIngreso?.monto ?? 0)}</td>
                         <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "center" }}>{a.totalSocios}</td>
                       </tr>
                     ))}

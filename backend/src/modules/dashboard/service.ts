@@ -69,12 +69,22 @@ export async function resumen(agenciaId: string | null) {
      group by c.agencia_id`,
   );
 
+  const { rows: cuotasIngresoRows } = await pool.query(
+    `select agencia_id,
+            count(*)::int as total_cuotas,
+            coalesce(sum(monto), 0)::numeric(14,2) as monto_total
+     from caja_movimientos_auxiliar
+     where categoria = 'INGRESO_ASOCIADO'
+     group by agencia_id`,
+  );
+
   const mapaCajaChica = new Map(cajaChica.map((r) => [r.agencia_id, Number(r.saldo)]));
   const mapaSocios = new Map(socios.map((r) => [r.agencia_id, r.total]));
   const mapaMovHoy = new Map(movimientosHoy.map((r) => [r.agencia_id, r.total]));
   const mapaPrestamos = new Map(prestamos.map((r) => [r.agencia_id, { count: r.total_prestamos, saldo: Number(r.saldo_total) }]));
   const mapaPlazoFijo = new Map(plazoFijo.map((r) => [r.agencia_id, { count: r.total_certificados, monto: Number(r.monto_total) }]));
   const mapaAportaciones = new Map(aportaciones.map((r) => [r.agencia_id, { count: r.total_aportantes, saldo: Number(r.saldo_total) }]));
+  const mapaCuotasIngreso = new Map(cuotasIngresoRows.map((r) => [r.agencia_id, { count: r.total_cuotas, monto: Number(r.monto_total) }]));
 
   const porAgencia = agencias.map((ag) => {
     const ahorrosAgencia = ahorros.filter((a) => a.agencia_id === ag.id);
@@ -93,6 +103,7 @@ export async function resumen(agenciaId: string | null) {
       carteraPrestamos: mapaPrestamos.get(ag.id) ?? { count: 0, saldo: 0 },
       plazoFijo: mapaPlazoFijo.get(ag.id) ?? { count: 0, monto: 0 },
       aportaciones: mapaAportaciones.get(ag.id) ?? { count: 0, saldo: 0 },
+      cuotasIngreso: mapaCuotasIngreso.get(ag.id) ?? { count: 0, monto: 0 },
       totalSocios: mapaSocios.get(ag.id) ?? 0,
       movimientosHoy: mapaMovHoy.get(ag.id) ?? 0,
     };
@@ -116,6 +127,10 @@ export async function resumen(agenciaId: string | null) {
         count: acc.aportaciones.count + a.aportaciones.count,
         saldo: acc.aportaciones.saldo + a.aportaciones.saldo,
       },
+      cuotasIngreso: {
+        count: acc.cuotasIngreso.count + a.cuotasIngreso.count,
+        monto: acc.cuotasIngreso.monto + a.cuotasIngreso.monto,
+      },
       totalSocios: acc.totalSocios + a.totalSocios,
       movimientosHoy: acc.movimientosHoy + a.movimientosHoy,
     }),
@@ -127,6 +142,7 @@ export async function resumen(agenciaId: string | null) {
       carteraPrestamos: { count: 0, saldo: 0 },
       plazoFijo: { count: 0, monto: 0 },
       aportaciones: { count: 0, saldo: 0 },
+      cuotasIngreso: { count: 0, monto: 0 },
       totalSocios: 0,
       movimientosHoy: 0,
     },

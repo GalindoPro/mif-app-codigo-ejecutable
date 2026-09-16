@@ -28,8 +28,7 @@ export function categoriasDeGrupo(seccion: "BI" | "PROPIO", tipo: "INGRESO" | "E
       CATEGORIAS_AUXILIAR[k].tipo === tipo &&
       !k.includes("PRESTAMO") &&
       !k.includes("HIPOTECARIO") &&
-      !k.includes("FIDUCIARIO") &&
-      k !== "INGRESO_ASOCIADO"
+      !k.includes("FIDUCIARIO")
   );
 }
 
