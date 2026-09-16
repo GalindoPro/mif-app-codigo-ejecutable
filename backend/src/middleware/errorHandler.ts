@@ -22,5 +22,11 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
 
   // eslint-disable-next-line no-console
   console.error("Error no controlado:", err);
+  
+  try {
+    const fs = require("fs");
+    fs.appendFileSync("error.log", new Date().toISOString() + " - " + String(err) + (err instanceof Error ? "\n" + err.stack : "") + "\n");
+  } catch (e) {}
+  
   return res.status(500).json({ error: "Ocurrió un error inesperado en el servidor" });
 }
