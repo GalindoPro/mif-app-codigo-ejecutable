@@ -766,7 +766,7 @@ export default function CobroCreditoVentanilla({
           </div>
 
           {/* CONTROL DE CUOTA */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+          <div style={{ marginBottom: "1rem" }}>
             <div className="field">
               <label htmlFor="num-cuota">Número de Cuota a pagar</label>
               <input
@@ -776,18 +776,9 @@ export default function CobroCreditoVentanilla({
                 value={numeroCuota}
                 onChange={(e) => setNumeroCuota(e.target.value)}
               />
-              <span className="hint">Cuota inicial</span>
-            </div>
-            <div className="field">
-              <label htmlFor="cant-cuotas">Cantidad de Cuotas a pagar</label>
-              <input
-                id="cant-cuotas"
-                type="number"
-                min="1"
-                value={cantidadCuotas}
-                onChange={(e) => setCantidadCuotas(e.target.value)}
-              />
-              <span className="hint">Cuántas cuotas abarca este pago</span>
+              <span className="hint">
+                Cuota inicial de este pago. (La cantidad de cuotas que cubre se calcula automáticamente en el sistema).
+              </span>
             </div>
           </div>
 
