@@ -647,7 +647,7 @@ export default function CreditoForm() {
 
                   <div className="field">
                     <label htmlFor="mig-cuotas-pagadas" style={{ color: "#065f46", fontWeight: 700 }}>
-                      🔢 Cuotas ya pagadas por el asociado *
+                      🔢 Cuotas ya pagadas *
                     </label>
                     <input
                       id="mig-cuotas-pagadas"
@@ -664,7 +664,25 @@ export default function CreditoForm() {
                       placeholder="Ej. 6"
                       style={{ fontWeight: 700, fontSize: "1.05rem", borderColor: "#059669" }}
                     />
-                    <span className="hint">Número de cuotas que ya canceló (Ej. 6)</span>
+                    <span className="hint">Número de cuotas pagadas</span>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="mig-saldo-actual" style={{ color: "#059669", fontWeight: 700 }}>
+                      💰 Saldo Capital Vivo Actual (Q) *
+                    </label>
+                    <input
+                      id="mig-saldo-actual"
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={saldoCapitalActual}
+                      onChange={(e) => setSaldoCapitalActual(e.target.value)}
+                      required={esMigracion}
+                      placeholder="Ej. 33143.93"
+                      style={{ fontWeight: 700, fontSize: "1.05rem", borderColor: "#059669", background: "#f0fdf4" }}
+                    />
+                    <span className="hint">Monto real adeudado (puedes editarlo si dio abonos extra)</span>
                   </div>
                 </div>
 
