@@ -160,6 +160,13 @@ export default function CobroCreditoVentanilla({
     setPrestamo(p);
     setOrigenFondos(p.origen_fondos || "FONDOS_PROPIOS");
     setCargandoLiquidacion(true);
+
+    const saldoBase = Number(
+      p.saldo_capital !== null && p.saldo_capital !== undefined
+        ? p.saldo_capital
+        : p.monto_aprobado || p.monto_solicitado
+    );
+
     try {
       const { data } = await api.get<{ prestamo: Prestamo; liquidacion: ResultadoLiquidacion }>(
         `/prestamos/${p.id}/liquidacion`,
@@ -177,31 +184,32 @@ export default function CobroCreditoVentanilla({
       setInteres(String(intSugerido));
       setMora(String(data.liquidacion.moraFijaSugerida));
       setMontoEntregadoInput(String(totalSugerido));
+
+      setSaldoActualReportado(String(Math.max(0, Math.round((saldoBase - capSugerido) * 100) / 100)));
+      const cuotaRef = data.liquidacion.cuotaProgramadaOficial || Number(p.cuota_mensual) || 1;
+      setCantidadCuotas(String(Math.max(1, Math.floor((totalSugerido + 0.01) / cuotaRef))));
+
     } catch {
-      const saldo = Number(
-        p.saldo_capital !== null && p.saldo_capital !== undefined
-          ? p.saldo_capital
-          : p.monto_aprobado || p.monto_solicitado,
-      );
       const tasa = Number(p.tasa_interes_mensual || 2.0) / 100;
-      const interesMes = Math.round(saldo * tasa * 100) / 100;
+      const interesMes = Math.round(saldoBase * tasa * 100) / 100;
       const cuotaTotal = Number(p.cuota_mensual);
-      const capitalMes = Math.max(0, Math.min(saldo, Math.round((cuotaTotal - interesMes) * 100) / 100));
+      const capitalMes = Math.max(0, Math.min(saldoBase, Math.round((cuotaTotal - interesMes) * 100) / 100));
 
       setAbonoCapital(String(capitalMes));
       setInteres(String(interesMes));
       setMora("0");
-      setMontoEntregadoInput(String(capitalMes + interesMes));
+      const totalSugerido = capitalMes + interesMes;
+      setMontoEntregadoInput(String(totalSugerido));
       setLiquidacion(null);
+
+      setSaldoActualReportado(String(Math.max(0, Math.round((saldoBase - capitalMes) * 100) / 100)));
+      const cuotaRef = Number(p.cuota_mensual) || 1;
+      setCantidadCuotas(String(Math.max(1, Math.floor((totalSugerido + 0.01) / cuotaRef))));
+
     } finally {
       // Pre-fill fields based on prestamo
       setNumeroCuota(String((p.cuotas_pagadas || 0) + 1));
-      setCantidadCuotas("1");
-      setSaldoAnteriorReportado(String(
-        p.saldo_capital !== null && p.saldo_capital !== undefined
-          ? p.saldo_capital
-          : p.monto_aprobado || p.monto_solicitado
-      ));
+      setSaldoAnteriorReportado(String(saldoBase));
       setDescripcion("");
       setCargandoLiquidacion(false);
     }
@@ -303,6 +311,15 @@ export default function CobroCreditoVentanilla({
     setMora(String(dist.pagoMora));
     setInteres(String(dist.pagoInteres));
     setAbonoCapital(String(dist.pagoCapital));
+
+    // Auto-rellenar Saldo Actual
+    const nuevoSaldo = Math.max(0, Math.round((saldo - dist.pagoCapital) * 100) / 100);
+    setSaldoActualReportado(String(nuevoSaldo));
+
+    // Auto-rellenar Cantidad de Cuotas
+    const cuotaRef = liquidacion?.cuotaProgramadaOficial || Number(prestamo.cuota_mensual) || 1;
+    const cuotasCubiertas = Math.max(1, Math.floor((num + 0.01) / cuotaRef));
+    setCantidadCuotas(String(cuotasCubiertas));
   }
 
   const saldoActual = prestamo
