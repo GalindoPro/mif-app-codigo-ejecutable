@@ -89,7 +89,7 @@ export async function listar(filtros: FiltrosSocios) {
        left join (select socio_id, count(*) as total_cuentas from cuentas group by socio_id) cnt
               on cnt.socio_id = s.id
        ${where}
-       order by s.numero_asociado asc, s.created_at asc
+       order by s.numero_asociado desc, s.created_at desc
        limit $${limitIdx} offset $${offsetIdx}`,
       valores,
     ),
@@ -623,7 +623,7 @@ export async function listarAportaciones(params: { agenciaId: string | null; q?:
     left join saldos_cuenta sc on sc.cuenta_id = c.id
     ${where}
     group by s.id, a.nombre
-    order by s.numero_asociado asc
+    order by s.numero_asociado desc
   `;
 
   const { rows } = await pool.query(query, valores);

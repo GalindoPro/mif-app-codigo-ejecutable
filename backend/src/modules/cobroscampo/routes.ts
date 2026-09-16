@@ -20,7 +20,7 @@ cobrosCampoRouter.get("/pendientes", requireAuth, requireRole("PROMOTOR"), async
       join socios s on s.id = c.socio_id
       join prestamos p on p.id = c.prestamo_id
       where c.promotor_id = $1 and c.estado = 'PENDIENTE'
-      order by c.created_at asc
+      order by c.created_at desc
     `, [promotorId]);
     res.json(rows);
   } catch (err) {

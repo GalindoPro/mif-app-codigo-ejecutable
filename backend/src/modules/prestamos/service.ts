@@ -478,7 +478,7 @@ export async function listarPagos(prestamoId: string) {
      from prestamo_pagos pp
      join usuarios u on u.id = pp.usuario_id
      where pp.prestamo_id = $1
-     order by pp.fecha asc, pp.created_at asc`,
+     order by pp.fecha desc, pp.created_at desc`,
     [prestamoId],
   );
   return rows;
@@ -524,7 +524,7 @@ export async function obtenerKardexCartera(filtros: FiltrosKardexCartera) {
      join agencias a on a.id = p.agencia_id
      left join usuarios u on u.id = p.promotor_id
      where ${condiciones.join(" and ")}
-     order by p.tipo asc, p.codigo asc`,
+     order by p.tipo desc, p.codigo desc`,
     valores,
   );
 
@@ -537,7 +537,7 @@ export async function obtenerKardexCartera(filtros: FiltrosKardexCartera) {
          from prestamo_pagos pp
          left join usuarios u on u.id = pp.usuario_id
          where pp.prestamo_id = $1
-         order by pp.fecha asc, pp.created_at asc`,
+         order by pp.fecha desc, pp.created_at desc`,
         [p.id],
       );
 

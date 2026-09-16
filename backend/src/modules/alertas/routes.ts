@@ -37,7 +37,7 @@ alertasRouter.get(
         JOIN agencias a ON a.id = cd.agencia_id
         LEFT JOIN usuarios u ON u.id = cd.cajero_id
         WHERE cd.estado = 'ABIERTO'
-        ORDER BY cd.fecha ASC
+        ORDER BY cd.fecha DESC
       `);
 
       for (const c of cajasAbiertas) {
@@ -103,7 +103,7 @@ alertasRouter.get(
         FROM prestamos p
         JOIN socios s ON s.id = p.socio_id
         WHERE p.estado = 'APROBADO'
-        ORDER BY p.created_at ASC
+        ORDER BY p.created_at DESC
       `);
 
       for (const cr of creditosAprobados) {

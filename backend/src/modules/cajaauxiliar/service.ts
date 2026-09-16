@@ -138,7 +138,7 @@ export async function detalle(id: string, agenciaVisible: string | null) {
     `select m.*, u.nombre as usuario_nombre, u.rol as usuario_rol
      from caja_movimientos_auxiliar m join usuarios u on u.id = m.usuario_id
      where m.caja_dia_id = $1
-     order by m.created_at asc`,
+     order by m.created_at desc`,
     [id],
   );
 
@@ -1549,7 +1549,7 @@ export async function arqueosMensuales(
      left join usuarios u_cerro on u_cerro.id = d.cerrado_por
      left join caja_arqueos a on a.caja_dia_id = d.id
      where d.agencia_id = $1 and to_char(d.fecha, 'YYYY-MM') = $2
-     order by d.fecha asc`,
+     order by d.fecha desc`,
     [targetAgencia, mesParam],
   );
 
