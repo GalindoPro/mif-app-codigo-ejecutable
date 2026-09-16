@@ -227,6 +227,12 @@ export const CATEGORIAS: Record<CajaCategoria, CategoriaInfo> = {
     descripcion: "Colocación de préstamo (desembolso)",
     sinModuloReal: true,
   },
+  TRASLADO_FONDOS: {
+    seccion: "PROPIO",
+    tipo: "EGRESO",
+    grupoContador: "egreso_propio",
+    descripcion: "Traslado de fondos",
+  },
   EGRESO_VARIO: {
     seccion: "PROPIO",
     tipo: "EGRESO",

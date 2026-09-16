@@ -248,6 +248,7 @@ export default function NuevoMovimientoForm({
     usuarioRol?: string;
   } | null>(null);
   const [verificandoDocNo, setVerificandoDocNo] = useState(false);
+  const [metodoPago, setMetodoPago] = useState<"EFECTIVO" | "CHEQUE">("EFECTIVO");
 
   function cambiarGrupo(nuevo: (typeof GRUPOS)[number]["key"]) {
     setGrupo(nuevo);
@@ -259,6 +260,7 @@ export default function NuevoMovimientoForm({
     setBeneficiario("");
     setReferenciaAut("");
     setDocNo("");
+    setMetodoPago("EFECTIVO");
   }
 
   function cambiarCategoria(nueva: CajaCategoria) {
@@ -268,6 +270,7 @@ export default function NuevoMovimientoForm({
     setBeneficiario("");
     setDocNo("");
     setError(null);
+    setMetodoPago("EFECTIVO");
   }
 
   useEffect(() => {
@@ -345,10 +348,21 @@ export default function NuevoMovimientoForm({
         docNo: docNo || undefined,
         referenciaAut: referenciaAut || undefined,
       });
-      onCreado();
+      if (metodoPago === "CHEQUE") {
+        setGrupo("PROPIO_EGRESO");
+        setCategoria("TRASLADO_FONDOS");
+        setBeneficiario("COMIF R.L.");
+        setSocio(null);
+        setCuenta(null);
+        setReferenciaAut("");
+        setDocNo("");
+        setMetodoPago("EFECTIVO");
+        setGuardando(false);
+      } else {
+        onCreado();
+      }
     } catch (err) {
       setError(mensajeError(err));
-    } finally {
       setGuardando(false);
     }
   }
@@ -377,6 +391,22 @@ export default function NuevoMovimientoForm({
             ))}
           </select>
         </div>
+
+        {!esAportacion && info.tipo === "INGRESO" && info.seccion === "PROPIO" && (
+          <div className="field" style={{ gridColumn: "1 / -1" }}>
+            <label>Método de pago</label>
+            <div style={{ display: "flex", gap: "1rem", marginTop: "0.25rem" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", cursor: "pointer", fontWeight: 500 }}>
+                <input type="radio" name="metodoPago" value="EFECTIVO" checked={metodoPago === "EFECTIVO"} onChange={() => setMetodoPago("EFECTIVO")} />
+                Efectivo
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", cursor: "pointer", fontWeight: 500 }}>
+                <input type="radio" name="metodoPago" value="CHEQUE" checked={metodoPago === "CHEQUE"} onChange={() => setMetodoPago("CHEQUE")} />
+                Cheque
+              </label>
+            </div>
+          </div>
+        )}
 
         {esAportacion && (
           <div style={{ gridColumn: "1 / -1" }}>
@@ -441,7 +471,9 @@ export default function NuevoMovimientoForm({
           <>
             {!info.requiereCuenta && (
               <div className="field">
-                <label htmlFor="aux-doc">No. de documento</label>
+                <label htmlFor="aux-doc">
+                  {metodoPago === "CHEQUE" ? "No. de boleta" : "No. de documento"}
+                </label>
                 <input id="aux-doc" value={docNo} onChange={(e) => setDocNo(e.target.value)} />
                 {verificandoDocNo && <span className="sub" style={{ fontSize: "0.72rem" }}>Verificando...</span>}
                 {!verificandoDocNo && infoDuplicado && (
@@ -458,7 +490,9 @@ export default function NuevoMovimientoForm({
             )}
             {info.requiereCuenta && (
               <div className="field">
-                <label htmlFor="aux-doc-cuenta">No. de recibo</label>
+                <label htmlFor="aux-doc-cuenta">
+                  {metodoPago === "CHEQUE" ? "No. de boleta" : "No. de recibo"}
+                </label>
                 <input id="aux-doc-cuenta" value={docNo} onChange={(e) => setDocNo(e.target.value)} />
                 {verificandoDocNo && <span className="sub" style={{ fontSize: "0.72rem" }}>Verificando...</span>}
                 {!verificandoDocNo && infoDuplicado && (
