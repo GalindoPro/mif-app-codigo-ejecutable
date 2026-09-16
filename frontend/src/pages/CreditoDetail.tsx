@@ -579,24 +579,29 @@ export default function CreditoDetail() {
                 </tr>
               </thead>
               <tbody>
-                {prestamo.amortizacion.tabla.map((c) => (
-                  <tr key={c.numero}>
-                    <td className="mono" style={{ fontWeight: 600 }}>
-                      Cuota {c.numero}
-                    </td>
-                    <td className="mono">{new Date(c.fechaPago).toLocaleDateString("es-GT")}</td>
-                    <td className="mono" style={{ fontWeight: 600 }}>
-                      {formatoQ(c.cuota)}
-                    </td>
-                    <td className="mono" style={{ color: "var(--accent)" }}>
-                      {formatoQ(c.capital)}
-                    </td>
-                    <td className="mono" style={{ color: "#d97706" }}>
-                      {formatoQ(c.interes)}
-                    </td>
-                    <td className="mono">{formatoQ(c.saldoRestante)}</td>
-                  </tr>
-                ))}
+                {prestamo.amortizacion.tabla.map((c, index) => {
+                  const estaPagada = index < pagos.length;
+                  return (
+                    <tr key={c.numero} style={{ opacity: estaPagada ? 0.6 : 1, background: estaPagada ? "rgba(16, 185, 129, 0.05)" : "transparent" }}>
+                      <td className="mono" style={{ fontWeight: 600 }}>
+                        Cuota {c.numero} {estaPagada && <span title="Cuota pagada" style={{ color: "#10b981", marginLeft: "4px" }}>✔</span>}
+                      </td>
+                      <td className="mono" style={{ textDecoration: estaPagada ? "line-through" : "none", color: estaPagada ? "var(--ink-soft)" : "inherit" }}>
+                        {new Date(c.fechaPago).toLocaleDateString("es-GT")}
+                      </td>
+                      <td className="mono" style={{ fontWeight: 600 }}>
+                        {formatoQ(c.cuota)}
+                      </td>
+                      <td className="mono" style={{ color: estaPagada ? "var(--ink-soft)" : "var(--accent)" }}>
+                        {formatoQ(c.capital)}
+                      </td>
+                      <td className="mono" style={{ color: estaPagada ? "var(--ink-soft)" : "#d97706" }}>
+                        {formatoQ(c.interes)}
+                      </td>
+                      <td className="mono">{formatoQ(c.saldoRestante)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
