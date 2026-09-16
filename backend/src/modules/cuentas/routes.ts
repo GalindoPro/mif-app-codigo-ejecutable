@@ -13,6 +13,8 @@ const TIPOS = [
   "AHORRO_PROGRAMADO",
   "AHORRO_INFANTO_JUVENIL",
   "AHORRO_SOBRE_PRESTAMO",
+  "AHORRO_PLAZO_FIJO",
+  "APORTACION",
 ] as const;
 const tipoSchema = z.enum(TIPOS);
 
