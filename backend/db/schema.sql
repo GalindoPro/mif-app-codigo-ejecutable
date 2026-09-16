@@ -323,7 +323,10 @@ create table if not exists caja_movimientos_auxiliar (
   monto            numeric(14,2) not null,
   saldo_acumulado  numeric(14,2) not null,
   usuario_id       uuid not null references usuarios(id),
-  created_at       timestamptz not null default now()
+  created_at       timestamptz not null default now(),
+  saldo_anterior_reportado numeric(14,2),
+  saldo_actual_reportado   numeric(14,2),
+  numero_cuota             int
 );
 create index if not exists idx_caja_mov_aux_dia on caja_movimientos_auxiliar(caja_dia_id, created_at);
 create index if not exists idx_caja_mov_aux_agencia_categoria on caja_movimientos_auxiliar(agencia_id, categoria);
