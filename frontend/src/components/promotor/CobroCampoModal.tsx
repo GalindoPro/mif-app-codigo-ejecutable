@@ -265,14 +265,13 @@ export function CobroCampoModal({ prestamoId, socioId, socioNombres, onClose, on
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: "0.25rem", fontSize: "0.85rem", fontWeight: 600 }}>No. de Recibo Físico (Papel)</label>
+              <label style={{ display: "block", marginBottom: "0.25rem", fontSize: "0.85rem", fontWeight: 600 }}>No. de Recibo Físico (Opcional en Campo)</label>
               <input
                 type="text"
-                required
                 disabled={esEdicion}
                 value={numeroReciboFisico}
                 onChange={(e) => setNumeroReciboFisico(e.target.value)}
-                placeholder="Ej. 10245"
+                placeholder="Ej. 10245 (dejar en blanco si no tienes recibo)"
                 style={{ width: "100%", padding: "0.4rem", borderRadius: "4px", border: "1px solid var(--line)" }}
               />
             </div>

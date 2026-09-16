@@ -40,7 +40,7 @@ cobrosCampoRouter.post("/", requireAuth, requireRole("PROMOTOR"), async (req, re
       return res.status(400).json({ error: "El promotor no tiene agencia asignada" });
     }
 
-    if (!prestamo_id || !socio_id || !numero_recibo_fisico || monto <= 0) {
+    if (!prestamo_id || !socio_id || monto <= 0) {
       return res.status(400).json({ error: "Datos incompletos o monto inválido" });
     }
 
@@ -50,7 +50,7 @@ cobrosCampoRouter.post("/", requireAuth, requireRole("PROMOTOR"), async (req, re
       values
         ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       returning *
-    `, [promotorId, agenciaId, socio_id, prestamo_id, numero_recibo_fisico, monto, pago_capital || 0, pago_interes || 0, pago_mora || 0, ahorro_prestamo || 0]);
+    `, [promotorId, agenciaId, socio_id, prestamo_id, numero_recibo_fisico || "", monto, pago_capital || 0, pago_interes || 0, pago_mora || 0, ahorro_prestamo || 0]);
 
     res.status(201).json(rows[0]);
   } catch (err) {
