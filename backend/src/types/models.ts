@@ -1,4 +1,4 @@
-export type RolUsuario = "GERENCIA" | "SUPERVISOR" | "CAJERO" | "CAJA_CHICA" | "PROMOTOR";
+export type RolUsuario = "ADMIN" | "GERENCIA" | "SUPERVISOR" | "CAJERO" | "CAJA_CHICA" | "PROMOTOR";
 export type EstadoSocio = "ACTIVO" | "INACTIVO";
 export type Genero = "M" | "F";
 
