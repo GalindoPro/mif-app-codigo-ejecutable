@@ -161,12 +161,48 @@ export function CobroCampoModal({ prestamoId, socioId, socioNombres, onClose, on
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.75rem", overflowY: "auto", paddingRight: "0.2rem" }}>
             
             <div style={{ background: "var(--paper-raised)", border: "1px solid var(--line)", padding: "0.75rem", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "1rem", fontWeight: 700, margin: 0 }}>
-                💵 Monto Total (Calculado)
+              <label htmlFor="cobro-total" style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "1rem", fontWeight: 700, margin: 0 }}>
+                💵 Monto Total
               </label>
-              <span style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--primary)" }}>
-                {formatoQ(sumaRealState)}
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+                <span style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--primary)" }}>Q</span>
+                <input
+                  id="cobro-total"
+                  type="number"
+                  step="any"
+                  min="0"
+                  disabled={yaEditado}
+                  value={sumaRealState === 0 ? "" : sumaRealState}
+                  onChange={(e) => {
+                    const total = Number(e.target.value) || 0;
+                    if (liquidacion && !esEdicion) {
+                      const bMora = liquidacion.moraFijaSugerida || 0;
+                      const bInt = (liquidacion.estaEnMora || liquidacion.cuotasVencidas > 0)
+                        ? liquidacion.interesDevengado
+                        : (liquidacion.interesMesCompleto || liquidacion.interesDevengado) || 0;
+                      
+                      const m = Math.min(total, bMora);
+                      const r1 = Math.max(0, total - m);
+                      const i = Math.min(r1, bInt);
+                      const c = Math.max(0, Math.round((r1 - i) * 100) / 100);
+                      
+                      setMora(String(m));
+                      setInteres(String(i));
+                      setAbonoCapital(String(c));
+                    }
+                  }}
+                  style={{
+                    fontSize: "1.2rem",
+                    fontWeight: 700,
+                    color: "var(--primary)",
+                    width: "120px",
+                    textAlign: "right",
+                    border: "1px solid var(--line)",
+                    borderRadius: "4px",
+                    padding: "0.2rem 0.4rem"
+                  }}
+                />
+              </div>
             </div>
 
             <div style={{ padding: "0.6rem", border: "1px solid var(--line)", borderRadius: "8px", background: "var(--paper)" }}>
