@@ -573,14 +573,16 @@ export default function CreditoDetail() {
                   <th>No. Cuota</th>
                   <th>Fecha de pago</th>
                   <th>Cuota mensual</th>
+                  <th>Saldo Anterior</th>
                   <th>Abono a Capital</th>
                   <th>Interés (2%)</th>
-                  <th>Saldo deudor</th>
+                  <th>Saldo Actual</th>
                 </tr>
               </thead>
               <tbody>
                 {prestamo.amortizacion.tabla.map((c, index) => {
                   const estaPagada = index < pagos.length;
+                  const saldoAnterior = Number(c.saldoRestante) + Number(c.capital);
                   return (
                     <tr key={c.numero} style={{ opacity: estaPagada ? 0.6 : 1, background: estaPagada ? "rgba(16, 185, 129, 0.05)" : "transparent" }}>
                       <td className="mono" style={{ fontWeight: 600 }}>
@@ -592,13 +594,16 @@ export default function CreditoDetail() {
                       <td className="mono" style={{ fontWeight: 600 }}>
                         {formatoQ(c.cuota)}
                       </td>
+                      <td className="mono" style={{ color: "var(--ink-soft)" }}>
+                        {formatoQ(saldoAnterior)}
+                      </td>
                       <td className="mono" style={{ color: estaPagada ? "var(--ink-soft)" : "var(--accent)" }}>
                         {formatoQ(c.capital)}
                       </td>
                       <td className="mono" style={{ color: estaPagada ? "var(--ink-soft)" : "#d97706" }}>
                         {formatoQ(c.interes)}
                       </td>
-                      <td className="mono">{formatoQ(c.saldoRestante)}</td>
+                      <td className="mono" style={{ fontWeight: 700 }}>{formatoQ(c.saldoRestante)}</td>
                     </tr>
                   );
                 })}

@@ -193,30 +193,37 @@ export default function CreditoSimulador() {
                   <th>No. Cuota</th>
                   <th>Fecha estimada</th>
                   <th>Cuota mensual</th>
+                  <th>Saldo Anterior</th>
                   <th>Abono a Capital</th>
                   <th>Interés (2%)</th>
-                  <th>Saldo restante</th>
+                  <th>Saldo Actual</th>
                 </tr>
               </thead>
               <tbody>
-                {resultado.tabla.map((c) => (
-                  <tr key={c.numero}>
-                    <td className="mono" style={{ fontWeight: 600 }}>
-                      Cuota {c.numero}
-                    </td>
-                    <td className="mono">{new Date(c.fechaPago).toLocaleDateString("es-GT")}</td>
-                    <td className="mono" style={{ fontWeight: 600 }}>
-                      {formatoQ(c.cuota)}
-                    </td>
-                    <td className="mono" style={{ color: "var(--accent)" }}>
-                      {formatoQ(c.capital)}
-                    </td>
-                    <td className="mono" style={{ color: "#d97706" }}>
-                      {formatoQ(c.interes)}
-                    </td>
-                    <td className="mono">{formatoQ(c.saldoRestante)}</td>
-                  </tr>
-                ))}
+                {resultado.tabla.map((c) => {
+                  const saldoAnterior = c.saldoRestante + c.capital;
+                  return (
+                    <tr key={c.numero}>
+                      <td className="mono" style={{ fontWeight: 600 }}>
+                        Cuota {c.numero}
+                      </td>
+                      <td className="mono">{new Date(c.fechaPago).toLocaleDateString("es-GT")}</td>
+                      <td className="mono" style={{ fontWeight: 600 }}>
+                        {formatoQ(c.cuota)}
+                      </td>
+                      <td className="mono" style={{ color: "var(--ink-soft)" }}>
+                        {formatoQ(saldoAnterior)}
+                      </td>
+                      <td className="mono" style={{ color: "var(--accent)" }}>
+                        {formatoQ(c.capital)}
+                      </td>
+                      <td className="mono" style={{ color: "#d97706" }}>
+                        {formatoQ(c.interes)}
+                      </td>
+                      <td className="mono" style={{ fontWeight: 700 }}>{formatoQ(c.saldoRestante)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

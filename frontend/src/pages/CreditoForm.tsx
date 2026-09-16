@@ -696,6 +696,18 @@ export default function CreditoForm() {
                     </div>
 
                     <div style={{ background: "var(--paper-raised)", padding: "0.5rem 0.75rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
+                      <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.72rem" }}>
+                        🏦 Saldo Original (Anterior)
+                      </span>
+                      <strong style={{ fontSize: "1.05rem", color: "var(--ink)" }}>
+                        Q {Number(montoOriginalContrato).toFixed(2)}
+                      </strong>
+                      <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)", display: "block" }}>
+                        Monto inicial desembolsado
+                      </span>
+                    </div>
+
+                    <div style={{ background: "var(--paper-raised)", padding: "0.5rem 0.75rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
                       <span style={{ color: "#065f46", display: "block", fontSize: "0.72rem", fontWeight: 700 }}>
                         💰 Saldo Capital Vivo Actual
                       </span>
@@ -860,9 +872,10 @@ export default function CreditoForm() {
                             <th style={{ padding: "0.35rem 0.5rem" }}>No.</th>
                             <th style={{ padding: "0.35rem 0.5rem" }}>Fecha programada</th>
                             <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Cuota Total</th>
+                            <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Saldo Anterior</th>
                             <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Capital</th>
                             <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Interés (2%)</th>
-                            <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Saldo Restante</th>
+                            <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Saldo Actual</th>
                             <th style={{ padding: "0.35rem 0.5rem", textAlign: "center" }}>Estado Cuadre</th>
                           </tr>
                         </thead>
@@ -891,6 +904,8 @@ export default function CreditoForm() {
                               labelEstado = "⚠️ Atrasada (+ Mora Q25)";
                             }
 
+                            const saldoAnterior = c.saldoRestante + c.capital;
+
                             return (
                               <tr
                                 key={c.numero}
@@ -903,6 +918,7 @@ export default function CreditoForm() {
                                 <td style={{ padding: "0.35rem 0.5rem" }}>{c.numero}</td>
                                 <td style={{ padding: "0.35rem 0.5rem" }}>{formatearFechaLocal(c.fechaPago)}</td>
                                 <td style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Q {c.cuota.toFixed(2)}</td>
+                                <td style={{ padding: "0.35rem 0.5rem", textAlign: "right", color: "var(--ink-soft)", fontWeight: 400 }}>Q {saldoAnterior.toFixed(2)}</td>
                                 <td style={{ padding: "0.35rem 0.5rem", textAlign: "right", fontWeight: 700 }}>Q {c.capital.toFixed(2)}</td>
                                 <td style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Q {c.interes.toFixed(2)}</td>
                                 <td style={{ padding: "0.35rem 0.5rem", textAlign: "right", fontWeight: 700 }}>
