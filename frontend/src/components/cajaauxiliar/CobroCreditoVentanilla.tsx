@@ -515,7 +515,7 @@ export default function CobroCreditoVentanilla({
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.5rem" }}>
               {(
                 [
-                  { id: "FONDOS_PROPIOS", num: "1", label: "Fondos Propios", icon: "🏦", desc: "MIF COOP" },
+                  { id: "FONDOS_PROPIOS", num: "1", label: "Fondos Propios", icon: "🏦", desc: "COOP COMIF R.L." },
                   { id: "FEDERURAL", num: "2", label: "FEDERURAL", icon: "🌾", desc: "Línea Federural" },
                   { id: "CHN_GUATEMALA", num: "3", label: "CHN-GUATEMALA", icon: "🏛️", desc: "Crédito Hipotecario Nal." },
                 ] as const

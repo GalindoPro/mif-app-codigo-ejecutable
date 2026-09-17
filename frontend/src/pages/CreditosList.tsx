@@ -189,91 +189,146 @@ export default function CreditosList() {
 
       {pestanaActiva === "CREDITOS" ? (
         <>
-          {/* FRANJA HORIZONTAL DE KPIS COMPACTA (1 FILA DELGADA) */}
-          <div className="screen-kpis" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+          {/* FRANJA HORIZONTAL DE KPIS COMPACTA (TARJETAS FINTECH CON BORDE DE COLOR) */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
+            {/* CARTERA ACTIVA */}
             <div
-              className="stat-card accent"
               style={{
-                padding: "0.4rem 0.75rem",
-                cursor: "pointer",
-                border: estadoFiltro === "DESEMBOLSADO" ? "2px solid #10b981" : undefined,
+                background: "var(--paper)",
+                border: "1px solid var(--line)",
+                borderLeft: "4px solid #059669",
+                borderRadius: "8px",
+                padding: "0.45rem 0.65rem",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
+                cursor: "pointer",
+                boxShadow: estadoFiltro === "DESEMBOLSADO" ? "0 0 0 2px #059669" : "0 1px 3px rgba(0,0,0,0.04)",
               }}
               onClick={() => setEstadoFiltro(estadoFiltro === "DESEMBOLSADO" ? "" : "DESEMBOLSADO")}
               title="Filtrar por préstamos en cobro activo"
             >
               <div>
-                <span className="label" style={{ fontSize: "0.66rem", display: "block" }}>Cartera Activa ({desembolsados})</span>
-                <span className="value mono" style={{ fontSize: "1.05rem" }}>{formatoQ(totalDesembolsado)}</span>
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#059669", display: "block", letterSpacing: "0.02em" }}>
+                  CARTERA ACTIVA ({desembolsados})
+                </span>
+                <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
+                  {formatoQ(totalDesembolsado)}
+                </span>
               </div>
-              <span style={{ fontSize: "1.2rem", opacity: 0.8 }}>💼</span>
+              <span style={{ fontSize: "1.2rem" }}>💼</span>
             </div>
 
+            {/* POR DESEMBOLSAR */}
             <div
-              className="stat-card"
               style={{
-                padding: "0.4rem 0.75rem",
-                cursor: "pointer",
-                border: estadoFiltro === "APROBADO" ? "2px solid #3b82f6" : undefined,
-                background: aprobados > 0 ? "rgba(59, 130, 246, 0.08)" : undefined,
+                background: aprobados > 0 ? "rgba(2, 132, 199, 0.06)" : "var(--paper)",
+                border: "1px solid var(--line)",
+                borderLeft: "4px solid #0284c7",
+                borderRadius: "8px",
+                padding: "0.45rem 0.65rem",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
+                cursor: "pointer",
+                boxShadow: estadoFiltro === "APROBADO" ? "0 0 0 2px #0284c7" : "0 1px 3px rgba(0,0,0,0.04)",
               }}
               onClick={() => setEstadoFiltro(estadoFiltro === "APROBADO" ? "" : "APROBADO")}
               title="Filtrar créditos aprobados listos para desembolso"
             >
               <div>
-                <span className="label" style={{ fontSize: "0.66rem", color: aprobados > 0 ? "#3b82f6" : undefined, fontWeight: 700, display: "block" }}>
-                  Por Desembolsar
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", display: "block", letterSpacing: "0.02em" }}>
+                  POR DESEMBOLSAR
                 </span>
-                <span className="value mono" style={{ fontSize: "1.05rem", color: aprobados > 0 ? "#3b82f6" : undefined }}>
+                <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#0284c7", fontFamily: "monospace" }}>
                   {aprobados}
                 </span>
               </div>
-              <span style={{ fontSize: "1.2rem", color: "#3b82f6" }}>⚡</span>
+              <span style={{ fontSize: "1.2rem" }}>⚡</span>
             </div>
 
+            {/* EN SOLICITUD */}
             <div
-              className="stat-card"
               style={{
-                padding: "0.4rem 0.75rem",
-                cursor: "pointer",
-                border: estadoFiltro === "SOLICITUD" ? "2px solid #f59e0b" : undefined,
+                background: "var(--paper)",
+                border: "1px solid var(--line)",
+                borderLeft: "4px solid #f59e0b",
+                borderRadius: "8px",
+                padding: "0.45rem 0.65rem",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
+                cursor: "pointer",
+                boxShadow: estadoFiltro === "SOLICITUD" ? "0 0 0 2px #f59e0b" : "0 1px 3px rgba(0,0,0,0.04)",
               }}
               onClick={() => setEstadoFiltro(estadoFiltro === "SOLICITUD" ? "" : "SOLICITUD")}
               title="Filtrar solicitudes en evaluación"
             >
               <div>
-                <span className="label" style={{ fontSize: "0.66rem", display: "block" }}>En Solicitud</span>
-                <span className="value mono" style={{ fontSize: "1.05rem", color: "#f59e0b" }}>{pendientes}</span>
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#d97706", display: "block", letterSpacing: "0.02em" }}>
+                  EN SOLICITUD
+                </span>
+                <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#d97706", fontFamily: "monospace" }}>
+                  {pendientes}
+                </span>
               </div>
-              <span style={{ fontSize: "1.2rem", opacity: 0.8 }}>⏳</span>
+              <span style={{ fontSize: "1.2rem" }}>⏳</span>
             </div>
 
+            {/* CANCELADOS / PAGADOS */}
             <div
-              className="stat-card"
               style={{
-                padding: "0.4rem 0.75rem",
-                cursor: "pointer",
-                border: estadoFiltro === "" ? "2px solid var(--accent)" : undefined,
+                background: "var(--paper)",
+                border: "1px solid var(--line)",
+                borderLeft: "4px solid #64748b",
+                borderRadius: "8px",
+                padding: "0.45rem 0.65rem",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
+                cursor: "pointer",
+                boxShadow: estadoFiltro === "CANCELADO" ? "0 0 0 2px #64748b" : "0 1px 3px rgba(0,0,0,0.04)",
+              }}
+              onClick={() => setEstadoFiltro(estadoFiltro === "CANCELADO" ? "" : "CANCELADO")}
+              title="Filtrar créditos pagados o solventes"
+            >
+              <div>
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--ink-soft)", display: "block", letterSpacing: "0.02em" }}>
+                  SOLVENTES / PAGADOS
+                </span>
+                <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
+                  {cancelados}
+                </span>
+              </div>
+              <span style={{ fontSize: "1.2rem" }}>✅</span>
+            </div>
+
+            {/* TOTAL CRÉDITOS */}
+            <div
+              style={{
+                background: "var(--paper)",
+                border: "1px solid var(--line)",
+                borderLeft: "4px solid #6366f1",
+                borderRadius: "8px",
+                padding: "0.45rem 0.65rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                cursor: "pointer",
+                boxShadow: estadoFiltro === "" ? "0 0 0 2px #6366f1" : "0 1px 3px rgba(0,0,0,0.04)",
               }}
               onClick={() => setEstadoFiltro("")}
               title="Ver todos los créditos"
             >
               <div>
-                <span className="label" style={{ fontSize: "0.66rem", display: "block" }}>Total Créditos</span>
-                <span className="value mono" style={{ fontSize: "1.05rem" }}>{prestamos?.length ?? 0}</span>
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", display: "block", letterSpacing: "0.02em" }}>
+                  TOTAL CRÉDITOS
+                </span>
+                <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#6366f1", fontFamily: "monospace" }}>
+                  {prestamos?.length ?? 0}
+                </span>
               </div>
-              <span style={{ fontSize: "1.2rem", opacity: 0.8 }}>📊</span>
+              <span style={{ fontSize: "1.2rem" }}>📊</span>
             </div>
           </div>
 

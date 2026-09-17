@@ -104,7 +104,7 @@ export default function LibroArqueoMensual() {
     if (!datos || datos.dias.length === 0) return;
     const lineas: string[] = [];
     lineas.push(`LIBRO DE ACTAS DE ARQUEO MENSUAL DE CAJA - COMISION DE VIGILANCIA`);
-    lineas.push(`COOPERATIVA INTEGRAL DE AHORRO Y CREDITO MAYA INVERSIONES FUTURAS R.L.`);
+    lineas.push(`COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."`);
     lineas.push(`Acta No.: ${numeroActa}`);
     lineas.push(`Agencia: ${agenciaNombre}`);
     lineas.push(`Periodo: ${mesNombreLargo}`);
@@ -369,7 +369,7 @@ export default function LibroArqueoMensual() {
           }}
         >
           <div style={{ fontSize: "1rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-            COOPERATIVA INTEGRAL DE AHORRO Y CRÉDITO &quot;MAYA INVERSIONES FUTURAS&quot;, R.L.
+            COOPERATIVA MAYA INVERSIONES FUTURAS R.L. &quot;COMIF R.L.&quot;
           </div>
           <div style={{ fontSize: "1.15rem", color: "#047857", fontWeight: 800, margin: "0.15rem 0" }}>
             COMISIÓN DE VIGILANCIA · LIBRO DE ACTAS DE ARQUEO MENSUAL
@@ -398,7 +398,7 @@ export default function LibroArqueoMensual() {
               <strong style={{ textDecoration: "underline" }}>PUNTO PRIMERO (APERTURA Y QUÓRUM):</strong> En el municipio
               de {lugarMunicipio}, departamento de Quiché, siendo las {horaInicio} horas del día {ultimoDiaMes} del mes
               de {mesNombreLargo}, reunidos en las oficinas de la Agencia <strong>{agenciaNombre}</strong> de la{" "}
-              <strong>Cooperativa Integral de Ahorro y Crédito &quot;Maya Inversiones Futuras&quot;, R.L.</strong>, se
+              <strong>COOPERATIVA MAYA INVERSIONES FUTURAS R.L. &quot;COMIF R.L.&quot;</strong>, se
               constituyen los miembros de la Comisión de Vigilancia: <strong>{nombrePresidente}</strong> (Presidente),{" "}
               <strong>{nombreSecretaria}</strong> (Secretaria) y <strong>{nombreVocal}</strong> (Vocal I), en presencia del
               Receptor Pagador <strong>{nombreCajero}</strong>, con el propósito de celebrar la sesión ordinaria de

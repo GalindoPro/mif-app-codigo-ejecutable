@@ -490,7 +490,7 @@ export default function CreditoDetail() {
                   {ORIGEN_FONDOS_LABEL[prestamo.origen_fondos]}
                 </span>
               ) : (
-                "Fondos Propios (MIF)"
+                "Fondos Propios (COOP COMIF R.L.)"
               )}
             </dd>
           </dl>

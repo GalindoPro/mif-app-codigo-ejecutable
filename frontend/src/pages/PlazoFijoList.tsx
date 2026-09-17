@@ -96,31 +96,120 @@ export default function PlazoFijoList() {
         </div>
       )}
 
-      {/* STRIP DE KPIS HORIZONTALES */}
-      <div className="screen-kpis" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-        <div className="screen-kpi-tile accent">
-          <span className="screen-kpi-label">CAPITAL A PLAZO FIJO</span>
-          <span className="screen-kpi-value">{formatoQ(totalInversionActiva)}</span>
-          <span className="screen-kpi-sub">En certificados activos</span>
+      {/* STRIP DE KPIS HORIZONTALES CON ESTILO FINTECH */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
+        {/* CAPITAL A PLAZO FIJO */}
+        <div
+          style={{
+            background: "rgba(124, 58, 237, 0.06)",
+            border: "1px solid rgba(124, 58, 237, 0.3)",
+            borderLeft: "4px solid #7c3aed",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#7c3aed", letterSpacing: "0.03em" }}>
+              CAPITAL A PLAZO FIJO
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>📦</span>
+          </div>
+          <span style={{ fontSize: "1.15rem", fontWeight: 800, color: "#7c3aed", fontFamily: "monospace" }}>
+            {formatoQ(totalInversionActiva)}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>En certificados activos</span>
         </div>
-        <div className="screen-kpi-tile">
-          <span className="screen-kpi-label">INTERESES NETOS POR PAGAR</span>
-          <span className="screen-kpi-value" style={{ color: "#d97706" }}>
+
+        {/* INTERESES NETOS POR PAGAR */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #f59e0b",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#d97706", letterSpacing: "0.03em" }}>
+              INTERESES NETOS POR PAGAR
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>💰</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#d97706", fontFamily: "monospace" }}>
             {formatoQ(totalInteresesComprometidos)}
           </span>
-          <span className="screen-kpi-sub">Proyectados al vencimiento</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Proyectados al vencimiento</span>
         </div>
-        <div className="screen-kpi-tile">
-          <span className="screen-kpi-label">CERTIFICADOS VIGENTES</span>
-          <span className="screen-kpi-value">{activos.length}</span>
-          <span className="screen-kpi-sub">Contratos activos</span>
+
+        {/* CERTIFICADOS VIGENTES */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #0284c7",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>
+              CERTIFICADOS VIGENTES
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>📜</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#0284c7", fontFamily: "monospace" }}>
+            {activos.length}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Contratos activos</span>
         </div>
-        <div className="screen-kpi-tile">
-          <span className="screen-kpi-label">VENCIDOS / POR LIQUIDAR</span>
-          <span className="screen-kpi-value" style={{ color: porVencerOyaVencidos > 0 ? "#ef4444" : "var(--ink)" }}>
+
+        {/* VENCIDOS / POR LIQUIDAR */}
+        <div
+          style={{
+            background: porVencerOyaVencidos > 0 ? "rgba(239, 68, 68, 0.06)" : "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: `4px solid ${porVencerOyaVencidos > 0 ? "#ef4444" : "#64748b"}`,
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span
+              style={{
+                fontSize: "0.65rem",
+                fontWeight: 700,
+                color: porVencerOyaVencidos > 0 ? "#ef4444" : "var(--ink-soft)",
+                letterSpacing: "0.03em",
+              }}
+            >
+              VENCIDOS / POR LIQUIDAR
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>{porVencerOyaVencidos > 0 ? "⚠️" : "✅"}</span>
+          </div>
+          <span
+            style={{
+              fontSize: "1.08rem",
+              fontWeight: 700,
+              color: porVencerOyaVencidos > 0 ? "#ef4444" : "var(--ink)",
+              fontFamily: "monospace",
+            }}
+          >
             {porVencerOyaVencidos}
           </span>
-          <span className="screen-kpi-sub">Listos para pago o renovación</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Listos para pago o renovación</span>
         </div>
       </div>
 

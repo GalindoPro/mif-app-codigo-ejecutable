@@ -363,7 +363,7 @@ export default function CreditoForm() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "0.5rem" }}>
               {(
                 [
-                  { id: "FONDOS_PROPIOS", label: "🏦 Fondos Propios (MIF)", desc: "Recursos propios" },
+                  { id: "FONDOS_PROPIOS", label: "🏦 Fondos Propios (COMIF R.L.)", desc: "Recursos propios" },
                   { id: "FEDERURAL", label: "🌾 FEDERURAL", desc: "Línea Federural" },
                   { id: "CHN_GUATEMALA", label: "🏛️ CHN-GUATEMALA", desc: "Crédito Hipotecario Nal." },
                 ] as const

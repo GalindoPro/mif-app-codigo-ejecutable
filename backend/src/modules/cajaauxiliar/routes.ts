@@ -19,6 +19,17 @@ cajaAuxiliarRouter.get(
 );
 
 cajaAuxiliarRouter.get(
+  "/reporte",
+  asyncHandler(async (req, res) => {
+    const agenciaId = (req.query.agenciaId as string) || req.user?.agenciaId;
+    if (!agenciaId) throw badRequest("Falta indicar la agencia");
+    const fechaInicio = typeof req.query.fechaInicio === "string" ? req.query.fechaInicio : undefined;
+    const fechaFin = typeof req.query.fechaFin === "string" ? req.query.fechaFin : undefined;
+    res.json(await service.reporteMovimientos(agenciaId, agenciaVisible(req), fechaInicio, fechaFin));
+  }),
+);
+
+cajaAuxiliarRouter.get(
   "/historial",
   requireRole("GERENCIA", "SUPERVISOR"),
   asyncHandler(async (req, res) => {

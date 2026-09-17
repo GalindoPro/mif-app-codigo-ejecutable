@@ -349,6 +349,7 @@ export type CajaCategoria =
   | "INTERES_PRESTAMO_FIDUCIARIO"
   | "MORA_PRESTAMO_FIDUCIARIO"
   | "COLOCACION_PRESTAMO"
+  | "TRASLADO_FONDOS"
   | "EGRESO_VARIO"
   | "INGRESO_VARIO";
 
@@ -431,6 +432,7 @@ export const CATEGORIAS_AUXILIAR: Record<CajaCategoria, CategoriaAuxiliarInfo> =
   MORA_PRESTAMO_FIDUCIARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Mora sobre préstamo fiduciario", requiereSocio: true },
 
   COLOCACION_PRESTAMO: { seccion: "PROPIO", tipo: "EGRESO", descripcion: "Colocación de préstamo (desembolso)", requiereSocio: true, sinModuloReal: true },
+  TRASLADO_FONDOS: { seccion: "PROPIO", tipo: "EGRESO", descripcion: "Traslado de fondos" },
   EGRESO_VARIO: { seccion: "PROPIO", tipo: "EGRESO", descripcion: "Egreso vario" },
   INGRESO_VARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Ingreso vario", requiereSocio: true },
 };
@@ -523,7 +525,7 @@ export interface CuotaAmortizacion {
 export type OrigenFondos = "FONDOS_PROPIOS" | "FEDERURAL" | "CHN_GUATEMALA";
 
 export const ORIGEN_FONDOS_LABEL: Record<OrigenFondos, string> = {
-  FONDOS_PROPIOS: "Fondos Propios (MIF COOP)",
+  FONDOS_PROPIOS: "Fondos Propios (COOP COMIF R.L.)",
   FEDERURAL: "FEDERURAL",
   CHN_GUATEMALA: "CHN - Guatemala",
 };

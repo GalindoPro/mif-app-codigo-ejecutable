@@ -286,7 +286,7 @@ export default function CajaChica() {
 
   if (mostrarReporte) {
     return (
-      <div className="screen-container" style={{ overflowY: "auto" }}>
+      <div className="screen-container" style={{ overflowY: "auto", overflowX: "hidden", height: "auto", maxHeight: "none", width: "100%" }}>
         <CajaChicaReporteView
           agenciaId={agenciaId || agencias[0]?.id || ""}
           agencias={agencias}
@@ -344,28 +344,107 @@ export default function CajaChica() {
 
         {error && <div className="alert error" style={{ margin: "0.4rem 0", padding: "0.5rem 0.8rem", fontSize: "0.85rem" }}>{error}</div>}
 
-        {/* CINTILLO SUPERIOR DE KPIS COMPACTOS */}
+        {/* CINTILLO SUPERIOR DE KPIS COMPACTOS FINTECH */}
         {resultado && (
-          <div className="screen-kpis" style={{ margin: "0.4rem 0" }}>
-            <div className="kpi-tile accent" style={{ padding: "0.5rem 0.85rem" }}>
-              <span className="kpi-tile-label">Saldo Actual</span>
-              <span className="kpi-tile-value" style={{ color: "#10b981" }}>{formatoQ(resultado.saldoActual)}</span>
-              <span className="kpi-tile-sub">Fondo disponible</span>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem", margin: "0.4rem 0" }}>
+            {/* SALDO ACTUAL */}
+            <div
+              style={{
+                background: "rgba(5, 150, 105, 0.06)",
+                border: "1px solid rgba(5, 150, 105, 0.3)",
+                borderLeft: "4px solid #059669",
+                borderRadius: "8px",
+                padding: "0.45rem 0.65rem",
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#059669", letterSpacing: "0.03em" }}>
+                  SALDO DISPONIBLE
+                </span>
+                <span style={{ fontSize: "0.85rem" }}>💵</span>
+              </div>
+              <span style={{ fontSize: "1.15rem", fontWeight: 800, color: "#059669", fontFamily: "monospace" }}>
+                {formatoQ(resultado.saldoActual)}
+              </span>
+              <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Fondo disponible en caja</span>
             </div>
-            <div className="kpi-tile" style={{ padding: "0.5rem 0.85rem" }}>
-              <span className="kpi-tile-label">Total Ingresos</span>
-              <span className="kpi-tile-value">{formatoQ(resultado.totalIngresos)}</span>
-              <span className="kpi-tile-sub">Reposiciones registradas</span>
+
+            {/* TOTAL INGRESOS */}
+            <div
+              style={{
+                background: "var(--paper)",
+                border: "1px solid var(--line)",
+                borderLeft: "4px solid #0284c7",
+                borderRadius: "8px",
+                padding: "0.45rem 0.65rem",
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>
+                  TOTAL INGRESOS
+                </span>
+                <span style={{ fontSize: "0.85rem" }}>📥</span>
+              </div>
+              <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#0284c7", fontFamily: "monospace" }}>
+                {formatoQ(resultado.totalIngresos)}
+              </span>
+              <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Reposiciones registradas</span>
             </div>
-            <div className="kpi-tile" style={{ padding: "0.5rem 0.85rem" }}>
-              <span className="kpi-tile-label">Total Egresos</span>
-              <span className="kpi-tile-value" style={{ color: "#ef4444" }}>{formatoQ(resultado.totalEgresos)}</span>
-              <span className="kpi-tile-sub">Gastos comprobados</span>
+
+            {/* TOTAL EGRESOS */}
+            <div
+              style={{
+                background: "var(--paper)",
+                border: "1px solid var(--line)",
+                borderLeft: "4px solid #f59e0b",
+                borderRadius: "8px",
+                padding: "0.45rem 0.65rem",
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#d97706", letterSpacing: "0.03em" }}>
+                  TOTAL EGRESOS
+                </span>
+                <span style={{ fontSize: "0.85rem" }}>📤</span>
+              </div>
+              <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#d97706", fontFamily: "monospace" }}>
+                {formatoQ(resultado.totalEgresos)}
+              </span>
+              <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Gastos comprobados</span>
             </div>
-            <div className="kpi-tile" style={{ padding: "0.5rem 0.85rem" }}>
-              <span className="kpi-tile-label">Comprobantes</span>
-              <span className="kpi-tile-value">{resultado.data.length}</span>
-              <span className="kpi-tile-sub">Movimientos en libro</span>
+
+            {/* COMPROBANTES */}
+            <div
+              style={{
+                background: "var(--paper)",
+                border: "1px solid var(--line)",
+                borderLeft: "4px solid #6366f1",
+                borderRadius: "8px",
+                padding: "0.45rem 0.65rem",
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", letterSpacing: "0.03em" }}>
+                  COMPROBANTES
+                </span>
+                <span style={{ fontSize: "0.85rem" }}>📄</span>
+              </div>
+              <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#6366f1", fontFamily: "monospace" }}>
+                {resultado.data.length}
+              </span>
+              <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Movimientos en libro</span>
             </div>
           </div>
         )}

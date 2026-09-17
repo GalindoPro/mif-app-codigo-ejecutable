@@ -249,6 +249,7 @@ export default function NuevoMovimientoForm({
   } | null>(null);
   const [verificandoDocNo, setVerificandoDocNo] = useState(false);
   const [metodoPago, setMetodoPago] = useState<"EFECTIVO" | "CHEQUE">("EFECTIVO");
+  const [bancoCheque, setBancoCheque] = useState("Banrural");
 
   function cambiarGrupo(nuevo: (typeof GRUPOS)[number]["key"]) {
     setGrupo(nuevo);
@@ -351,7 +352,11 @@ export default function NuevoMovimientoForm({
       if (metodoPago === "CHEQUE") {
         setGrupo("PROPIO_EGRESO");
         setCategoria("TRASLADO_FONDOS");
-        setBeneficiario("COMIF R.L.");
+        
+        const origen = (socio || cuenta) ? "asociado" : "tercero";
+        const nombreQuienEntrego = socio?.nombres || (cuenta as any)?.socio_nombres || beneficiarioFinal || "COMIF R.L.";
+        setBeneficiario(`Traslado-${origen} - ${nombreQuienEntrego} (${bancoCheque})`);
+        
         setSocio(null);
         setCuenta(null);
         setReferenciaAut("");
@@ -395,7 +400,7 @@ export default function NuevoMovimientoForm({
         {!esAportacion && info.tipo === "INGRESO" && info.seccion === "PROPIO" && (
           <div className="field" style={{ gridColumn: "1 / -1" }}>
             <label>Método de pago</label>
-            <div style={{ display: "flex", gap: "1rem", marginTop: "0.25rem" }}>
+            <div style={{ display: "flex", gap: "1.5rem", marginTop: "0.25rem", alignItems: "center" }}>
               <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", cursor: "pointer", fontWeight: 500 }}>
                 <input type="radio" name="metodoPago" value="EFECTIVO" checked={metodoPago === "EFECTIVO"} onChange={() => setMetodoPago("EFECTIVO")} />
                 Efectivo
@@ -405,6 +410,29 @@ export default function NuevoMovimientoForm({
                 Cheque
               </label>
             </div>
+
+            {metodoPago === "CHEQUE" && (
+              <div style={{ marginTop: "0.75rem", background: "rgba(2, 132, 199, 0.05)", border: "1px solid rgba(2, 132, 199, 0.2)", borderRadius: "6px", padding: "0.6rem 0.8rem" }}>
+                <label htmlFor="aux-banco" style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--ink)" }}>Banco emisor del cheque</label>
+                <select
+                  id="aux-banco"
+                  value={bancoCheque}
+                  onChange={(e) => setBancoCheque(e.target.value)}
+                  style={{ marginTop: "0.3rem", width: "100%", maxWidth: "320px" }}
+                >
+                  <option value="Banrural">Banrural</option>
+                  <option value="Banco Industrial">Banco Industrial</option>
+                  <option value="CHN">CHN (Crédito Hipotecario Nacional)</option>
+                  <option value="BAM">BAM (Banco Agromercantil)</option>
+                  <option value="G&T Continental">G&T Continental</option>
+                  <option value="Micoope">Micoope</option>
+                  <option value="Otro">Otro</option>
+                </select>
+                <p style={{ margin: "0.35rem 0 0", fontSize: "0.74rem", color: "var(--ink-soft)" }}>
+                  Al registrar el depósito en cheque, se abrirá automáticamente el egreso de <strong>Traslado de fondos</strong> con la referencia al banco seleccionado.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -472,13 +500,22 @@ export default function NuevoMovimientoForm({
             {!info.requiereCuenta && (
               <div className="field">
                 <label htmlFor="aux-doc">
-                  {metodoPago === "CHEQUE" ? "No. de boleta" : "No. de documento"}
+                  {info.seccion === "BI"
+                    ? "No. de cuenta"
+                    : metodoPago === "CHEQUE"
+                    ? "No. de boleta"
+                    : "No. de recibo"}
                 </label>
-                <input id="aux-doc" value={docNo} onChange={(e) => setDocNo(e.target.value)} />
+                <input
+                  id="aux-doc"
+                  value={docNo}
+                  onChange={(e) => setDocNo(e.target.value)}
+                  placeholder={info.seccion === "BI" ? "Ej. 00-0000000-0" : undefined}
+                />
                 {verificandoDocNo && <span className="sub" style={{ fontSize: "0.72rem" }}>Verificando...</span>}
                 {!verificandoDocNo && infoDuplicado && (
                   <div style={{ background: "rgba(220, 38, 38, 0.1)", border: "1px solid #ef4444", borderRadius: "6px", padding: "0.4rem 0.6rem", marginTop: "0.3rem", fontSize: "0.76rem", color: "#dc2626" }}>
-                    <strong>⚠️ Documento ya utilizado:</strong>
+                    <strong>⚠️ {info.seccion === "BI" ? "No. de cuenta / documento" : "Documento"} ya utilizado:</strong>
                     <div>Registrado en: <strong>{infoDuplicado.modulo}</strong> {infoDuplicado.fecha ? `el ${new Date(infoDuplicado.fecha).toLocaleDateString("es-GT")}` : ""}</div>
                     {infoDuplicado.beneficiario && <div>Beneficiario: {infoDuplicado.beneficiario}</div>}
                     {infoDuplicado.usuario && (

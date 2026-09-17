@@ -1,4 +1,4 @@
-# Bitácora de Mejoras y Actualizaciones — Sistema MIF COOP
+# Bitácora de Mejoras y Actualizaciones — Sistema COOP COMIF R.L.
 
 Este documento recopila de forma detallada todas las mejoras funcionales, reglas de negocio, formatos guatemaltecos y optimizaciones contables implementadas en el sistema.
 
@@ -594,5 +594,502 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
   - `01-codigo-backend.md`
 - **Sincronización Dual:** Downloads ↔ Documents completada.
 
+---
+
+## 41. Orden Descendente Global en Consultas y Listados del Sistema (`DESC`)
+
+- **Objetivo:** Garantizar que en todas las pantallas del sistema, los registros más recientes (socios nuevos, créditos recién ingresados, movimientos de caja, comprobantes de caja chica, cobros en campo y alertas) aparezcan siempre en la parte superior del listado (`order by ... desc`), mejorando la agilidad operativa y la visibilidad inmediata de las últimas transacciones registradas.
+- **Módulos y Consultas Optimizadas:**
+  - **Padrón de Socios (`backend/src/modules/socios/service.ts`):** `ORDER BY s.creado_en DESC` para visualizar inmediatamente los asociados recién inscritos o afiliados en campo.
+  - **Bandeja de Créditos (`backend/src/modules/prestamos/service.ts`):** `ORDER BY p.creado_en DESC` en `listar` y `listarCarteraPromotor`, situando las nuevas solicitudes y desembolsos al tope.
+  - **Auxiliar de Caja (`backend/src/modules/cajaauxiliar/service.ts`):** `ORDER BY m.creado_en DESC` en `listarMovimientos` y `d.fecha_apertura DESC` en historial de días.
+  - **Caja Chica (`backend/src/modules/cajachica/service.ts`):** `ORDER BY creado_en DESC` en comprobantes y `creado_en DESC` en arqueos.
+  - **Cobros en Campo (`backend/src/modules/cobroscampo/service.ts`):** `ORDER BY c.creado_en DESC` para que el cajero vea primero los cobros más recientes enviados por el promotor.
+  - **Panel de Alertas (`backend/src/modules/alertas/service.ts`):** `ORDER BY fecha DESC` para priorizar los vencimientos y anomalías más recientes.
+  - **Manejo de Errores de API en Frontend (`frontend/src/lib/api.ts`):** Se corrigió `mensajeError` para extraer prioritariamente el mensaje devuelto por el backend (`data.error` o `data.message`), permitiendo mostrar mensajes descriptivos en pantalla (ej. conflictos `409 Conflict`) en lugar del genérico "Request failed with status code 409".
+- **Archivos Modificados:**
+  - `backend/src/modules/socios/service.ts`
+  - `backend/src/modules/prestamos/service.ts`
+  - `backend/src/modules/cajaauxiliar/service.ts`
+  - `backend/src/modules/cajachica/service.ts`
+  - `backend/src/modules/cobroscampo/service.ts`
+  - `backend/src/modules/alertas/service.ts`
+  - `frontend/src/lib/api.ts`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 42. Depósitos en Efectivo vs Cheque con Boleta/Recibo, Selección de Banco y Traslado Automático de Fondos (`Auxiliar de Caja`)
+
+- **Objetivo:** Brindar a los cajeros la opción de registrar depósitos tanto en **Efectivo** como en **Cheque** en todas las cuentas propias de la cooperativa (Aportaciones, Ahorro Corriente, Programado, Infanto-Juvenil, Sobre-Préstamo). Cuando el depósito es en cheque, el sistema solicita el **No. de boleta** bancaria y el **Banco emisor** (Banrural, Banco Industrial, CHN, BAM, G&T Continental, Micoope, Otro), registrando el ingreso a la cuenta y abriendo automáticamente la ventana de **Egreso Propio** con categoría contable **Traslado de fondos** y beneficiario dinámico estandarizado (`Traslado-asociado - [Nombre] ([Banco])` o `Traslado-tercero - [Nombre] ([Banco])` / por defecto `COMIF R.L.`), cuadrando matemáticamente la gaveta física de efectivo en caja.
+- **Reglas Contables y Operativas Implementadas:**
+  1. **Selector de Método de Pago:**
+     - En todos los ingresos propios (`info.tipo === "INGRESO"` y `info.seccion === "PROPIO"`): Se incluye el conmutador radial `● Efectivo` / `○ Cheque`.
+  2. **Etiquetas Dinámicas de Documentos:**
+     - Si se selecciona **Efectivo:** El campo de comprobante se etiqueta como **"No. de recibo"** (o "No. de documento").
+     - Si se selecciona **Cheque:** El campo de comprobante cambia automáticamente a **"No. de boleta"**.
+  3. **Selector Estructurado de Banco Emisor:**
+     - Al seleccionar Cheque, se despliega el menú de bancos: `Banrural`, `Banco Industrial`, `CHN (Crédito Hipotecario Nacional)`, `BAM (Banco Agromercantil)`, `G&T Continental`, `Micoope`, `Otro`.
+  4. **Apertura Automática del Egreso de Traslado de Fondos:**
+     - Al registrar exitosamente el depósito en cheque: El formulario no se cierra, sino que conmuta inmediatamente a la pestaña **Egreso propio** con categoría **Traslado de fondos** (`TRASLADO_FONDOS`).
+     - El campo de **Monto** conserva el valor exacto del cheque para fácil verificación.
+     - El campo **Beneficiario** se pre-llena automáticamente según el origen:
+       - Para asociados: `Traslado-asociado - [Nombre del Asociado] ([Banco])`
+       - Para terceros: `Traslado-tercero - [Nombre] ([Banco])`
+       - Por defecto si no hay nombre: `COMIF R.L.`
+     - El campo de recibo/documento se limpia y el método vuelve a Efectivo, listo para que el cajero ingrese el número de recibo de egreso y confirme el traslado.
+  5. **Nueva Categoría Contable `TRASLADO_FONDOS`:**
+     - Registrada en `backend/src/modules/cajaauxiliar/categorias.ts` y en `frontend/src/types.ts` (`CATEGORIAS_AUXILIAR`) dentro de la sección `PROPIO` y tipo `EGRESO` con descripción *"Traslado de fondos"*.
+- **Archivos Modificados:**
+  - `backend/src/modules/cajaauxiliar/categorias.ts`
+  - `frontend/src/types.ts`
+  - `frontend/src/components/cajaauxiliar/NuevoMovimientoForm.tsx`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 43. Rediseño y Optimización del Arqueo Físico y Cierre de Caja a Pantalla Completa con 2 Decimales Exactos sin Truncamiento (`CierreCajaForm.tsx`)
+
+- **Objetivo:** Corregir el truncamiento de cifras monetarias con puntos suspensivos (ej. `Q 237,824...`) en el formulario de arqueo y cierre físico de caja, expandiendo la cuadrícula al 100% del ancho disponible, mejorando la distribución de denominaciones (Billetes y Monedas) y garantizando que el Total Contado, el Saldo Esperado y la Diferencia muestren siempre el formato completo de dos decimales (`Q 237,824.76`).
+- **Mejoras Visuales y Operativas Implementadas:**
+  1. **Eliminación del Límite Rígido de Ancho (`maxWidth: 640px`):** El formulario de cierre ahora aprovecha fluidamente el 100% del panel operativo en pantallas de escritorio.
+  2. **Cuadrícula Equilibrada para Billetes y Monedas:**
+     - Columna izquierda: Billetes de Q 200 a Q 5 con subtotales en tiempo real.
+     - Columna derecha: Monedas de Q 1 a 1 ctv. con subtotales en tiempo real.
+     - Inputs numéricos con selección automática al enfocar (`onFocus`) para agilizar el ingreso rápido por teclado numérico.
+     - Filas con indicador visual de fila activa al ingresar cantidades mayores a cero.
+  3. **3 Tarjetas de Resumen Financiero de Alta Densidad:**
+     - **TOTAL CONTADO (FÍSICO):** Sumatoria total con desglose de billetes y monedas.
+     - **SALDO ESPERADO (LIBRO):** Monto exacto calculado por el libro auxiliar de caja, con tipografía responsiva `clamp()` y `white-space: nowrap` para evitar cortes con puntos suspensivos.
+     - **DIFERENCIA DE ARQUEO:** Semáforo en tiempo real: verde esmeralda `✓ Cuadrada (Q 0.00)` al estar balanceada, o rojo de advertencia con el monto exacto de faltante/sobrante.
+  4. **Botón de Cierre Destacado:** Conexión con la validación matemática estricta de cuadre previo al guardado oficial.
+- **Archivos Modificados:**
+  - `frontend/src/components/cajaauxiliar/CierreCajaForm.tsx`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+---
+
+## 44. Reemplazo Institucional Global de MIF COOP por COOP COMIF R.L.
+
+- **Objetivo:** Actualizar y estandarizar la denominación institucional en toda la plataforma, reemplazando de manera integral todas las menciones del nombre anterior `(MIF COOP)` / `MIF COOP` por la denominación oficial **`COOP COMIF R.L.`**.
+- **Alcance de la Actualización Global:**
+  1. **Navegación y Barra Lateral (`Layout.tsx`):**
+     - Nombre de la institución en el menú colapsable de escritorio y en la barra superior móvil.
+  2. **Contratos y Pagarés de Crédito (`ContratoPagareCreditoModal.tsx`):**
+     - Encabezado oficial del contrato de crédito, cláusulas legales de reconocimiento de deuda, pagaré libre de protesto, firmas de personería jurídica y pie de página de validez legal.
+  3. **Recibos Oficiales de Cobro de Ventanilla y Créditos:**
+     - Encabezado institucional y pie de ticket de cobro en `ReciboCobroCreditoModal.tsx` y `ReciboMovimientoModal.tsx`.
+  4. **Reportes de Rendición y Exportaciones (`CajaChicaReporteModal.tsx`):**
+     - Título institucional en la exportación de archivos CSV / Excel de Caja Chica.
+  5. **Formularios de Ventanilla y Desembolsos:**
+     - Etiquetas de fuentes de fondos propios en `DesembolsoCreditoForm.tsx`, `CobroCreditoVentanilla.tsx` y en el diccionario `ORIGEN_FONDOS_LABEL` en `types.ts`.
+  6. **Scripts y Pruebas Backend:**
+     - Comentarios y etiquetas en `scripts/backup-db.sh` y suites de prueba E2E en `backend/src/tests/e2e_stress_test.ts`.
+  7. **Compendios de Documentación y Arquitectura:**
+     - Actualizados `00-INDICE.md`, `02-codigo-frontend.md` y `MEJORAS_SISTEMA_MIF.md`.
+- **Archivos Modificados:**
+  - `frontend/src/pages/Layout.tsx`
+  - `frontend/src/types.ts`
+  - `frontend/src/components/cajaauxiliar/ReciboMovimientoModal.tsx`
+  - `frontend/src/components/ReciboCobroCreditoModal.tsx`
+  - `frontend/src/components/ContratoPagareCreditoModal.tsx`
+  - `frontend/src/components/CajaChicaReporteModal.tsx`
+  - `frontend/src/components/cajaauxiliar/DesembolsoCreditoForm.tsx`
+  - `frontend/src/components/cajaauxiliar/CobroCreditoVentanilla.tsx`
+  - `backend/src/tests/e2e_stress_test.ts`
+  - `scripts/backup-db.sh`
+  - `00-INDICE.md`
+  - `02-codigo-frontend.md`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 45. Estandarización de Campo "No. de cuenta" en Operaciones BI y Recibos de Caja Auxiliar
+
+- **Objetivo:** Sustituir la etiqueta genérica "No. de documento" por **"No. de cuenta"** en las operaciones bancarias de Banco Industrial (Ingreso BI / Egreso BI) en el formulario de Auxiliar de Caja (`NuevoMovimientoForm.tsx`), facilitando la captura directa del número de cuenta del cliente y reflejando la misma precisión en la emisión de tickets y comprobantes impresos.
+- **Detalle de Cambios:**
+  1. **Formulario de Nuevo Movimiento (`NuevoMovimientoForm.tsx`):**
+     - Para la sección `BI` (Cobros por cuenta ajena BI / Pago por cuenta ajena BI): La casilla se etiqueta explícitamente como **"No. de cuenta"** con placeholder descriptivo `Ej. 00-0000000-0`.
+     - Para la sección `PROPIO` con cuenta interna: Se mantiene **"No. de recibo"** (o "No. de boleta" si el método es cheque).
+     - Para movimientos varios propios sin cuenta: Se etiqueta como **"No. de recibo"** (o "No. de boleta").
+     - Alertas de validación de unicidad en vivo adaptadas a "No. de cuenta / documento".
+  2. **Ticket y Recibo Oficial (`ReciboMovimientoModal.tsx`):**
+     - En operaciones de Banco Industrial (`seccion === "BI"`), el desglose del comprobante muestra la línea **"No. de cuenta:"** en lugar del genérico "Documento:".
+- **Archivos Modificados:**
+  - `frontend/src/components/cajaauxiliar/NuevoMovimientoForm.tsx`
+  - `frontend/src/components/cajaauxiliar/ReciboMovimientoModal.tsx`
+  - `02-codigo-frontend.md`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 46. Reemplazo Institucional Integral por COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."
+
+- **Objetivo:** Estandarizar la razón social y nombre legal oficial en toda la plataforma, reemplazando la denominación anterior `COOPERATIVA INTEGRAL DE AHORRO Y CRÉDITO "MAYA INVERSIONES FUTURAS" R.L. (MIF)` por la denominación oficial y legal **`COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."`**.
+- **Alcance de la Actualización:**
+  1. **Inicio de Sesión y Acceso (`Login.tsx`):**
+     - Subtítulo oficial de bienvenida actualizado a `COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."`.
+  2. **Tablero Principal (`Tablero.tsx`):**
+     - Subtítulo de cabecera operativa y estado en vivo por agencias actualizado a `COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."`.
+  3. **Actas Oficiales de Arqueo Diario y Mensual (`ActaArqueoModal.tsx`, `LibroArqueoMensual.tsx`):**
+     - Encabezado institucional formal de actas de la Comisión de Vigilancia, redacción del *Punto Primero de Apertura y Quórum* y exportación oficial a CSV / Excel.
+  4. **Contratos y Pagarés de Crédito (`ContratoPagareCreditoModal.tsx`):**
+     - Encabezado institucional, cláusulas de procedencia de fondos propios y texto legal vinculante del pagaré libre de protesto.
+  5. **Informe de Gastos de Caja Chica (`CajaChicaReporteModal.tsx`):**
+     - Membrete y encabezado de rendición y liquidación de gastos de caja chica.
+  6. **Formularios y Detalles de Créditos (`CreditoForm.tsx`, `CreditoDetail.tsx`, `CajaAbierta.tsx`):**
+     - Botones de selección de fuentes de fondos propios actualizados a `🏦 Fondos Propios (COMIF R.L.)` y `COMIF Propios`.
+  7. **Documentación Oficial del Repositorio:**
+     - Actualizados `00-INDICE.md`, `02-codigo-frontend.md`, `README.md` y `MEJORAS_SISTEMA_MIF.md`.
+- **Archivos Modificados:**
+  - `frontend/src/pages/Login.tsx`
+  - `frontend/src/pages/Tablero.tsx`
+  - `frontend/src/components/CajaChicaReporteModal.tsx`
+  - `frontend/src/pages/LibroArqueoMensual.tsx`
+  - `frontend/src/components/cajaauxiliar/ActaArqueoModal.tsx`
+  - `frontend/src/components/ContratoPagareCreditoModal.tsx`
+  - `frontend/src/pages/CreditoForm.tsx`
+  - `frontend/src/pages/CreditoDetail.tsx`
+  - `frontend/src/components/cajaauxiliar/CajaAbierta.tsx`
+  - `00-INDICE.md`
+  - `02-codigo-frontend.md`
+  - `README.md`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 47. Optimización de Impresión en 1 Hoja Carta y Distribución de Espacios en Informe de Caja Chica
+
+- **Objetivo:** Ajustar el informe de rendición y liquidación de gastos de Caja Chica (`CajaChicaReporteModal.tsx`) para ocupar de manera armónica, balanceada y completa la totalidad de una sola hoja en orientación vertical (Carta / A4), eliminando espacios vacíos en la mitad inferior de la página y evitando desbordes a una segunda hoja.
+- **Mejoras Implementadas:**
+  1. **Distribución Vertical Dinámica (`.print-area`):**
+     - Configuración de contenedor flexbox con `min-height: 252mm` y `justify-content: space-between` al imprimir, asegurando que las tablas, resumen y firmas se extiendan de forma proporcional por todo el alto de la hoja.
+  2. **Espaciado y Tipografía Proporcional:**
+     - Aumento del padding de celdas de tabla a `5px 6px` (frente a `2px 4px`), mejorando la legibilidad de comprobantes, categorías y reposiciones.
+     - Altura y separación en el cintillo de KPIs (`padding: 0.65rem 0.85rem`, valores en `1.2rem`).
+     - Cuadre de caja chica con cuadrícula clara y legible (`padding: 0.6rem 0.75rem`).
+  3. **Bloque de Firmas Institucionales Destacado:**
+     - Separación y anclaje inferior con `margin-top: auto` y `page-break-inside: avoid`.
+     - Líneas de firma ampliadas a `height: 46px` con borde sólido de `1.5px` para rúbrica y sello físico claro.
+     - Pie de página institucional: *"Sistema Integral COOP COMIF R.L. · Documento Oficial de Control y Liquidación de Caja Chica"*.
+  4. **Ajuste Global de Impresión (`app.css`):**
+     - Regla `@page` estandarizada a `size: letter portrait; margin: 8mm 10mm;` para todos los documentos del sistema.
+- **Archivos Modificados:**
+  - `frontend/src/components/CajaChicaReporteModal.tsx`
+  - `frontend/src/styles/app.css`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 48. Ajuste Responsivo Fluido al 100% de la Pantalla del Informe de Caja Chica
+
+- **Objetivo:** Adaptar la visualización en pantalla del Informe de Rendición de Gastos de Caja Chica (`CajaChicaReporteModal.tsx` y `CajaChica.tsx`) para abarcar fluidamente el 100% del contenedor sin desbordamientos horizontales ni botones cortados en laptops o pantallas estándar.
+- **Mejoras Implementadas:**
+  1. **Ancho Fluido y Flexible (100%):**
+     - Se eliminó el límite rígido de ancho de la tarjeta principal, permitiendo que ocupe fluidamente el 100% del espacio disponible dentro del contenedor principal.
+     - En `CajaChica.tsx`, se configuró `overflowX: "hidden"` y `width: "100%"` para evitar la aparición de barras de desplazamiento horizontales en la ventana general.
+  2. **Cabecera y Botones de Acción Accesibles:**
+     - La barra superior del informe se configuró con `flexWrap: "wrap"` y espaciado compacto para que el botón de `📥 Excel (CSV)` y `🖨️ Imprimir / Guardar PDF` permanezcan 100% visibles y nunca se corten al costado derecho.
+     - Se mantuvo el botón de impresión flotante en la esquina inferior derecha con alta visibilidad y anclaje fijo (`position: fixed`).
+  3. **Preservación de la Hoja Única de Impresión:**
+     - Las reglas de impresión `@media print` se mantuvieron estrictamente aisladas al contenedor de hoja carta vertical sin alteraciones, garantizando que el documento físico se imprima en 1 sola página exacta sin páginas en blanco.
+- **Archivos Modificados:**
+  - `frontend/src/components/CajaChicaReporteModal.tsx`
+  - `frontend/src/pages/CajaChica.tsx`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 49. Diseño Ejecutivo Compacto y Proporciones Armónicas en Informe de Caja Chica
+
+- **Objetivo:** Optimizar la estética y aprovechamiento del espacio en el Informe de Rendición de Gastos (`CajaChicaReporteModal.tsx`), eliminando espacios vacíos horizontales y evitando que las tablas se vean excesivamente estiradas.
+- **Mejoras Implementadas:**
+  1. **Ancho Ejecutivo Centrado (1060px):**
+     - Tarjeta principal configurada con `maxWidth: 1060px`, centrada automáticamente con sombra sutil (`box-shadow: 0 4px 16px rgba(0,0,0,0.06)`), padding equilibrado de `0.85rem 1.15rem` y bordes de `10px`.
+  2. **Proporciones Armónicas de Columnas:**
+     - Definición de anchos compactos por columna (`#` 30px, `Fecha` 85px, `No. Doc.` 110px, `Proveedor/Beneficiario` 190px, `Categoría` 150px, `Descripción` flexible, `Monto` 110px).
+     - La tabla de subtotales por categoría y el panel de reposiciones / cuadre se integran en una cuadrícula equilibrada con márgenes limpios y sin vacíos visuales.
+  3. **Preservación Integral de la Impresión:**
+     - La hoja física de impresión en 1 página carta vertical (`@media print`) permanece 100% aislada, idéntica e intacta sin generar páginas en blanco.
+- **Archivos Modificados:**
+  - `frontend/src/components/CajaChicaReporteModal.tsx`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 50. Rediseño Fintech Integral del Dashboard y Ficha del Asociado (`SocioDetail.tsx`)
+
+- **Objetivo:** Transformar la vista de detalle del asociado en una interfaz moderna y profesional de nivel bancario/cooperativo, eliminando saltos de línea quebrados y organizando el portafolio financiero en tarjetas ejecutivas de alto impacto.
+- **Mejoras Implementadas:**
+  1. **Tarjeta Hero de Perfil:**
+     - Avatar con iniciales en degradado esmeralda (`#059669`), nombre del socio con tipografía destacada, insignias de estado en vivo (`● Activo` / `○ Inactivo`), número de asociado en chip mono y agencia responsable.
+     - Botones de acción rápida en cabecera: `[✏️ Editar Expediente]`, `[Marcar Inactivo]` y `[➕ Aperturar Aportación]` cuando falte la aportación estatutaria.
+  2. **Cintillo de KPIs Financieros del Asociado:**
+     - **Aportación Estatutaria:** Saldo con validación del mínimo de Q 100.00.
+     - **Ahorro Disponible:** Total consolidado de cuentas de ahorro corriente, programado, infanto y garantía.
+     - **Inversiones a Plazo:** Total en certificados a plazo fijo activos.
+     - **Cartera de Créditos:** Saldo deudor vigente o indicador de solvencia.
+  3. **Expediente del Asociado Estructurado:**
+     - Bloques de información organizados por tarjetas con iconos: Fecha de ingreso, Género, DPI con botón de copiado rápido, Teléfono con acceso directo a **WhatsApp** (`+502`), Dirección completa y ficha destacada del Beneficiario con su parentesco oficial.
+  4. **Portafolio de Cuentas Interactivas:**
+     - Lista de cuentas en tarjetas dinámicas con badges de tipo de producto, números de cuenta legibles, saldos destacados y acceso directo con un solo clic a sus movimientos.
+- **Archivos Modificados:**
+  - `frontend/src/pages/SocioDetail.tsx`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 51. Modernización Ejecutiva del Tablero Principal (`Tablero.tsx`) — Ajuste en 1 Sola Pantalla (100vh)
+
+- **Objetivo:** Transformar el Tablero Principal en un centro de mando ejecutivo moderno, profesional y de alta densidad de información, ajustándolo exactamente al tamaño de 1 sola pantalla (`100vh` en monitores de escritorio estándar) sin barras de desplazamiento innecesarias, ocupando eficientemente los espacios vacíos y brindando métricas en vivo de alta jerarquía visual.
+- **Mejoras Implementadas:**
+  1. **Ajuste y Contención en Pantalla Única (`100vh`):**
+     - Estructura flex contenedor con `height: calc(100vh - 1.5rem)`, `overflow: hidden` y márgenes reducidos para garantizar visualización completa sin scroll vertical.
+  2. **Cintillo Superior de 8 Tarjetas KPI con Borde de Color Temático:**
+     - Aportaciones Estatutarias (`#059669` Verde esmeralda) con indicador de total recaudado.
+     - Ahorros a la Vista (`#0284c7` Azul cielo) con desglose de cuentas activas.
+     - Depósitos a Plazo Fijo (`#7c3aed` Púrpura) con balance consolidado.
+     - Cartera de Créditos (`#38bdf8` Celeste) con saldo vivo y número de colocaciones.
+     - Caja Chica Global (`#f59e0b` Ámbar) con estado de disponibilidad inmediata.
+     - Padrón de Asociados (`#6366f1` Índigo) con conteo de socios registrados.
+     - Colocación y Cartera en Mora (`#ef4444` Rojo coral) con semáforo de riesgo crediticio.
+  3. **Columna Izquierda: Acciones Rápidas & Estado en Vivo por Agencia:**
+     - Botones de acceso directo con iconos vectoriales para Ventanilla de Caja, Nuevo Socio, Nueva Solicitud y Caja Chica.
+     - Tabla compacta con scroll contenido de agencias con estado de caja (`🟢 Abierta` / `🔴 Cerrada`), saldo en ventanilla y botón de auditoría/ingreso.
+  4. **Columna Derecha: Monitoreo Estratégico con Gráficos Recharts Optimizados:**
+     - Gráfico Donut de Composición de Cartera y Pasivos ajustado a `height: 165px` con leyendas dinámicas y tooltips interactivos.
+     - Gráfico de Barras Horizontales de Captaciones vs Colocaciones por Agencia ajustado a `height: 165px` con escala limpia.
+- **Archivos Modificados:**
+  - `frontend/src/pages/Tablero.tsx`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 52. Modernización Fintech de Ventanilla de Caja (`CajaAbierta.tsx` / `AuxiliarCaja.tsx`)
+
+- **Objetivo:** Optimizar el espacio operativo del libro de caja diario y ventanilla de atención al asociado, incorporando búsqueda rápida en tiempo real, KPIs con acento de color institucional y visualización en una sola pantalla.
+- **Mejoras Implementadas:**
+  1. **Cintillo de 4 KPIs Ejecutivos con Bordes Temáticos:**
+     - **Saldo Inicial:** Borde gris pizarra (`#64748b`), icono 🪙 y desglose de apertura.
+     - **Total Ingresos:** Borde esmeralda (`#059669`), icono 📥 y desglose de cobros / depósitos.
+     - **Total Egresos:** Borde ámbar (`#f59e0b`), icono 📤 y desglose de colocaciones / retiros.
+     - **Saldo Actual en Caja:** Borde azul cielo (`#0284c7`), fondo resaltado, icono 💵 y saldo disponible.
+  2. **Buscador en Tiempo Real de Operaciones Diarias:**
+     - Barra de filtro instantáneo que permite localizar transacciones por nombre de beneficiario, número de documento, referencia contable, descripción o cajero responsable.
+     - Contador de coincidencia dinámico (`X de Y movs.`) con botón de limpieza rápida (`✕`).
+  3. **Tabla de Movimientos con Scroll Contenido:**
+     - Encabezados compactos fijos (`HORA`, `MOVIMIENTO`, `REFERENCIA`, `BENEFICIARIO`, `DOC.`, `INGRESO`, `EGRESO`, `SALDO`, `USUARIO`, `ACCIÓN`).
+     - Badges de Origen de Fondos (`COMIF Propios`, `FEDERURAL`, `CHN`) y tipografía mono alineada.
+  4. **Panel Lateral de Operaciones y Fondos Institucionales:**
+     - Botones de acción rápida con paleta coherente (`Cobro Cuota`, `Desembolso`, `Liquidar PF`, `+ Nuevo Mov.`, `Cerrar Caja`).
+- **Archivos Modificados:**
+  - `frontend/src/components/cajaauxiliar/CajaAbierta.tsx`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 53. Modernización Fintech del Dashboard de Créditos (`CreditosList.tsx`)
+
+- **Objetivo:** Optimizar el módulo de Cartera de Créditos con diseño bancario moderno, métricas clave con bordes de color temático, tabs integradas de Cartera y Fiadores, y contención de tabla en una sola pantalla.
+- **Mejoras Implementadas:**
+  1. **Cintillo Superior de 5 KPIs Financieros de Cartera:**
+     - **Cartera Activa:** Borde verde esmeralda (`#059669`), saldo vivo desembolsado e icono 💼.
+     - **Por Desembolsar:** Borde azul cielo (`#0284c7`), créditos aprobados listos para entrega e icono ⚡.
+     - **En Solicitud:** Borde ámbar (`#f59e0b`), expedientes en análisis e icono ⏳.
+     - **Solventes / Pagados:** Borde gris pizarra (`#64748b`), historial de préstamos cancelados e icono ✅.
+     - **Total Créditos:** Borde índigo (`#6366f1`), conteo general e icono 📊.
+  2. **Interacción y Filtrado Rápido con 1 Clic:**
+     - Al hacer clic en cualquiera de las tarjetas KPI se activa automáticamente el filtro de la tabla con realce visual.
+     - Chips de acceso rápido (`Todos`, `Desembolso`, `Cobro`, `Pagados`) y buscador instantáneo por socio, código o DPI.
+  3. **Visualización y Paginación Optimizada:**
+     - Estructura con cabecera fija, scroll interno fluido y botones de acción rápida con paleta coherente (`⚡ Desembolsar`, `✓ Aprobar`, `✕ Rechazar`, `Cobrar`).
+- **Archivos Modificados:**
+  - `frontend/src/pages/CreditosList.tsx`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 54. Modernización Fintech de Ahorros y Depósitos a Plazo Fijo (`AhorroList.tsx` / `PlazoFijoList.tsx`)
+
+- **Objetivo:** Estandarizar la visualización ejecutiva en los módulos de captaciones (Ahorro Corriente, Infantil, Programado, Ahorro sobre Préstamo y Depósitos a Plazo Fijo) con tarjetas KPI de borde de color temático y contención de tabla en una sola pantalla.
+- **Mejoras Implementadas:**
+  1. **Dashboard de Cuentas de Ahorro (`AhorroList.tsx`):**
+     - **Saldo Total Captado:** Borde azul cielo (`#0284c7`), saldo consolidado e icono 🏦.
+     - **Total Depósitos:** Borde verde esmeralda (`#059669`), ingresos acumulados e icono 📥.
+     - **Total Retiros:** Borde ámbar (`#f59e0b`), egresos acumulados e icono 📤.
+     - **Padrón de Cuentas:** Borde índigo (`#6366f1`), conteo de cuentas registradas e icono 👥.
+  2. **Dashboard de Ahorro a Plazo Fijo (`PlazoFijoList.tsx`):**
+     - **Capital a Plazo Fijo:** Borde púrpura (`#7c3aed`), capital en custodia e icono 📦.
+     - **Intereses Netos por Pagar:** Borde ámbar (`#f59e0b`), rendimiento comprometido e icono 💰.
+     - **Certificados Vigentes:** Borde azul cielo (`#0284c7`), conteo de contratos activos e icono 📜.
+     - **Vencidos / Por Liquidar:** Borde rojo (`#ef4444`) o gris pizarra con semáforo de vencimiento e icono ⚠️.
+  3. **Buscadores Rápidos y Paginación Fija:**
+     - Búsqueda instantánea con lupa y filtros por estado sin saltos de línea.
+- **Archivos Modificados:**
+  - `frontend/src/pages/AhorroList.tsx`
+  - `frontend/src/pages/PlazoFijoList.tsx`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 55. Modernización Fintech del Padrón de Aportaciones (`AportacionesList.tsx`)
+
+- **Objetivo:** Optimizar la visualización y auditoría del Capital Social Oficial con métricas ejecutivas temáticas, cumplimiento estatutario del mínimo de Q 100.00 y tabla ajustada en una sola pantalla.
+- **Mejoras Implementadas:**
+  1. **Cintillo Superior de 4 KPIs Institucionales:**
+     - **Capital Social Oficial:** Borde verde esmeralda (`#059669`), total consolidado aportado e icono 🏛️.
+     - **Asociados en Padrón:** Borde índigo (`#6366f1`), total de socios inscritos e icono 👥.
+     - **Aportación Promedio:** Borde azul cielo (`#0284c7`), saldo medio por asociado e icono 📈.
+     - **Cumplimiento Estatutario:** Borde verde esmeralda (`#10b981`), regla del mínimo de Q 100.00 e icono ✓.
+  2. **Tabla y Paginación en 1 Sola Pantalla:**
+     - Encabezados fijos compactos, visualización directa del beneficiario con parentesco oficial, DPI formateado y género.
+     - Búsqueda en tiempo real por asociado, DPI o nombre.
+- **Archivos Modificados:**
+  - `frontend/src/pages/AportacionesList.tsx`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 56. Modernización Fintech del Gestor de Caja Chica (`CajaChica.tsx`)
+
+- **Objetivo:** Perfeccionar la gestión de gastos operativos y reposiciones de fondo fijo con KPIs temáticos de alta densidad, distribución en dos paneles equilibrados y ajuste a 1 sola pantalla.
+- **Mejoras Implementadas:**
+  1. **Cintillo de 4 KPIs Ejecutivos de Caja Chica:**
+     - **Saldo Disponible:** Borde verde esmeralda (`#059669`), fondo disponible en caja e icono 💵.
+     - **Total Ingresos:** Borde azul cielo (`#0284c7`), reposiciones acumuladas e icono 📥.
+     - **Total Egresos:** Borde ámbar (`#f59e0b`), gastos comprobados e icono 📤.
+     - **Comprobantes:** Borde índigo (`#6366f1`), total de movimientos registrados e icono 📄.
+  2. **Paneles Distribuidos (100vh):**
+     - Panel izquierdo con desglose visual de egresos por categoría (barras de porcentaje relativas y tooltips).
+     - Formularios dinámicos contextuales (`+ Nuevo Comprobante`, `📥 Reponer Fondo`, `✏️ Corregir Comprobante`) integrados sin desbordamiento.
+     - Panel derecho con buscador instantáneo y tabla de comprobantes con encabezados pegajosos.
+- **Archivos Modificados:**
+  - `frontend/src/pages/CajaChica.tsx`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 57. Modernización Fintech del Padrón de Asociados (`SociosList.tsx`)
+
+- **Objetivo:** Perfeccionar la exploración del padrón de asociados y prospectos/fiadores con métricas ejecutivas de alto impacto visual, tabs integradas y tabla contenida en una sola pantalla.
+- **Mejoras Implementadas:**
+  1. **Cintillo de KPIs Financieros e Institucionales:**
+     - **Total Asociados:** Borde índigo (`#6366f1`), conteo en padrón e icono 👥.
+     - **Prospectos / Fiadores:** Borde ámbar (`#f59e0b`), oportunidades de afiliación e icono 🎯.
+     - **Vista Actual:** Borde azul cielo (`#0284c7`), paginación compacta e icono 📄.
+  2. **Interacción Rápida y Paginación Fija:**
+     - Selector ágil de pestañas (`Padrón` vs `🎯 Prospectos`) con conteos en vivo.
+     - Buscador instantáneo con formato automático de DPI y teléfono.
+- **Archivos Modificados:**
+  - `frontend/src/pages/SociosList.tsx`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 58. Modernización Fintech de Módulos de Administración (`Usuarios.tsx` / `Agencias.tsx` / `Sesiones.tsx`)
+
+- **Objetivo:** Estandarizar la interfaz de administración del sistema (control de usuarios, catálogo de agencias y monitoreo de sesiones activas) con tarjetas Fintech de borde temático, tipografía mono y tablas compactas con scroll interno.
+- **Mejoras Implementadas:**
+  1. **Gestión de Usuarios (`Usuarios.tsx`):**
+     - KPIs temáticos: Total Usuarios (`#6366f1`), Admin & Control (`#9333ea`), Operación & Campo (`#0284c7`), Cuentas Activas (`#059669`).
+     - Badges de roles institucionales con fondos semitransparentes elegantes y tabla pegajosa.
+  2. **Agencias y Puntos de Atención (`Agencias.tsx`):**
+     - KPIs: Total Agencias (`#0284c7`) y Agencias Operativas (`#059669`).
+     - Tabla compacta con scroll contenido y códigos en tipografía mono destacada.
+  3. **Control de Sesiones y Accesos (`Sesiones.tsx`):**
+     - KPIs: Usuarios Habilitados (`#6366f1`), Activos Hoy (`#059669`), Transacciones Auditadas (`#0284c7`).
+     - Monitoreo en vivo con buscador rápido por colaborador, agencia o rol.
+- **Archivos Modificados:**
+  - `frontend/src/pages/Usuarios.tsx`
+  - `frontend/src/pages/Agencias.tsx`
+  - `frontend/src/pages/Sesiones.tsx`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 59. Modernización Fintech de Auditoría y Alertas del Sistema (`Auditoria.tsx` / `Alertas.tsx`)
+
+- **Objetivo:** Perfeccionar los módulos de supervisión, alertas tempranas y auditoría inmutable del sistema con tarjetas KPI temáticas, filtros rápidos y ajuste sin desbordamiento.
+- **Mejoras Implementadas:**
+  1. **Bitácora de Auditoría (`Auditoria.tsx`):**
+     - KPIs temáticos: Total Eventos Auditados (`#0284c7`), Entidades Monitoreadas (`#6366f1`) y Vista Actual (`#059669`).
+     - Tabla con scroll interno y modal interactivo de diferencias (diff) antes/después con formateo monetario en Quetzales.
+  2. **Panel de Alertas del Sistema (`Alertas.tsx`):**
+     - KPIs temáticos: Total Alertas (`#6366f1`), Atención Inmediata (`#ef4444`), Advertencias (`#f59e0b`), Informativos (`#0284c7`).
+     - Filtros por categoría con conteos dinámicos en vivo.
+- **Archivos Modificados:**
+  - `frontend/src/pages/Auditoria.tsx`
+  - `frontend/src/pages/Alertas.tsx`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 60. Modernización Global de Submenús, Botones Fintech Pro y Modales/Pantallas Desplegables Responsivos (PC, Tabletas y Teléfonos Móviles)
+
+- **Objetivo:** Actualizar globalmente los submenús de navegación, la familia de botones y las pantallas emergentes/modales para que luzcan modernos con el estilo **Fintech Ejecutivo**, adaptándose a una sola pantalla (`100vh`) de forma responsiva en Computadoras, Tabletas y Teléfonos Móviles.
+- **Mejoras Implementadas:**
+  1. **Familia de Botones Fintech Pro:**
+     - **Botones Primarios (`.btn`):** Gradientes esmeralda (`#059669` a `#047857`), micro-elevación suave en hover (`translateY(-1px)`), sombra difusa con resplandor perimetral y feedback táctil activo (`scale(0.98)`).
+     - **Botones Secundarios (`.btn.secondary`):** Acabado limpio con bordes reactivos y hover pulido.
+     - **Botones de Alerta / Peligro (`.btn.danger`):** Gradiente carmesí (`#ef4444` a `#dc2626`) con micro-sombra y elevación.
+     - **Variantes de Tamaño (`.btn-sm`, `.btn-xs`, `.btn-icon`):** Espaciados compactos ideales para interfaces densas de una sola pantalla.
+  2. **Modales y Pantallas Emergentes (Glassmorphism & Fit 100vh):**
+     - **Fondo Desenfoque Glassmorphism (`backdrop-filter: blur(8px)`):** `rgba(15, 23, 42, 0.72)` para un aislamiento visual elegante.
+     - **Contenedor con Scroll Interno:** `max-height: 88vh` en PC, cabeceras (`.modal-header`) y barras de acción (`.modal-footer`) fijas, con scrollbar interno estilizado en `.modal-body` para evitar desbordes de ventana.
+     - **Adaptación Responsiva en Móvil (`max-width: 768px`):** Transformación automática en **Bottom-Sheet** con radio superior redondeado (`18px 18px 0 0`) y `max-height: 94vh` manteniendo las acciones principales al alcance del pulgar.
+  3. **Navegación y Submenús Responsivos:**
+     - **PC / Escritorio:** Icon-Rail colapsable suave con tooltips universales flotantes de alto contraste y badges de agencia activa.
+     - **Tabletas y Teléfonos:** Drawer lateral táctil con fondo ejecutivo `#070738`, sombra perimetral de profundidad y cabecera superior con contraste optimizado.
+- **Archivos Modificados:**
+  - `frontend/src/styles/app.css`
+  - `frontend/src/pages/Layout.tsx`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 61. Módulo Oficial de Impresión y Cuadre del Libro de Movimientos de Caja Auxiliar (`LibroCajaReporteModal.tsx`)
+
+- **Objetivo:** Incorporar la emisión e impresión oficial del **Libro Diario de Movimientos y Cuadre de Caja Auxiliar** en 1 o 2 hojas tamaño Carta optimizadas, permitiendo a los cajeros, supervisores y auditores revisar y conciliar físicamente todas las operaciones de ventanilla por turno activo, día específico, rango de fechas, mes o año, evitando pérdidas y discrepancias contables.
+- **Mejoras Implementadas:**
+  1. **Generación e Impresión Oficial del Comprobante de Caja:**
+     - **Membrete Notarial e Institucional:** `COOPERATIVA MAYA INVERSIONES FUTURAS R.L "COMIF R.L."`, agencia, período de consulta, moneda en Quetzales y timestamp de emisión.
+     - **Cuadro Ejecutivo de Cuadre Financiero:** Saldo Inicial (Apertura), (+) Total Ingresos (Cobros/Depósitos), (-) Total Egresos (Desembolsos/Retiros/Liquidaciones) y (=) Saldo Final en Caja.
+     - **Consolidado por Fuentes de Fondos:** Desglose independiente de cobros, colocación y neto para COMIF Propios, FEDERURAL y CHN-Guatemala.
+     - **Tabla Cronológica de Transacciones:** Hora, No. Doc/Recibo, Concepto/Operación, Socio/Beneficiario, Ingreso (Q), Egreso (Q), Saldo en Línea y Usuario/Rol.
+     - **Doble Bloque de Firmas para Arqueo:** Espacio oficial para firma y sello de entrega por el **Cajero(a) Responsable** y firma de revisión y conformidad por el **Supervisor(a) / Auditor(a) de Arqueo**.
+  2. **Filtros Temporales Rápidos y Consulta Dinámica Backend:**
+     - Botones de selección rápida: `🟢 Turno Actual`, `Hoy`, `Esta Semana`, `Este Mes` y `Personalizado` (con selectores de fecha `inicio` y `fin`).
+     - Nuevo endpoint backend `GET /caja-auxiliar/reporte` con agregación en vivo de ingresos, egresos y fuentes de fondos.
+  3. **Acceso Omnipresente en la Interfaz:**
+     - Botón `🖨️ Imprimir Libro` integrado directamente en la barra de operaciones/búsqueda de `CajaAbierta.tsx`.
+     - Botón `🖨️ Imprimir Libro de Caja` en la cabecera superior de `AuxiliarCaja.tsx`.
+     - Botón `🖨️ Libro` en cada fila del historial de cierres diarios (`HistorialCajasModal.tsx`).
+     - Botón `📥 Excel` para exportación instantánea a archivo CSV.
+- **Archivos Modificados / Creados:**
+  - `backend/src/modules/cajaauxiliar/service.ts`
+  - `backend/src/modules/cajaauxiliar/routes.ts`
+  - `frontend/src/components/cajaauxiliar/LibroCajaReporteModal.tsx` [NEW]
+  - `frontend/src/components/cajaauxiliar/CajaAbierta.tsx`
+  - `frontend/src/components/cajaauxiliar/HistorialCajasModal.tsx`
+  - `frontend/src/pages/AuxiliarCaja.tsx`
+  - `frontend/src/styles/app.css`
+  - `MEJORAS_SISTEMA_MIF.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
 
 

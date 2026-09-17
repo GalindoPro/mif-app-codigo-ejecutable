@@ -10,6 +10,7 @@ import AbrirCajaCard from "../components/cajaauxiliar/AbrirCajaCard";
 import CajaAbierta from "../components/cajaauxiliar/CajaAbierta";
 import CajaCerradaCard from "../components/cajaauxiliar/CajaCerradaCard";
 import HistorialCajasModal from "../components/cajaauxiliar/HistorialCajasModal";
+import LibroCajaReporteModal from "../components/cajaauxiliar/LibroCajaReporteModal";
 
 export default function AuxiliarCaja() {
   const { usuario } = useAuth();
@@ -22,6 +23,7 @@ export default function AuxiliarCaja() {
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [mostrarHistorial, setMostrarHistorial] = useState(false);
+  const [mostrarReporteGlobal, setMostrarReporteGlobal] = useState(false);
 
   useEffect(() => {
     api.get<Agencia[]>("/agencias").then(({ data }) => {
@@ -114,6 +116,15 @@ export default function AuxiliarCaja() {
         </div>
 
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="btn secondary"
+            onClick={() => setMostrarReporteGlobal(true)}
+            style={{ padding: "0.3rem 0.65rem", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.3rem" }}
+            title="Imprimir Libro de Movimientos y Cuadre de Caja"
+          >
+            <span>🖨️</span> Imprimir Libro de Caja
+          </button>
           {usuario?.rol !== "CAJERO" && (
             <button
               type="button"
@@ -182,6 +193,15 @@ export default function AuxiliarCaja() {
           agenciaId={agenciaId}
           agenciaNombre={agenciaActualNombre}
           onCerrar={() => setMostrarHistorial(false)}
+        />
+      )}
+
+      {mostrarReporteGlobal && (
+        <LibroCajaReporteModal
+          agenciaId={agenciaId}
+          agenciaNombre={agenciaActualNombre}
+          detalleActual={detalle}
+          onClose={() => setMostrarReporteGlobal(false)}
         />
       )}
     </div>

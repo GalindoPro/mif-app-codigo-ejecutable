@@ -147,7 +147,7 @@ export default function ReciboCobroCreditoModal({ datos, onClose }: Props) {
           {/* ENCABEZADO INSTITUCIONAL */}
           <div style={{ textAlign: "center", borderBottom: "2px dashed #94a3b8", paddingBottom: "0.75rem", marginBottom: "0.85rem" }}>
             <h2 style={{ margin: "0 0 0.15rem", fontSize: "1.15rem", fontWeight: 800, letterSpacing: "0.05em", color: "#065f46" }}>
-              MIF COOP
+              COOP COMIF R.L.
             </h2>
             <div style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", color: "#334155" }}>
               Maya Inversiones Futuras R.L.
@@ -329,7 +329,7 @@ export default function ReciboCobroCreditoModal({ datos, onClose }: Props) {
           <div style={{ textAlign: "center", marginTop: "1rem", fontSize: "0.72rem", color: "#64748b", borderTop: "1px dotted #cbd5e1", paddingTop: "0.5rem" }}>
             Este comprobante certifica la amortización y el aporte de ahorro correspondiente.
             <br />
-            <em>¡Gracias por su puntualidad en MIF COOP!</em>
+            <em>¡Gracias por su puntualidad en COOP COMIF R.L.!</em>
           </div>
         </div>
 

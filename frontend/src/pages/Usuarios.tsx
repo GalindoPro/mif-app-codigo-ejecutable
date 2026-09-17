@@ -73,49 +73,136 @@ export default function Usuarios() {
   }
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <h1>Gestión de Usuarios</h1>
-          <p>Administra el personal de la cooperativa: administradores, gerencia, jefes, cajeros y promotores.</p>
+    <div className="screen-container">
+      <div className="screen-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", flexWrap: "wrap" }}>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.2rem" }}>
+            <span>👤</span> Gestión de Usuarios
+          </h1>
+          <span
+            style={{
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              padding: "0.15rem 0.5rem",
+              borderRadius: "4px",
+              background: "rgba(99, 102, 241, 0.15)",
+              color: "#6366f1",
+              border: "1px solid rgba(99, 102, 241, 0.3)",
+            }}
+          >
+            Personal & Roles
+          </span>
         </div>
         {esAdmin && (
-          <button className="btn" onClick={() => setMostrarForm((v) => !v)}>
+          <button
+            className="btn"
+            style={{ padding: "0.3rem 0.75rem", fontSize: "0.8rem" }}
+            onClick={() => setMostrarForm((v) => !v)}
+          >
             {mostrarForm ? "Cancelar" : "+ Nuevo usuario"}
           </button>
         )}
       </div>
 
-      {error && <div className="alert error">{error}</div>}
-      {mensajeExito && <div className="alert success">{mensajeExito}</div>}
+      {error && <div className="alert error" style={{ margin: "0.25rem 0", padding: "0.4rem 0.75rem", fontSize: "0.82rem" }}>{error}</div>}
+      {mensajeExito && <div className="alert success" style={{ margin: "0.25rem 0", padding: "0.4rem 0.75rem", fontSize: "0.82rem" }}>{mensajeExito}</div>}
 
-      {/* KPI METRICS STRIP - 100% FLUID */}
-      <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", marginBottom: "1.5rem" }}>
-        <div className="stat-card accent">
-          <span className="label">Total Usuarios</span>
-          <span className="value mono">{usuarios?.length ?? 0}</span>
-          <span className="sub">Cuentas creadas</span>
+      {/* KPI METRICS STRIP FINTECH */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #6366f1",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", letterSpacing: "0.03em" }}>
+              TOTAL USUARIOS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>👥</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#6366f1", fontFamily: "monospace" }}>
+            {usuarios?.length ?? 0}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Cuentas creadas</span>
         </div>
-        <div className="stat-card">
-          <span className="label">Administración y Control</span>
-          <span className="value mono">
+
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #9333ea",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#9333ea", letterSpacing: "0.03em" }}>
+              ADMIN & CONTROL
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>🛡️</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#9333ea", fontFamily: "monospace" }}>
             {usuarios?.filter((u) => u.rol === "GERENCIA" || u.rol === "SUPERVISOR").length ?? 0}
           </span>
-          <span className="sub">Admin, Gerencia y Jefes</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Gerencia y Supervisión</span>
         </div>
-        <div className="stat-card">
-          <span className="label">Operaciones y Campo</span>
-          <span className="value mono">
-            {usuarios?.filter((u) => u.rol === "CAJERO" || u.rol === "PROMOTOR").length ?? 0}
+
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #0284c7",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>
+              OPERACIÓN & CAMPO
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>💼</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#0284c7", fontFamily: "monospace" }}>
+            {usuarios?.filter((u) => u.rol === "CAJERO" || u.rol === "PROMOTOR" || u.rol === "CAJA_CHICA").length ?? 0}
           </span>
-          <span className="sub">Caja y Promoción</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Caja y Promotores</span>
         </div>
-        <div className="stat-card">
-          <span className="label">Cuentas Activas</span>
-          <span className="value mono" style={{ color: "#10b981" }}>
+
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #059669",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#059669", letterSpacing: "0.03em" }}>
+              CUENTAS ACTIVAS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>✅</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#059669", fontFamily: "monospace" }}>
             {usuarios?.filter((u) => u.activo).length ?? 0}
           </span>
-          <span className="sub">Habilitados para acceso</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Habilitados para acceso</span>
         </div>
       </div>
 
@@ -199,58 +286,59 @@ export default function Usuarios() {
         </form>
       )}
 
-      <div className="table-wrap">
-        <table>
+      <div className="table-scroll-container" style={{ flex: 1, minHeight: 0, marginTop: "0.5rem" }}>
+        <table className="table-compact" style={{ width: "100%" }}>
           <thead>
             <tr>
               <th>Nombre</th>
-              <th>Correo</th>
-              <th>Rol</th>
-              <th>Agencia</th>
-              <th>Estado</th>
+              <th>Correo Institucional</th>
+              <th>Rol / Cargo</th>
+              <th>Agencia Asignada</th>
+              <th style={{ textAlign: "center" }}>Estado</th>
             </tr>
           </thead>
           <tbody>
             {usuarios?.map((u) => (
               <tr key={u.id}>
                 <td style={{ fontWeight: 600 }}>{u.nombre}</td>
-                <td className="mono">{u.email}</td>
+                <td className="mono" style={{ fontSize: "0.8rem" }}>{u.email}</td>
                 <td>
                   <span
                     style={{
                       display: "inline-block",
-                      padding: "0.2rem 0.55rem",
-                      borderRadius: "6px",
-                      fontSize: "0.82rem",
+                      padding: "0.15rem 0.45rem",
+                      borderRadius: "4px",
+                      fontSize: "0.74rem",
                       fontWeight: 600,
                       background:
                          u.rol === "PROMOTOR"
-                          ? "#ede9fe"
+                          ? "rgba(109, 40, 217, 0.12)"
                           : u.rol === "GERENCIA"
-                            ? "#fee2e2"
+                            ? "rgba(153, 27, 27, 0.12)"
                             : u.rol === "SUPERVISOR"
-                              ? "#e0e7ff"
+                              ? "rgba(55, 48, 163, 0.12)"
                               : u.rol === "CAJA_CHICA"
-                                ? "#fef3c7"
-                                : "#e2e8f0",
+                                ? "rgba(146, 64, 14, 0.12)"
+                                : "rgba(100, 116, 139, 0.12)",
                       color:
                         u.rol === "PROMOTOR"
-                          ? "#6d28d9"
+                          ? "#7c3aed"
                           : u.rol === "GERENCIA"
-                            ? "#991b1b"
+                            ? "#dc2626"
                             : u.rol === "SUPERVISOR"
-                              ? "#3730a3"
+                              ? "#4f46e5"
                               : u.rol === "CAJA_CHICA"
-                                ? "#92400e"
-                                : "#334155",
+                                ? "#d97706"
+                                : "#64748b",
+                      border: "1px solid var(--line)",
                     }}
                   >
                     {ROL_LABEL[u.rol] ?? u.rol}
                   </span>
                 </td>
-                <td>{u.agencia_nombre ?? "Todas (Global)"}</td>
-                <td>
-                  <span className={`badge ${u.activo ? "activo" : "inactivo"}`}>
+                <td style={{ fontSize: "0.8rem" }}>{u.agencia_nombre ?? "Todas (Global)"}</td>
+                <td style={{ textAlign: "center" }}>
+                  <span className={`badge ${u.activo ? "activo" : "inactivo"}`} style={{ fontSize: "0.7rem", padding: "0.12rem 0.4rem" }}>
                     {u.activo ? "Activo" : "Inactivo"}
                   </span>
                 </td>
@@ -258,7 +346,7 @@ export default function Usuarios() {
             ))}
           </tbody>
         </table>
-        {usuarios && usuarios.length === 0 && <div className="empty">No hay usuarios registrados.</div>}
+        {usuarios && usuarios.length === 0 && <div className="empty" style={{ padding: "1.5rem" }}>No hay usuarios registrados.</div>}
       </div>
     </div>
   );

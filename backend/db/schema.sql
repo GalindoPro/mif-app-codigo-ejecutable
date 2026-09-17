@@ -64,6 +64,7 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 alter type caja_categoria add value if not exists 'DEPOSITO_AHORRO_SOBRE_PRESTAMO';
 alter type caja_categoria add value if not exists 'RETIRO_AHORRO_SOBRE_PRESTAMO';
+alter type caja_categoria add value if not exists 'TRASLADO_FONDOS';
 
 
 do $$ begin

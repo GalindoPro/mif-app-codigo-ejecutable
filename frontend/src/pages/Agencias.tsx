@@ -42,39 +42,92 @@ export default function Agencias() {
   }
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <h1>Agencias</h1>
-          <p>Cada agencia captura sus propios movimientos; este consolidado une todas en un solo sistema.</p>
+    <div className="screen-container">
+      <div className="screen-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", flexWrap: "wrap" }}>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.2rem" }}>
+            <span>🏢</span> Agencias y Puntos de Atención
+          </h1>
+          <span
+            style={{
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              padding: "0.15rem 0.5rem",
+              borderRadius: "4px",
+              background: "rgba(2, 132, 199, 0.15)",
+              color: "#0284c7",
+              border: "1px solid rgba(2, 132, 199, 0.3)",
+            }}
+          >
+            Red Cooperativa
+          </span>
         </div>
         {usuario?.rol === "GERENCIA" && (
-          <button className="btn" onClick={() => setMostrarForm((v) => !v)}>
+          <button
+            className="btn"
+            style={{ padding: "0.3rem 0.75rem", fontSize: "0.8rem" }}
+            onClick={() => setMostrarForm((v) => !v)}
+          >
             {mostrarForm ? "Cancelar" : "+ Nueva agencia"}
           </button>
         )}
       </div>
 
-      {error && <div className="alert error">{error}</div>}
+      {error && <div className="alert error" style={{ margin: "0.25rem 0", padding: "0.4rem 0.75rem", fontSize: "0.82rem" }}>{error}</div>}
 
-      {/* KPI METRICS - 100% FLUID */}
-      <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", marginBottom: "1.5rem" }}>
-        <div className="stat-card accent">
-          <span className="label">Total Agencias</span>
-          <span className="value mono">{agencias.length}</span>
-          <span className="sub">Puntos de atención registrados</span>
+      {/* KPI METRICS STRIP FINTECH */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #0284c7",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>
+              TOTAL AGENCIAS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>🏢</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#0284c7", fontFamily: "monospace" }}>
+            {agencias.length}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Puntos de atención registrados</span>
         </div>
-        <div className="stat-card">
-          <span className="label">Agencias Operativas</span>
-          <span className="value mono" style={{ color: "#10b981" }}>
+
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #059669",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#059669", letterSpacing: "0.03em" }}>
+              AGENCIAS OPERATIVAS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>✅</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#059669", fontFamily: "monospace" }}>
             {agencias.filter((a) => a.activa).length}
           </span>
-          <span className="sub">Activas para ventanilla y campo</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Activas para ventanilla y campo</span>
         </div>
       </div>
 
       {mostrarForm && (
-        <form className="card" onSubmit={crear} style={{ width: "100%", maxWidth: "100%", marginBottom: "1.5rem" }}>
+        <form className="card" onSubmit={crear} style={{ width: "100%", maxWidth: "100%", margin: "0.5rem 0" }}>
           <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
             <div className="field">
               <label>Código</label>
@@ -101,24 +154,26 @@ export default function Agencias() {
         </form>
       )}
 
-      <div className="table-wrap">
-        <table>
+      <div className="table-scroll-container" style={{ flex: 1, minHeight: 0, marginTop: "0.5rem" }}>
+        <table className="table-compact" style={{ width: "100%" }}>
           <thead>
             <tr>
               <th>Código</th>
-              <th>Nombre</th>
+              <th>Nombre de Agencia</th>
               <th>Dirección</th>
-              <th>Estado</th>
+              <th style={{ textAlign: "center" }}>Estado</th>
             </tr>
           </thead>
           <tbody>
             {agencias.map((a) => (
               <tr key={a.id}>
-                <td className="mono">{a.codigo}</td>
-                <td>{a.nombre}</td>
-                <td>{a.direccion ?? "—"}</td>
-                <td>
-                  <span className={`badge ${a.activa ? "activo" : "inactivo"}`}>{a.activa ? "Activa" : "Inactiva"}</span>
+                <td className="mono" style={{ fontWeight: 700, color: "var(--accent)" }}>{a.codigo}</td>
+                <td style={{ fontWeight: 600 }}>{a.nombre}</td>
+                <td style={{ fontSize: "0.8rem" }}>{a.direccion ?? "—"}</td>
+                <td style={{ textAlign: "center" }}>
+                  <span className={`badge ${a.activa ? "activo" : "inactivo"}`} style={{ fontSize: "0.7rem", padding: "0.12rem 0.4rem" }}>
+                    {a.activa ? "Activa" : "Inactiva"}
+                  </span>
                 </td>
               </tr>
             ))}

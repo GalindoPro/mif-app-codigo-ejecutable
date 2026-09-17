@@ -84,33 +84,108 @@ export default function AhorroList() {
         </div>
       )}
 
-      {/* STRIP DE KPIS HORIZONTALES */}
-      <div className="screen-kpis" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-        <div className="screen-kpi-tile accent">
-          <span className="screen-kpi-label">SALDO TOTAL</span>
-          <span className="screen-kpi-value">{formatoQ(saldoTotal)}</span>
-          <span className="screen-kpi-sub">{resumen?.totalCuentas ?? totalCuentas} cuenta(s) activas</span>
+      {/* STRIP DE KPIS HORIZONTALES CON ESTILO FINTECH */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
+        {/* SALDO TOTAL */}
+        <div
+          style={{
+            background: "rgba(2, 132, 199, 0.06)",
+            border: "1px solid rgba(2, 132, 199, 0.3)",
+            borderLeft: "4px solid #0284c7",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>
+              SALDO TOTAL CAPTADO
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>🏦</span>
+          </div>
+          <span style={{ fontSize: "1.15rem", fontWeight: 800, color: "#0284c7", fontFamily: "monospace" }}>
+            {formatoQ(saldoTotal)}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>
+            {resumen?.totalCuentas ?? totalCuentas} cuentas activas
+          </span>
         </div>
-        <div className="screen-kpi-tile">
-          <span className="screen-kpi-label">TOTAL DEPÓSITOS</span>
-          <span className="screen-kpi-value" style={{ color: "#059669" }}>
+
+        {/* TOTAL DEPÓSITOS */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #059669",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#059669", letterSpacing: "0.03em" }}>
+              TOTAL DEPÓSITOS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>📥</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#059669", fontFamily: "monospace" }}>
             {formatoQ(resumen?.totalDepositos ?? 0)}
           </span>
-          <span className="screen-kpi-sub">Ingresos acumulados</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Ingresos acumulados</span>
         </div>
-        <div className="screen-kpi-tile">
-          <span className="screen-kpi-label">TOTAL RETIROS</span>
-          <span className="screen-kpi-value" style={{ color: "#d97706" }}>
+
+        {/* TOTAL RETIROS */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #f59e0b",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#d97706", letterSpacing: "0.03em" }}>
+              TOTAL RETIROS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>📤</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#d97706", fontFamily: "monospace" }}>
             {formatoQ(resumen?.totalRetiros ?? 0)}
           </span>
-          <span className="screen-kpi-sub">Egresos acumulados</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Egresos acumulados</span>
         </div>
-        <div className="screen-kpi-tile">
-          <span className="screen-kpi-label">VISTA DE CUENTAS</span>
-          <span className="screen-kpi-value" style={{ fontSize: "1.1rem" }}>
-            Pág {page} de {totalPaginas}
+
+        {/* PADRÓN DE CUENTAS */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #6366f1",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", letterSpacing: "0.03em" }}>
+              PADRÓN DE CUENTAS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>👥</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#6366f1", fontFamily: "monospace" }}>
+            {totalCuentas}
           </span>
-          <span className="screen-kpi-sub">10 cuentas por vista</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Pág {page} de {totalPaginas}</span>
         </div>
       </div>
 

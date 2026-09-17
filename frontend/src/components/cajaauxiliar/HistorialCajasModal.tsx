@@ -3,6 +3,7 @@ import { api } from "../../lib/api";
 import { formatoQ } from "../../types";
 import type { DetalleCajaAuxiliar } from "../../types";
 import ActaArqueoModal from "./ActaArqueoModal";
+import LibroCajaReporteModal from "./LibroCajaReporteModal";
 
 export interface HistorialCajasModalProps {
   agenciaId: string;
@@ -17,7 +18,8 @@ export default function HistorialCajasModal({
 }: HistorialCajasModalProps) {
   const [dias, setDias] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
-  const [detalleSeleccionado, setDetalleSeleccionado] = useState<DetalleCajaAuxiliar | null>(null);
+  const [detalleActa, setDetalleActa] = useState<DetalleCajaAuxiliar | null>(null);
+  const [detalleLibro, setDetalleLibro] = useState<DetalleCajaAuxiliar | null>(null);
 
   useEffect(() => {
     api
@@ -29,7 +31,13 @@ export default function HistorialCajasModal({
   function abrirActa(diaId: string) {
     api
       .get<DetalleCajaAuxiliar>(`/caja-auxiliar/${diaId}`)
-      .then(({ data }) => setDetalleSeleccionado(data));
+      .then(({ data }) => setDetalleActa(data));
+  }
+
+  function abrirLibro(diaId: string) {
+    api
+      .get<DetalleCajaAuxiliar>(`/caja-auxiliar/${diaId}`)
+      .then(({ data }) => setDetalleLibro(data));
   }
 
   return (
@@ -37,7 +45,9 @@ export default function HistorialCajasModal({
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "rgba(0,0,0,0.6)",
+        backgroundColor: "rgba(15, 23, 42, 0.72)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
@@ -46,25 +56,31 @@ export default function HistorialCajasModal({
       }}
     >
       <div
-        className="card"
+        className="modal-content"
         style={{
-          maxWidth: 860,
+          maxWidth: 920,
           width: "100%",
-          maxHeight: "85vh",
+          maxHeight: "88vh",
           overflowY: "auto",
-          background: "var(--paper)",
-          padding: "1.5rem",
+          background: "var(--paper-raised, #ffffff)",
+          padding: "1.35rem 1.5rem",
+          borderRadius: "14px",
+          boxShadow: "0 25px 50px -12px rgba(15, 23, 42, 0.35)",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", borderBottom: "1px solid var(--line)", paddingBottom: "0.65rem" }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: "1.15rem" }}>📅 Historial de Cajas Diarias · {agenciaNombre}</h2>
-            <p className="sub" style={{ margin: 0 }}>Consulta de cierres anteriores y actas de arqueo</p>
+            <h2 style={{ margin: 0, fontSize: "1.15rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <span>📅</span> Historial de Cajas Diarias · {agenciaNombre}
+            </h2>
+            <p className="sub" style={{ margin: 0, fontSize: "0.78rem" }}>
+              Consulta de cierres anteriores, actas notariales de arqueo y libros de movimientos
+            </p>
           </div>
           <button className="btn secondary" onClick={onCerrar}>✕ Cerrar</button>
         </div>
 
-        {cargando && <p>Cargando historial…</p>}
+        {cargando && <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>Cargando historial…</p>}
 
         {!cargando && dias.length === 0 && (
           <div className="alert info">No hay registros de cajas anteriores para esta agencia.</div>
@@ -72,17 +88,17 @@ export default function HistorialCajasModal({
 
         {dias.length > 0 && (
           <div className="table-wrap">
-            <table>
+            <table className="table-compact">
               <thead>
                 <tr>
                   <th>Fecha</th>
                   <th>Estado</th>
-                  <th>Saldo Inicial</th>
-                  <th>Ingresos</th>
-                  <th>Egresos</th>
-                  <th>Saldo Final</th>
+                  <th style={{ textAlign: "right" }}>Saldo Inicial</th>
+                  <th style={{ textAlign: "right" }}>Ingresos</th>
+                  <th style={{ textAlign: "right" }}>Egresos</th>
+                  <th style={{ textAlign: "right" }}>Saldo Final</th>
                   <th>Operador</th>
-                  <th>Acciones</th>
+                  <th style={{ textAlign: "center" }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -96,19 +112,30 @@ export default function HistorialCajasModal({
                         {d.estado === "ABIERTO" ? "🟢 Abierto" : "🔒 Cerrado"}
                       </span>
                     </td>
-                    <td className="mono">{formatoQ(d.saldo_inicial)}</td>
-                    <td className="mono" style={{ color: "#16a34a" }}>{formatoQ(d.total_ingresos)}</td>
-                    <td className="mono" style={{ color: "#dc2626" }}>{formatoQ(d.total_egresos)}</td>
-                    <td className="mono" style={{ fontWeight: 700 }}>{formatoQ(d.saldo_final ?? d.saldo_inicial)}</td>
-                    <td style={{ fontSize: "0.82rem" }}>{d.cerrado_por_nombre || d.abierto_por_nombre || "—"}</td>
-                    <td>
-                      <button
-                        className="btn secondary"
-                        style={{ fontSize: "0.78rem", padding: "0.25rem 0.5rem" }}
-                        onClick={() => abrirActa(d.id)}
-                      >
-                        🖨️ Ver Acta
-                      </button>
+                    <td className="mono" style={{ textAlign: "right" }}>{formatoQ(d.saldo_inicial)}</td>
+                    <td className="mono" style={{ color: "#059669", textAlign: "right", fontWeight: 600 }}>{formatoQ(d.total_ingresos)}</td>
+                    <td className="mono" style={{ color: "#dc2626", textAlign: "right", fontWeight: 600 }}>{formatoQ(d.total_egresos)}</td>
+                    <td className="mono" style={{ fontWeight: 700, textAlign: "right" }}>{formatoQ(d.saldo_final ?? d.saldo_inicial)}</td>
+                    <td style={{ fontSize: "0.78rem" }}>{d.cerrado_por_nombre || d.abierto_por_nombre || "—"}</td>
+                    <td style={{ textAlign: "center" }}>
+                      <div style={{ display: "flex", gap: "0.3rem", justifyContent: "center" }}>
+                        <button
+                          type="button"
+                          className="btn btn-xs"
+                          onClick={() => abrirLibro(d.id)}
+                          title="Imprimir Libro de Movimientos de este día"
+                        >
+                          🖨️ Libro
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-xs secondary"
+                          onClick={() => abrirActa(d.id)}
+                          title="Ver Acta Notarial de Arqueo"
+                        >
+                          📑 Acta
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -117,11 +144,20 @@ export default function HistorialCajasModal({
           </div>
         )}
 
-        {detalleSeleccionado && (
+        {detalleActa && (
           <ActaArqueoModal
             agenciaNombre={agenciaNombre}
-            detalle={detalleSeleccionado}
-            onCerrar={() => setDetalleSeleccionado(null)}
+            detalle={detalleActa}
+            onCerrar={() => setDetalleActa(null)}
+          />
+        )}
+
+        {detalleLibro && (
+          <LibroCajaReporteModal
+            agenciaId={agenciaId}
+            agenciaNombre={agenciaNombre}
+            detalleActual={detalleLibro}
+            onClose={() => setDetalleLibro(null)}
           />
         )}
       </div>

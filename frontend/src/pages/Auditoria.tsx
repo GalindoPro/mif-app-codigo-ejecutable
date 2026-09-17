@@ -232,22 +232,78 @@ export default function Auditoria() {
 
       {error && <div className="alert error" style={{ margin: "0 1rem", flexShrink: 0 }}>{error}</div>}
 
-      {/* ── KPI STRIP ── */}
-      <div className="screen-kpis" style={{ gridTemplateColumns: "repeat(3, 1fr)", flexShrink: 0 }}>
-        <div className="screen-kpi-tile accent">
-          <span className="screen-kpi-label">Total Eventos Auditados</span>
-          <span className="screen-kpi-value">{pagina?.total.toLocaleString("es-GT") ?? "0"}</span>
-          <span className="screen-kpi-sub">Trazabilidad completa</span>
+      {/* ── KPI STRIP FINTECH ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem", flexShrink: 0 }}>
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #0284c7",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>
+              TOTAL EVENTOS AUDITADOS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>🛡️</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
+            {pagina?.total.toLocaleString("es-GT") ?? "0"}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Trazabilidad completa inmutable</span>
         </div>
-        <div className="screen-kpi-tile">
-          <span className="screen-kpi-label">Entidades Monitoreadas</span>
-          <span className="screen-kpi-value">{entidades.length}</span>
-          <span className="screen-kpi-sub">Módulos bajo supervisión</span>
+
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #6366f1",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", letterSpacing: "0.03em" }}>
+              ENTIDADES MONITOREADAS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>📦</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#6366f1", fontFamily: "monospace" }}>
+            {entidades.length}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Módulos bajo supervisión</span>
         </div>
-        <div className="screen-kpi-tile">
-          <span className="screen-kpi-label">Página Actual</span>
-          <span className="screen-kpi-value">{page} / {totalPaginas}</span>
-          <span className="screen-kpi-sub">{pageSize} registros por bloque</span>
+
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #059669",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#059669", letterSpacing: "0.03em" }}>
+              VISTA ACTUAL
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>📄</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
+            Pág {page} de {totalPaginas}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>{pageSize} registros por bloque</span>
         </div>
       </div>
 

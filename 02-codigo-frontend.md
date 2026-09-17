@@ -852,7 +852,7 @@ export interface CuotaAmortizacion {
 export type OrigenFondos = "FONDOS_PROPIOS" | "FEDERURAL" | "CHN_GUATEMALA";
 
 export const ORIGEN_FONDOS_LABEL: Record<OrigenFondos, string> = {
-  FONDOS_PROPIOS: "Fondos Propios (MIF COOP)",
+  FONDOS_PROPIOS: "Fondos Propios (COOP COMIF R.L.)",
   FEDERURAL: "FEDERURAL",
   CHN_GUATEMALA: "CHN - Guatemala",
 };
@@ -3633,13 +3633,26 @@ function NuevoMovimientoForm({ agenciaId, diaId, onCreado }: { agenciaId: string
 
         {!info.requiereCuenta && (
           <div className="field">
-            <label htmlFor="aux-doc">No. de documento</label>
-            <input id="aux-doc" value={docNo} onChange={(e) => setDocNo(e.target.value)} />
+            <label htmlFor="aux-doc">
+              {info.seccion === "BI"
+                ? "No. de cuenta"
+                : metodoPago === "CHEQUE"
+                ? "No. de boleta"
+                : "No. de recibo"}
+            </label>
+            <input
+              id="aux-doc"
+              value={docNo}
+              onChange={(e) => setDocNo(e.target.value)}
+              placeholder={info.seccion === "BI" ? "Ej. 00-0000000-0" : undefined}
+            />
           </div>
         )}
         {info.requiereCuenta && (
           <div className="field">
-            <label htmlFor="aux-doc-cuenta">No. de recibo</label>
+            <label htmlFor="aux-doc-cuenta">
+              {metodoPago === "CHEQUE" ? "No. de boleta" : "No. de recibo"}
+            </label>
             <input id="aux-doc-cuenta" value={docNo} onChange={(e) => setDocNo(e.target.value)} />
           </div>
         )}
@@ -4675,7 +4688,7 @@ export default function Layout() {
             display: "flex", alignItems: "center", justifyContent: "center",
             fontWeight: 900, fontSize: "0.9rem",
           }}>M</div>
-          <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "var(--ink)" }}>MIF COOP</span>
+          <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "var(--ink)" }}>COOP COMIF R.L.</span>
         </div>
         <button className="hamburger-btn" onClick={() => setSidebarOpen(true)}>☰</button>
       </div>
@@ -4696,7 +4709,7 @@ export default function Layout() {
           >
             <div className="sidebar-toggle-logo">M</div>
             <div className="sidebar-toggle-text">
-              <span className="name">MIF COOP</span>
+              <span className="name">COOP COMIF R.L.</span>
               <span className="sub">Maya Inversiones Futuras</span>
             </div>
             <i className="sidebar-chevron">‹</i>
@@ -4905,7 +4918,7 @@ export default function Login() {
     <div className="login-wrap">
       <div className="card login-card">
         <h1>Sistema Integral MIF</h1>
-        <p className="sub">Cooperativa Integral de Ahorro y Crédito "Maya Inversiones Futuras" R.L.</p>
+        <p className="sub">COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."</p>
 
         {error && <div className="alert error">{error}</div>}
 
@@ -5605,7 +5618,7 @@ export default function Tablero() {
             </span>
           </div>
           <p>
-            Cooperativa Integral de Ahorro y Crédito "Maya Inversiones Futuras", R.L. {varias ? " · Todas las Agencias" : ""}
+            COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."{varias ? " · Todas las Agencias" : ""}
           </p>
         </div>
 
@@ -6237,7 +6250,7 @@ export default function LibroArqueoMensual() {
     if (!datos || datos.dias.length === 0) return;
     const lineas: string[] = [];
     lineas.push(`LIBRO DE ACTAS DE ARQUEO MENSUAL DE CAJA - COMISION DE VIGILANCIA`);
-    lineas.push(`COOPERATIVA INTEGRAL DE AHORRO Y CREDITO MAYA INVERSIONES FUTURAS R.L.`);
+    lineas.push(`COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."`);
     lineas.push(`Acta No.: ${numeroActa}`);
     lineas.push(`Agencia: ${agenciaNombre}`);
     lineas.push(`Periodo: ${mesNombreLargo}`);
@@ -6502,7 +6515,7 @@ export default function LibroArqueoMensual() {
           }}
         >
           <div style={{ fontSize: "1rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-            COOPERATIVA INTEGRAL DE AHORRO Y CRÉDITO &quot;MAYA INVERSIONES FUTURAS&quot;, R.L.
+            COOPERATIVA MAYA INVERSIONES FUTURAS R.L. &quot;COMIF R.L.&quot;
           </div>
           <div style={{ fontSize: "1.15rem", color: "#047857", fontWeight: 800, margin: "0.15rem 0" }}>
             COMISIÓN DE VIGILANCIA · LIBRO DE ACTAS DE ARQUEO MENSUAL
@@ -6531,7 +6544,7 @@ export default function LibroArqueoMensual() {
               <strong style={{ textDecoration: "underline" }}>PUNTO PRIMERO (APERTURA Y QUÓRUM):</strong> En el municipio
               de {lugarMunicipio}, departamento de Quiché, siendo las {horaInicio} horas del día {ultimoDiaMes} del mes
               de {mesNombreLargo}, reunidos en las oficinas de la Agencia <strong>{agenciaNombre}</strong> de la{" "}
-              <strong>Cooperativa Integral de Ahorro y Crédito &quot;Maya Inversiones Futuras&quot;, R.L.</strong>, se
+              <strong>COOPERATIVA MAYA INVERSIONES FUTURAS R.L. &quot;COMIF R.L.&quot;</strong>, se
               constituyen los miembros de la Comisión de Vigilancia: <strong>{nombrePresidente}</strong> (Presidente),{" "}
               <strong>{nombreSecretaria}</strong> (Secretaria) y <strong>{nombreVocal}</strong> (Vocal I), en presencia del
               Receptor Pagador <strong>{nombreCajero}</strong>, con el propósito de celebrar la sesión ordinaria de

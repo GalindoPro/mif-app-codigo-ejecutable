@@ -31,7 +31,7 @@ export default function Login() {
     <div className="login-wrap">
       <div className="card login-card">
         <h1>Sistema Integral MIF</h1>
-        <p className="sub">Cooperativa Integral de Ahorro y Crédito "Maya Inversiones Futuras" R.L.</p>
+        <p className="sub">COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."</p>
 
         {error && <div className="alert error">{error}</div>}
 

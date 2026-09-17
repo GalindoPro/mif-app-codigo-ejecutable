@@ -1,6 +1,6 @@
 # Sistema Integral MIF — Estado y Control de Desarrollo
 
-Este documento registra el **avance real y completo** del sistema de la Cooperativa Integral de Ahorro y Crédito "Maya Inversiones Futuras" R.L. (MIF), detallando los módulos completados, la estructura operativa y las siguientes funciones en cola.
+Este documento registra el **avance real y completo** del sistema de la COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L.", detallando los módulos completados, la estructura operativa y las siguientes funciones en cola.
 
 ---
 
@@ -97,7 +97,7 @@ Este documento registra el **avance real y completo** del sistema de la Cooperat
    - **Vista de Caja Cerrada y Acta Oficial de Arqueo (`🖨️ Imprimir Acta Oficial de Arqueo`):**
      - Basado en las hojas reales de auditoría `Arqueo Caja Ag Chaj...` de `Auxiliar de Caja COMIF CHAJUL 15-08-2026.xlsx`.
      - Resumen de turno finalizado: Saldo inicial, total ingresos, total egresos, saldo final del libro, total efectivo contado y diferencia de arqueo.
-     - **Acta Oficial Imprimible:** Encabezado de *Maya Inversiones Futuras, R.L.*, cuadro de recuento de billetes y monedas, texto formal de auditoría y 4 firmas institucionales de conformidad (**Receptor Pagador, Presidente, Secretaria y Vocal I de la Comisión de Vigilancia**).
+     - **Acta Oficial Imprimible:** Encabezado de *COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."*, cuadro de recuento de billetes y monedas, texto formal de auditoría y 4 firmas institucionales de conformidad (**Receptor Pagador, Presidente, Secretaria y Vocal I de la Comisión de Vigilancia**).
    - **Historial de Días de Caja (`📅 Historial de Cajas`):**
      - Consulta cronológica de cajas diarias anteriores para supervisores y auditoría.
      - Permite inspeccionar movimientos de cualquier fecha anterior y reimprimir su Acta Oficial de Arqueo en un clic.
@@ -175,7 +175,7 @@ Este documento registra el **avance real y completo** del sistema de la Cooperat
     - **Tablero Ejecutivo en 2 Columnas Balanceadas (`.dashboard-grid`):**
       * **Columna Izquierda:** Cuadrícula de 7 KPIs financieros de alta densidad + Panel de accesos directos de ventanilla y campo (`💵 Ventanilla`, `📂 Kardex Cartera`, `📑 Libro Arqueos`, `👥 Padrón`, `🔒 Plazo Fijo`, `🏛️ Aportaciones`) + Desglose por agencia.
       * **Columna Derecha:** Gráfica interactiva de demanda de servicios en tiempo real alineada a la misma altura, con podio y barras de progreso en Quetzales. Toda la visión operativa se aprecia en una sola pantalla.
-    - **Barra Lateral Institucional:** Emblema esmeralda `[M] MIF COOP`, indicador de operatividad `🟢 Agencia Chajul · Activa`, navegación categorizada por áreas de trabajo y tarjeta de usuario con avatar.
+    - **Barra Lateral Institucional:** Emblema esmeralda `[M] COOP COMIF R.L.`, indicador de operatividad `🟢 Agencia Chajul · Activa`, navegación categorizada por áreas de trabajo y tarjeta de usuario con avatar.
 
 18. **Eliminación de Colores Claros/Brillantes y Supresión Total del Cambio de Color en Hover:**
     - **Cero cambio de color al pasar el cursor:** Se eliminó por completo el efecto hover en filas (`tbody tr:hover { background: inherit !important; }`), garantizando una navegación fija y estable sin parpadeos ni destellos claros en ningún módulo (Kardex, Plazos Fijos, Cuentas de Ahorro, Créditos, Socios, Caja).
@@ -237,6 +237,19 @@ Este documento registra el **avance real y completo** del sistema de la Cooperat
 
 
 
+25. **Modernización Global de Submenús, Botones Fintech Pro y Modales Responsivos (100vh Multi-Dispositivo):**
+    - **Botones Fintech Pro con Micro-Interacciones:** Gradientes esmeralda y carmesí con elevación suave (`translateY(-1px)`), sombras perimetrales difusas y feedback táctil activo (`scale(0.98)`).
+    - **Modales con Glassmorphism Blur (`backdrop-filter: blur(8px)`):** Ventanas emergentes de acción y arqueo con aislamiento visual elegante, cabecera y pie de acciones fijos, y scroll interno que nunca desborda la pantalla en PC (`max-height: 88vh`).
+    - **Adaptación Responsiva en Teléfonos Móviles y Tabletas:**
+      * **Móvil (< 768px):** Modales convertidos en Bottom-Sheets ergonómicos con bordes redondeados superiores (`18px 18px 0 0`) y `max-height: 94vh`.
+      * **Tabletas (768px - 1024px):** Menú lateral táctil deslizable con fondo ejecutivo `#070738` y paneles de 2 columnas.
+      * **PC / Laptops (> 1024px):** Icon-rail colapsable con tooltips universales flotantes de alto contraste y visión 100vh sin scroll de ventana.
+
+26. **Emisión e Impresión Oficial del Libro de Movimientos y Cuadre de Caja Auxiliar:**
+    - **Comprobante de Caja Oficial (1-2 Hojas Carta):** Membrete COMIF R.L., Cuadro de Saldo Inicial, (+) Total Ingresos, (-) Total Egresos y (=) Saldo Final, Consolidado de Fuentes de Fondos (COMIF Propios, FEDERURAL, CHN), tabla cronológica de transacciones y doble firma de auditoría/arqueo (Cajero Responsable y Supervisor).
+    - **Filtros Temporales Dinámicos:** Selector rápido para Turno Activo, Hoy, Esta Semana, Este Mes y Rango Personalizado con exportación a Excel (CSV).
+    - **Disponibilidad:** Botón `🖨️ Imprimir Libro` en la tabla activa de `CajaAbierta.tsx`, cabecera de `AuxiliarCaja.tsx` y en cada día del `HistorialCajasModal.tsx`.
+
 ## 2. Usuarios de Prueba Configurados
 
 | Rol | Correo electrónico | Contraseña | Enfoque |
@@ -275,4 +288,7 @@ Todas las especificaciones operativas y estatutarias acordadas se encuentran doc
 38. **Habilitación de Auxiliar de Caja para Caja Chica con Control de Cierre y Validación Cruzada:** Permite al rol `CAJA_CHICA` operar ventanilla en Auxiliar de Caja con bloqueo del botón de arqueo diario (`403 Forbidden`), trazabilidad con insignias de rol en tablas y validación debounced cruzada en tiempo real contra duplicados entre Auxiliar de Caja y Caja Chica.
 39. **Infraestructura Cloud de Producción (Supabase + Vercel + Render/Railway):** Soporte de SSL dinámico en PostgreSQL pool para conexiones a Supabase, CORS compatible con `*.vercel.app`, configuración de rutas SPA en `frontend/vercel.json` y blueprint `render.yaml` para despliegue automatizado del backend.
 40. **Migración y Aprovisionamiento Exitoso de Base de Datos en Supabase (PostgreSQL Cloud):** Esquema relacional de 15 tablas creado y probado en Supabase con resolución de claves foráneas diferidas e idempotentes, ampliación del enum de roles (`CAJA_CHICA`) y datos iniciales aprovisionados (Agencia Chajul y los 5 usuarios estándar).
-
+41. **Orden Descendente Global (`DESC`) y Extracción de Errores Backend:** Listados ordenados de forma descendente en todos los módulos (`socios`, `prestamos`, `cajaauxiliar`, `cajachica`, `cobroscampo`, `alertas`) y optimización del cliente Axios (`api.ts`) para mostrar errores de conflicto `409` descriptivos.
+42. **Depósitos en Efectivo vs Cheque con Boleta/Recibo, Selección de Banco y Traslado Automático en Auxiliar de Caja:** Opción de registrar depósitos con cheque o efectivo en todas las cuentas de ahorro/aportaciones, selector de banco emisor (Banrural, Industrial, CHN, etc.) y transición automática al formulario de Egreso Propio (Traslado de fondos) con beneficiario estandarizado para cuadre exacto de gaveta.
+43. **Arqueo Físico y Cierre de Caja a Pantalla Completa con 2 Decimales Completos:** Cuadrícula de billetes y monedas balanceada al 100% de ancho útil, inputs ágiles y tarjetas resumen de Total Contado, Saldo Esperado y Diferencia con 2 decimales exactos sin truncamiento con puntos suspensivos.
+44. **Modernización Fintech Global de Dashboards en 1 Sola Pantalla (100vh):** Transformación integral módulo por módulo (`Tablero`, `AuxiliarCaja/CajaAbierta`, `CreditosList`, `AhorroList`, `PlazoFijoList`, `AportacionesList`, `CajaChica`, `SociosList`, `Usuarios`, `Agencias`, `Sesiones`, `Auditoria`, `Alertas`) con cintillos KPI de borde de color temático, búsqueda rápida en vivo, tablas compactas con cabecera pegajosa, y eliminación completa de espacios vacíos y scrolls externos.

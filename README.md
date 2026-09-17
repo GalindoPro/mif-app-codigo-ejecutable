@@ -1,7 +1,7 @@
 # Sistema Integral MIF — Fase 1
 
-Reemplazo del Excel de la Cooperativa Integral de Ahorro y Crédito "Maya
-Inversiones Futuras" R.L. por una aplicación web. Esta primera fase entrega:
+Reemplazo del Excel de la COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."
+por una aplicación web. Esta primera fase entrega:
 
 - El **modelo de datos completo** (agencias, usuarios/roles, auditoría, socios,
   cuentas, movimientos, plazo fijo, caja chica, ingresos COMIF) — ver

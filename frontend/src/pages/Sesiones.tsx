@@ -56,65 +56,128 @@ export default function Sesiones() {
   });
 
   return (
-    <div style={{ width: "100%" }}>
-      <div className="page-head">
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span style={{ fontSize: "1.5rem" }}>🛡️</span>
-            <h1>Control de Sesiones y Accesos Activos</h1>
-          </div>
-          <p>
-            Monitoreo de actividad de colaboradores, trazabilidad de operaciones en tiempo real y asignación de agencias.
-          </p>
+    <div className="screen-container">
+      <div className="screen-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", flexWrap: "wrap" }}>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.2rem" }}>
+            <span>🛡️</span> Control de Sesiones y Accesos
+          </h1>
+          <span
+            style={{
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              padding: "0.15rem 0.5rem",
+              borderRadius: "4px",
+              background: "rgba(16, 185, 129, 0.15)",
+              color: "#10b981",
+              border: "1px solid rgba(16, 185, 129, 0.3)",
+            }}
+          >
+            Monitoreo en Vivo
+          </span>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          <Link to="/auditoria" className="btn secondary">
-            🔍 Ver Bitácora Completa
+          <Link to="/auditoria" className="btn secondary" style={{ fontSize: "0.78rem", padding: "0.3rem 0.65rem" }}>
+            🔍 Ver Auditoría
           </Link>
-          <Link to="/usuarios" className="btn">
-            👤 Gestionar Usuarios
+          <Link to="/usuarios" className="btn" style={{ fontSize: "0.78rem", padding: "0.3rem 0.75rem" }}>
+            👤 Usuarios
           </Link>
         </div>
       </div>
 
-      {error && <div className="alert error">{error}</div>}
+      {error && <div className="alert error" style={{ margin: "0.25rem 0", padding: "0.4rem 0.75rem", fontSize: "0.82rem" }}>{error}</div>}
 
-      {/* KPI CARDS - 100% FLUID WIDTH */}
-      <div
-        className="stat-grid"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", marginBottom: "1.5rem" }}
-      >
-        <div className="stat-card accent">
-          <span className="label">Usuarios Habilitados</span>
-          <span className="value mono">{totalActivos}</span>
-          <span className="sub">De {usuarios.length} cuentas registradas</span>
+      {/* KPI CARDS FINTECH */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #6366f1",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", letterSpacing: "0.03em" }}>
+              USUARIOS HABILITADOS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>👥</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#6366f1", fontFamily: "monospace" }}>
+            {totalActivos}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>De {usuarios.length} cuentas registradas</span>
         </div>
-        <div className="stat-card">
-          <span className="label">Activos en el Sistema Hoy</span>
-          <span className="value mono" style={{ color: "#10b981" }}>{usuariosConActividadHoy}</span>
-          <span className="sub">Con operaciones registradas hoy</span>
+
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #059669",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#059669", letterSpacing: "0.03em" }}>
+              ACTIVOS HOY
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>🟢</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#059669", fontFamily: "monospace" }}>
+            {usuariosConActividadHoy}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Con actividad en la fecha</span>
         </div>
-        <div className="stat-card">
-          <span className="label">Transacciones Monitoreadas</span>
-          <span className="value mono">
+
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #0284c7",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>
+              TRANSACCIONES AUDITADAS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>📊</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#0284c7", fontFamily: "monospace" }}>
             {usuarios.reduce((acc, u) => acc + Number(u.total_acciones), 0).toLocaleString("es-GT")}
           </span>
-          <span className="sub">Eventos auditados en bitácora</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Eventos registrados</span>
         </div>
       </div>
 
       {/* SEARCH BAR */}
-      <div className="searchbar">
-        <input
-          placeholder="Buscar por colaborador, correo, agencia o rol…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
+      <div className="screen-toolbar" style={{ margin: "0.4rem 0" }}>
+        <div style={{ flex: 1, maxWidth: 440 }}>
+          <input
+            placeholder="🔍 Buscar por colaborador, correo, agencia o rol…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            style={{ width: "100%", padding: "0.35rem 0.65rem", fontSize: "0.82rem", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--paper)", color: "var(--ink)" }}
+          />
+        </div>
       </div>
 
-      {/* TABLA DE SESIONES Y ACTIVIDAD AL 100% DE ANCHO */}
-      <div className="table-wrap">
-        <table>
+      {/* TABLA DE SESIONES Y ACTIVIDAD */}
+      <div className="table-scroll-container" style={{ flex: 1, minHeight: 0 }}>
+        <table className="table-compact" style={{ width: "100%" }}>
           <thead>
             <tr>
               <th>Colaborador / Usuario</th>
@@ -122,8 +185,8 @@ export default function Sesiones() {
               <th>Rol / Cargo</th>
               <th>Agencia</th>
               <th>Última Operación</th>
-              <th>Última Conexión / Registro</th>
-              <th style={{ textAlign: "center" }}>Estado Cuenta</th>
+              <th>Última Conexión</th>
+              <th style={{ textAlign: "center" }}>Estado</th>
             </tr>
           </thead>
           <tbody>

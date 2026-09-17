@@ -394,39 +394,141 @@ export default function SocioDetail() {
   const saldoAportacion = cuentaAportacion ? Number(cuentaAportacion.saldo_actual) : 0;
   const tieneAportacionMinima = saldoAportacion >= 100;
 
+  // Cálculos de portafolio financiero del socio
+  const totalAhorroLiquido = socio.cuentas
+    .filter((c) => ["AHORRO_CORRIENTE", "AHORRO_PROGRAMADO", "AHORRO_INFANTO_JUVENIL", "AHORRO_SOBRE_PRESTAMO"].includes(c.tipo))
+    .reduce((acc, c) => acc + Number(c.saldo_actual || 0), 0);
+
+  const totalPlazoFijo = socio.cuentas
+    .filter((c) => c.tipo === "AHORRO_PLAZO_FIJO")
+    .reduce((acc, c) => acc + Number(c.saldo_actual || 0), 0);
+
+  const totalCreditosActivos = (socio.prestamos || [])
+    .filter((p) => ["APROBADO", "DESEMBOLSADO", "MIGRADO_ACTIVO"].includes(p.estado))
+    .reduce((acc, p) => acc + Number(p.saldo_capital ?? p.monto_aprobado ?? p.monto_solicitado ?? 0), 0);
+
+  const iniciales = socio.nombres
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <button className="link-btn" onClick={() => navigate("/socios")} style={{ marginBottom: "0.5rem" }}>
-            ← Volver a socios
-          </button>
-          <h1>{socio.nombres}</h1>
-          <p>
-            <span className="mono">{socio.numero_asociado}</span> · {socio.agencia_nombre} · {socio.cuentas.length} cuenta(s) registradas
-          </p>
+    <div style={{ maxWidth: "1200px", margin: "0 auto", paddingBottom: "2rem" }}>
+      {/* NAVEGACIÓN Y ENLACE DE RETORNO */}
+      <div style={{ marginBottom: "0.75rem" }}>
+        <button
+          className="link-btn"
+          onClick={() => navigate("/socios")}
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", fontSize: "0.82rem", fontWeight: 700 }}
+        >
+          ← Volver a listado de asociados
+        </button>
+      </div>
+
+      {/* TARJETA DE PERFIL HERO / CABECERA EJECUTIVA */}
+      <div
+        className="card"
+        style={{
+          background: "linear-gradient(135deg, var(--paper) 0%, var(--paper-raised) 100%)",
+          border: "1px solid var(--line)",
+          borderRadius: "12px",
+          padding: "1.2rem 1.4rem",
+          marginBottom: "1rem",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "1rem",
+        }}
+      >
+        {/* Lado Izquierdo: Avatar + Nombres + Badges */}
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", minWidth: 0 }}>
+          <div
+            style={{
+              width: "56px",
+              height: "56px",
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+              color: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: 800,
+              fontSize: "1.35rem",
+              letterSpacing: "1px",
+              boxShadow: "0 4px 12px rgba(5, 150, 105, 0.35)",
+              flexShrink: 0,
+            }}
+          >
+            {iniciales || "S"}
+          </div>
+
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <h1 style={{ margin: 0, fontSize: "1.35rem", fontWeight: 800, letterSpacing: "-0.02em" }}>
+                {socio.nombres}
+              </h1>
+              <span
+                className={`badge ${socio.estado === "ACTIVO" ? "activo" : "inactivo"}`}
+                style={{ fontSize: "0.75rem", padding: "0.15rem 0.5rem", fontWeight: 700 }}
+              >
+                {socio.estado === "ACTIVO" ? "● Activo" : "○ Inactivo"}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.35rem", flexWrap: "wrap", fontSize: "0.82rem", color: "var(--ink-soft)" }}>
+              <span className="mono" style={{ background: "rgba(0,0,0,0.05)", padding: "0.1rem 0.45rem", borderRadius: "4px", fontWeight: 700, color: "var(--ink)" }}>
+                💳 No. {socio.numero_asociado}
+              </span>
+              <span>·</span>
+              <span>🏢 {socio.agencia_nombre}</span>
+              <span>·</span>
+              <span>📁 {socio.cuentas.length} cuenta(s)</span>
+              {socio.genero && (
+                <>
+                  <span>·</span>
+                  <span>{socio.genero === "F" ? "👩 Femenino" : "👨 Masculino"}</span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", alignItems: "center" }}>
+
+        {/* Lado Derecho: Acciones Principales */}
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
           {!tieneAportacion && (
             <button
               type="button"
               className="btn"
-              style={{ background: "#059669", borderColor: "#059669", fontWeight: 700 }}
+              style={{ background: "#059669", borderColor: "#059669", fontWeight: 700, fontSize: "0.84rem" }}
               onClick={() => setMostrarModalAportacion(true)}
             >
               ➕ Aperturar Aportación (Q 100)
             </button>
           )}
-          <span className={`badge ${socio.estado === "ACTIVO" ? "activo" : "inactivo"}`}>
-            {socio.estado === "ACTIVO" ? "Activo" : "Inactivo"}
-          </span>
+
+          {!editando && (
+            <button
+              type="button"
+              className="btn secondary"
+              style={{ fontSize: "0.84rem", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.3rem" }}
+              onClick={() => setEditando(true)}
+            >
+              ✏️ Editar Expediente
+            </button>
+          )}
+
           {socio.estado === "ACTIVO" ? (
-            <button className="btn secondary" onClick={() => cambiarEstado("INACTIVO")}>
-              Marcar inactivo
+            <button className="btn secondary" style={{ fontSize: "0.84rem" }} onClick={() => cambiarEstado("INACTIVO")}>
+              Marcar Inactivo
             </button>
           ) : (
-            <button className="btn secondary" onClick={() => cambiarEstado("ACTIVO")}>
-              Reactivar
+            <button className="btn secondary" style={{ fontSize: "0.84rem" }} onClick={() => cambiarEstado("ACTIVO")}>
+              Reactivar Socio
             </button>
           )}
         </div>
@@ -435,7 +537,117 @@ export default function SocioDetail() {
       {mensajeExito && <div className="alert success" style={{ marginBottom: "1rem" }}>{mensajeExito}</div>}
       {error && <div className="alert error" style={{ marginBottom: "1rem" }}>{error}</div>}
 
-      {/* ALERTA: SOCIO CON 0 CUENTAS O SIN APORTACIÓN ESTATUTARIA */}
+      {/* CINTILLO EJECUTIVO DE KPIS FINANCIEROS DEL SOCIO */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: "0.75rem",
+          marginBottom: "1rem",
+        }}
+      >
+        {/* KPI 1: Aportaciones */}
+        <div
+          className="card"
+          style={{
+            padding: "0.85rem 1rem",
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "10px",
+            borderLeft: "4px solid #059669",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.2rem" }}>
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--ink-soft)", letterSpacing: "0.03em" }}>
+              Aportación Estatutaria
+            </span>
+            <span style={{ fontSize: "1rem" }}>🏛️</span>
+          </div>
+          <strong className="mono" style={{ fontSize: "1.25rem", color: tieneAportacionMinima ? "#059669" : "#d97706", display: "block" }}>
+            {formatoQ(saldoAportacion)}
+          </strong>
+          <span style={{ fontSize: "0.72rem", color: tieneAportacionMinima ? "var(--ink-soft)" : "#d97706", fontWeight: 600 }}>
+            {tieneAportacionMinima ? "✓ Al día con estatutos" : "⚠️ Mínimo Q 100.00 requerido"}
+          </span>
+        </div>
+
+        {/* KPI 2: Ahorros Líquidos */}
+        <div
+          className="card"
+          style={{
+            padding: "0.85rem 1rem",
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "10px",
+            borderLeft: "4px solid #0284c7",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.2rem" }}>
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--ink-soft)", letterSpacing: "0.03em" }}>
+              Ahorro Disponible
+            </span>
+            <span style={{ fontSize: "1rem" }}>💰</span>
+          </div>
+          <strong className="mono" style={{ fontSize: "1.25rem", color: "var(--ink)", display: "block" }}>
+            {formatoQ(totalAhorroLiquido)}
+          </strong>
+          <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
+            Corriente · Programado · Infanto
+          </span>
+        </div>
+
+        {/* KPI 3: Plazo Fijo */}
+        <div
+          className="card"
+          style={{
+            padding: "0.85rem 1rem",
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "10px",
+            borderLeft: "4px solid #7c3aed",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.2rem" }}>
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--ink-soft)", letterSpacing: "0.03em" }}>
+              Inversiones a Plazo
+            </span>
+            <span style={{ fontSize: "1rem" }}>📈</span>
+          </div>
+          <strong className="mono" style={{ fontSize: "1.25rem", color: "#7c3aed", display: "block" }}>
+            {formatoQ(totalPlazoFijo)}
+          </strong>
+          <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
+            Certificados a término fijo
+          </span>
+        </div>
+
+        {/* KPI 4: Créditos / Saldo Deudor */}
+        <div
+          className="card"
+          style={{
+            padding: "0.85rem 1rem",
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "10px",
+            borderLeft: "4px solid #dc2626",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.2rem" }}>
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--ink-soft)", letterSpacing: "0.03em" }}>
+              Cartera de Créditos
+            </span>
+            <span style={{ fontSize: "1rem" }}>📋</span>
+          </div>
+          <strong className="mono" style={{ fontSize: "1.25rem", color: totalCreditosActivos > 0 ? "#dc2626" : "var(--ink)", display: "block" }}>
+            {formatoQ(totalCreditosActivos)}
+          </strong>
+          <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
+            {totalCreditosActivos > 0 ? "Saldo deudor vigente" : "Sin créditos pendientes"}
+          </span>
+        </div>
+      </div>
+
+      {/* ALERTA ESTATUTARIA SI NO TIENE APORTACIÓN */}
       {!tieneAportacionMinima && (
         <div
           className="alert warning"
@@ -445,54 +657,56 @@ export default function SocioDetail() {
             alignItems: "center",
             flexWrap: "wrap",
             gap: "1rem",
-            marginBottom: "1.25rem",
+            marginBottom: "1rem",
             borderLeft: "4px solid #f59e0b",
+            borderRadius: "8px",
           }}
         >
           <div>
-            <strong style={{ fontSize: "0.95rem" }}>
+            <strong style={{ fontSize: "0.92rem" }}>
               ⚠️ Asociado sin Cuenta de Aportaciones Estatutaria ({socio.cuentas.length} cuentas registradas)
             </strong>
-            <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem", color: "var(--ink-soft)" }}>
-              Por estatuto cooperativo, todo asociado debe contar con su <strong>Cuenta de Aportación Inicial (Mínimo Q 100.00)</strong> para poder abrir cuentas de Ahorro Corriente, Programado, Plazo Fijo o solicitar Créditos.
+            <p style={{ margin: "0.25rem 0 0", fontSize: "0.82rem", color: "var(--ink-soft)" }}>
+              Por estatuto cooperativo de COMIF R.L., todo asociado debe contar con su <strong>Cuenta de Aportación Inicial (Mínimo Q 100.00)</strong> para aperturar cuentas de ahorro o solicitar créditos.
             </p>
           </div>
           <button
             type="button"
             className="btn"
-            style={{ background: "#059669", borderColor: "#059669", fontWeight: 700, fontSize: "0.88rem" }}
+            style={{ background: "#059669", borderColor: "#059669", fontWeight: 700, fontSize: "0.84rem" }}
             onClick={() => setMostrarModalAportacion(true)}
           >
-            ➕ Aperturar Aportación Inicial (Q 100.00)
+            ➕ Aperturar Aportación Inicial (Q 100)
           </button>
         </div>
       )}
 
-      {/* PANEL DE ACCIONES RÁPIDAS PARA ESTE SOCIO */}
+      {/* PANEL DE ACCIONES RÁPIDAS MODERNO */}
       <div
         className="card"
         style={{
           marginBottom: "1.25rem",
           background: "var(--paper-raised)",
           border: "1px solid var(--line)",
-          padding: "0.85rem 1rem",
+          borderRadius: "10px",
+          padding: "0.75rem 1rem",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}>
-          <div>
-            <strong style={{ fontSize: "0.88rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <span>⚡</span> Acciones Rápidas para {socio.nombres.split(" ")[0]}
-            </strong>
-            <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>
-              Abre nuevas cuentas o solicitudes vinculadas automáticamente a este socio:
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.6rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <span style={{ fontSize: "1rem" }}>⚡</span>
+            <strong style={{ fontSize: "0.86rem" }}>Operaciones Rápidas:</strong>
+            <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+              Aperturar productos vinculados automáticamente a este asociado
             </span>
           </div>
-          <div style={{ display: "flex", gap: "0.45rem", flexWrap: "wrap" }}>
+
+          <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
             {!tieneAportacion && (
               <button
                 type="button"
                 className="btn"
-                style={{ background: "#059669", borderColor: "#059669", fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+                style={{ background: "#059669", borderColor: "#059669", fontSize: "0.76rem", padding: "0.25rem 0.6rem", fontWeight: 700 }}
                 onClick={() => setMostrarModalAportacion(true)}
               >
                 + Aportación
@@ -501,35 +715,35 @@ export default function SocioDetail() {
             <Link
               to={`/ahorros/corriente/nueva?socioId=${socio.id}`}
               className="btn secondary"
-              style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+              style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem", fontWeight: 600 }}
             >
               + Ahorro Corriente
             </Link>
             <Link
               to={`/ahorros/programado/nueva?socioId=${socio.id}`}
               className="btn secondary"
-              style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+              style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem", fontWeight: 600 }}
             >
               + Ahorro Programado
             </Link>
             <Link
               to={`/ahorros/infanto-juvenil/nueva?socioId=${socio.id}`}
               className="btn secondary"
-              style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+              style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem", fontWeight: 600 }}
             >
               + Infanto Juvenil
             </Link>
             <Link
               to={`/ahorros/plazo-fijo/nuevo?socioId=${socio.id}`}
               className="btn secondary"
-              style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+              style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem", fontWeight: 600 }}
             >
               + Plazo Fijo
             </Link>
             <Link
               to={`/creditos/nuevo?socioId=${socio.id}`}
               className="btn"
-              style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+              style={{ fontSize: "0.76rem", padding: "0.25rem 0.65rem", fontWeight: 700 }}
             >
               + Solicitar Crédito
             </Link>
@@ -537,14 +751,30 @@ export default function SocioDetail() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "1.25rem", alignItems: "start" }}>
-        {/* DATOS GENERALES DEL SOCIO */}
-        <div className="card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-            <h3 style={{ fontFamily: "inherit", fontSize: "1rem", margin: 0 }}>Datos generales</h3>
+      {/* CUADRÍCULA PRINCIPAL: EXPEDIENTE (IZQUIERDA) Y PORTAFOLIO DE CUENTAS (DERECHA) */}
+      <div style={{ display: "grid", gridTemplateColumns: "1.05fr 1.15fr", gap: "1.25rem", alignItems: "start" }}>
+        {/* EXPEDIENTE Y DATOS GENERALES DEL ASOCIADO */}
+        <div
+          className="card"
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "10px",
+            padding: "1rem 1.15rem",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", borderBottom: "1px solid var(--line)", paddingBottom: "0.45rem" }}>
+            <h3 style={{ fontFamily: "inherit", fontSize: "0.95rem", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <span>📋</span> Expediente del Asociado
+            </h3>
             {!editando && (
-              <button className="btn secondary" onClick={() => setEditando(true)}>
-                ✏️ Editar Datos
+              <button
+                type="button"
+                className="btn secondary"
+                style={{ padding: "0.2rem 0.5rem", fontSize: "0.76rem", fontWeight: 600 }}
+                onClick={() => setEditando(true)}
+              >
+                ✏️ Modificar
               </button>
             )}
           </div>
@@ -766,76 +996,131 @@ export default function SocioDetail() {
               </div>
             </form>
           ) : (
-            <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "auto 1fr", rowGap: "0.6rem", columnGap: "1rem" }}>
-              <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Fecha de ingreso</dt>
-              <dd className="mono" style={{ margin: 0 }}>{new Date(socio.fecha_ingreso).toLocaleDateString("es-GT")}</dd>
-              <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Género</dt>
-              <dd style={{ margin: 0 }}>{socio.genero === "F" ? "Femenino" : socio.genero === "M" ? "Masculino" : "—"}</dd>
-              <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>DPI</dt>
-              <dd className="mono" style={{ margin: 0 }}>{socio.dpi ? formatearDPI(socio.dpi) : "—"}</dd>
-              <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Teléfono</dt>
-              <dd style={{ margin: 0 }}>
-                {socio.telefono ? (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
-                    <span className="mono">{socio.telefono}</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {/* Fila 1: Fecha Ingreso y Género */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                <div style={{ background: "var(--paper-raised)", padding: "0.55rem 0.75rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                  <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)", fontWeight: 600, display: "block" }}>Fecha de Ingreso</span>
+                  <strong className="mono" style={{ fontSize: "0.85rem", color: "var(--ink)", display: "block", marginTop: "2px" }}>
+                    {new Date(socio.fecha_ingreso).toLocaleDateString("es-GT")}
+                  </strong>
+                </div>
+
+                <div style={{ background: "var(--paper-raised)", padding: "0.55rem 0.75rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                  <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)", fontWeight: 600, display: "block" }}>Género</span>
+                  <strong style={{ fontSize: "0.85rem", color: "var(--ink)", display: "block", marginTop: "2px" }}>
+                    {socio.genero === "F" ? "👩 Femenino" : socio.genero === "M" ? "👨 Masculino" : "—"}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Fila 2: DPI */}
+              <div style={{ background: "var(--paper-raised)", padding: "0.55rem 0.75rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)", fontWeight: 600, display: "block" }}>Documento Personal de Identificación (DPI)</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "2px" }}>
+                  <strong className="mono" style={{ fontSize: "0.95rem", letterSpacing: "0.5px", color: "var(--ink)" }}>
+                    {socio.dpi ? formatearDPI(socio.dpi) : "—"}
+                  </strong>
+                  {socio.dpi && (
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      style={{ padding: "0.15rem 0.45rem", fontSize: "0.72rem" }}
+                      onClick={() => navigator.clipboard.writeText((socio.dpi || "").replace(/\D/g, ""))}
+                      title="Copiar DPI"
+                    >
+                      Copiar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Fila 3: Teléfono con WhatsApp */}
+              <div style={{ background: "var(--paper-raised)", padding: "0.55rem 0.75rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)", fontWeight: 600, display: "block" }}>Teléfono Principal</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "2px", flexWrap: "wrap", gap: "0.4rem" }}>
+                  <strong className="mono" style={{ fontSize: "0.95rem", color: "var(--ink)" }}>
+                    {socio.telefono ? socio.telefono : "—"}
+                  </strong>
+                  {socio.telefono && (
                     <a
                       href={`https://wa.me/${socio.telefono.replace(/\D/g, "")}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn secondary"
-                      style={{ padding: "0.15rem 0.45rem", fontSize: "0.75rem", borderRadius: "4px" }}
-                      title="Enviar WhatsApp"
+                      className="btn"
+                      style={{
+                        padding: "0.2rem 0.6rem",
+                        fontSize: "0.75rem",
+                        borderRadius: "20px",
+                        background: "#25D366",
+                        color: "#ffffff",
+                        borderColor: "#25D366",
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.25rem",
+                      }}
+                      title="Contactar vía WhatsApp"
                     >
                       💬 WhatsApp
                     </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Fila 4: Dirección */}
+              <div style={{ background: "var(--paper-raised)", padding: "0.55rem 0.75rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)", fontWeight: 600, display: "block" }}>Dirección y Residencia</span>
+                <strong style={{ fontSize: "0.85rem", color: "var(--ink)", display: "block", marginTop: "2px" }}>
+                  {socio.direccion ?? "—"}
+                </strong>
+              </div>
+
+              {/* Fila 5: Beneficiario Registrado */}
+              <div style={{ background: "rgba(2, 132, 199, 0.05)", padding: "0.65rem 0.8rem", borderRadius: "8px", border: "1px solid rgba(2, 132, 199, 0.2)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "0.72rem", color: "#0284c7", fontWeight: 700, textTransform: "uppercase" }}>
+                    Persona Beneficiaria
                   </span>
-                ) : (
-                  "—"
-                )}
-              </dd>
-              <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Dirección</dt>
-              <dd style={{ margin: 0 }}>{socio.direccion ?? "—"}</dd>
-              <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Beneficiario</dt>
-              <dd style={{ margin: 0 }}>
-                <strong>{socio.nombre_beneficiario ?? "—"}</strong>
-                {socio.parentesco_beneficiario && (
-                  <span
-                    style={{
-                      marginLeft: "0.45rem",
-                      fontSize: "0.78rem",
-                      fontWeight: 600,
-                      padding: "0.12rem 0.45rem",
-                      borderRadius: "4px",
-                      background: "var(--mono-bg)",
-                      border: "1px solid var(--line)",
-                      color: "var(--accent)",
-                    }}
-                  >
-                    {socio.parentesco_beneficiario}
-                  </span>
-                )}
+                  {socio.parentesco_beneficiario && (
+                    <span style={{ fontSize: "0.72rem", fontWeight: 700, padding: "0.1rem 0.45rem", borderRadius: "4px", background: "rgba(2, 132, 199, 0.15)", color: "#0284c7" }}>
+                      {socio.parentesco_beneficiario}
+                    </span>
+                  )}
+                </div>
+                <strong style={{ fontSize: "0.9rem", color: "var(--ink)", display: "block", marginTop: "3px" }}>
+                  {socio.nombre_beneficiario ?? "Sin beneficiario asignado"}
+                </strong>
                 {(socio.dpi_beneficiario || socio.telefono_beneficiario) && (
-                  <div style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "0.2rem" }}>
+                  <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", marginTop: "0.25rem" }}>
                     {socio.dpi_beneficiario ? `DPI: ${formatearDPI(socio.dpi_beneficiario)} ` : ""}
                     {socio.telefono_beneficiario ? `· Tel: ${socio.telefono_beneficiario}` : ""}
                   </div>
                 )}
-              </dd>
-            </dl>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* CUENTAS DEL ASOCIADO */}
-        <div className="card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-            <h3 style={{ fontFamily: "inherit", fontSize: "1rem", margin: 0 }}>
-              Cuentas Registradas ({socio.cuentas.length})
+        {/* PORTAFOLIO DE CUENTAS DEL ASOCIADO */}
+        <div
+          className="card"
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "10px",
+            padding: "1rem 1.15rem",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", borderBottom: "1px solid var(--line)", paddingBottom: "0.45rem" }}>
+            <h3 style={{ fontFamily: "inherit", fontSize: "0.95rem", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <span>🏦</span> Cuentas y Portafolio ({socio.cuentas.length})
             </h3>
             {!tieneAportacion && (
               <button
                 type="button"
-                className="btn secondary"
-                style={{ fontSize: "0.78rem", padding: "0.2rem 0.5rem", borderColor: "#059669", color: "#10b981" }}
+                className="btn"
+                style={{ fontSize: "0.75rem", padding: "0.2rem 0.55rem", background: "#059669", borderColor: "#059669", fontWeight: 700 }}
                 onClick={() => setMostrarModalAportacion(true)}
               >
                 + Aportación
@@ -844,75 +1129,85 @@ export default function SocioDetail() {
           </div>
 
           {socio.cuentas.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "1.5rem 0.5rem", color: "var(--ink-soft)" }}>
-              <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>📂</div>
-              <p style={{ margin: "0 0 0.75rem", fontSize: "0.88rem" }}>
-                Este socio todavía no tiene cuentas activas en el sistema.
+            <div style={{ textAlign: "center", padding: "2rem 1rem", color: "var(--ink-soft)" }}>
+              <div style={{ fontSize: "2.5rem", marginBottom: "0.5rem" }}>📂</div>
+              <p style={{ margin: "0 0 0.75rem", fontSize: "0.9rem", fontWeight: 600 }}>
+                Este asociado todavía no tiene cuentas activas en el sistema.
               </p>
               <button
                 type="button"
                 className="btn"
-                style={{ background: "#059669", borderColor: "#059669", fontWeight: 700, fontSize: "0.82rem" }}
+                style={{ background: "#059669", borderColor: "#059669", fontWeight: 700, fontSize: "0.84rem" }}
                 onClick={() => setMostrarModalAportacion(true)}
               >
                 ➕ Aperturar Cuenta de Aportaciones (Q 100)
               </button>
             </div>
           ) : (
-            <div className="table-wrap" style={{ border: "1px solid var(--line)" }}>
-              <table style={{ fontSize: "0.82rem", width: "100%", margin: 0 }}>
-                <thead>
-                  <tr style={{ background: "var(--paper-raised)" }}>
-                    <th style={{ padding: "4px 8px" }}>Cuenta</th>
-                    <th style={{ padding: "4px 8px" }}>Tipo</th>
-                    <th style={{ textAlign: "right", padding: "4px 8px" }}>Saldo</th>
-                    <th style={{ width: "90px", textAlign: "center", padding: "4px 8px" }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {socio.cuentas.map((c) => {
-                    const slug = TIPO_SLUG[c.tipo];
-                    const esApor = c.tipo === "APORTACION";
-                    return (
-                      <tr key={c.id}>
-                        <td className="mono" style={{ fontWeight: 600, padding: "4px 8px" }}>
-                          {slug ? (
-                            <Link to={`/ahorros/${slug}/${c.id}`}>{c.numero_cuenta}</Link>
-                          ) : (
-                            c.numero_cuenta
-                          )}
-                        </td>
-                        <td style={{ padding: "4px 8px" }}>
-                          <span
-                            className="badge"
-                            style={{
-                              background: esApor ? "rgba(5, 150, 105, 0.15)" : undefined,
-                              color: esApor ? "#059669" : undefined,
-                              fontWeight: 600,
-                            }}
-                          >
-                            {TIPO_CUENTA_LABEL[c.tipo] ?? c.tipo}
-                          </span>
-                        </td>
-                        <td className="mono" style={{ textAlign: "right", fontWeight: 700, padding: "4px 8px" }}>
-                          {formatoQ(c.saldo_actual)}
-                        </td>
-                        <td style={{ textAlign: "center", padding: "4px 8px" }}>
-                          {slug ? (
-                            <Link to={`/ahorros/${slug}/${c.id}`} style={{ fontSize: "0.78rem", textDecoration: "none" }}>
-                              Ver →
-                            </Link>
-                          ) : (
-                            <Link to="/aportaciones" style={{ fontSize: "0.78rem", textDecoration: "none" }}>
-                              Ver →
-                            </Link>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+              {socio.cuentas.map((c) => {
+                const slug = TIPO_SLUG[c.tipo];
+                const esApor = c.tipo === "APORTACION";
+                const esPF = c.tipo === "AHORRO_PLAZO_FIJO";
+                const esASP = c.tipo === "AHORRO_SOBRE_PRESTAMO";
+                const saldoNum = Number(c.saldo_actual || 0);
+
+                return (
+                  <div
+                    key={c.id}
+                    style={{
+                      background: esApor ? "rgba(5, 150, 105, 0.04)" : "var(--paper-raised)",
+                      border: `1px solid ${esApor ? "rgba(5, 150, 105, 0.25)" : "var(--line)"}`,
+                      borderRadius: "8px",
+                      padding: "0.65rem 0.85rem",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "0.6rem",
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        <span
+                          className="badge"
+                          style={{
+                            background: esApor ? "rgba(5, 150, 105, 0.15)" : esPF ? "rgba(124, 58, 237, 0.15)" : esASP ? "rgba(217, 119, 6, 0.15)" : "rgba(2, 132, 199, 0.15)",
+                            color: esApor ? "#059669" : esPF ? "#7c3aed" : esASP ? "#d97706" : "#0284c7",
+                            fontWeight: 700,
+                            fontSize: "0.72rem",
+                            padding: "0.1rem 0.45rem",
+                          }}
+                        >
+                          {TIPO_CUENTA_LABEL[c.tipo] ?? c.tipo}
+                        </span>
+                      </div>
+                      <div className="mono" style={{ fontWeight: 700, fontSize: "0.86rem", color: "var(--ink)", marginTop: "3px" }}>
+                        {c.numero_cuenta}
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)", display: "block", textTransform: "uppercase", fontWeight: 600 }}>
+                        Saldo Actual
+                      </span>
+                      <strong className="mono" style={{ fontSize: "1.05rem", color: esApor ? "#059669" : "var(--ink)", display: "block" }}>
+                        {formatoQ(saldoNum)}
+                      </strong>
+                      <div style={{ marginTop: "2px" }}>
+                        {slug ? (
+                          <Link to={`/ahorros/${slug}/${c.id}`} style={{ fontSize: "0.74rem", fontWeight: 700, textDecoration: "none" }}>
+                            Ver Cuenta →
+                          </Link>
+                        ) : (
+                          <Link to="/aportaciones" style={{ fontSize: "0.74rem", fontWeight: 700, textDecoration: "none" }}>
+                            Ver Aportación →
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

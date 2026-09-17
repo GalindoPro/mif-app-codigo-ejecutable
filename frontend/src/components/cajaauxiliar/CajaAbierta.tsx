@@ -17,6 +17,7 @@ import LiquidarPlazoFijoForm from "./LiquidarPlazoFijoForm";
 import CierreCajaForm from "./CierreCajaForm";
 import AuxiliarCajaEditModal from "./AuxiliarCajaEditModal";
 import ReciboMovimientoModal from "./ReciboMovimientoModal";
+import LibroCajaReporteModal from "./LibroCajaReporteModal";
 import type { CajaMovimientoAuxiliar } from "../../types";
 import { useAuth } from "../../context/AuthContext";
 
@@ -80,8 +81,10 @@ export default function CajaAbierta({
   const [mostrarDesembolso, setMostrarDesembolso] = useState(false);
   const [mostrarLiquidarPF, setMostrarLiquidarPF] = useState(false);
   const [mostrarCierre, setMostrarCierre] = useState(false);
+  const [mostrarReporteLibro, setMostrarReporteLibro] = useState(false);
   const [editarRegistro, setEditarRegistro] = useState<CajaMovimientoAuxiliar | null>(null);
   const [imprimirRegistro, setImprimirRegistro] = useState<CajaMovimientoAuxiliar | null>(null);
+  const [filtroTexto, setFiltroTexto] = useState("");
 
   const { usuario } = useAuth();
 
@@ -96,6 +99,19 @@ export default function CajaAbierta({
     setMostrarCierre(false);
     setEditarRegistro(null);
   }
+
+  const movimientosFiltrados = useMemo(() => {
+    if (!filtroTexto.trim()) return detalle.movimientos;
+    const q = filtroTexto.toLowerCase().trim();
+    return detalle.movimientos.filter(
+      (m) =>
+        m.descripcion?.toLowerCase().includes(q) ||
+        m.beneficiario?.toLowerCase().includes(q) ||
+        m.referencia?.toLowerCase().includes(q) ||
+        m.doc_no?.toLowerCase().includes(q) ||
+        m.usuario_nombre?.toLowerCase().includes(q)
+    );
+  }, [detalle.movimientos, filtroTexto]);
 
   const resumenFondos = useMemo(() => {
     const r: Record<
@@ -253,7 +269,7 @@ export default function CajaAbierta({
           <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
             {(
               [
-                { id: "FONDOS_PROPIOS", icon: "🏦", label: "MIF Propios", data: resumenFondos.FONDOS_PROPIOS, color: "#059669" },
+                { id: "FONDOS_PROPIOS", icon: "🏦", label: "COMIF Propios", data: resumenFondos.FONDOS_PROPIOS, color: "#059669" },
                 { id: "FEDERURAL", icon: "🌾", label: "FEDERURAL", data: resumenFondos.FEDERURAL, color: "#d97706" },
                 { id: "CHN_GUATEMALA", icon: "🏛️", label: "CHN-GUATEMALA", data: resumenFondos.CHN_GUATEMALA, color: "#2563eb" },
               ] as const
@@ -312,27 +328,106 @@ export default function CajaAbierta({
 
       {/* PANEL DERECHO: 4 KPIS + FORMULARIO ACTIVO O TABLA DE MOVIMIENTOS */}
       <div className="screen-panel" style={{ padding: "0.65rem", gap: "0.5rem", minHeight: 0 }}>
-        {/* 4 KPIS HORIZONTALES */}
-        <div className="screen-kpis" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-          <div className="screen-kpi-tile">
-            <span className="screen-kpi-label">SALDO INICIAL</span>
-            <span className="screen-kpi-value" style={{ fontSize: "1.05rem" }}>{formatoQ(detalle.dia.saldo_inicial)}</span>
-            <span className="screen-kpi-sub">Apertura</span>
+        {/* 4 KPIS HORIZONTALES CON ESTILO FINTECH */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem" }}>
+          {/* SALDO INICIAL */}
+          <div
+            style={{
+              background: "var(--paper)",
+              border: "1px solid var(--line)",
+              borderLeft: "4px solid #64748b",
+              borderRadius: "8px",
+              padding: "0.45rem 0.65rem",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--ink-soft)", letterSpacing: "0.03em" }}>
+                SALDO INICIAL
+              </span>
+              <span style={{ fontSize: "0.85rem" }}>🪙</span>
+            </div>
+            <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
+              {formatoQ(detalle.dia.saldo_inicial)}
+            </span>
+            <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Apertura de turno</span>
           </div>
-          <div className="screen-kpi-tile">
-            <span className="screen-kpi-label">TOTAL INGRESOS</span>
-            <span className="screen-kpi-value" style={{ color: "#059669", fontSize: "1.05rem" }}>{formatoQ(detalle.totalIngreso)}</span>
-            <span className="screen-kpi-sub">Cobros</span>
+
+          {/* TOTAL INGRESOS */}
+          <div
+            style={{
+              background: "var(--paper)",
+              border: "1px solid var(--line)",
+              borderLeft: "4px solid #059669",
+              borderRadius: "8px",
+              padding: "0.45rem 0.65rem",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#059669", letterSpacing: "0.03em" }}>
+                TOTAL INGRESOS
+              </span>
+              <span style={{ fontSize: "0.85rem" }}>📥</span>
+            </div>
+            <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#059669", fontFamily: "monospace" }}>
+              {formatoQ(detalle.totalIngreso)}
+            </span>
+            <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Cobros & depósitos</span>
           </div>
-          <div className="screen-kpi-tile">
-            <span className="screen-kpi-label">TOTAL EGRESOS</span>
-            <span className="screen-kpi-value" style={{ color: "#d97706", fontSize: "1.05rem" }}>{formatoQ(detalle.totalEgreso)}</span>
-            <span className="screen-kpi-sub">Colocación</span>
+
+          {/* TOTAL EGRESOS */}
+          <div
+            style={{
+              background: "var(--paper)",
+              border: "1px solid var(--line)",
+              borderLeft: "4px solid #f59e0b",
+              borderRadius: "8px",
+              padding: "0.45rem 0.65rem",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#d97706", letterSpacing: "0.03em" }}>
+                TOTAL EGRESOS
+              </span>
+              <span style={{ fontSize: "0.85rem" }}>📤</span>
+            </div>
+            <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#d97706", fontFamily: "monospace" }}>
+              {formatoQ(detalle.totalEgreso)}
+            </span>
+            <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Colocación & retiros</span>
           </div>
-          <div className="screen-kpi-tile accent">
-            <span className="screen-kpi-label">SALDO ACTUAL</span>
-            <span className="screen-kpi-value" style={{ fontSize: "1.05rem" }}>{formatoQ(detalle.saldoActual)}</span>
-            <span className="screen-kpi-sub">En caja hoy</span>
+
+          {/* SALDO ACTUAL */}
+          <div
+            style={{
+              background: "rgba(2, 132, 199, 0.06)",
+              border: "1px solid rgba(2, 132, 199, 0.3)",
+              borderLeft: "4px solid #0284c7",
+              borderRadius: "8px",
+              padding: "0.45rem 0.65rem",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>
+                SALDO ACTUAL EN CAJA
+              </span>
+              <span style={{ fontSize: "0.85rem" }}>💵</span>
+            </div>
+            <span style={{ fontSize: "1.15rem", fontWeight: 800, color: "#0284c7", fontFamily: "monospace" }}>
+              {formatoQ(detalle.saldoActual)}
+            </span>
+            <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Disponible en ventanilla</span>
           </div>
         </div>
 
@@ -415,104 +510,165 @@ export default function CajaAbierta({
             )}
           </div>
         ) : (
-          /* TABLA CON SCROLL INTERNO Y CABECERA PEGAJOSA */
-          <div className="table-scroll-container">
-            <table className="table-compact">
-              <thead>
-                <tr>
-                  <th style={{ minWidth: 60 }}>HORA</th>
-                  <th style={{ minWidth: 160 }}>MOVIMIENTO</th>
-                  <th style={{ minWidth: 100 }}>REFERENCIA</th>
-                  <th style={{ minWidth: 150 }}>BENEFICIARIO</th>
-                  <th style={{ minWidth: 70 }}>DOC.</th>
-                  <th style={{ minWidth: 85, textAlign: "right" }}>INGRESO</th>
-                  <th style={{ minWidth: 85, textAlign: "right" }}>EGRESO</th>
-                  <th style={{ minWidth: 95, textAlign: "right" }}>SALDO</th>
-                  <th style={{ minWidth: 90 }}>USUARIO</th>
-                  <th style={{ minWidth: 40, textAlign: "center" }}>ACCIÓN</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detalle.movimientos.map((m) => (
-                  <tr key={m.id}>
-                    <td className="mono" style={{ fontSize: "0.76rem" }}>
-                      {new Date(m.created_at).toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem", alignItems: "flex-start" }}>
-                        <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>{m.descripcion}</span>
-                        {m.origen_fondos && (
-                          <span
-                            style={{
-                              fontSize: "0.64rem",
-                              fontWeight: 700,
-                              padding: "0.06rem 0.28rem",
-                              borderRadius: "3px",
-                              width: "fit-content",
-                              ...ORIGEN_FONDOS_BADGE_STYLE[m.origen_fondos as OrigenFondos],
-                            }}
-                          >
-                            {ORIGEN_FONDOS_SHORT_LABEL[m.origen_fondos as OrigenFondos]}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="mono" style={{ fontSize: "0.76rem", color: "var(--accent)" }}>{m.referencia ?? "—"}</td>
-                    <td style={{ fontSize: "0.78rem" }}>{m.beneficiario}</td>
-                    <td className="mono" style={{ fontSize: "0.76rem" }}>{m.doc_no ?? "—"}</td>
-                    <td className="mono" style={{ color: "#059669", fontWeight: 700, textAlign: "right", fontSize: "0.8rem" }}>
-                      {m.tipo === "INGRESO" ? formatoQ(m.monto) : ""}
-                    </td>
-                    <td className="mono" style={{ color: "#d97706", fontWeight: 700, textAlign: "right", fontSize: "0.8rem" }}>
-                      {m.tipo === "EGRESO" ? formatoQ(m.monto) : ""}
-                    </td>
-                    <td className="mono" style={{ fontWeight: 700, textAlign: "right", fontSize: "0.8rem" }}>{formatoQ(m.saldo_acumulado)}</td>
-                    <td style={{ fontSize: "0.74rem", color: "var(--ink-soft)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
-                        <span>{m.usuario_nombre}</span>
-                        {renderRolBadge(m.usuario_rol)}
-                      </div>
-                    </td>
-                    <td style={{ textAlign: "center" }}>
-                      <div style={{ display: "flex", gap: "0.2rem", justifyContent: "center" }}>
-                        <button
-                          title="Imprimir Recibo"
-                          className="btn btn-icon"
-                          style={{ padding: "0.2rem", fontSize: "0.9rem" }}
-                          onClick={() => setImprimirRegistro(m)}
-                        >
-                          🖨️
-                        </button>
-                        {(usuario?.rol === "GERENCIA" || (m.usuario_id === usuario?.id && m.created_at.startsWith(new Date().toISOString().slice(0, 10)))) && (
-                          <button
-                            title="Corregir Movimiento"
-                            className="btn btn-icon"
-                            style={{ padding: "0.2rem", fontSize: "0.9rem" }}
-                            onClick={() => setEditarRegistro(m)}
-                          >
-                            ✏️
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {detalle.movimientos.length === 0 && (
-              <div className="empty" style={{ padding: "2rem", textAlign: "center", color: "var(--ink-soft)" }}>
-                Todavía no hay movimientos registrados hoy.
+          /* TABLA CON BUSCADOR RÁPIDO, SCROLL INTERNO Y CABECERA PEGAJOSA */
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, gap: "0.4rem" }}>
+            {/* BARRA DE BÚSQUEDA RÁPIDA DE OPERACIONES */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", background: "var(--paper)", border: "1px solid var(--line)", borderRadius: "6px", padding: "0.3rem 0.55rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flex: 1 }}>
+                <span style={{ fontSize: "0.85rem", opacity: 0.7 }}>🔍</span>
+                <input
+                  type="text"
+                  placeholder="Buscar por beneficiario, doc, referencia o descripción..."
+                  value={filtroTexto}
+                  onChange={(e) => setFiltroTexto(e.target.value)}
+                  style={{
+                    flex: 1,
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--ink)",
+                    fontSize: "0.78rem",
+                    outline: "none",
+                  }}
+                />
+                {filtroTexto && (
+                  <button
+                    type="button"
+                    onClick={() => setFiltroTexto("")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--ink-soft)",
+                      cursor: "pointer",
+                      fontSize: "0.75rem",
+                      padding: "0.1rem 0.3rem",
+                    }}
+                    title="Limpiar búsqueda"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
-            )}
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span style={{ fontSize: "0.7rem", color: "var(--ink-soft)", whiteSpace: "nowrap" }}>
+                  {movimientosFiltrados.length} de {detalle.movimientos.length} movs.
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-xs"
+                  onClick={() => setMostrarReporteLibro(true)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.3rem",
+                    padding: "0.22rem 0.6rem",
+                    fontSize: "0.74rem",
+                    fontWeight: 700,
+                  }}
+                  title="Imprimir Comprobante Oficial del Libro de Caja"
+                >
+                  <span>🖨️</span> Imprimir Libro
+                </button>
+              </div>
+            </div>
+
+            <div className="table-scroll-container" style={{ flex: 1 }}>
+              <table className="table-compact">
+                <thead>
+                  <tr>
+                    <th style={{ minWidth: 55 }}>HORA</th>
+                    <th style={{ minWidth: 160 }}>MOVIMIENTO</th>
+                    <th style={{ minWidth: 90 }}>REFERENCIA</th>
+                    <th style={{ minWidth: 140 }}>BENEFICIARIO</th>
+                    <th style={{ minWidth: 65 }}>DOC.</th>
+                    <th style={{ minWidth: 85, textAlign: "right" }}>INGRESO</th>
+                    <th style={{ minWidth: 85, textAlign: "right" }}>EGRESO</th>
+                    <th style={{ minWidth: 95, textAlign: "right" }}>SALDO</th>
+                    <th style={{ minWidth: 85 }}>USUARIO</th>
+                    <th style={{ minWidth: 40, textAlign: "center" }}>ACCIÓN</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movimientosFiltrados.map((m) => (
+                    <tr key={m.id}>
+                      <td className="mono" style={{ fontSize: "0.74rem" }}>
+                        {new Date(m.created_at).toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem", alignItems: "flex-start" }}>
+                          <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>{m.descripcion}</span>
+                          {m.origen_fondos && (
+                            <span
+                              style={{
+                                fontSize: "0.62rem",
+                                fontWeight: 700,
+                                padding: "0.05rem 0.25rem",
+                                borderRadius: "3px",
+                                width: "fit-content",
+                                ...ORIGEN_FONDOS_BADGE_STYLE[m.origen_fondos as OrigenFondos],
+                              }}
+                            >
+                              {ORIGEN_FONDOS_SHORT_LABEL[m.origen_fondos as OrigenFondos]}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="mono" style={{ fontSize: "0.74rem", color: "var(--accent)" }}>{m.referencia ?? "—"}</td>
+                      <td style={{ fontSize: "0.76rem" }}>{m.beneficiario}</td>
+                      <td className="mono" style={{ fontSize: "0.74rem" }}>{m.doc_no ?? "—"}</td>
+                      <td className="mono" style={{ color: "#059669", fontWeight: 700, textAlign: "right", fontSize: "0.78rem" }}>
+                        {m.tipo === "INGRESO" ? formatoQ(m.monto) : ""}
+                      </td>
+                      <td className="mono" style={{ color: "#d97706", fontWeight: 700, textAlign: "right", fontSize: "0.78rem" }}>
+                        {m.tipo === "EGRESO" ? formatoQ(m.monto) : ""}
+                      </td>
+                      <td className="mono" style={{ fontWeight: 700, textAlign: "right", fontSize: "0.78rem" }}>{formatoQ(m.saldo_acumulado)}</td>
+                      <td style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", flexWrap: "wrap" }}>
+                          <span>{m.usuario_nombre}</span>
+                          {renderRolBadge(m.usuario_rol)}
+                        </div>
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        <div style={{ display: "flex", gap: "0.2rem", justifyContent: "center" }}>
+                          <button
+                            title="Imprimir Recibo"
+                            className="btn btn-icon"
+                            style={{ padding: "0.2rem", fontSize: "0.85rem" }}
+                            onClick={() => setImprimirRegistro(m)}
+                          >
+                            🖨️
+                          </button>
+                          {(usuario?.rol === "GERENCIA" || (m.usuario_id === usuario?.id && m.created_at.startsWith(new Date().toISOString().slice(0, 10)))) && (
+                            <button
+                              title="Corregir Movimiento"
+                              className="btn btn-icon"
+                              style={{ padding: "0.2rem", fontSize: "0.85rem" }}
+                              onClick={() => setEditarRegistro(m)}
+                            >
+                              ✏️
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {movimientosFiltrados.length === 0 && (
+                <div className="empty" style={{ padding: "1.5rem", textAlign: "center", color: "var(--ink-soft)", fontSize: "0.82rem" }}>
+                  {filtroTexto ? `No se encontraron movimientos que coincidan con "${filtroTexto}".` : "Todavía no hay movimientos registrados hoy."}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* FOOTER FIJO */}
-        <div className="screen-footer">
-          <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+        <div className="screen-footer" style={{ padding: "0.25rem 0.5rem" }}>
+          <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>
             Turno activo · {detalle.movimientos.length} movimiento(s) registrado(s) hoy
           </span>
-          <span className="badge activo" style={{ fontSize: "0.72rem", padding: "0.12rem 0.45rem" }}>
+          <span className="badge activo" style={{ fontSize: "0.7rem", padding: "0.1rem 0.4rem" }}>
             🟢 En línea
           </span>
         </div>
@@ -533,6 +689,15 @@ export default function CajaAbierta({
         <ReciboMovimientoModal
           movimiento={imprimirRegistro}
           onClose={() => setImprimirRegistro(null)}
+        />
+      )}
+
+      {mostrarReporteLibro && (
+        <LibroCajaReporteModal
+          agenciaId={agenciaId}
+          agenciaNombre="Agencia Chajul"
+          detalleActual={detalle}
+          onClose={() => setMostrarReporteLibro(false)}
         />
       )}
     </div>

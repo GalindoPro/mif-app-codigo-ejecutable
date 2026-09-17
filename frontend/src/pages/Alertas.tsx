@@ -96,27 +96,106 @@ export default function Alertas() {
 
       {error && <div className="alert error" style={{ margin: "0 1rem", flexShrink: 0 }}>{error}</div>}
 
-      {/* ── KPI STRIP ── */}
-      <div className="screen-kpis" style={{ gridTemplateColumns: "repeat(4, 1fr)", flexShrink: 0 }}>
-        <div className="screen-kpi-tile accent">
-          <span className="screen-kpi-label">Total Alertas</span>
-          <span className="screen-kpi-value">{alertas.length}</span>
-          <span className="screen-kpi-sub">Eventos activos</span>
+      {/* ── KPI STRIP FINTECH ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem", flexShrink: 0 }}>
+        {/* TOTAL ALERTAS */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #6366f1",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", letterSpacing: "0.03em" }}>
+              TOTAL ALERTAS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>🔔</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#6366f1", fontFamily: "monospace" }}>
+            {alertas.length}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Eventos activos</span>
         </div>
-        <div className="screen-kpi-tile" style={{ borderTop: "3px solid #ef4444" }}>
-          <span className="screen-kpi-label" style={{ color: "#ef4444" }}>⚡ Atención Inmediata</span>
-          <span className="screen-kpi-value" style={{ color: "#ef4444" }}>{totalPeligro}</span>
-          <span className="screen-kpi-sub">Cajas / vencimientos</span>
+
+        {/* ATENCIÓN INMEDIATA */}
+        <div
+          style={{
+            background: totalPeligro > 0 ? "rgba(239, 68, 68, 0.06)" : "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #ef4444",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#ef4444", letterSpacing: "0.03em" }}>
+              ATENCIÓN INMEDIATA
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>⚡</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#ef4444", fontFamily: "monospace" }}>
+            {totalPeligro}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Cajas / vencimientos críticos</span>
         </div>
-        <div className="screen-kpi-tile" style={{ borderTop: "3px solid #f59e0b" }}>
-          <span className="screen-kpi-label" style={{ color: "#f59e0b" }}>⚠️ Advertencias</span>
-          <span className="screen-kpi-value" style={{ color: "#f59e0b" }}>{totalAdvertencia}</span>
-          <span className="screen-kpi-sub">Próximos vencimientos</span>
+
+        {/* ADVERTENCIAS */}
+        <div
+          style={{
+            background: totalAdvertencia > 0 ? "rgba(245, 158, 11, 0.06)" : "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #f59e0b",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#d97706", letterSpacing: "0.03em" }}>
+              ADVERTENCIAS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>⚠️</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#d97706", fontFamily: "monospace" }}>
+            {totalAdvertencia}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Próximos vencimientos</span>
         </div>
-        <div className="screen-kpi-tile" style={{ borderTop: "3px solid #3b82f6" }}>
-          <span className="screen-kpi-label" style={{ color: "#3b82f6" }}>ℹ️ Informativos</span>
-          <span className="screen-kpi-value" style={{ color: "#3b82f6" }}>{totalInfo}</span>
-          <span className="screen-kpi-sub">Desembolsos / expedientes</span>
+
+        {/* INFORMATIVOS */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #0284c7",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>
+              INFORMATIVOS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>ℹ️</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#0284c7", fontFamily: "monospace" }}>
+            {totalInfo}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Desembolsos y solicitudes</span>
         </div>
       </div>
 

@@ -1745,3 +1745,73 @@ export async function aprobarLiquidacion(agenciaId: string, promotorId: string, 
 
   return { ok: true, procesados, mensaje: `Se liquidaron exitosamente ${procesados} cobros.` };
 }
+
+export async function reporteMovimientos(
+  agenciaId: string,
+  agenciaVisible: string | null,
+  fechaInicio?: string,
+  fechaFin?: string,
+) {
+  checarAgencia(agenciaId, agenciaVisible);
+
+  const fInicio = fechaInicio || hoyISO();
+  const fFin = fechaFin || hoyISO();
+
+  const { rows: agenciaRows } = await pool.query(`select * from agencias where id = $1`, [agenciaId]);
+  const agencia = agenciaRows[0];
+
+  const { rows: movimientos } = await pool.query(
+    `select m.*, u.nombre as usuario_nombre, u.rol as usuario_rol, d.fecha as dia_fecha, d.saldo_inicial as dia_saldo_inicial
+     from caja_movimientos_auxiliar m
+     join caja_dias d on d.id = m.caja_dia_id
+     join usuarios u on u.id = m.usuario_id
+     where m.agencia_id = $1 and d.fecha >= $2 and d.fecha <= $3
+     order by d.fecha asc, m.created_at asc`,
+    [agenciaId, fInicio, fFin],
+  );
+
+  // Obtener saldo inicial del primer día en rango
+  const { rows: primerDiaRows } = await pool.query(
+    `select saldo_inicial from caja_dias where agencia_id = $1 and fecha >= $2 and fecha <= $3 order by fecha asc limit 1`,
+    [agenciaId, fInicio, fFin],
+  );
+  const saldoInicial = primerDiaRows[0] ? Number(primerDiaRows[0].saldo_inicial) : 0;
+
+  const totalIngreso = movimientos.filter((m) => m.tipo === "INGRESO").reduce((acc, m) => acc + Number(m.monto), 0);
+  const totalEgreso = movimientos.filter((m) => m.tipo === "EGRESO").reduce((acc, m) => acc + Number(m.monto), 0);
+  const saldoFinal = saldoInicial + totalIngreso - totalEgreso;
+
+  // Desglose por fuente
+  const desgloseFuentes: Record<string, { cobros: number; colocacion: number; total: number; ops: number }> = {
+    FONDOS_PROPIOS: { cobros: 0, colocacion: 0, total: 0, ops: 0 },
+    FEDERURAL: { cobros: 0, colocacion: 0, total: 0, ops: 0 },
+    CHN_GUATEMALA: { cobros: 0, colocacion: 0, total: 0, ops: 0 },
+  };
+
+  for (const m of movimientos) {
+    let f = m.origen_fondos || "FONDOS_PROPIOS";
+    if (!desgloseFuentes[f]) f = "FONDOS_PROPIOS";
+    const monto = Number(m.monto);
+    desgloseFuentes[f].ops += 1;
+    if (m.tipo === "INGRESO") {
+      desgloseFuentes[f].cobros += monto;
+      desgloseFuentes[f].total += monto;
+    } else {
+      desgloseFuentes[f].colocacion += monto;
+      desgloseFuentes[f].total -= monto;
+    }
+  }
+
+  return {
+    agencia,
+    fechaInicio: fInicio,
+    fechaFin: fFin,
+    saldoInicial,
+    totalIngreso,
+    totalEgreso,
+    saldoFinal,
+    movimientos,
+    desgloseFuentes,
+  };
+}
+

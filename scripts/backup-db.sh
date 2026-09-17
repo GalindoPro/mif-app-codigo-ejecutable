@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Script de Respaldo Automatizado de Base de Datos - Sistema MIF COOP
+# Script de Respaldo Automatizado de Base de Datos - Sistema COOP COMIF R.L.
 # Ejecutar diariamente vía cron (ej: 23:00 cada noche tras el cierre de caja):
 # 0 23 * * * /ruta/al/proyecto/scripts/backup-db.sh >> /var/log/mif-backup.log 2>&1
 # ==============================================================================

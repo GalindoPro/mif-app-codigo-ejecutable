@@ -176,7 +176,7 @@ export default function Tablero() {
             </span>
           </div>
           <p style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-            <span>Cooperativa Integral de Ahorro y Crédito "Maya Inversiones Futuras", R.L. {varias ? " · Todas las Agencias" : ""}</span>
+            <span>COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."{varias ? " · Todas las Agencias" : ""}</span>
             {driveConnected ? (
               <span style={{ fontSize: "0.75rem", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", padding: "0.2rem 0.6rem", borderRadius: "20px", display: "flex", alignItems: "center", gap: "0.3rem" }}>
                 ✅ Google Drive Conectado
@@ -246,124 +246,165 @@ export default function Tablero() {
       {mensajeExito && <div className="alert success" style={{ margin: "0.25rem 0", padding: "0.5rem 0.8rem", fontSize: "0.82rem" }}>{mensajeExito}</div>}
       {error && <div className="alert error" style={{ margin: "0.25rem 0", padding: "0.5rem 0.8rem", fontSize: "0.82rem" }}>{error}</div>}
 
-      {/* Banda Superior: 8 Tarjetas KPI Financieras */}
+      {/* Banda Superior: 8 Tarjetas KPI Financieras con Iconos y Acentos de Color */}
       <div className="dashboard-kpi-band">
-        {usuario?.rol !== "PROMOTOR" && (
-          <Link to="/caja-chica" className="kpi-tile">
-            <span className="kpi-tile-label">Caja chica</span>
-            <span className="kpi-tile-value">{formatoQ(global.cajaChica)}</span>
-            <span className="kpi-tile-sub">Fondo disponible</span>
-          </Link>
-        )}
-        <Link to="/ahorros/corriente" className="kpi-tile">
-          <span className="kpi-tile-label">Ahorro corriente</span>
-          <span className="kpi-tile-value" style={{ color: "var(--accent)" }}>{formatoQ(global.ahorroCorriente)}</span>
-          <span className="kpi-tile-sub">Disponible a la vista</span>
-        </Link>
-        <Link to="/ahorros/programado" className="kpi-tile">
-          <span className="kpi-tile-label">Ahorro programado</span>
-          <span className="kpi-tile-value">{formatoQ(global.ahorroProgramado)}</span>
-          <span className="kpi-tile-sub">Cuota pactada</span>
-        </Link>
-        <Link to="/ahorros/infanto-juvenil" className="kpi-tile">
-          <span className="kpi-tile-label">Ahorro infantil</span>
-          <span className="kpi-tile-value">{formatoQ(global.ahorroInfantoJuvenil)}</span>
-          <span className="kpi-tile-sub">Infanto juvenil</span>
-        </Link>
-        <Link to="/ahorros/plazo-fijo" className="kpi-tile">
-          <span className="kpi-tile-label">Ahorro Plazo Fijo</span>
-          <span className="kpi-tile-value" style={{ color: "#f59e0b" }}>
-            {global.plazoFijo && global.plazoFijo.monto > 0 ? formatoQ(global.plazoFijo.monto) : "Kardex PF"}
-          </span>
-          <span className="kpi-tile-sub">{global.plazoFijo?.count ?? 692} certificados</span>
-        </Link>
-        <Link to="/aportaciones" className="kpi-tile">
-          <span className="kpi-tile-label">Aportaciones Capital</span>
-          <span className="kpi-tile-value" style={{ color: "var(--accent)" }}>
+        <Link to="/aportaciones" className="kpi-tile" style={{ borderLeft: "3px solid #059669" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="kpi-tile-label">Aportaciones Capital</span>
+            <span style={{ fontSize: "0.85rem" }}>🏛️</span>
+          </div>
+          <span className="kpi-tile-value" style={{ color: "#059669" }}>
             {formatoQ(global.aportaciones?.saldo ?? 11600)}
           </span>
           <span className="kpi-tile-sub">{global.aportaciones?.count ?? 117} socios aportantes</span>
         </Link>
-        <Link to="/auxiliar-caja" className="kpi-tile">
-          <span className="kpi-tile-label">Cuotas de Ingreso</span>
-          <span className="kpi-tile-value" style={{ color: "#10b981" }}>
-            {formatoQ(global.cuotasIngreso?.monto ?? 0)}
+
+        <Link to="/ahorros/corriente" className="kpi-tile" style={{ borderLeft: "3px solid #0284c7" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="kpi-tile-label">Ahorro Corriente</span>
+            <span style={{ fontSize: "0.85rem" }}>💰</span>
+          </div>
+          <span className="kpi-tile-value" style={{ color: "var(--accent)" }}>{formatoQ(global.ahorroCorriente)}</span>
+          <span className="kpi-tile-sub">Disponible a la vista</span>
+        </Link>
+
+        <Link to="/ahorros/plazo-fijo" className="kpi-tile" style={{ borderLeft: "3px solid #7c3aed" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="kpi-tile-label">Plazo Fijo (DPF)</span>
+            <span style={{ fontSize: "0.85rem" }}>🔒</span>
+          </div>
+          <span className="kpi-tile-value" style={{ color: "#7c3aed" }}>
+            {global.plazoFijo && global.plazoFijo.monto > 0 ? formatoQ(global.plazoFijo.monto) : "Kardex PF"}
           </span>
-          <span className="kpi-tile-sub">{global.cuotasIngreso?.count ?? 0} cuotas registradas</span>
+          <span className="kpi-tile-sub">{global.plazoFijo?.count ?? 692} certificados activos</span>
         </Link>
-        <Link to="/socios" className="kpi-tile">
-          <span className="kpi-tile-label">Socios activos</span>
-          <span className="kpi-tile-value mono">{global.totalSocios}</span>
-          <span className="kpi-tile-sub">{global.movimientosHoy} mov. hoy</span>
-        </Link>
-        {usuario?.rol !== "CAJERO" && (
-          <Link to="/creditos" className="kpi-tile accent">
-            <span className="kpi-tile-label">Cartera de Crédito</span>
-            <span className="kpi-tile-value" style={{ color: "#38bdf8" }}>
+
+        {usuario?.rol !== "CAJERO" ? (
+          <Link to="/creditos" className="kpi-tile" style={{ borderLeft: "3px solid #38bdf8" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span className="kpi-tile-label">Cartera de Crédito</span>
+              <span style={{ fontSize: "0.85rem" }}>💼</span>
+            </div>
+            <span className="kpi-tile-value" style={{ color: "#0284c7" }}>
               {formatoQ(global.carteraPrestamos?.saldo ?? 15210193.13)}
             </span>
             <span className="kpi-tile-sub">{global.carteraPrestamos?.count ?? 65} préstamos activos</span>
           </Link>
+        ) : (
+          <Link to="/ahorros/programado" className="kpi-tile" style={{ borderLeft: "3px solid #0891b2" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span className="kpi-tile-label">Ahorro Programado</span>
+              <span style={{ fontSize: "0.85rem" }}>📅</span>
+            </div>
+            <span className="kpi-tile-value">{formatoQ(global.ahorroProgramado)}</span>
+            <span className="kpi-tile-sub">Cuotas pactadas</span>
+          </Link>
         )}
+
+        {usuario?.rol !== "PROMOTOR" && (
+          <Link to="/caja-chica" className="kpi-tile" style={{ borderLeft: "3px solid #f59e0b" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span className="kpi-tile-label">Caja Chica</span>
+              <span style={{ fontSize: "0.85rem" }}>☕</span>
+            </div>
+            <span className="kpi-tile-value" style={{ color: "#d97706" }}>{formatoQ(global.cajaChica)}</span>
+            <span className="kpi-tile-sub">Fondo disponible</span>
+          </Link>
+        )}
+
+        <Link to="/auxiliar-caja" className="kpi-tile" style={{ borderLeft: "3px solid #10b981" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="kpi-tile-label">Cuotas de Ingreso</span>
+            <span style={{ fontSize: "0.85rem" }}>🎫</span>
+          </div>
+          <span className="kpi-tile-value" style={{ color: "#10b981" }}>
+            {formatoQ(global.cuotasIngreso?.monto ?? 0)}
+          </span>
+          <span className="kpi-tile-sub">{global.cuotasIngreso?.count ?? 0} registradas en caja</span>
+        </Link>
+
+        <Link to="/ahorros/infanto-juvenil" className="kpi-tile" style={{ borderLeft: "3px solid #ec4899" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="kpi-tile-label">Ahorro Infantil</span>
+            <span style={{ fontSize: "0.85rem" }}>👶</span>
+          </div>
+          <span className="kpi-tile-value" style={{ color: "#ec4899" }}>{formatoQ(global.ahorroInfantoJuvenil)}</span>
+          <span className="kpi-tile-sub">Infanto juvenil</span>
+        </Link>
+
+        <Link to="/socios" className="kpi-tile" style={{ borderLeft: "3px solid #6366f1" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="kpi-tile-label">Membresía / Socios</span>
+            <span style={{ fontSize: "0.85rem" }}>👥</span>
+          </div>
+          <span className="kpi-tile-value mono" style={{ color: "#6366f1" }}>{global.totalSocios}</span>
+          <span className="kpi-tile-sub">{global.movimientosHoy} mov. registrados hoy</span>
+        </Link>
       </div>
 
       {/* Cuadrícula Inferior: 2 Paneles Balanceados Lado a Lado */}
       <div className="dashboard-lower-grid">
         {/* Panel Izquierdo: Supervisión y Control / Accesos Rápidos */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-          <div className="dashboard-panel-card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h3 style={{ margin: 0, fontSize: "0.88rem", fontWeight: 700, color: "var(--ink)" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+          <div className="dashboard-panel-card" style={{ padding: "0.65rem 0.85rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem", borderBottom: "1px solid var(--line)", paddingBottom: "0.35rem" }}>
+              <h3 style={{ margin: 0, fontSize: "0.86rem", fontWeight: 700, color: "var(--ink)" }}>
                 {usuario?.rol === "SUPERVISOR" || usuario?.rol === "GERENCIA"
-                  ? "🛡️ Panel de Supervisión y Control de Agencia"
+                  ? "🛡️ Panel de Supervisión y Control"
                   : "⚡ Accesos Rápidos de Operación"}
               </h3>
-              <span className="badge" style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}>
+              <span className="badge" style={{ fontSize: "0.68rem", padding: "0.1rem 0.4rem" }}>
                 {usuario?.rol}
               </span>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(115px, 1fr))", gap: "0.45rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: "0.4rem" }}>
               {usuario?.rol === "SUPERVISOR" || usuario?.rol === "GERENCIA" ? (
                 <>
-                  <Link to="/libro-mensual-arqueos" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                  <Link to="/auxiliar-caja" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
+                    💵 Ventanilla
+                  </Link>
+                  <Link to="/arqueos/mensual" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
                     📑 Libro Arqueos
                   </Link>
-                  <Link to="/creditos" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
-                    🤝 Aprobar Créditos
+                  <Link to="/creditos" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
+                    🤝 Cartera Crédito
                   </Link>
-                  <Link to="/promotor/cartera" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                  <Link to="/promotor/cartera" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
                     📂 Kardex Cartera
                   </Link>
-                  <Link to="/socios" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                  <Link to="/socios" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
                     👥 Padrón Socios
                   </Link>
-                  <Link to="/ahorros/plazo-fijo" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                  <Link to="/ahorros/plazo-fijo" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
                     🔒 Plazos Fijos
                   </Link>
-                  <Link to="/aportaciones" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                  <Link to="/aportaciones" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
                     🏛️ Aportaciones
                   </Link>
-                  <Link to="/auxiliar-caja" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
-                    📊 Historial Cierres
+                  <Link to="/caja-chica" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
+                    ☕ Caja Chica
                   </Link>
                 </>
               ) : (
                 <>
-                  <Link to="/auxiliar-caja" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
-                    💵 Ventanilla Caja
+                  <Link to="/auxiliar-caja" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem" }}>
+                    💵 Ventanilla
                   </Link>
-                  <Link to="/promotor/cartera" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                  <Link to="/promotor/cartera" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem" }}>
                     📂 Kardex Cartera
                   </Link>
-                  <Link to="/socios" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                  <Link to="/socios" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem" }}>
                     👥 Padrón Socios
                   </Link>
-                  <Link to="/aportaciones" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                  <Link to="/aportaciones" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem" }}>
                     🏛️ Aportaciones
                   </Link>
-                  <Link to="/ahorros/corriente" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
+                  <Link to="/ahorros/corriente" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem" }}>
                     💰 Ahorros
+                  </Link>
+                  <Link to="/caja-chica" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem" }}>
+                    ☕ Caja Chica
                   </Link>
                 </>
               )}
@@ -372,29 +413,30 @@ export default function Tablero() {
 
           {/* Desglose por Agencia (si aplica) */}
           {varias && (
-            <div className="dashboard-panel-card">
-              <h3 style={{ margin: "0 0 0.35rem", fontSize: "0.85rem", fontWeight: 700 }}>Desglose por Agencia</h3>
-              <div className="table-wrap" style={{ maxHeight: "160px", overflowY: "auto" }}>
-                <table style={{ fontSize: "0.78rem" }}>
+            <div className="dashboard-panel-card" style={{ padding: "0.65rem 0.85rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                <h3 style={{ margin: 0, fontSize: "0.84rem", fontWeight: 700 }}>🏢 Estado en Vivo por Agencia</h3>
+                <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)" }}>{porAgencia.length} agencias</span>
+              </div>
+              <div className="table-wrap" style={{ maxHeight: "150px", overflowY: "auto", border: "1px solid var(--line)", borderRadius: "6px" }}>
+                <table style={{ fontSize: "0.76rem", width: "100%", margin: 0 }}>
                   <thead>
-                    <tr>
-                      <th style={{ padding: "0.35rem 0.5rem" }}>Agencia</th>
-                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Caja chica</th>
-                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Ahorro corriente</th>
-                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Cartera Crédito</th>
-                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Cuotas Ingreso</th>
-                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "center" }}>Socios</th>
+                    <tr style={{ background: "var(--paper-raised)" }}>
+                      <th style={{ padding: "3px 6px" }}>Agencia</th>
+                      <th style={{ padding: "3px 6px", textAlign: "right" }}>Caja chica</th>
+                      <th style={{ padding: "3px 6px", textAlign: "right" }}>Ahorro corriente</th>
+                      <th style={{ padding: "3px 6px", textAlign: "right" }}>Cartera Crédito</th>
+                      <th style={{ padding: "3px 6px", textAlign: "center" }}>Socios</th>
                     </tr>
                   </thead>
                   <tbody>
                     {porAgencia.map((a) => (
                       <tr key={a.agenciaId}>
-                        <td style={{ padding: "0.35rem 0.5rem", fontWeight: 600 }}>{a.agenciaNombre}</td>
-                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>{formatoQ(a.cajaChica.saldo)}</td>
-                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>{formatoQ(a.ahorroCorriente.saldoTotal)}</td>
-                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right", color: "#38bdf8" }}>{formatoQ(a.carteraPrestamos?.saldo ?? 0)}</td>
-                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right", color: "#10b981" }}>{formatoQ(a.cuotasIngreso?.monto ?? 0)}</td>
-                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "center" }}>{a.totalSocios}</td>
+                        <td style={{ padding: "3px 6px", fontWeight: 600 }}>{a.agenciaNombre}</td>
+                        <td className="mono" style={{ padding: "3px 6px", textAlign: "right" }}>{formatoQ(a.cajaChica.saldo)}</td>
+                        <td className="mono" style={{ padding: "3px 6px", textAlign: "right", color: "var(--accent)" }}>{formatoQ(a.ahorroCorriente.saldoTotal)}</td>
+                        <td className="mono" style={{ padding: "3px 6px", textAlign: "right", color: "#0284c7" }}>{formatoQ(a.carteraPrestamos?.saldo ?? 0)}</td>
+                        <td className="mono" style={{ padding: "3px 6px", textAlign: "center" }}>{a.totalSocios}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -645,11 +687,11 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
             </div>
           </div>
 
-          {/* Gráficos de Recharts */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginTop: "1rem" }}>
-            <div style={{ background: "var(--mono-bg)", borderRadius: "6px", border: "1px solid var(--line)", padding: "1rem" }}>
-              <h4 style={{ margin: "0 0 1rem 0", fontSize: "0.85rem", color: "var(--ink-soft)" }}>Distribución de Operaciones</h4>
-              <div style={{ width: "100%", height: 220 }}>
+          {/* Gráficos de Recharts Compactos */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem", marginTop: "0.5rem" }}>
+            <div style={{ background: "var(--mono-bg)", borderRadius: "6px", border: "1px solid var(--line)", padding: "0.5rem 0.65rem" }}>
+              <h4 style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "var(--ink-soft)", fontWeight: 700 }}>Distribución de Operaciones</h4>
+              <div style={{ width: "100%", height: 165 }}>
                 <ResponsiveContainer>
                   <PieChart>
                     <Pie
@@ -658,8 +700,8 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
                       nameKey="label"
                       cx="50%"
                       cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
+                      innerRadius={40}
+                      outerRadius={68}
                       paddingAngle={2}
                     >
                       {serviciosFiltrados.map((_entry, index) => {
@@ -673,13 +715,13 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
               </div>
             </div>
 
-            <div style={{ background: "var(--mono-bg)", borderRadius: "6px", border: "1px solid var(--line)", padding: "1rem" }}>
-              <h4 style={{ margin: "0 0 1rem 0", fontSize: "0.85rem", color: "var(--ink-soft)" }}>Volumen Monetario (Q)</h4>
-              <div style={{ width: "100%", height: 220 }}>
+            <div style={{ background: "var(--mono-bg)", borderRadius: "6px", border: "1px solid var(--line)", padding: "0.5rem 0.65rem" }}>
+              <h4 style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "var(--ink-soft)", fontWeight: 700 }}>Volumen Monetario (Q)</h4>
+              <div style={{ width: "100%", height: 165 }}>
                 <ResponsiveContainer>
-                  <BarChart data={serviciosFiltrados} layout="vertical" margin={{ left: 20 }}>
+                  <BarChart data={serviciosFiltrados} layout="vertical" margin={{ left: 10, right: 10 }}>
                     <XAxis type="number" hide />
-                    <YAxis dataKey="label" type="category" width={100} tick={{ fontSize: 10 }} />
+                    <YAxis dataKey="label" type="category" width={95} tick={{ fontSize: 9 }} />
                     <RechartsTooltip formatter={(value: any) => [formatoQ(Number(value) || 0), "Volumen"]} />
                     <Bar dataKey="totalMonto" radius={[0, 4, 4, 0]}>
                       {serviciosFiltrados.map((_entry, index) => {

@@ -79,10 +79,10 @@ export default function ContratoPagareCreditoModal({ prestamo, onClose }: Props)
   const fechaHoy = new Date().toLocaleDateString("es-GT", { day: "2-digit", month: "long", year: "numeric" });
   const origen = prestamo.origen_fondos || "FONDOS_PROPIOS";
 
-  let clausulaFuente = "Los recursos del presente crédito provienen de FONDOS PROPIOS INSTITUCIONALES de la Cooperativa Maya Inversiones Futuras R.L. (MIF COOP).";
-  let institucionFuente = "MIF COOP (Fondos Propios)";
+  let clausulaFuente = "Los recursos del presente crédito provienen de FONDOS PROPIOS INSTITUCIONALES de la COOPERATIVA MAYA INVERSIONES FUTURAS R.L. \"COMIF R.L.\".";
+  let institucionFuente = "COOP COMIF R.L. (Fondos Propios)";
   if (origen === "FEDERURAL") {
-    clausulaFuente = "Los recursos del presente crédito corresponden a la LÍNEA DE FINANCIAMIENTO Y DESARROLLO RURAL DE FEDERURAL, administrados y colocados bajo la supervisión operativa de MIF COOP.";
+    clausulaFuente = "Los recursos del presente crédito corresponden a la LÍNEA DE FINANCIAMIENTO Y DESARROLLO RURAL DE FEDERURAL, administrados y colocados bajo la supervisión operativa de COOP COMIF R.L.";
     institucionFuente = "FEDERURAL - Federación de Cooperativas de Desarrollo Rural";
   } else if (origen === "CHN_GUATEMALA") {
     clausulaFuente = "Los recursos del presente crédito son canalizados a través del programa de intermediación financiera con el CRÉDITO HIPOTECARIO NACIONAL DE GUATEMALA (CHN), sujetos a las normativas bancarias de fondeo correspondientes.";
@@ -188,7 +188,7 @@ export default function ContratoPagareCreditoModal({ prestamo, onClose }: Props)
           {/* ENCABEZADO INSTITUCIONAL */}
           <div style={{ textAlign: "center", borderBottom: "2px solid #0f172a", paddingBottom: "1rem", marginBottom: "1.25rem" }}>
             <h1 style={{ margin: "0 0 0.2rem", fontSize: "1.35rem", fontWeight: 800, letterSpacing: "0.05em", color: "#065f46" }}>
-              MAYA INVERSIONES FUTURAS R.L. — MIF COOP
+              COOPERATIVA MAYA INVERSIONES FUTURAS R.L. &quot;COMIF R.L.&quot;
             </h1>
             <div style={{ fontSize: "0.8rem", fontWeight: 700, textTransform: "uppercase", color: "#475569" }}>
               {prestamo.agencia_nombre || "Agencia Central"} · República de Guatemala
@@ -226,7 +226,7 @@ export default function ContratoPagareCreditoModal({ prestamo, onClose }: Props)
             <strong>{prestamo.socio_dpi ? formatearDPI(prestamo.socio_dpi) : "____________________"}</strong>,
             actuando en calidad de socio deudor con Registro No. <strong>{prestamo.numero_asociado ?? "—"}</strong>;
             por el presente <strong>PAGARÉ LIBRE DE PROTESTO</strong> prometo incondicionalmente pagar a la orden de la{" "}
-            <strong>COOPERATIVA MAYA INVERSIONES FUTURAS, RESPONSABILIDAD LIMITADA (MIF COOP)</strong> la suma principal de{" "}
+            <strong>COOPERATIVA MAYA INVERSIONES FUTURAS R.L. &quot;COMIF R.L.&quot;</strong> la suma principal de{" "}
             <strong>{numeroALetras(monto)}</strong>.
           </p>
 
@@ -305,13 +305,13 @@ export default function ContratoPagareCreditoModal({ prestamo, onClose }: Props)
 
             <div style={{ marginTop: "1rem" }}>
               <div style={{ borderBottom: "1px solid #0f172a", height: "45px" }} />
-              <div style={{ marginTop: "0.4rem", fontWeight: 700, fontSize: "0.85rem" }}>Gerencia / Administración MIF COOP</div>
+              <div style={{ marginTop: "0.4rem", fontWeight: 700, fontSize: "0.85rem" }}>Gerencia / Administración COOP COMIF R.L.</div>
               <div style={{ color: "#475569" }}>Vo.Bo. Representante Legal</div>
             </div>
           </div>
 
           <div style={{ textAlign: "center", marginTop: "2rem", fontSize: "0.72rem", color: "#64748b", borderTop: "1px dotted #cbd5e1", paddingTop: "0.6rem" }}>
-            Documento emitido formalmente por el Sistema Integral de MIF COOP · Impreso el {fechaHoy}
+            Documento emitido formalmente por el Sistema Integral de COOP COMIF R.L. · Impreso el {fechaHoy}
           </div>
         </div>
 

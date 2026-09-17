@@ -88,29 +88,106 @@ export default function AportacionesList() {
 
       {error && <div className="alert error" style={{ margin: "0.25rem 0", padding: "0.4rem 0.75rem", fontSize: "0.82rem" }}>{error}</div>}
 
-      {/* STRIP DE KPIS HORIZONTALES */}
-      <div className="screen-kpis" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-        <div className="screen-kpi-tile accent">
-          <span className="screen-kpi-label">CAPITAL SOCIAL APORTADO</span>
-          <span className="screen-kpi-value">{formatoQ(totalCapital)}</span>
-          <span className="screen-kpi-sub">Total en aportaciones</span>
-        </div>
-        <div className="screen-kpi-tile">
-          <span className="screen-kpi-label">ASOCIADOS EN PADRÓN</span>
-          <span className="screen-kpi-value">{totalSocios}</span>
-          <span className="screen-kpi-sub">Socios inscritos</span>
-        </div>
-        <div className="screen-kpi-tile">
-          <span className="screen-kpi-label">APORTACIÓN PROMEDIO</span>
-          <span className="screen-kpi-value">{formatoQ(promedioAportacion)}</span>
-          <span className="screen-kpi-sub">Por asociado activo</span>
-        </div>
-        <div className="screen-kpi-tile">
-          <span className="screen-kpi-label">BLOQUE DE PADRÓN</span>
-          <span className="screen-kpi-value" style={{ fontSize: "1.1rem" }}>
-            Pág {page} de {totalPaginas}
+      {/* STRIP DE KPIS HORIZONTALES CON ESTILO FINTECH */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
+        {/* CAPITAL SOCIAL APORTADO */}
+        <div
+          style={{
+            background: "rgba(5, 150, 105, 0.06)",
+            border: "1px solid rgba(5, 150, 105, 0.3)",
+            borderLeft: "4px solid #059669",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#059669", letterSpacing: "0.03em" }}>
+              CAPITAL SOCIAL OFICIAL
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>🏛️</span>
+          </div>
+          <span style={{ fontSize: "1.15rem", fontWeight: 800, color: "#059669", fontFamily: "monospace" }}>
+            {formatoQ(totalCapital)}
           </span>
-          <span className="screen-kpi-sub">10 asociados por vista</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Patrimonio cooperativo</span>
+        </div>
+
+        {/* ASOCIADOS EN PADRÓN */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #6366f1",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", letterSpacing: "0.03em" }}>
+              ASOCIADOS EN PADRÓN
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>👥</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#6366f1", fontFamily: "monospace" }}>
+            {totalSocios}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Socios activos inscritos</span>
+        </div>
+
+        {/* APORTACIÓN PROMEDIO */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #0284c7",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>
+              APORTACIÓN PROMEDIO
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>📈</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#0284c7", fontFamily: "monospace" }}>
+            {formatoQ(promedioAportacion)}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Por asociado activo</span>
+        </div>
+
+        {/* CUMPLIMIENTO ESTATUTARIO */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #10b981",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#10b981", letterSpacing: "0.03em" }}>
+              CUMPLIMIENTO ESTATUTARIO
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>✓</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#10b981", fontFamily: "monospace" }}>
+            Min. Q 100.00
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Norma cooperativa activa</span>
         </div>
       </div>
 

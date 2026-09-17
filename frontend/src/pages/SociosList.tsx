@@ -158,37 +158,91 @@ export default function SociosList() {
         </div>
       )}
 
-      {/* FRANJA DE KPIS COMPACTA (1 FILA) */}
-      <div className="screen-kpis" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+      {/* FRANJA DE KPIS COMPACTA FINTECH */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
+        {/* TOTAL ASOCIADOS */}
         <div
-          className="stat-card accent"
-          style={{ padding: "0.35rem 0.65rem", cursor: "pointer" }}
+          style={{
+            background: tab === "socios" ? "rgba(99, 102, 241, 0.06)" : "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #6366f1",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            cursor: "pointer",
+            boxShadow: tab === "socios" ? "0 0 0 2px #6366f1" : "0 1px 3px rgba(0,0,0,0.04)",
+          }}
           onClick={() => {
             setTab("socios");
             setQ("");
           }}
         >
-          <span className="label" style={{ fontSize: "0.64rem", display: "block" }}>Total Asociados</span>
-          <span className="value mono" style={{ fontSize: "1.05rem" }}>{resultado?.total ?? "—"}</span>
+          <div>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", display: "block", letterSpacing: "0.02em" }}>
+              TOTAL ASOCIADOS
+            </span>
+            <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
+              {resultado?.total ?? "—"}
+            </span>
+          </div>
+          <span style={{ fontSize: "1.2rem" }}>👥</span>
         </div>
 
+        {/* PROSPECTOS / FIADORES */}
         <div
-          className="stat-card"
-          style={{ padding: "0.35rem 0.65rem", cursor: "pointer", border: tab === "prospectos" ? "1.5px solid #d97706" : undefined }}
+          style={{
+            background: tab === "prospectos" ? "rgba(245, 158, 11, 0.06)" : "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #f59e0b",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            cursor: "pointer",
+            boxShadow: tab === "prospectos" ? "0 0 0 2px #f59e0b" : "0 1px 3px rgba(0,0,0,0.04)",
+          }}
           onClick={() => {
             setTab("prospectos");
             setQ("");
           }}
         >
-          <span className="label" style={{ fontSize: "0.64rem", color: "#d97706", fontWeight: 700, display: "block" }}>
-            🎯 Prospectos / Fiadores
-          </span>
-          <span className="value mono" style={{ fontSize: "1.05rem", color: "#d97706" }}>{fiadores.length}</span>
+          <div>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#d97706", display: "block", letterSpacing: "0.02em" }}>
+              PROSPECTOS / FIADORES
+            </span>
+            <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#d97706", fontFamily: "monospace" }}>
+              {fiadores.length}
+            </span>
+          </div>
+          <span style={{ fontSize: "1.2rem" }}>🎯</span>
         </div>
 
-        <div className="stat-card" style={{ padding: "0.35rem 0.65rem" }}>
-          <span className="label" style={{ fontSize: "0.64rem", display: "block" }}>Bloque de Padrón</span>
-          <span className="value mono" style={{ fontSize: "1.05rem" }}>Pág {page} de {totalPaginas}</span>
+        {/* BLOQUE DE PADRÓN */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #0284c7",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", display: "block", letterSpacing: "0.02em" }}>
+              VISTA ACTUAL
+            </span>
+            <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
+              Pág {page} de {totalPaginas}
+            </span>
+          </div>
+          <span style={{ fontSize: "1.2rem" }}>📄</span>
         </div>
       </div>
 

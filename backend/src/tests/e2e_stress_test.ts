@@ -8,7 +8,7 @@ import { distribuirMontoCobro } from "../modules/prestamos/liquidacion";
 
 async function runE2EStressTest() {
   console.log("================================================================================");
-  console.log("🏦 MIF COOPERATIVA - SUITE DE PRUEBAS END-TO-END Y AUDITORÍA FINANCIERA (FASE 4)");
+  console.log("🏦 COOP COMIF R.L. - SUITE DE PRUEBAS END-TO-END Y AUDITORÍA FINANCIERA (FASE 4)");
   console.log("================================================================================\n");
 
   let totalTests = 0;
