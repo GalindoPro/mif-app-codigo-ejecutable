@@ -60,8 +60,8 @@ async function main() {
 
   await pool.query(
     `insert into usuarios (nombre, email, password_hash, rol, agencia_id)
-     values ('Lucia Caja Chica Chajul', $1, $2, 'CAJA_CHICA', $3)
-     on conflict (email) do update set password_hash = excluded.password_hash`,
+     values ('Lucía Caba Asicona', $1, $2, 'CAJA_CHICA', $3)
+     on conflict (email) do update set nombre = 'Lucía Caba Asicona', password_hash = excluded.password_hash`,
     [cajaChicaEmail, cajaChicaHash, agencia.id],
   );
 
