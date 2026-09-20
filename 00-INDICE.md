@@ -250,6 +250,28 @@ Este documento registra el **avance real y completo** del sistema de la COOPERAT
     - **Filtros Temporales Dinámicos:** Selector rápido para Turno Activo, Hoy, Esta Semana, Este Mes y Rango Personalizado con exportación a Excel (CSV).
     - **Disponibilidad:** Botón `🖨️ Imprimir Libro` en la tabla activa de `CajaAbierta.tsx`, cabecera de `AuxiliarCaja.tsx` y en cada día del `HistorialCajasModal.tsx`.
 
+27. **Suite Panorámica de Inteligencia y Analítica Estratégica en Dashboard:**
+    - **Eliminación de Redundancia:** Sustitución de la tarjeta repetitiva de botones por un centro de inteligencia de ancho completo (100% útil).
+    - **Visualización en 3 Columnas Responsivas:** (1) Dona de distribución de transacciones, (2) Barras horizontales de volumen monetario en Quetzales, y (3) Ranking de demanda con insignias (`#1, #2, #3`) y barras de progreso visuales.
+    - **Filtros Dinámicos:** Selección por agencia, períodos temporales (`Día`, `Semana`, `Mes`, `Año`) y chips por tipo de servicio.
+
+28. **Inteligencia y Analítica Financiera Específica por Cuenta y Tendencia Temporal:**
+    - **Selector Granular por Cuenta / Producto:** Filtros dedicados para Ahorro Corriente, Programado, Infantil, Ahorro s/Préstamo, Plazo Fijo, Aportaciones, Créditos, Agente BI, Caja Chica y Tesorería/Ventanilla.
+    - **Balance Específico de Entradas vs Salidas:** Métricas en vivo de total captado (Depósitos), total colocado/retirado (Egresos), y Flujo Neto (`+ / - Q`).
+    - **Conmutador de Vista Dual:** Modo Balance & Distribución (Donut + Barras comparativas Verde/Rojo + Ranking) y Modo Tendencia Temporal (Área cronológica Recharts con gradientes de captación vs retiros).
+
+29. **Normalización Visual Porcentual (1-100%) y Tooltips en Quetzales Exactos:**
+    - **Escala Proporcional (0% - 100%):** Gráfica de barras horizontales normalizada para que operaciones de menor cuantía no se reduzcan a líneas invisibles ante movimientos grandes.
+    - **Tooltips Glassmorphism Flotantes:** Muestran el monto exacto en Quetzales (`Q`), el porcentaje de volumen (`%`), las transacciones y la naturaleza (`🟢 Entrada` o `🔴 Salida`) al pasar el cursor.
+
+30. **Integración Integral de Aportaciones de Capital y Aperturas de Cuentas:**
+    - **Captura de Aportaciones Estatutarias:** Inclusión automática de los `Q 2,100.00` de aportaciones de los 21 socios y depósitos iniciales de cuentas en la analítica financiera.
+    - **Filtro Anti-Duplicidad:** Exclusión inteligente de registros duplicados entre movimientos y auxiliar de caja.
+
+
+
+
+
 ## 2. Usuarios de Prueba Configurados
 
 | Rol | Correo electrónico | Contraseña | Enfoque |

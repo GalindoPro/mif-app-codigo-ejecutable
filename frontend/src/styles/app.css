@@ -665,16 +665,30 @@
 }
 
 /* Contenedor inferior de 2 columnas balanceadas */
+/* Contenedor inferior de analítica panorámica */
 .dashboard-lower-grid {
-  display: grid;
-  grid-template-columns: 0.95fr 1.05fr;
+  display: flex;
+  flex-direction: column;
   gap: 0.65rem;
-  align-items: stretch;
   width: 100%;
 }
 
-@media (max-width: 1080px) {
-  .dashboard-lower-grid {
+.dashboard-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.15fr;
+  gap: 0.65rem;
+  margin-top: 0.45rem;
+  width: 100%;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-charts-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-charts-grid {
     grid-template-columns: 1fr;
   }
 }

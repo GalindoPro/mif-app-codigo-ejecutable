@@ -1376,132 +1376,265 @@ export async function analiticaServicios(
   const query = `
     with ops as (
       -- 1. Movimientos de Ventanilla en Auxiliar de Caja
-      select m.categoria::text, count(*)::int as cant, sum(m.monto)::numeric(14,2) as monto
+      select 
+        d.fecha::date as fecha,
+        m.categoria::text as categoria,
+        case when m.tipo = 'INGRESO' then 'INGRESO' else 'EGRESO' end as flujo,
+        m.monto as monto
       from caja_movimientos_auxiliar m
       join caja_dias d on d.id = m.caja_dia_id
       where d.fecha >= ${fechaInicioSql} and d.fecha <= current_date + interval '1 day' ${filtroAgenciaAux}
-      group by m.categoria
 
       union all
 
-      -- 2. Movimientos de Ahorros, Plazos Fijos y Aportaciones
+      -- 2. Aperturas de Cuentas / Aportaciones Estatutarias de Capital
+      select
+        c.created_at::date as fecha,
+        case 
+          when c.tipo = 'APORTACION' then 'APORTACION'
+          when c.tipo = 'AHORRO_CORRIENTE' then 'DEPOSITO_AHORRO_CORRIENTE'
+          when c.tipo = 'AHORRO_PROGRAMADO' then 'DEPOSITO_AHORRO_PROGRAMADO'
+          when c.tipo = 'AHORRO_INFANTO_JUVENIL' then 'DEPOSITO_AHORRO_INFANTO_JUVENIL'
+          when c.tipo = 'AHORRO_SOBRE_PRESTAMO' then 'DEPOSITO_AHORRO_SOBRE_PRESTAMO'
+          when c.tipo = 'AHORRO_PLAZO_FIJO' then 'DEPOSITO_PLAZO_FIJO'
+          else 'INGRESO_VARIO'
+        end as categoria,
+        'INGRESO' as flujo,
+        c.saldo_inicial as monto
+      from cuentas c
+      where c.saldo_inicial > 0
+        and c.created_at::date >= ${fechaInicioSql}
+        and c.created_at::date <= current_date + interval '1 day'
+        ${filtroAgenciaCuentas}
+
+      union all
+
+      -- 3. Movimientos en Cuentas (evitando duplicar con ventanilla)
       select 
+        m.fecha::date as fecha,
         case 
           when c.tipo = 'APORTACION' then 'APORTACION'
           when c.tipo = 'AHORRO_CORRIENTE' and m.tipo = 'DEPOSITO' then 'DEPOSITO_AHORRO_CORRIENTE'
           when c.tipo = 'AHORRO_CORRIENTE' and m.tipo = 'RETIRO' then 'RETIRO_AHORRO_CORRIENTE'
-          when c.tipo = 'AHORRO_PROGRAMADO' then 'DEPOSITO_AHORRO_PROGRAMADO'
-          when c.tipo = 'AHORRO_INFANTO_JUVENIL' then 'DEPOSITO_AHORRO_INFANTO_JUVENIL'
+          when c.tipo = 'AHORRO_PROGRAMADO' and m.tipo = 'DEPOSITO' then 'DEPOSITO_AHORRO_PROGRAMADO'
+          when c.tipo = 'AHORRO_PROGRAMADO' and m.tipo = 'RETIRO' then 'RETIRO_AHORRO_PROGRAMADO'
+          when c.tipo = 'AHORRO_INFANTO_JUVENIL' and m.tipo = 'DEPOSITO' then 'DEPOSITO_AHORRO_INFANTO_JUVENIL'
+          when c.tipo = 'AHORRO_INFANTO_JUVENIL' and m.tipo = 'RETIRO' then 'RETIRO_AHORRO_INFANTO_JUVENIL'
           when c.tipo = 'AHORRO_SOBRE_PRESTAMO' and m.tipo = 'DEPOSITO' then 'DEPOSITO_AHORRO_SOBRE_PRESTAMO'
           when c.tipo = 'AHORRO_SOBRE_PRESTAMO' and m.tipo = 'RETIRO' then 'RETIRO_AHORRO_SOBRE_PRESTAMO'
           when c.tipo = 'AHORRO_PLAZO_FIJO' and m.tipo = 'DEPOSITO' then 'DEPOSITO_PLAZO_FIJO'
           when c.tipo = 'AHORRO_PLAZO_FIJO' and m.tipo = 'RETIRO' then 'RETIRO_PLAZO_FIJO'
           else 'INGRESO_VARIO'
         end as categoria,
-        count(*)::int as cant,
-        sum(m.monto)::numeric(14,2) as monto
+        case when m.tipo = 'DEPOSITO' or c.tipo = 'APORTACION' then 'INGRESO' else 'EGRESO' end as flujo,
+        m.monto as monto
       from movimientos m
       join cuentas c on c.id = m.cuenta_id
       where m.fecha >= ${fechaInicioSql} and m.fecha <= current_date + interval '1 day' ${filtroAgenciaCuentas}
-      group by 1
+        and not exists (select 1 from caja_movimientos_auxiliar cma where cma.movimiento_id = m.id)
 
       union all
 
-      -- 3. Préstamos Colocados
+      -- 4. Préstamos Colocados
       select 
-        case 
-          when p.tipo = 'HIPOTECARIO' then 'COLOCACION_PRESTAMO'
-          else 'COLOCACION_PRESTAMO'
-        end as categoria,
-        count(*)::int as cant,
-        sum(p.monto_aprobado)::numeric(14,2) as monto
+        coalesce(p.fecha_aprobacion, p.created_at::date) as fecha,
+        'COLOCACION_PRESTAMO' as categoria,
+        'EGRESO' as flujo,
+        p.monto_aprobado as monto
       from prestamos p
       where coalesce(p.fecha_aprobacion, p.created_at::date) >= ${fechaInicioSql}
         and coalesce(p.fecha_aprobacion, p.created_at::date) <= current_date + interval '1 day'
         ${filtroAgenciaPrestamos}
-      group by 1
 
       union all
 
-      -- 4. Gastos y Comprobantes de Caja Chica
+      -- 5. Gastos y Comprobantes de Caja Chica
       select
+        cc.fecha::date as fecha,
         coalesce('CAJA_CHICA_' || cc.categoria::text, 'CAJA_CHICA_GASTO') as categoria,
-        count(*)::int as cant,
-        sum(cc.monto)::numeric(14,2) as monto
+        case when cc.tipo = 'INGRESO' then 'INGRESO' else 'EGRESO' end as flujo,
+        cc.monto as monto
       from caja_chica_comprobantes cc
       where cc.fecha >= ${fechaInicioSql}
         and cc.fecha <= current_date + interval '1 day'
         ${filtroAgenciaCajaChica}
-      group by 1
     )
-    select categoria, sum(cant)::int as cantidad, sum(monto)::numeric(14,2) as total_monto
+    select 
+      categoria, 
+      flujo, 
+      count(*)::int as cantidad, 
+      sum(monto)::numeric(14,2) as total_monto
     from ops
-    group by categoria
+    group by categoria, flujo
     order by cantidad desc;
   `;
 
-  const { rows } = await pool.query(query, params);
+  const queryTendencia = `
+    with ops as (
+      select 
+        d.fecha::date as fecha,
+        case when m.tipo = 'INGRESO' then 'INGRESO' else 'EGRESO' end as flujo,
+        m.monto as monto
+      from caja_movimientos_auxiliar m
+      join caja_dias d on d.id = m.caja_dia_id
+      where d.fecha >= ${fechaInicioSql} and d.fecha <= current_date + interval '1 day' ${filtroAgenciaAux}
 
-  const GRUPOS: Record<string, { label: string; icon: string }> = {
-    SERVICIOS_BI: { label: "Pago de Servicios (Agente BI)", icon: "🏦" },
-    DEPOSITO_BI: { label: "Depósitos Agente BI", icon: "📥" },
-    RETIRO_BI: { label: "Retiros Agente BI", icon: "📤" },
-    REMESA_BI: { label: "Cobro de Remesas BI", icon: "💵" },
-    ABONO_PRESTAMO_HIPOTECARIO: { label: "Abono Préstamo Hipotecario", icon: "🏠" },
-    INTERES_PRESTAMO_HIPOTECARIO: { label: "Interés Préstamo Hipotecario", icon: "📊" },
-    MORA_PRESTAMO_HIPOTECARIO: { label: "Mora Préstamo Hipotecario", icon: "⚠️" },
-    ABONO_PRESTAMO_FIDUCIARIO: { label: "Abono Préstamo Fiduciario", icon: "🤝" },
-    INTERES_PRESTAMO_FIDUCIARIO: { label: "Interés Préstamo Fiduciario", icon: "📈" },
-    MORA_PRESTAMO_FIDUCIARIO: { label: "Mora Préstamo Fiduciario", icon: "⚠️" },
-    COLOCACION_PRESTAMO: { label: "Desembolso de Préstamos", icon: "💼" },
-    DEPOSITO_AHORRO_CORRIENTE: { label: "Depósito Ahorro Corriente", icon: "💰" },
-    RETIRO_AHORRO_CORRIENTE: { label: "Retiro Ahorro Corriente", icon: "💸" },
-    DEPOSITO_AHORRO_PROGRAMADO: { label: "Depósito Ahorro Programado", icon: "📅" },
-    RETIRO_AHORRO_PROGRAMADO: { label: "Retiro Ahorro Programado", icon: "📅" },
-    DEPOSITO_AHORRO_INFANTO_JUVENIL: { label: "Depósito Ahorro Infantil", icon: "🧒" },
-    RETIRO_AHORRO_INFANTO_JUVENIL: { label: "Retiro Ahorro Infantil", icon: "🧒" },
-    DEPOSITO_AHORRO_SOBRE_PRESTAMO: { label: "Depósito Ahorro sobre Préstamo", icon: "🛡️" },
-    RETIRO_AHORRO_SOBRE_PRESTAMO: { label: "Retiro Ahorro sobre Préstamo", icon: "🛡️" },
-    DEPOSITO_PLAZO_FIJO: { label: "Apertura Plazo Fijo", icon: "🔒" },
-    RETIRO_PLAZO_FIJO: { label: "Liquidación Plazo Fijo", icon: "📦" },
-    APORTACION: { label: "Aportaciones de Capital", icon: "🏛️" },
-    INGRESO_ASOCIADO: { label: "Cuotas de Ingreso Asociado", icon: "📝" },
-    COMISION: { label: "Comisiones por Servicios", icon: "🏷️" },
-    INGRESO_VARIO: { label: "Ingresos Varios", icon: "➕" },
-    EGRESO_VARIO: { label: "Egresos Varios", icon: "➖" },
-    CAJA_CHICA_SUMINISTROS_OFICINA: { label: "Papelería y Suministros (C.Chica)", icon: "📎" },
-    CAJA_CHICA_CAFETERIA_LIMPIEZA: { label: "Cafetería y Limpieza (C.Chica)", icon: "☕" },
-    CAJA_CHICA_COMBUSTIBLES_LUBRICANTES: { label: "Combustibles (C.Chica)", icon: "⛽" },
-    CAJA_CHICA_COMISIONES_GASTOS: { label: "Comisiones y Gastos (C.Chica)", icon: "🧾" },
-    CAJA_CHICA_TELEFONO: { label: "Telefonía (C.Chica)", icon: "📞" },
-    CAJA_CHICA_INTERNET: { label: "Internet (C.Chica)", icon: "🌐" },
-    CAJA_CHICA_ENERGIA_ELECTRICA: { label: "Energía Eléctrica (C.Chica)", icon: "⚡" },
-    CAJA_CHICA_GASTOS_DIVERSOS: { label: "Gastos Diversos (C.Chica)", icon: "📦" },
-    CAJA_CHICA_REPARACION_MANTENIMIENTO: { label: "Mantenimiento (C.Chica)", icon: "🔧" },
-    CAJA_CHICA_FLETES_ACARREO: { label: "Fletes y Acarreo (C.Chica)", icon: "🚚" },
-    CAJA_CHICA_PROYECCION_SOCIAL: { label: "Proyección Social (C.Chica)", icon: "🤝" },
-    CAJA_CHICA_OTRO: { label: "Otros Gastos C.Chica", icon: "📋" },
-    CAJA_CHICA_GASTO: { label: "Gastos Operativos (C.Chica)", icon: "☕" },
+      union all
+
+      select
+        c.created_at::date as fecha,
+        'INGRESO' as flujo,
+        c.saldo_inicial as monto
+      from cuentas c
+      where c.saldo_inicial > 0
+        and c.created_at::date >= ${fechaInicioSql}
+        and c.created_at::date <= current_date + interval '1 day'
+        ${filtroAgenciaCuentas}
+
+      union all
+
+      select 
+        m.fecha::date as fecha,
+        case when m.tipo = 'DEPOSITO' or c.tipo = 'APORTACION' then 'INGRESO' else 'EGRESO' end as flujo,
+        m.monto as monto
+      from movimientos m
+      join cuentas c on c.id = m.cuenta_id
+      where m.fecha >= ${fechaInicioSql} and m.fecha <= current_date + interval '1 day' ${filtroAgenciaCuentas}
+        and not exists (select 1 from caja_movimientos_auxiliar cma where cma.movimiento_id = m.id)
+
+      union all
+
+      select 
+        coalesce(p.fecha_aprobacion, p.created_at::date) as fecha,
+        'EGRESO' as flujo,
+        p.monto_aprobado as monto
+      from prestamos p
+      where coalesce(p.fecha_aprobacion, p.created_at::date) >= ${fechaInicioSql}
+        and coalesce(p.fecha_aprobacion, p.created_at::date) <= current_date + interval '1 day'
+        ${filtroAgenciaPrestamos}
+
+      union all
+
+      select
+        cc.fecha::date as fecha,
+        case when cc.tipo = 'INGRESO' then 'INGRESO' else 'EGRESO' end as flujo,
+        cc.monto as monto
+      from caja_chica_comprobantes cc
+      where cc.fecha >= ${fechaInicioSql}
+        and cc.fecha <= current_date + interval '1 day'
+        ${filtroAgenciaCajaChica}
+    )
+    select 
+      fecha::text as fecha,
+      sum(case when flujo = 'INGRESO' then monto else 0 end)::numeric(14,2) as ingresos,
+      sum(case when flujo = 'EGRESO' then monto else 0 end)::numeric(14,2) as egresos,
+      (sum(case when flujo = 'INGRESO' then monto else 0 end) - sum(case when flujo = 'EGRESO' then monto else 0 end))::numeric(14,2) as neto,
+      count(*)::int as operaciones
+    from ops
+    group by fecha
+    order by fecha asc;
+  `;
+
+  const [{ rows }, { rows: rowsTendencia }] = await Promise.all([
+    pool.query(query, params),
+    pool.query(queryTendencia, params),
+  ]);
+
+  const GRUPOS: Record<string, { label: string; icon: string; producto: string }> = {
+    // 🏦 Agente BI
+    SERVICIOS_BI: { label: "Pago de Servicios (Agente BI)", icon: "💡", producto: "AGENTE_BI" },
+    DEPOSITO_BI: { label: "Depósitos Agente BI", icon: "📥", producto: "AGENTE_BI" },
+    RETIRO_BI: { label: "Retiros Agente BI", icon: "📤", producto: "AGENTE_BI" },
+    REMESA_BI: { label: "Cobro de Remesas BI", icon: "💵", producto: "AGENTE_BI" },
+
+    // 💼 Créditos
+    ABONO_PRESTAMO_HIPOTECARIO: { label: "Abono Capital Crédito Hipotecario", icon: "🏠", producto: "CREDITOS" },
+    INTERES_PRESTAMO_HIPOTECARIO: { label: "Interés Crédito Hipotecario", icon: "📊", producto: "CREDITOS" },
+    MORA_PRESTAMO_HIPOTECARIO: { label: "Mora Crédito Hipotecario", icon: "⚠️", producto: "CREDITOS" },
+    ABONO_PRESTAMO_FIDUCIARIO: { label: "Abono Capital Crédito Fiduciario", icon: "🤝", producto: "CREDITOS" },
+    INTERES_PRESTAMO_FIDUCIARIO: { label: "Interés Crédito Fiduciario", icon: "📈", producto: "CREDITOS" },
+    MORA_PRESTAMO_FIDUCIARIO: { label: "Mora Crédito Fiduciario", icon: "⚠️", producto: "CREDITOS" },
+    COLOCACION_PRESTAMO: { label: "Desembolso de Préstamo", icon: "💼", producto: "CREDITOS" },
+
+    // 💰 Ahorro Corriente
+    DEPOSITO_AHORRO_CORRIENTE: { label: "Depósito Ahorro Corriente", icon: "💰", producto: "AHORRO_CORRIENTE" },
+    RETIRO_AHORRO_CORRIENTE: { label: "Retiro Ahorro Corriente", icon: "💸", producto: "AHORRO_CORRIENTE" },
+
+    // 📅 Ahorro Programado
+    DEPOSITO_AHORRO_PROGRAMADO: { label: "Depósito Ahorro Programado", icon: "📅", producto: "AHORRO_PROGRAMADO" },
+    RETIRO_AHORRO_PROGRAMADO: { label: "Retiro Ahorro Programado", icon: "📅", producto: "AHORRO_PROGRAMADO" },
+
+    // 🧒 Ahorro Infantil
+    DEPOSITO_AHORRO_INFANTO_JUVENIL: { label: "Depósito Ahorro Infantil", icon: "🧒", producto: "AHORRO_INFANTIL" },
+    RETIRO_AHORRO_INFANTO_JUVENIL: { label: "Retiro Ahorro Infantil", icon: "🧒", producto: "AHORRO_INFANTIL" },
+
+    // 🛡️ Ahorro sobre Préstamo
+    DEPOSITO_AHORRO_SOBRE_PRESTAMO: { label: "Depósito Ahorro sobre Préstamo", icon: "🛡️", producto: "AHORRO_SOBRE_PRESTAMO" },
+    RETIRO_AHORRO_SOBRE_PRESTAMO: { label: "Retiro Ahorro sobre Préstamo", icon: "🛡️", producto: "AHORRO_SOBRE_PRESTAMO" },
+
+    // 🔒 Plazo Fijo
+    DEPOSITO_PLAZO_FIJO: { label: "Apertura Certificado Plazo Fijo", icon: "🔒", producto: "PLAZO_FIJO" },
+    RETIRO_PLAZO_FIJO: { label: "Liquidación Certificado Plazo Fijo", icon: "📦", producto: "PLAZO_FIJO" },
+
+    // 🏛️ Aportaciones
+    APORTACION: { label: "Aportación de Capital Social", icon: "🏛️", producto: "APORTACIONES" },
+
+    // 💵 Ventanilla & Tesorería
+    INGRESO_ASOCIADO: { label: "Cuota de Ingreso / Inscripción", icon: "📝", producto: "VENTANILLA_TESORERIA" },
+    COMISION: { label: "Comisiones por Servicios", icon: "🏷️", producto: "VENTANILLA_TESORERIA" },
+    INGRESO_VARIO: { label: "Ingresos Varios de Ventanilla", icon: "➕", producto: "VENTANILLA_TESORERIA" },
+    EGRESO_VARIO: { label: "Egresos Varios de Ventanilla", icon: "➖", producto: "VENTANILLA_TESORERIA" },
+    TRASLADO_FONDOS: { label: "Traslado de Fondos a Banco / Bóveda", icon: "🚚", producto: "VENTANILLA_TESORERIA" },
+    REPOSICION_FONDO: { label: "Reposición de Fondo Caja Chica", icon: "📥", producto: "CAJA_CHICA" },
+
+    // ☕ Caja Chica
+    CAJA_CHICA_SUMINISTROS_OFICINA: { label: "Papelería y Suministros (C.Chica)", icon: "📎", producto: "CAJA_CHICA" },
+    CAJA_CHICA_CAFETERIA_LIMPIEZA: { label: "Cafetería y Limpieza (C.Chica)", icon: "☕", producto: "CAJA_CHICA" },
+    CAJA_CHICA_COMBUSTIBLES_LUBRICANTES: { label: "Combustibles y Movilización (C.Chica)", icon: "⛽", producto: "CAJA_CHICA" },
+    CAJA_CHICA_COMISIONES_GASTOS: { label: "Comisiones y Gastos Bancarios (C.Chica)", icon: "🧾", producto: "CAJA_CHICA" },
+    CAJA_CHICA_TELEFONO: { label: "Servicio de Telefonía (C.Chica)", icon: "📞", producto: "CAJA_CHICA" },
+    CAJA_CHICA_INTERNET: { label: "Servicio de Internet (C.Chica)", icon: "🌐", producto: "CAJA_CHICA" },
+    CAJA_CHICA_ENERGIA_ELECTRICA: { label: "Energía Eléctrica (C.Chica)", icon: "⚡", producto: "CAJA_CHICA" },
+    CAJA_CHICA_GASTOS_DIVERSOS: { label: "Gastos Diversos (C.Chica)", icon: "📦", producto: "CAJA_CHICA" },
+    CAJA_CHICA_REPARACION_MANTENIMIENTO: { label: "Mantenimiento y Reparación (C.Chica)", icon: "🔧", producto: "CAJA_CHICA" },
+    CAJA_CHICA_FLETES_ACARREO: { label: "Fletes y Acarreos (C.Chica)", icon: "🚚", producto: "CAJA_CHICA" },
+    CAJA_CHICA_PROYECCION_SOCIAL: { label: "Proyección Social (C.Chica)", icon: "🤝", producto: "CAJA_CHICA" },
+    CAJA_CHICA_OTRO: { label: "Otros Gastos Operativos (C.Chica)", icon: "📋", producto: "CAJA_CHICA" },
+    CAJA_CHICA_GASTO: { label: "Gastos Generales de Caja Chica", icon: "☕", producto: "CAJA_CHICA" },
   };
-
-  function determinarModulo(cat: string): "AHORROS" | "CREDITOS" | "CAJA_CHICA" | "VENTANILLA" {
-    if (cat.startsWith("CAJA_CHICA")) return "CAJA_CHICA";
-    if (cat.includes("PRESTAMO")) return "CREDITOS";
-    if (cat.includes("AHORRO") || cat.includes("PLAZO_FIJO") || cat === "APORTACION") return "AHORROS";
-    return "VENTANILLA";
-  }
 
   const totalOperaciones = rows.reduce((acc, r) => acc + Number(r.cantidad), 0);
   const volumenTotal = rows.reduce((acc, r) => acc + Number(r.total_monto), 0);
 
+  let totalIngresos = 0;
+  let totalEgresos = 0;
+  let operacionesIngreso = 0;
+  let operacionesEgreso = 0;
+
   const servicios = rows.map((r) => {
-    const info = GRUPOS[r.categoria] ?? { label: r.categoria, icon: "📌" };
+    const info = GRUPOS[r.categoria] ?? { 
+      label: r.categoria.replace(/_/g, " "), 
+      icon: r.flujo === "INGRESO" ? "📥" : "📤", 
+      producto: "VENTANILLA_TESORERIA" 
+    };
     const cant = Number(r.cantidad);
     const monto = Number(r.total_monto);
+    const flujo = (r.flujo === "INGRESO" ? "INGRESO" : "EGRESO") as "INGRESO" | "EGRESO";
+
+    if (flujo === "INGRESO") {
+      totalIngresos += monto;
+      operacionesIngreso += cant;
+    } else {
+      totalEgresos += monto;
+      operacionesEgreso += cant;
+    }
+
     const pct = totalOperaciones > 0 ? Math.round((cant / totalOperaciones) * 1000) / 10 : 0;
     return {
       categoria: r.categoria,
-      modulo: determinarModulo(r.categoria),
+      producto: info.producto,
+      modulo: info.producto,
+      flujo,
       label: info.label,
       icon: info.icon,
       cantidad: cant,
@@ -1510,12 +1643,27 @@ export async function analiticaServicios(
     };
   });
 
+  const tendenciaTemporal = rowsTendencia.map((t) => ({
+    fecha: t.fecha,
+    label: t.fecha.slice(5), // MM-DD
+    ingresos: Number(t.ingresos),
+    egresos: Number(t.egresos),
+    neto: Number(t.neto),
+    operaciones: Number(t.operaciones),
+  }));
+
   return {
     periodo,
     totalOperaciones,
     volumenTotal,
+    totalIngresos,
+    totalEgresos,
+    flujoNeto: totalIngresos - totalEgresos,
+    operacionesIngreso,
+    operacionesEgreso,
     servicioTop: servicios[0] ?? null,
     servicios,
+    tendenciaTemporal,
   };
 }
 

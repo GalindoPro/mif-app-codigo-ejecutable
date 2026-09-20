@@ -4,7 +4,21 @@ import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { formatoQ } from "../types";
 import type { ResumenDashboard } from "../types";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  Legend,
+} from "recharts";
 
 export default function Tablero() {
   const { usuario } = useAuth();
@@ -342,116 +356,45 @@ export default function Tablero() {
         </Link>
       </div>
 
-      {/* Cuadrícula Inferior: 2 Paneles Balanceados Lado a Lado */}
+      {/* Panel Panorámico de Monitoreo Estratégico & Analítica Financiera */}
       <div className="dashboard-lower-grid">
-        {/* Panel Izquierdo: Supervisión y Control / Accesos Rápidos */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-          <div className="dashboard-panel-card" style={{ padding: "0.65rem 0.85rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem", borderBottom: "1px solid var(--line)", paddingBottom: "0.35rem" }}>
-              <h3 style={{ margin: 0, fontSize: "0.86rem", fontWeight: 700, color: "var(--ink)" }}>
-                {usuario?.rol === "SUPERVISOR" || usuario?.rol === "GERENCIA"
-                  ? "🛡️ Panel de Supervisión y Control"
-                  : "⚡ Accesos Rápidos de Operación"}
-              </h3>
-              <span className="badge" style={{ fontSize: "0.68rem", padding: "0.1rem 0.4rem" }}>
-                {usuario?.rol}
-              </span>
-            </div>
+        {(usuario?.rol === "SUPERVISOR" || usuario?.rol === "GERENCIA" || usuario?.rol === "ADMIN") && (
+          <PanelGraficaServicios agenciaIdInicial={usuario?.agenciaId ?? undefined} />
+        )}
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: "0.4rem" }}>
-              {usuario?.rol === "SUPERVISOR" || usuario?.rol === "GERENCIA" ? (
-                <>
-                  <Link to="/auxiliar-caja" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
-                    💵 Ventanilla
-                  </Link>
-                  <Link to="/arqueos/mensual" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
-                    📑 Libro Arqueos
-                  </Link>
-                  <Link to="/creditos" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
-                    🤝 Cartera Crédito
-                  </Link>
-                  <Link to="/promotor/cartera" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
-                    📂 Kardex Cartera
-                  </Link>
-                  <Link to="/socios" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
-                    👥 Padrón Socios
-                  </Link>
-                  <Link to="/ahorros/plazo-fijo" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
-                    🔒 Plazos Fijos
-                  </Link>
-                  <Link to="/aportaciones" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
-                    🏛️ Aportaciones
-                  </Link>
-                  <Link to="/caja-chica" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem", gap: "0.25rem" }}>
-                    ☕ Caja Chica
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link to="/auxiliar-caja" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem" }}>
-                    💵 Ventanilla
-                  </Link>
-                  <Link to="/promotor/cartera" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem" }}>
-                    📂 Kardex Cartera
-                  </Link>
-                  <Link to="/socios" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem" }}>
-                    👥 Padrón Socios
-                  </Link>
-                  <Link to="/aportaciones" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem" }}>
-                    🏛️ Aportaciones
-                  </Link>
-                  <Link to="/ahorros/corriente" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem" }}>
-                    💰 Ahorros
-                  </Link>
-                  <Link to="/caja-chica" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.76rem", padding: "0.35rem 0.25rem" }}>
-                    ☕ Caja Chica
-                  </Link>
-                </>
-              )}
+        {/* Desglose por Agencia (si aplica más de 1 agencia) */}
+        {varias && (
+          <div className="dashboard-panel-card" style={{ padding: "0.65rem 0.85rem", marginTop: "0.25rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+              <h3 style={{ margin: 0, fontSize: "0.84rem", fontWeight: 700 }}>🏢 Estado en Vivo por Agencia</h3>
+              <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)" }}>{porAgencia.length} agencias</span>
+            </div>
+            <div className="table-wrap" style={{ maxHeight: "140px", overflowY: "auto", border: "1px solid var(--line)", borderRadius: "6px" }}>
+              <table style={{ fontSize: "0.76rem", width: "100%", margin: 0 }}>
+                <thead>
+                  <tr style={{ background: "var(--paper-raised)" }}>
+                    <th style={{ padding: "3px 6px" }}>Agencia</th>
+                    <th style={{ padding: "3px 6px", textAlign: "right" }}>Caja chica</th>
+                    <th style={{ padding: "3px 6px", textAlign: "right" }}>Ahorro corriente</th>
+                    <th style={{ padding: "3px 6px", textAlign: "right" }}>Cartera Crédito</th>
+                    <th style={{ padding: "3px 6px", textAlign: "center" }}>Socios</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {porAgencia.map((a) => (
+                    <tr key={a.agenciaId}>
+                      <td style={{ padding: "3px 6px", fontWeight: 600 }}>{a.agenciaNombre}</td>
+                      <td className="mono" style={{ padding: "3px 6px", textAlign: "right" }}>{formatoQ(a.cajaChica.saldo)}</td>
+                      <td className="mono" style={{ padding: "3px 6px", textAlign: "right", color: "var(--accent)" }}>{formatoQ(a.ahorroCorriente.saldoTotal)}</td>
+                      <td className="mono" style={{ padding: "3px 6px", textAlign: "right", color: "#0284c7" }}>{formatoQ(a.carteraPrestamos?.saldo ?? 0)}</td>
+                      <td className="mono" style={{ padding: "3px 6px", textAlign: "center" }}>{a.totalSocios}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-
-          {/* Desglose por Agencia (si aplica) */}
-          {varias && (
-            <div className="dashboard-panel-card" style={{ padding: "0.65rem 0.85rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-                <h3 style={{ margin: 0, fontSize: "0.84rem", fontWeight: 700 }}>🏢 Estado en Vivo por Agencia</h3>
-                <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)" }}>{porAgencia.length} agencias</span>
-              </div>
-              <div className="table-wrap" style={{ maxHeight: "150px", overflowY: "auto", border: "1px solid var(--line)", borderRadius: "6px" }}>
-                <table style={{ fontSize: "0.76rem", width: "100%", margin: 0 }}>
-                  <thead>
-                    <tr style={{ background: "var(--paper-raised)" }}>
-                      <th style={{ padding: "3px 6px" }}>Agencia</th>
-                      <th style={{ padding: "3px 6px", textAlign: "right" }}>Caja chica</th>
-                      <th style={{ padding: "3px 6px", textAlign: "right" }}>Ahorro corriente</th>
-                      <th style={{ padding: "3px 6px", textAlign: "right" }}>Cartera Crédito</th>
-                      <th style={{ padding: "3px 6px", textAlign: "center" }}>Socios</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {porAgencia.map((a) => (
-                      <tr key={a.agenciaId}>
-                        <td style={{ padding: "3px 6px", fontWeight: 600 }}>{a.agenciaNombre}</td>
-                        <td className="mono" style={{ padding: "3px 6px", textAlign: "right" }}>{formatoQ(a.cajaChica.saldo)}</td>
-                        <td className="mono" style={{ padding: "3px 6px", textAlign: "right", color: "var(--accent)" }}>{formatoQ(a.ahorroCorriente.saldoTotal)}</td>
-                        <td className="mono" style={{ padding: "3px 6px", textAlign: "right", color: "#0284c7" }}>{formatoQ(a.carteraPrestamos?.saldo ?? 0)}</td>
-                        <td className="mono" style={{ padding: "3px 6px", textAlign: "center" }}>{a.totalSocios}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Panel Derecho: Monitoreo Estratégico de Servicios */}
-        <div>
-          {(usuario?.rol === "SUPERVISOR" || usuario?.rol === "GERENCIA") && (
-            <PanelGraficaServicios agenciaIdInicial={usuario?.agenciaId ?? undefined} />
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
@@ -459,7 +402,9 @@ export default function Tablero() {
 
 interface ServicioItem {
   categoria: string;
-  modulo?: "AHORROS" | "CREDITOS" | "CAJA_CHICA" | "VENTANILLA";
+  producto: string;
+  modulo?: string;
+  flujo: "INGRESO" | "EGRESO";
   label: string;
   icon: string;
   cantidad: number;
@@ -467,12 +412,27 @@ interface ServicioItem {
   porcentaje: number;
 }
 
+interface PuntoTendencia {
+  fecha: string;
+  label: string;
+  ingresos: number;
+  egresos: number;
+  neto: number;
+  operaciones: number;
+}
+
 interface AnaliticaResponse {
   periodo: "dia" | "semana" | "mes" | "anio";
   totalOperaciones: number;
   volumenTotal: number;
+  totalIngresos: number;
+  totalEgresos: number;
+  flujoNeto: number;
+  operacionesIngreso: number;
+  operacionesEgreso: number;
   servicioTop: ServicioItem | null;
   servicios: ServicioItem[];
+  tendenciaTemporal: PuntoTendencia[];
 }
 
 function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string }) {
@@ -481,7 +441,8 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
   const [agencias, setAgencias] = useState<any[]>([]);
   const [agenciaId, setAgenciaId] = useState(agenciaIdInicial || usuario?.agenciaId || "");
   const [periodo, setPeriodo] = useState<"dia" | "semana" | "mes" | "anio">("mes");
-  const [filtroModulo, setFiltroModulo] = useState<"TODOS" | "AHORROS" | "CREDITOS" | "CAJA_CHICA" | "VENTANILLA">("TODOS");
+  const [filtroCuenta, setFiltroCuenta] = useState<string>("TODOS");
+  const [modoVista, setModoVista] = useState<"BALANCE" | "TENDENCIA">("BALANCE");
   const [datos, setDatos] = useState<AnaliticaResponse | null>(null);
   const [cargando, setCargando] = useState(false);
 
@@ -529,29 +490,50 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
 
   const periodoLabel = periodo === "dia" ? "Día actual" : periodo === "semana" ? "Últimos 7 días" : periodo === "mes" ? "Últimos 30 días" : "Año actual";
 
+  // Filtrado específico por producto / cuenta
   const serviciosFiltrados = !datos
     ? []
-    : filtroModulo === "TODOS"
+    : filtroCuenta === "TODOS"
       ? datos.servicios
-      : datos.servicios.filter((s) => s.modulo === filtroModulo);
+      : datos.servicios.filter((s) => s.producto === filtroCuenta);
 
   const totalOperacionesFiltro = serviciosFiltrados.reduce((acc, s) => acc + s.cantidad, 0);
   const volumenTotalFiltro = serviciosFiltrados.reduce((acc, s) => acc + s.totalMonto, 0);
+  const totalIngresosFiltro = serviciosFiltrados.filter((s) => s.flujo === "INGRESO").reduce((acc, s) => acc + s.totalMonto, 0);
+  const totalEgresosFiltro = serviciosFiltrados.filter((s) => s.flujo === "EGRESO").reduce((acc, s) => acc + s.totalMonto, 0);
+  const opIngresosFiltro = serviciosFiltrados.filter((s) => s.flujo === "INGRESO").reduce((acc, s) => acc + s.cantidad, 0);
+  const opEgresosFiltro = serviciosFiltrados.filter((s) => s.flujo === "EGRESO").reduce((acc, s) => acc + s.cantidad, 0);
+  const flujoNetoFiltro = totalIngresosFiltro - totalEgresosFiltro;
   const servicioTopFiltro = serviciosFiltrados[0] ?? null;
+
+  // Cuentas disponibles con sus conteos
+  const CUENTAS_OPCIONES = [
+    { id: "TODOS", label: "Consolidado General", icon: "🌐" },
+    { id: "AHORRO_CORRIENTE", label: "Ahorro Corriente", icon: "💰" },
+    { id: "AHORRO_PROGRAMADO", label: "Ahorro Programado", icon: "📅" },
+    { id: "AHORRO_INFANTIL", label: "Ahorro Infantil", icon: "🧒" },
+    { id: "AHORRO_SOBRE_PRESTAMO", label: "Ahorro s/Préstamo", icon: "🛡️" },
+    { id: "PLAZO_FIJO", label: "Plazo Fijo (DPF)", icon: "🔒" },
+    { id: "APORTACIONES", label: "Aportaciones", icon: "🏛️" },
+    { id: "CREDITOS", label: "Cartera Créditos", icon: "💼" },
+    { id: "AGENTE_BI", label: "Agente BI & Servicios", icon: "🏦" },
+    { id: "CAJA_CHICA", label: "Caja Chica", icon: "☕" },
+    { id: "VENTANILLA_TESORERIA", label: "Tesorería & Ventanilla", icon: "💵" },
+  ];
 
   return (
     <div className="dashboard-panel-card" style={{ borderTop: "3px solid #0284c7" }}>
-      {/* Encabezado del Panel */}
+      {/* Encabezado Superior: Título, Filtros Temporales y Selector de Modo */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
-            <h2 style={{ margin: 0, fontSize: "0.98rem", fontWeight: 700 }}>📊 Monitoreo Estratégico de Servicios</h2>
+            <h2 style={{ margin: 0, fontSize: "0.98rem", fontWeight: 700 }}>📊 Inteligencia y Analítica Financiera por Cuenta</h2>
             <span className="live-badge" style={{ fontSize: "0.68rem", padding: "0.15rem 0.45rem" }}>
               <span className="live-dot" /> En Vivo
             </span>
           </div>
           <p style={{ margin: "0.15rem 0 0", fontSize: "0.74rem", color: "var(--ink-soft)" }}>
-            Demanda transaccional ({periodoLabel})
+            Desglose específico de entradas, salidas y flujo monetario ({periodoLabel})
           </p>
         </div>
 
@@ -567,35 +549,58 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
             </select>
           )}
 
+          {/* Conmutador de Modo Dual */}
           <div style={{ display: "inline-flex", background: "var(--mono-bg)", borderRadius: "6px", padding: "0.15rem", border: "1px solid var(--line)" }}>
             <button
               type="button"
-              className={`btn ${periodo === "dia" ? "" : "secondary"}`}
+              className={`btn btn-xs ${modoVista === "BALANCE" ? "" : "secondary"}`}
               style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
+              onClick={() => setModoVista("BALANCE")}
+              title="Ver balance de entradas vs salidas y ranking de movimientos"
+            >
+              📊 Balance & Distribución
+            </button>
+            <button
+              type="button"
+              className={`btn btn-xs ${modoVista === "TENDENCIA" ? "" : "secondary"}`}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
+              onClick={() => setModoVista("TENDENCIA")}
+              title="Ver evolución cronológica de captaciones y retiros"
+            >
+              📈 Tendencia Temporal
+            </button>
+          </div>
+
+          {/* Filtros de Período */}
+          <div style={{ display: "inline-flex", background: "var(--mono-bg)", borderRadius: "6px", padding: "0.15rem", border: "1px solid var(--line)" }}>
+            <button
+              type="button"
+              className={`btn btn-xs ${periodo === "dia" ? "" : "secondary"}`}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
               onClick={() => setPeriodo("dia")}
             >
               Día
             </button>
             <button
               type="button"
-              className={`btn ${periodo === "semana" ? "" : "secondary"}`}
-              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
+              className={`btn btn-xs ${periodo === "semana" ? "" : "secondary"}`}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
               onClick={() => setPeriodo("semana")}
             >
               Semana
             </button>
             <button
               type="button"
-              className={`btn ${periodo === "mes" ? "" : "secondary"}`}
-              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
+              className={`btn btn-xs ${periodo === "mes" ? "" : "secondary"}`}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
               onClick={() => setPeriodo("mes")}
             >
               Mes
             </button>
             <button
               type="button"
-              className={`btn ${periodo === "anio" ? "" : "secondary"}`}
-              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
+              className={`btn btn-xs ${periodo === "anio" ? "" : "secondary"}`}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
               onClick={() => setPeriodo("anio")}
             >
               Año
@@ -604,138 +609,371 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
         </div>
       </div>
 
-      {/* Pestañas de Segmentación por Área Financiera */}
-      <div style={{ display: "flex", gap: "0.25rem", flexWrap: "wrap", borderBottom: "1px solid var(--line)", paddingBottom: "0.4rem" }}>
-        <button
-          type="button"
-          className={`btn ${filtroModulo === "TODOS" ? "" : "secondary"}`}
-          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
-          onClick={() => setFiltroModulo("TODOS")}
-        >
-          🌐 Consolidado ({datos?.totalOperaciones ?? 0})
-        </button>
-        <button
-          type="button"
-          className={`btn ${filtroModulo === "AHORROS" ? "" : "secondary"}`}
-          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
-          onClick={() => setFiltroModulo("AHORROS")}
-        >
-          🏦 Ahorros & PF
-        </button>
-        <button
-          type="button"
-          className={`btn ${filtroModulo === "CREDITOS" ? "" : "secondary"}`}
-          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
-          onClick={() => setFiltroModulo("CREDITOS")}
-        >
-          💼 Créditos
-        </button>
-        <button
-          type="button"
-          className={`btn ${filtroModulo === "CAJA_CHICA" ? "" : "secondary"}`}
-          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
-          onClick={() => setFiltroModulo("CAJA_CHICA")}
-        >
-          ☕ Caja Chica
-        </button>
-        <button
-          type="button"
-          className={`btn ${filtroModulo === "VENTANILLA" ? "" : "secondary"}`}
-          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
-          onClick={() => setFiltroModulo("VENTANILLA")}
-        >
-          💵 Ventanilla
-        </button>
+      {/* Pestañas de Selección Específica por Cuenta y Producto */}
+      <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", borderBottom: "1px solid var(--line)", paddingBottom: "0.4rem" }}>
+        {CUENTAS_OPCIONES.map((cta) => {
+          const isSelected = filtroCuenta === cta.id;
+          const count = !datos
+            ? 0
+            : cta.id === "TODOS"
+              ? datos.totalOperaciones
+              : datos.servicios.filter((s) => s.producto === cta.id).reduce((acc, s) => acc + s.cantidad, 0);
+
+          return (
+            <button
+              key={cta.id}
+              type="button"
+              className={`btn btn-xs ${isSelected ? "" : "secondary"}`}
+              style={{
+                fontSize: "0.72rem",
+                padding: "0.2rem 0.5rem",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.3rem",
+                borderRadius: "5px",
+                borderColor: isSelected ? "#0284c7" : undefined,
+              }}
+              onClick={() => setFiltroCuenta(cta.id)}
+            >
+              <span>{cta.icon}</span>
+              <span>{cta.label}</span>
+              {count > 0 && (
+                <span
+                  style={{
+                    background: isSelected ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.06)",
+                    borderRadius: "10px",
+                    padding: "0.05rem 0.35rem",
+                    fontSize: "0.64rem",
+                    fontWeight: 700,
+                  }}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {cargando && <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", padding: "0.5rem" }}>Cargando datos en vivo...</div>}
+      {cargando && <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", padding: "0.5rem" }}>Cargando analítica en vivo...</div>}
 
       {!cargando && (!datos || serviciosFiltrados.length === 0) && (
         <div className="alert info" style={{ margin: "0.5rem 0", padding: "0.5rem 0.75rem", fontSize: "0.78rem" }}>
-          No hay movimientos registrados en esta categoría durante el período seleccionado ({periodoLabel}).
+          No hay movimientos registrados para esta cuenta durante el período seleccionado ({periodoLabel}).
         </div>
       )}
 
       {datos && serviciosFiltrados.length > 0 && (
         <>
-          {/* Métricas destacadas de la categoría seleccionada */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.45rem" }}>
-            <div className="kpi-tile accent" style={{ minHeight: 52, padding: "0.4rem 0.6rem" }}>
-              <span className="kpi-tile-label">🏆 Mayor Demanda</span>
-              <span className="kpi-tile-value" style={{ fontSize: "0.86rem", margin: "0.1rem 0" }}>
+          {/* Cintillo Superior de 4 KPIs: Entradas, Salidas, Flujo Neto y Mayor Demanda */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.55rem" }}>
+            <div className="kpi-tile" style={{ minHeight: 50, padding: "0.4rem 0.65rem", borderLeft: "4px solid #10b981" }}>
+              <span className="kpi-tile-label" style={{ color: "#059669" }}>🟢 Entradas / Depósitos</span>
+              <span className="kpi-tile-value mono" style={{ color: "#059669", fontSize: "0.98rem", margin: "0.1rem 0" }}>
+                {formatoQ(totalIngresosFiltro)}
+              </span>
+              <span className="kpi-tile-sub" style={{ fontSize: "0.68rem" }}>{opIngresosFiltro} transacciones</span>
+            </div>
+
+            <div className="kpi-tile" style={{ minHeight: 50, padding: "0.4rem 0.65rem", borderLeft: "4px solid #ef4444" }}>
+              <span className="kpi-tile-label" style={{ color: "#dc2626" }}>🔴 Salidas / Retiros</span>
+              <span className="kpi-tile-value mono" style={{ color: "#dc2626", fontSize: "0.98rem", margin: "0.1rem 0" }}>
+                {formatoQ(totalEgresosFiltro)}
+              </span>
+              <span className="kpi-tile-sub" style={{ fontSize: "0.68rem" }}>{opEgresosFiltro} transacciones</span>
+            </div>
+
+            <div className="kpi-tile" style={{ minHeight: 50, padding: "0.4rem 0.65rem", borderLeft: `4px solid ${flujoNetoFiltro >= 0 ? "#0284c7" : "#f59e0b"}` }}>
+              <span className="kpi-tile-label">⚖️ Flujo Neto del Período</span>
+              <span className="kpi-tile-value mono" style={{ color: flujoNetoFiltro >= 0 ? "#0284c7" : "#d97706", fontSize: "0.98rem", margin: "0.1rem 0" }}>
+                {flujoNetoFiltro >= 0 ? "+" : ""}{formatoQ(flujoNetoFiltro)}
+              </span>
+              <span className="kpi-tile-sub" style={{ fontSize: "0.68rem" }}>
+                {flujoNetoFiltro >= 0 ? "Superávit neto de captación" : "Déficit / Colocación neta"}
+              </span>
+            </div>
+
+            <div className="kpi-tile accent" style={{ minHeight: 50, padding: "0.4rem 0.65rem", borderLeft: "4px solid #f59e0b" }}>
+              <span className="kpi-tile-label">🏆 Mayor Operación</span>
+              <span className="kpi-tile-value" style={{ fontSize: "0.85rem", margin: "0.1rem 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {servicioTopFiltro ? `${servicioTopFiltro.icon} ${servicioTopFiltro.label}` : "—"}
               </span>
-              <span className="kpi-tile-sub" style={{ fontSize: "0.65rem" }}>
+              <span className="kpi-tile-sub" style={{ fontSize: "0.68rem" }}>
                 {servicioTopFiltro
                   ? `${servicioTopFiltro.cantidad} op. (${totalOperacionesFiltro > 0 ? Math.round((servicioTopFiltro.cantidad / totalOperacionesFiltro) * 1000) / 10 : 0}%)`
                   : ""}
               </span>
             </div>
-
-            <div className="kpi-tile" style={{ minHeight: 52, padding: "0.4rem 0.6rem" }}>
-              <span className="kpi-tile-label">Operaciones</span>
-              <span className="kpi-tile-value mono" style={{ fontSize: "0.96rem", margin: "0.1rem 0" }}>{totalOperacionesFiltro}</span>
-              <span className="kpi-tile-sub" style={{ fontSize: "0.65rem" }}>En este rubro</span>
-            </div>
-
-            <div className="kpi-tile" style={{ minHeight: 52, padding: "0.4rem 0.6rem" }}>
-              <span className="kpi-tile-label">Volumen Operado</span>
-              <span className="kpi-tile-value mono" style={{ color: "var(--accent)", fontSize: "0.96rem", margin: "0.1rem 0" }}>
-                {formatoQ(volumenTotalFiltro)}
-              </span>
-              <span className="kpi-tile-sub" style={{ fontSize: "0.65rem" }}>Flujo monetario</span>
-            </div>
           </div>
 
-          {/* Gráficos de Recharts Compactos */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem", marginTop: "0.5rem" }}>
-            <div style={{ background: "var(--mono-bg)", borderRadius: "6px", border: "1px solid var(--line)", padding: "0.5rem 0.65rem" }}>
-              <h4 style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "var(--ink-soft)", fontWeight: 700 }}>Distribución de Operaciones</h4>
-              <div style={{ width: "100%", height: 165 }}>
-                <ResponsiveContainer>
-                  <PieChart>
-                    <Pie
-                      data={serviciosFiltrados}
-                      dataKey="cantidad"
-                      nameKey="label"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={68}
-                      paddingAngle={2}
+          {/* MODO 1: BALANCE & DISTRIBUCIÓN (3 Columnas Panorámicas) */}
+          {modoVista === "BALANCE" && (
+            <div className="dashboard-charts-grid">
+              {/* Card 1: Dona de Distribución con Tooltip Enriquecido */}
+              <div style={{ background: "var(--mono-bg)", borderRadius: "8px", border: "1px solid var(--line)", padding: "0.6rem 0.75rem", display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                  <h4 style={{ margin: 0, fontSize: "0.78rem", color: "var(--ink)", fontWeight: 700 }}>
+                    🍩 Distribución de Operaciones
+                  </h4>
+                  <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)" }}>{totalOperacionesFiltro} ops.</span>
+                </div>
+                <div style={{ width: "100%", height: 185, position: "relative" }}>
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie
+                        data={serviciosFiltrados.map((s) => ({
+                          ...s,
+                          pctMonto: volumenTotalFiltro > 0 ? Math.round((s.totalMonto / volumenTotalFiltro) * 1000) / 10 : 0,
+                        }))}
+                        dataKey="cantidad"
+                        nameKey="label"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={45}
+                        outerRadius={75}
+                        paddingAngle={3}
+                      >
+                        {serviciosFiltrados.map((s, index) => {
+                          const isIngreso = s.flujo === "INGRESO";
+                          const baseColors = isIngreso
+                            ? ["#10b981", "#059669", "#047857", "#065f46", "#34d399"]
+                            : ["#ef4444", "#dc2626", "#b91c1c", "#f97316", "#ea580c"];
+                          return <Cell key={`cell-${index}`} fill={baseColors[index % baseColors.length]} />;
+                        })}
+                      </Pie>
+                      <RechartsTooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const d = payload[0].payload as ServicioItem & { pctMonto: number };
+                            const isIngreso = d.flujo === "INGRESO";
+                            return (
+                              <div style={{ background: "rgba(15, 23, 42, 0.94)", color: "#fff", padding: "0.45rem 0.65rem", borderRadius: "6px", fontSize: "0.74rem", boxShadow: "0 4px 12px rgba(0,0,0,0.3)" }}>
+                                <div style={{ fontWeight: 700, marginBottom: "0.2rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                                  <span>{d.icon}</span> <span>{d.label}</span>
+                                </div>
+                                <div style={{ color: isIngreso ? "#34d399" : "#f87171", fontSize: "0.7rem", fontWeight: 700 }}>
+                                  {isIngreso ? "🟢 Entrada / Depósito" : "🔴 Salida / Retiro"}
+                                </div>
+                                <div style={{ marginTop: "0.2rem" }}>
+                                  💵 <strong>{formatoQ(d.totalMonto)}</strong> ({d.pctMonto}% del volumen)
+                                </div>
+                                <div style={{ color: "#94a3b8", fontSize: "0.68rem" }}>
+                                  ⚡ {d.cantidad} operaciones ({d.porcentaje}% de demanda)
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Card 2: Participación Proporcional en Volumen (%) con Tooltip en Quetzales */}
+              <div style={{ background: "var(--mono-bg)", borderRadius: "8px", border: "1px solid var(--line)", padding: "0.6rem 0.75rem", display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                  <h4 style={{ margin: 0, fontSize: "0.78rem", color: "var(--ink)", fontWeight: 700 }}>
+                    📊 Participación por Volumen (%)
+                  </h4>
+                  <span className="mono" style={{ fontSize: "0.68rem", color: "#0284c7", fontWeight: 700 }}>
+                    Total: {formatoQ(volumenTotalFiltro)}
+                  </span>
+                </div>
+                <div style={{ width: "100%", height: 185 }}>
+                  <ResponsiveContainer>
+                    <BarChart
+                      data={serviciosFiltrados.map((s) => ({
+                        ...s,
+                        pctMonto: volumenTotalFiltro > 0 ? Math.round((s.totalMonto / volumenTotalFiltro) * 1000) / 10 : 0,
+                      }))}
+                      layout="vertical"
+                      margin={{ left: 10, right: 25, top: 5, bottom: 5 }}
                     >
-                      {serviciosFiltrados.map((_entry, index) => {
-                        const barColors = ["#0284c7", "#059669", "#7c3aed", "#ea580c", "#0891b2", "#d97706"];
-                        return <Cell key={`cell-${index}`} fill={barColors[index % barColors.length]} />;
-                      })}
-                    </Pie>
-                    <RechartsTooltip formatter={(value) => [`${value} op.`, "Operaciones"]} />
-                  </PieChart>
-                </ResponsiveContainer>
+                      <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 9 }} tickFormatter={(val) => `${val}%`} />
+                      <YAxis dataKey="label" type="category" width={115} tick={{ fontSize: 9 }} />
+                      <RechartsTooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const d = payload[0].payload as ServicioItem & { pctMonto: number };
+                            const isIngreso = d.flujo === "INGRESO";
+                            return (
+                              <div style={{ background: "rgba(15, 23, 42, 0.94)", color: "#fff", padding: "0.45rem 0.65rem", borderRadius: "6px", fontSize: "0.74rem", boxShadow: "0 4px 12px rgba(0,0,0,0.3)" }}>
+                                <div style={{ fontWeight: 700, marginBottom: "0.2rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                                  <span>{d.icon}</span> <span>{d.label}</span>
+                                </div>
+                                <div style={{ color: isIngreso ? "#34d399" : "#f87171", fontSize: "0.7rem", fontWeight: 700 }}>
+                                  {isIngreso ? "🟢 Entrada / Depósito" : "🔴 Salida / Retiro"}
+                                </div>
+                                <div style={{ marginTop: "0.2rem" }}>
+                                  💵 Monto exacto: <strong>{formatoQ(d.totalMonto)}</strong>
+                                </div>
+                                <div style={{ color: "#38bdf8", fontSize: "0.7rem" }}>
+                                  📊 Participación: <strong>{d.pctMonto}%</strong>
+                                </div>
+                                <div style={{ color: "#94a3b8", fontSize: "0.68rem" }}>
+                                  ⚡ Transacciones: {d.cantidad} op. ({d.porcentaje}%)
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Bar dataKey="pctMonto" radius={[0, 4, 4, 0]}>
+                        {serviciosFiltrados.map((s, index) => {
+                          const fill = s.flujo === "INGRESO" ? "#10b981" : "#ef4444";
+                          return <Cell key={`cell-bar-${index}`} fill={fill} />;
+                        })}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-            </div>
 
-            <div style={{ background: "var(--mono-bg)", borderRadius: "6px", border: "1px solid var(--line)", padding: "0.5rem 0.65rem" }}>
-              <h4 style={{ margin: "0 0 0.35rem 0", fontSize: "0.78rem", color: "var(--ink-soft)", fontWeight: 700 }}>Volumen Monetario (Q)</h4>
-              <div style={{ width: "100%", height: 165 }}>
-                <ResponsiveContainer>
-                  <BarChart data={serviciosFiltrados} layout="vertical" margin={{ left: 10, right: 10 }}>
-                    <XAxis type="number" hide />
-                    <YAxis dataKey="label" type="category" width={95} tick={{ fontSize: 9 }} />
-                    <RechartsTooltip formatter={(value: any) => [formatoQ(Number(value) || 0), "Volumen"]} />
-                    <Bar dataKey="totalMonto" radius={[0, 4, 4, 0]}>
-                      {serviciosFiltrados.map((_entry, index) => {
-                        const barColors = ["#0284c7", "#059669", "#7c3aed", "#ea580c", "#0891b2", "#d97706"];
-                        return <Cell key={`cell-${index}`} fill={barColors[index % barColors.length]} />;
-                      })}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+              {/* Card 3: Ranking y Desglose Detallado con Porcentajes y Quetzales */}
+              <div style={{ background: "var(--mono-bg)", borderRadius: "8px", border: "1px solid var(--line)", padding: "0.6rem 0.75rem", display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+                  <h4 style={{ margin: 0, fontSize: "0.78rem", color: "var(--ink)", fontWeight: 700 }}>
+                    📋 Desglose de Movimientos
+                  </h4>
+                  <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)" }}>Porcentaje & Monto</span>
+                </div>
+                <div style={{ maxHeight: 185, overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.35rem", paddingRight: "0.2rem" }}>
+                  {serviciosFiltrados.map((s, idx) => {
+                    const pctOp = totalOperacionesFiltro > 0 ? Math.round((s.cantidad / totalOperacionesFiltro) * 1000) / 10 : 0;
+                    const pctVol = volumenTotalFiltro > 0 ? Math.round((s.totalMonto / volumenTotalFiltro) * 1000) / 10 : 0;
+                    const isIngreso = s.flujo === "INGRESO";
+                    const color = isIngreso ? "#10b981" : "#ef4444";
+
+                    return (
+                      <div
+                        key={s.categoria || idx}
+                        style={{
+                          background: "var(--paper-raised)",
+                          border: "1px solid var(--line)",
+                          borderRadius: "6px",
+                          padding: "0.3rem 0.45rem",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.15rem",
+                        }}
+                        title={`${s.label}: ${formatoQ(s.totalMonto)} (${pctVol}% volumen / ${s.cantidad} transacciones - ${pctOp}% de demanda)`}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.72rem" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <span
+                              style={{
+                                fontSize: "0.62rem",
+                                padding: "0.05rem 0.25rem",
+                                borderRadius: "3px",
+                                fontWeight: 700,
+                                background: isIngreso ? "rgba(16, 185, 129, 0.12)" : "rgba(239, 68, 68, 0.12)",
+                                color: color,
+                              }}
+                            >
+                              {isIngreso ? "🟢 ENT" : "🔴 SAL"}
+                            </span>
+                            <span>{s.icon}</span>
+                            <span style={{ fontWeight: 600, color: "var(--ink)" }}>{s.label}</span>
+                          </div>
+                          <span className="mono" style={{ fontWeight: 700, color: color }}>
+                            {formatoQ(s.totalMonto)}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                          <div style={{ flex: 1, background: "rgba(0,0,0,0.06)", height: 4, borderRadius: 2, overflow: "hidden" }}>
+                            <div style={{ width: `${Math.min(pctVol, 100)}%`, background: color, height: "100%", borderRadius: 2 }} />
+                          </div>
+                          <span style={{ fontSize: "0.64rem", color: "var(--ink-soft)", minWidth: "75px", textAlign: "right" }}>
+                            {pctVol}% vol. ({s.cantidad} op.)
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* MODO 2: TENDENCIA TEMPORAL (Evolución por Días/Semanas/Meses) */}
+          {modoVista === "TENDENCIA" && (
+            <div style={{ display: "grid", gridTemplateColumns: "2.1fr 1fr", gap: "0.65rem", marginTop: "0.45rem" }}>
+              {/* Gráfica de Área de Tendencia Temporal */}
+              <div style={{ background: "var(--mono-bg)", borderRadius: "8px", border: "1px solid var(--line)", padding: "0.6rem 0.75rem", display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                  <h4 style={{ margin: 0, fontSize: "0.78rem", color: "var(--ink)", fontWeight: 700 }}>
+                    📈 Evolución Cronológica: Entradas (Verde) vs Salidas (Rojo)
+                  </h4>
+                  <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)" }}>Curva de actividad diaria</span>
+                </div>
+                <div style={{ width: "100%", height: 185 }}>
+                  <ResponsiveContainer>
+                    <AreaChart data={datos.tendenciaTemporal} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="gradIngresos" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                        </linearGradient>
+                        <linearGradient id="gradEgresos" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <XAxis dataKey="label" tick={{ fontSize: 9.5 }} />
+                      <YAxis tick={{ fontSize: 9.5 }} tickFormatter={(val) => `Q${val >= 1000 ? `${Math.round(val / 1000)}k` : val}`} />
+                      <RechartsTooltip formatter={(val: any) => [formatoQ(Number(val) || 0)]} labelFormatter={(l) => `Fecha: ${l}`} />
+                      <Legend wrapperStyle={{ fontSize: "0.7rem", paddingTop: "0.2rem" }} />
+                      <Area type="monotone" dataKey="ingresos" name="🟢 Entradas / Depósitos" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#gradIngresos)" />
+                      <Area type="monotone" dataKey="egresos" name="🔴 Salidas / Retiros" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#gradEgresos)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Panel de Resumen de Tendencia Temporal */}
+              <div style={{ background: "var(--mono-bg)", borderRadius: "8px", border: "1px solid var(--line)", padding: "0.6rem 0.75rem", display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+                  <h4 style={{ margin: 0, fontSize: "0.78rem", color: "var(--ink)", fontWeight: 700 }}>
+                    🎯 Radiografía de Flujo
+                  </h4>
+                  <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)" }}>Por fecha</span>
+                </div>
+                <div style={{ maxHeight: 185, overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.35rem", paddingRight: "0.2rem" }}>
+                  {datos.tendenciaTemporal.slice(-6).reverse().map((t) => (
+                    <div
+                      key={t.fecha}
+                      style={{
+                        background: "var(--paper-raised)",
+                        border: "1px solid var(--line)",
+                        borderRadius: "6px",
+                        padding: "0.3rem 0.45rem",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontSize: "0.72rem",
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontWeight: 700, color: "var(--ink)" }}>📅 {t.fecha}</span>
+                        <div style={{ fontSize: "0.64rem", color: "var(--ink-soft)" }}>{t.operaciones} transacciones</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "0.68rem", color: "#059669", fontWeight: 700 }}>+{formatoQ(t.ingresos)}</div>
+                        <div style={{ fontSize: "0.68rem", color: "#dc2626", fontWeight: 700 }}>-{formatoQ(t.egresos)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
   );
 }
+

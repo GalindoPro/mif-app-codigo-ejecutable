@@ -1312,21 +1312,62 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 ## `frontend/src/styles/app.css` {#frontendsrcstylesappcss}
 
 ```css
-.shell {
-  display: grid;
-  grid-template-columns: 250px 1fr;
-  min-height: 100vh;
-  width: 100%;
+:root {
+  --sidebar-w: 240px;
+  --sidebar-collapsed-w: 56px;
+  --sidebar-transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  min-height: 100vh;
+  width: 100%;
+  transition: grid-template-columns var(--sidebar-transition);
+}
+.shell.sidebar-collapsed {
+  grid-template-columns: var(--sidebar-collapsed-w) 1fr;
+}
+
+/* ═══════════════════════════════════════════════════
+   SIDEBAR — COLLAPSIBLE ICON RAIL
+═══════════════════════════════════════════════════ */
 .sidebar {
-  background: var(--paper-raised);
-  border-right: 1px solid var(--line);
-  padding: 1.25rem 1rem;
+  background: #070738;
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  transition: transform 0.3s ease;
+  gap: 0;
+  transition: width var(--sidebar-transition), transform 0.3s ease;
+  overflow: hidden;
+  position: relative;
+  width: var(--sidebar-w);
+  /* Fix height to viewport */
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  z-index: 20;
+}
+/* Collapsed state */
+.shell.sidebar-collapsed .sidebar {
+  width: var(--sidebar-collapsed-w);
+}
+/* Shimmer top line */
+.sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #BF9903, #eab308, #BF9903);
+  background-size: 200% 100%;
+  animation: shimmer-bar 3s linear infinite;
+  z-index: 1;
+}
+@keyframes shimmer-bar {
+  0%   { background-position: 0% 0%; }
+  100% { background-position: 200% 0%; }
 }
 
 .mobile-header {
@@ -1372,65 +1413,343 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   pointer-events: auto;
 }
 
+/* ── BRAND AREA ── */
 .brand {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  padding: 0 0.5rem;
+  gap: 0;
+  padding: 0;
+  background: rgba(5, 150, 105, 0.07);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+/* Toggle button at top of brand */
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 0.85rem 0.75rem;
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  position: relative;
+}
+.sidebar-toggle-logo {
+  width: 34px;
+  height: 34px;
+  background: linear-gradient(135deg, #BF9903 0%, #997b02 100%);
+  color: #fff;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 1rem;
+  flex-shrink: 0;
+  box-shadow: 0 3px 10px rgba(191,153,3,0.4), 0 0 0 1px rgba(234,179,8,0.2);
+  transition: box-shadow 0.2s;
+}
+.sidebar-toggle:hover .sidebar-toggle-logo {
+  box-shadow: 0 4px 14px rgba(191,153,3,0.55), 0 0 0 2px rgba(234,179,8,0.35);
+}
+.sidebar-toggle-text {
+  overflow: hidden;
+  transition: opacity var(--sidebar-transition), width var(--sidebar-transition);
+  white-space: nowrap;
+}
+.shell.sidebar-collapsed .sidebar-toggle-text {
+  opacity: 0;
+  width: 0;
 }
 .brand .name {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-weight: 800;
-  font-size: 1.25rem;
-  letter-spacing: -0.02em;
-  color: var(--accent);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  text-transform: uppercase;
+  display: block;
 }
 .brand .sub {
-  font-size: 0.72rem;
-  color: var(--ink-soft);
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.55rem;
+  color: #BF9903;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   font-weight: 600;
+  display: block;
+}
+/* Chevron toggle icon */
+.sidebar-chevron {
+  position: absolute;
+  right: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%) rotate(0deg);
+  color: rgba(255,255,255,0.3);
+  font-size: 0.7rem;
+  transition: transform var(--sidebar-transition), color 0.2s;
+  font-style: normal;
+}
+.shell.sidebar-collapsed .sidebar-chevron {
+  transform: translateY(-50%) rotate(180deg);
+}
+/* Agency badge */
+.agency-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(191,153,3,0.15);
+  border-top: 1px solid rgba(191,153,3,0.2);
+  padding: 0.38rem 0.85rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #BF9903;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: padding var(--sidebar-transition);
+}
+.shell.sidebar-collapsed .agency-badge {
+  justify-content: center;
+  padding: 0.38rem 0;
+}
+.agency-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #BF9903;
+  box-shadow: 0 0 6px #BF9903;
+  flex-shrink: 0;
+  animation: pulse-dot 2s infinite;
+}
+.agency-badge-text {
+  overflow: hidden;
+  transition: opacity var(--sidebar-transition), width var(--sidebar-transition);
+  white-space: nowrap;
+}
+.shell.sidebar-collapsed .agency-badge-text {
+  opacity: 0;
+  width: 0;
 }
 
+/* ── NAV ── */
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.05rem;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.5rem 0.55rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
 }
-.nav a {
-  display: block;
-  padding: 0.55rem 0.75rem;
-  border-radius: 8px;
-  color: var(--ink-soft);
-  text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: all 0.15s ease;
+.nav::-webkit-scrollbar { width: 2px; }
+.nav::-webkit-scrollbar-track { background: transparent; }
+.nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+/* Section labels */
+.nav-section {
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: rgba(255,255,255,0.22);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 0.65rem 0.55rem 0.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity var(--sidebar-transition), height var(--sidebar-transition), padding var(--sidebar-transition);
 }
-.nav a:hover {
-  background: var(--mono-bg);
-  color: var(--ink);
-}
-.nav a.active {
-  background: var(--accent);
-  color: #ffffff;
-  font-weight: 600;
+.shell.sidebar-collapsed .nav-section {
+  opacity: 0;
+  height: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
+/* Nav links */
+.nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  color: rgba(255,255,255,0.48);
+  text-decoration: none;
+  font-size: 0.81rem;
+  font-weight: 500;
+  transition: all 0.18s ease;
+  position: relative;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.nav a .nav-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+  width: 22px;
+  text-align: center;
+  opacity: 0.75;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.nav a .nav-label {
+  transition: opacity var(--sidebar-transition), width var(--sidebar-transition);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.shell.sidebar-collapsed .nav a .nav-label {
+  opacity: 0;
+  width: 0;
+}
+/* ─────────────────────────────────────────────────────────────
+   UNIVERSAL TOOLTIP — aparece en AMBOS modos (colapsado + expandido)
+   Pill oscuro flotante a la derecha con flechita — estilo VS Code / Linear
+───────────────────────────────────────────────────────────── */
+
+/* Collapsed: centrar ícono */
+.shell.sidebar-collapsed .nav a {
+  justify-content: center;
+  padding: 0.5rem;
+}
+
+/* Allow the tooltip to overflow the nav container */
+.nav {
+  overflow-x: visible;
+}
+.nav a[data-tooltip] {
+  overflow: visible;
+}
+
+/* ── Tooltip pill (::before) ── */
+.nav a[data-tooltip]::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  /* Horizontally: start right after the sidebar */
+  left: 100%;
+  margin-left: 10px;
+  /* Vertically: center on the link */
+  top: 50%;
+  transform: translateY(-50%) translateX(-6px);
+  /* Pill style */
+  background: #162033;
+  color: #e2e8f0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.3rem 0.72rem;
+  border-radius: 7px;
+  white-space: nowrap;
+  /* Hidden by default */
+  opacity: 0;
+  pointer-events: none;
+  /* Border + shadow */
+  border: 1px solid rgba(52, 211, 153, 0.18);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,0,0,0.2);
+  /* z-index to float above content */
+  z-index: 9999;
+  letter-spacing: 0.01em;
+  /* Animate in: 0.3s delay, slide in from left */
+  transition: opacity 0.15s ease 0.3s, transform 0.15s ease 0.3s;
+}
+
+/* ── Left arrow (::after on the link, only when tooltip is visible) ── */
+/* We use a second pseudo trick: since ::after is for the active bar,
+   we embed the arrow as a box-shadow notch on ::before itself */
+/* Arrow via left border on ::before */
+.nav a[data-tooltip]::before {
+  /* Add left pointing arrow using box-shadow trick */
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));
+}
+
+/* ── Show on hover ── */
+.nav a[data-tooltip]:hover::before {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+/* ── In collapsed mode: anchor from collapsed width ── */
+.shell.sidebar-collapsed .nav a[data-tooltip]::before {
+  left: 100%;
+  margin-left: 8px;
+}
+
+
+.nav a:hover {
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.9);
+}
+.nav a:hover .nav-icon {
+  opacity: 1;
+  transform: scale(1.1);
+}
+.nav a.active {
+  background: linear-gradient(135deg, rgba(5,150,105,0.3) 0%, rgba(16,185,129,0.15) 100%);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 0 0 1px rgba(52,211,153,0.2), inset 0 0 10px rgba(52,211,153,0.06);
+}
+.nav a.active .nav-icon {
+  opacity: 1;
+}
+.nav a.active::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 3px;
+  background: linear-gradient(180deg, #BF9903, #997b02);
+  border-radius: 3px 0 0 3px;
+}
+.shell.sidebar-collapsed .nav a.active::after {
+  right: auto;
+  left: 0;
+  border-radius: 0 3px 3px 0;
+}
+
+/* ── SIDEBAR FOOTER ── */
 .sidebar-footer {
-  margin-top: auto;
-  border-top: 1px solid var(--line);
-  padding-top: 1rem;
+  margin-top: 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding: 0.6rem 0.7rem;
   font-size: 0.85rem;
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.2);
+  overflow: hidden;
+}
+.sidebar-footer-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
 }
 .sidebar-footer .who {
   font-weight: 600;
+  color: #ffffff;
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: opacity var(--sidebar-transition), width var(--sidebar-transition);
 }
 .sidebar-footer .role {
-  color: var(--ink-soft);
-  font-size: 0.78rem;
+  color: rgba(255,255,255,0.38);
+  font-size: 0.68rem;
+  transition: opacity var(--sidebar-transition);
+}
+.sidebar-footer-text {
+  flex: 1;
+  overflow: hidden;
+  transition: opacity var(--sidebar-transition), width var(--sidebar-transition);
+}
+.shell.sidebar-collapsed .sidebar-footer-text {
+  opacity: 0;
+  width: 0;
+}
+.shell.sidebar-collapsed .sidebar-footer-inner {
+  justify-content: center;
+}
+.shell.sidebar-collapsed .sidebar-footer-logout {
+  display: none;
 }
 .link-btn {
   background: none;
@@ -1444,7 +1763,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 }
 
 .content {
-  padding: 1.25rem 2rem;
+  padding: 1rem 1.5rem;
   max-width: none;
   width: 100%;
   box-sizing: border-box;
@@ -1520,6 +1839,11 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
   70% { transform: scale(1.15); box-shadow: 0 0 0 5px rgba(16, 185, 129, 0); }
   100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+@keyframes tooltip-in {
+  from { opacity: 0; transform: translateY(-50%) translateX(-4px); }
+  to   { opacity: 1; transform: translateY(-50%) translateX(0); }
 }
 
 .live-dot {
@@ -1655,16 +1979,30 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 }
 
 /* Contenedor inferior de 2 columnas balanceadas */
+/* Contenedor inferior de analítica panorámica */
 .dashboard-lower-grid {
-  display: grid;
-  grid-template-columns: 0.95fr 1.05fr;
+  display: flex;
+  flex-direction: column;
   gap: 0.65rem;
-  align-items: stretch;
   width: 100%;
 }
 
-@media (max-width: 1080px) {
-  .dashboard-lower-grid {
+.dashboard-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.15fr;
+  gap: 0.65rem;
+  margin-top: 0.45rem;
+  width: 100%;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-charts-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-charts-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1726,6 +2064,52 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 0.5rem;
   flex-shrink: 0;
+}
+
+.screen-kpi-tile {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  gap: 0.15rem;
+}
+.screen-kpi-tile.accent {
+  border-left: 3px solid var(--accent);
+}
+.screen-kpi-label {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.screen-kpi-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+  white-space: nowrap;
+  display: block;
+}
+.screen-kpi-tile.accent .screen-kpi-value {
+  color: var(--accent);
+}
+.screen-kpi-sub {
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
 
 .screen-split-layout {
@@ -1832,39 +2216,93 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  border: 1px solid transparent;
+  justify-content: center;
+  gap: 0.45rem;
+  border: 1px solid rgba(5, 150, 105, 0.4);
   border-radius: 8px;
-  padding: 0.55rem 1.1rem;
-  font-size: 0.9rem;
+  padding: 0.52rem 1.05rem;
+  font-size: 0.86rem;
   font-weight: 600;
   cursor: pointer;
-  background: var(--accent);
-  color: var(--paper-raised);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #ffffff;
   text-decoration: none;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  white-space: nowrap;
 }
-.btn:hover {
-  background: var(--accent-strong);
+.btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+.btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.3);
 }
 .btn:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
+  filter: grayscale(0.2);
+  transform: none !important;
+  box-shadow: none !important;
 }
+
 .btn.secondary {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.9);
   border-color: var(--line);
   color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
-.btn.secondary:hover {
+.btn.secondary:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: #94a3b8;
+  color: #0f172a;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+}
+.btn.secondary:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
   background: var(--mono-bg);
 }
+
 .btn.danger {
-  background: #dc2626;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   color: #ffffff;
-  border-color: #b91c1c;
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
-.btn.danger:hover {
-  background: #b91c1c;
+.btn.danger:hover:not(:disabled) {
+  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
+  color: #ffffff;
+}
+.btn.danger:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.btn-sm, .btn.btn-sm {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  gap: 0.3rem;
+}
+.btn-xs, .btn.btn-xs {
+  padding: 0.22rem 0.5rem;
+  font-size: 0.72rem;
+  border-radius: 5px;
+  gap: 0.25rem;
+}
+.btn-icon {
+  padding: 0.45rem;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .field {
@@ -1986,7 +2424,7 @@ td a {
 }
 .badge.activo, .badge.activa, .badge.desembolsado {
   background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
+  color: #10b981;
   border-color: rgba(16, 185, 129, 0.3);
 }
 .badge.inactivo, .badge.cerrada, .badge.liquidado, .badge.cancelado {
@@ -2267,62 +2705,77 @@ td a {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
   }
   .mobile-header {
     display: flex;
+    background: #070738;
+    color: #ffffff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+  .hamburger-btn {
+    color: #ffffff;
   }
   .sidebar {
     position: fixed;
     top: 0;
     left: 0;
     bottom: 0;
-    width: 280px;
+    width: 290px;
     z-index: 50;
-    background: var(--paper-raised);
+    background: #070738;
     transform: translateX(-100%);
-    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
-    border-right: none;
-    padding: 1.5rem 1.25rem;
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 0;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .sidebar.open {
     transform: translateX(0);
   }
   .content {
-    padding: 1.25rem 1rem;
+    padding: 0.75rem 1rem;
     max-width: 100%;
     width: 100%;
     box-sizing: border-box;
     overflow-x: hidden;
+    overflow-y: auto;
+    flex: 1;
+    height: calc(100vh - 56px);
   }
   .stat-grid {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
-    gap: 0.75rem !important;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+    gap: 0.65rem !important;
   }
   .page-head h1 {
-    font-size: 1.4rem;
+    font-size: 1.3rem;
   }
 }
 
 /* Teléfonos móviles y pantallas compactas (≤ 640px) */
 @media (max-width: 640px) {
   .sidebar {
-    width: 85%;
+    width: 86%;
     max-width: 320px;
   }
   .content {
-    padding: 1rem 0.75rem;
+    padding: 0.6rem 0.6rem;
+    height: calc(100vh - 52px);
   }
   .stat-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
   }
   .stat-card .value {
-    font-size: 1.35rem !important;
+    font-size: 1.15rem !important;
   }
   .page-head h1 {
-    font-size: 1.25rem;
+    font-size: 1.15rem;
   }
   .table-wrap {
-    margin: 0 -0.75rem;
+    margin: 0 -0.5rem;
     border-radius: 0;
     border-left: none;
     border-right: none;
@@ -2339,8 +2792,8 @@ td a {
 
 @media print {
   @page {
-    size: letter landscape;
-    margin: 0.6cm;
+    size: letter portrait;
+    margin: 8mm 10mm;
   }
 
   body {
@@ -2443,10 +2896,10 @@ td a {
     display: none !important;
   }
 
-  /* Contenedores de reportes directos en pantalla optimizados para imprimir */
-  .caja-chica-reporte-container,
+  /* Contenedores de modales optimizados para imprimir */
   .caja-chica-modal-overlay,
-  .arqueo-modal-overlay {
+  .arqueo-modal-overlay,
+  .libro-caja-modal-overlay {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
@@ -2456,9 +2909,9 @@ td a {
     width: 100% !important;
   }
 
-  .caja-chica-reporte-card,
   .caja-chica-modal-card,
-  .arqueo-modal-card {
+  .arqueo-modal-card,
+  .libro-caja-modal-card {
     max-width: 100% !important;
     width: 100% !important;
     box-shadow: none !important;
@@ -2469,11 +2922,13 @@ td a {
   }
 
   /* Ocultar TODO el contenido de fondo (la aplicación completa) cuando se imprime un modal de Portal */
-  body:has(.arqueo-modal-overlay) #root {
+  body:has(.arqueo-modal-overlay) #root,
+  body:has(.libro-caja-modal-overlay) #root {
     display: none !important;
   }
   
-  body:has(.arqueo-modal-overlay) .arqueo-modal-overlay {
+  body:has(.arqueo-modal-overlay) .arqueo-modal-overlay,
+  body:has(.libro-caja-modal-overlay) .libro-caja-modal-overlay {
     display: block !important;
     position: absolute !important;
     top: 0 !important;
@@ -2483,29 +2938,161 @@ td a {
   }
 }
 
-/* Modales estándar del sistema */
-.modal {
+/* ═══════════════════════════════════════════════════
+   MODALES EJECUTIVOS FINTECH Y PANTALLAS EMERGENTES
+   ═══════════════════════════════════════════════════ */
+.modal,
+.modal-overlay,
+.recibo-modal-overlay,
+.caja-chica-modal-overlay,
+.modal-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(2px);
+  background-color: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 9999;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 1rem;
+  padding: 1.25rem;
   overflow-y: auto;
+  animation: modal-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.modal-content {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
-  padding: 1.5rem;
+@keyframes modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content,
+.modal-card,
+.caja-chica-modal-card,
+.recibo-modal-card {
+  background: var(--paper-raised, #ffffff);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 14px;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  padding: 1.35rem 1.5rem;
   width: 100%;
-  max-width: 500px;
+  max-width: 580px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
   color: var(--ink);
+  position: relative;
+  animation: modal-scale-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+@keyframes modal-scale-in {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0.85rem;
+  flex-shrink: 0;
+}
+.modal-header h2,
+.modal-header h3,
+.modal-title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 6px;
+  line-height: 1;
+  transition: all 0.15s;
+}
+.modal-close-btn:hover {
+  background: var(--mono-bg);
+  color: var(--ink);
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.4rem;
+  margin-right: -0.4rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+.modal-body::-webkit-scrollbar {
+  width: 4px;
+}
+.modal-body::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 4px;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+  margin-top: 0.85rem;
+  flex-shrink: 0;
+}
+
+/* Modales Adaptativos en Tablets y Teléfonos Móviles */
+@media (max-width: 768px) {
+  .modal,
+  .modal-overlay,
+  .recibo-modal-overlay,
+  .caja-chica-modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal-content,
+  .modal-card,
+  .caja-chica-modal-card,
+  .recibo-modal-card {
+    max-width: 100%;
+    width: 100%;
+    max-height: 94vh;
+    border-radius: 18px 18px 0 0;
+    padding: 1.15rem 1rem 1.35rem;
+    border-bottom: none;
+    animation: modal-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+@keyframes modal-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+
+/* Estilos para créditos con cobro pendiente de aprobación */
+.row-cobrado {
+  background-color: var(--paper-soft) !important;
+  opacity: 0.8;
+}
+.row-cobrado td {
+  color: var(--ink-soft) !important;
+}
+.row-cobrado .strikethrough-text {
+  text-decoration: line-through;
 }
 ```
 
@@ -3135,44 +3722,23 @@ export default function AhorroList() {
 ## `frontend/src/pages/AuxiliarCaja.tsx` {#frontendsrcpagesauxiliarcajatsx}
 
 ```tsx
-import { useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import BuscadorSocio from "../components/BuscadorSocio";
-import BuscadorCuenta from "../components/BuscadorCuenta";
-import {
-  CATEGORIAS_AUXILIAR,
-  CATEGORIA_AUXILIAR_KEYS,
-  DENOMINACIONES_GT,
-  formatoQ,
-  labelDenominacion,
-} from "../types";
 import type {
   Agencia,
-  CajaCategoria,
-  Cuenta,
   DetalleCajaAuxiliar,
   EstadoCajaAuxiliar,
-  Socio,
 } from "../types";
-
-const GRUPOS = [
-  { key: "PROPIO_INGRESO", seccion: "PROPIO", tipo: "INGRESO", titulo: "Ingreso propio" },
-  { key: "PROPIO_EGRESO", seccion: "PROPIO", tipo: "EGRESO", titulo: "Egreso propio" },
-  { key: "BI_INGRESO", seccion: "BI", tipo: "INGRESO", titulo: "Ingreso BI" },
-  { key: "BI_EGRESO", seccion: "BI", tipo: "EGRESO", titulo: "Egreso BI" },
-] as const;
-
-function categoriasDeGrupo(seccion: "BI" | "PROPIO", tipo: "INGRESO" | "EGRESO"): CajaCategoria[] {
-  return CATEGORIA_AUXILIAR_KEYS.filter(
-    (k) => CATEGORIAS_AUXILIAR[k].seccion === seccion && CATEGORIAS_AUXILIAR[k].tipo === tipo,
-  );
-}
+import AbrirCajaCard from "../components/cajaauxiliar/AbrirCajaCard";
+import CajaAbierta from "../components/cajaauxiliar/CajaAbierta";
+import CajaCerradaCard from "../components/cajaauxiliar/CajaCerradaCard";
+import HistorialCajasModal from "../components/cajaauxiliar/HistorialCajasModal";
+import LibroCajaReporteModal from "../components/cajaauxiliar/LibroCajaReporteModal";
 
 export default function AuxiliarCaja() {
   const { usuario } = useAuth();
-  const puedeElegirAgencia = usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA";
+  const puedeElegirAgencia = usuario?.rol === "GERENCIA";
 
   const [agencias, setAgencias] = useState<Agencia[]>([]);
   const [agenciaId, setAgenciaId] = useState(usuario?.agenciaId ?? "");
@@ -3180,10 +3746,20 @@ export default function AuxiliarCaja() {
   const [detalle, setDetalle] = useState<DetalleCajaAuxiliar | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+  const [mostrarHistorial, setMostrarHistorial] = useState(false);
+  const [mostrarReporteGlobal, setMostrarReporteGlobal] = useState(false);
 
   useEffect(() => {
-    if (puedeElegirAgencia) api.get<Agencia[]>("/agencias").then(({ data }) => setAgencias(data));
-  }, [puedeElegirAgencia]);
+    api.get<Agencia[]>("/agencias").then(({ data }) => {
+      setAgencias(data);
+      // Si el usuario es ADMIN/GERENCIA y no tiene agencia asignada,
+      // seleccionar automáticamente la primera agencia disponible
+      if (!usuario?.agenciaId && data.length > 0) {
+        setAgenciaId(data[0].id);
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function cargarEstado() {
     if (!agenciaId) return;
@@ -3227,49 +3803,90 @@ export default function AuxiliarCaja() {
 
   if (!agenciaId) {
     return (
-      <div>
-        <div className="page-head">
-          <div>
-            <h1>Auxiliar de caja</h1>
-            <p>Selecciona una agencia para ver o abrir la caja del día.</p>
-          </div>
+      <div className="screen-container">
+        <div className="screen-header">
+          <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.2rem" }}>
+            <span>💵</span> Auxiliar de Caja
+          </h1>
         </div>
-        <div className="field" style={{ maxWidth: 320 }}>
-          <label htmlFor="aux-agencia-inicial">Agencia</label>
-          <select id="aux-agencia-inicial" value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)}>
-            <option value="" disabled>
-              Selecciona una agencia
-            </option>
-            {agencias.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
+        <div className="alert error">Debes tener una agencia asignada o seleccionar una.</div>
       </div>
     );
   }
 
+  const agenciaActualNombre = agencias.find((a) => a.id === agenciaId)?.nombre ?? "Agencia";
+
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <h1>Auxiliar de caja</h1>
-          <p>Libro de caja del día: transacciones agente Banco Industrial e ingresos/egresos propios.</p>
+    <div className="screen-container">
+      {/* CABECERA COMPACTA DE 1 LÍNEA */}
+      <div className="screen-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", flexWrap: "wrap" }}>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.2rem" }}>
+            <span>💵</span> Auxiliar de Caja
+          </h1>
+          <span
+            style={{
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              padding: "0.15rem 0.5rem",
+              borderRadius: "4px",
+              background: "rgba(16, 185, 129, 0.15)",
+              color: "#10b981",
+              border: "1px solid rgba(16, 185, 129, 0.3)",
+            }}
+          >
+            Libro de Operaciones Diarias
+          </span>
         </div>
-        {puedeElegirAgencia && (
-          <select value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} style={{ maxWidth: 240 }}>
-            {agencias.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.nombre}
-              </option>
-            ))}
-          </select>
-        )}
+
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="btn secondary"
+            onClick={() => setMostrarReporteGlobal(true)}
+            style={{ padding: "0.3rem 0.65rem", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.3rem" }}
+            title="Imprimir Libro de Movimientos y Cuadre de Caja"
+          >
+            <span>🖨️</span> Imprimir Libro de Caja
+          </button>
+          {usuario?.rol !== "CAJERO" && (
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={() => setMostrarHistorial(true)}
+              style={{ padding: "0.3rem 0.65rem", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.3rem" }}
+            >
+              <span>📅</span> Historial de Cajas
+            </button>
+          )}
+          {puedeElegirAgencia && (
+            <select
+              value={agenciaId}
+              onChange={(e) => setAgenciaId(e.target.value)}
+              style={{
+                padding: "0.3rem 0.65rem",
+                borderRadius: "6px",
+                border: "1px solid var(--line)",
+                background: "var(--paper)",
+                color: "var(--ink)",
+                fontSize: "0.8rem",
+              }}
+            >
+              {agencias.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.nombre}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
       </div>
 
-      {error && <div className="alert error">{error}</div>}
+      {error && (
+        <div className="alert error" style={{ margin: "0.25rem 0", padding: "0.4rem 0.75rem", fontSize: "0.82rem" }}>
+          {error}
+        </div>
+      )}
 
       {estadoInfo?.estado === "SIN_ABRIR" && (
         <AbrirCajaCard estadoInfo={estadoInfo} cargando={cargando} onAbrir={abrirCaja} />
@@ -3286,504 +3903,31 @@ export default function AuxiliarCaja() {
           }}
         />
       )}
-    </div>
-  );
-}
 
-function AbrirCajaCard({
-  estadoInfo,
-  cargando,
-  onAbrir,
-}: {
-  estadoInfo: Extract<EstadoCajaAuxiliar, { estado: "SIN_ABRIR" }>;
-  cargando: boolean;
-  onAbrir: (saldoInicial?: number) => void;
-}) {
-  const [saldoManual, setSaldoManual] = useState("");
-  const hoy = new Date().toLocaleDateString("es-GT", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-
-  return (
-    <div className="card" style={{ maxWidth: 480 }}>
-      <h2 style={{ marginTop: 0 }}>Abrir caja de hoy</h2>
-      <p className="sub" style={{ textTransform: "capitalize" }}>
-        {hoy}
-      </p>
-      {estadoInfo.esPrimeraVez ? (
-        <>
-          <p>Es la primera vez que se abre la caja de esta agencia. Indica el saldo inicial de hoy.</p>
-          <div className="field">
-            <label htmlFor="aux-saldo-manual">Saldo inicial</label>
-            <input
-              id="aux-saldo-manual"
-              type="number"
-              min="0"
-              step="0.01"
-              value={saldoManual}
-              onChange={(e) => setSaldoManual(e.target.value)}
-            />
-          </div>
-          <button className="btn" disabled={cargando || !saldoManual} onClick={() => onAbrir(Number(saldoManual))}>
-            {cargando ? "Abriendo…" : "Abrir caja"}
-          </button>
-        </>
-      ) : (
-        <>
-          <p>
-            El saldo inicial de hoy se toma automáticamente del cierre del{" "}
-            {estadoInfo.fechaUltimoCierre ? new Date(estadoInfo.fechaUltimoCierre).toLocaleDateString("es-GT") : "día anterior"}:
-          </p>
-          <div className="stat-card accent" style={{ marginBottom: "1rem" }}>
-            <span className="label">Saldo inicial de hoy</span>
-            <span className="value">{formatoQ(estadoInfo.saldoSugerido ?? 0)}</span>
-          </div>
-          <button className="btn" disabled={cargando} onClick={() => onAbrir()}>
-            {cargando ? "Abriendo…" : "Abrir caja de hoy"}
-          </button>
-        </>
+      {estadoInfo?.estado === "CERRADO" && (
+        <CajaCerradaCard
+          agenciaNombre={agenciaActualNombre}
+          detalle={estadoInfo.detalle}
+          onVerHistorial={() => setMostrarHistorial(true)}
+        />
       )}
-    </div>
-  );
-}
 
-function CajaAbierta({
-  agenciaId,
-  detalle,
-  onRecargar,
-  onCerrada,
-}: {
-  agenciaId: string;
-  detalle: DetalleCajaAuxiliar;
-  onRecargar: () => void;
-  onCerrada: () => void;
-}) {
-  const [mostrarForm, setMostrarForm] = useState(false);
-  const [mostrarCierre, setMostrarCierre] = useState(false);
-
-  return (
-    <div>
-      <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 210px))" }}>
-        <div className="stat-card">
-          <span className="label">Saldo inicial</span>
-          <span className="value">{formatoQ(detalle.dia.saldo_inicial)}</span>
-        </div>
-        <div className="stat-card">
-          <span className="label">Total ingresos</span>
-          <span className="value">{formatoQ(detalle.totalIngreso)}</span>
-        </div>
-        <div className="stat-card">
-          <span className="label">Total egresos</span>
-          <span className="value">{formatoQ(detalle.totalEgreso)}</span>
-        </div>
-        <div className="stat-card accent">
-          <span className="label">Saldo actual</span>
-          <span className="value">{formatoQ(detalle.saldoActual)}</span>
-        </div>
-      </div>
-
-      <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem" }}>
-        <button className="btn" onClick={() => setMostrarForm((v) => !v)}>
-          {mostrarForm ? "Cancelar" : "+ Nuevo movimiento"}
-        </button>
-        <button className="btn secondary" onClick={() => setMostrarCierre((v) => !v)}>
-          {mostrarCierre ? "Cancelar cierre" : "Cerrar caja del día"}
-        </button>
-      </div>
-
-      {mostrarForm && (
-        <NuevoMovimientoForm
+      {mostrarHistorial && (
+        <HistorialCajasModal
           agenciaId={agenciaId}
-          diaId={detalle.dia.id}
-          onCreado={() => {
-            setMostrarForm(false);
-            onRecargar();
-          }}
+          agenciaNombre={agenciaActualNombre}
+          onCerrar={() => setMostrarHistorial(false)}
         />
       )}
 
-      {mostrarCierre && (
-        <CierreCajaForm
-          diaId={detalle.dia.id}
-          saldoEsperado={detalle.saldoActual}
-          onCerrada={() => {
-            setMostrarCierre(false);
-            onCerrada();
-          }}
+      {mostrarReporteGlobal && (
+        <LibroCajaReporteModal
+          agenciaId={agenciaId}
+          agenciaNombre={agenciaActualNombre}
+          detalleActual={detalle}
+          onClose={() => setMostrarReporteGlobal(false)}
         />
       )}
-
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Hora</th>
-              <th>Movimiento</th>
-              <th>Referencia</th>
-              <th>Beneficiario</th>
-              <th>Doc.</th>
-              <th>Ingreso</th>
-              <th>Egreso</th>
-              <th>Saldo</th>
-              <th>Usuario</th>
-            </tr>
-          </thead>
-          <tbody>
-            {detalle.movimientos.map((m) => (
-              <tr key={m.id}>
-                <td className="mono">
-                  {new Date(m.created_at).toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}
-                </td>
-                <td>{m.descripcion}</td>
-                <td className="mono">{m.referencia ?? "—"}</td>
-                <td>{m.beneficiario}</td>
-                <td className="mono">{m.doc_no ?? "—"}</td>
-                <td className="mono movimiento-monto deposito">{m.tipo === "INGRESO" ? formatoQ(m.monto) : ""}</td>
-                <td className="mono movimiento-monto retiro">{m.tipo === "EGRESO" ? formatoQ(m.monto) : ""}</td>
-                <td className="mono">{formatoQ(m.saldo_acumulado)}</td>
-                <td>{m.usuario_nombre}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {detalle.movimientos.length === 0 && <div className="empty">Todavía no hay movimientos registrados hoy.</div>}
-      </div>
-    </div>
-  );
-}
-
-function NuevoMovimientoForm({ agenciaId, diaId, onCreado }: { agenciaId: string; diaId: string; onCreado: () => void }) {
-  const [grupo, setGrupo] = useState<(typeof GRUPOS)[number]["key"]>("PROPIO_INGRESO");
-  const opcionesGrupo = useMemo(() => {
-    const g = GRUPOS.find((x) => x.key === grupo)!;
-    return categoriasDeGrupo(g.seccion, g.tipo);
-  }, [grupo]);
-
-  const [categoria, setCategoria] = useState<CajaCategoria>(opcionesGrupo[0]);
-  const info = CATEGORIAS_AUXILIAR[categoria];
-
-  const [socio, setSocio] = useState<Socio | null>(null);
-  const [socioManual, setSocioManual] = useState(false);
-  const [cuenta, setCuenta] = useState<Cuenta | null>(null);
-  const [beneficiario, setBeneficiario] = useState("");
-  const [sugerencias, setSugerencias] = useState<string[]>([]);
-  const [referenciaAut, setReferenciaAut] = useState("");
-  const [docNo, setDocNo] = useState("");
-  const [monto, setMonto] = useState("");
-  const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  function cambiarGrupo(nuevo: (typeof GRUPOS)[number]["key"]) {
-    setGrupo(nuevo);
-    const g = GRUPOS.find((x) => x.key === nuevo)!;
-    const opciones = categoriasDeGrupo(g.seccion, g.tipo);
-    setCategoria(opciones[0]);
-    setSocio(null);
-    setCuenta(null);
-    setBeneficiario("");
-    setReferenciaAut("");
-    setDocNo("");
-  }
-
-  useEffect(() => {
-    if (info.seccion !== "BI") return;
-    if (!beneficiario || beneficiario.length < 2) {
-      setSugerencias([]);
-      return;
-    }
-    const t = setTimeout(() => {
-      api
-        .get<string[]>("/caja-auxiliar/beneficiarios", { params: { agenciaId, q: beneficiario } })
-        .then(({ data }) => setSugerencias(data));
-    }, 250);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [beneficiario, info.seccion]);
-
-  async function enviar(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-
-    const beneficiarioFinal = info.requiereCuenta ? undefined : socio ? socio.nombres : beneficiario;
-    if (!info.requiereCuenta && !beneficiarioFinal) {
-      setError("Indica el beneficiario");
-      return;
-    }
-    if (info.requiereCuenta && !cuenta) {
-      setError("Selecciona la cuenta");
-      return;
-    }
-
-    setGuardando(true);
-    try {
-      await api.post(`/caja-auxiliar/${diaId}/movimientos`, {
-        categoria,
-        monto: Number(monto),
-        beneficiario: beneficiarioFinal,
-        socioId: socio?.id,
-        cuentaId: cuenta?.id,
-        docNo: docNo || undefined,
-        referenciaAut: referenciaAut || undefined,
-      });
-      onCreado();
-    } catch (err) {
-      setError(mensajeError(err));
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  const referenciaPreview = cuenta ? `${cuenta.numero_cuenta}-${info.tipo === "INGRESO" ? "IN" : "EN"}` : null;
-
-  return (
-    <form className="card" onSubmit={enviar} style={{ marginBottom: "1.5rem" }}>
-      <div className="tabs" style={{ marginBottom: "1rem" }}>
-        {GRUPOS.map((g) => (
-          <button key={g.key} type="button" className={grupo === g.key ? "on" : ""} onClick={() => cambiarGrupo(g.key)}>
-            {g.titulo}
-          </button>
-        ))}
-      </div>
-
-      <div className="form-grid">
-        <div className="field" style={{ gridColumn: "1 / -1" }}>
-          <label htmlFor="aux-categoria">Tipo de movimiento</label>
-          <select id="aux-categoria" value={categoria} onChange={(e) => setCategoria(e.target.value as CajaCategoria)}>
-            {opcionesGrupo.map((c) => (
-              <option key={c} value={c}>
-                {CATEGORIAS_AUXILIAR[c].descripcion}
-                {CATEGORIAS_AUXILIAR[c].sinModuloReal ? " (solo registro de caja)" : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {info.requiereCuenta && (
-          <div className="field" style={{ gridColumn: "1 / -1" }}>
-            <label>Cuenta del socio</label>
-            <BuscadorCuenta tipo={info.requiereCuenta} agenciaId={agenciaId} seleccionada={cuenta} onSeleccionar={setCuenta} />
-            {referenciaPreview && (
-              <span className="sub mono" style={{ marginTop: "0.35rem", display: "inline-block" }}>
-                Referencia: {referenciaPreview}
-              </span>
-            )}
-          </div>
-        )}
-
-        {!info.requiereCuenta && info.seccion === "PROPIO" && info.requiereSocio && (
-          <div className="field" style={{ gridColumn: "1 / -1" }}>
-            <label>Socio / beneficiario</label>
-            {!socioManual ? (
-              <>
-                <BuscadorSocio agenciaId={agenciaId} seleccionado={socio} onSeleccionar={setSocio} />
-                <button type="button" className="link-btn" style={{ marginTop: "0.35rem" }} onClick={() => setSocioManual(true)}>
-                  No es socio / escribir el nombre manualmente
-                </button>
-              </>
-            ) : (
-              <>
-                <input
-                  placeholder="Nombre del beneficiario"
-                  value={beneficiario}
-                  onChange={(e) => setBeneficiario(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="link-btn"
-                  style={{ marginTop: "0.35rem" }}
-                  onClick={() => {
-                    setSocioManual(false);
-                    setBeneficiario("");
-                  }}
-                >
-                  Buscar en socios
-                </button>
-              </>
-            )}
-          </div>
-        )}
-
-        {!info.requiereCuenta && info.seccion === "PROPIO" && !info.requiereSocio && (
-          <div className="field" style={{ gridColumn: "1 / -1" }}>
-            <label htmlFor="aux-beneficiario">Beneficiario</label>
-            <input id="aux-beneficiario" value={beneficiario} onChange={(e) => setBeneficiario(e.target.value)} />
-          </div>
-        )}
-
-        {info.seccion === "BI" && (
-          <>
-            <div className="field" style={{ gridColumn: "1 / -1" }}>
-              <label htmlFor="aux-beneficiario-bi">Beneficiario</label>
-              <input
-                id="aux-beneficiario-bi"
-                list="aux-beneficiarios-datalist"
-                value={beneficiario}
-                onChange={(e) => setBeneficiario(e.target.value)}
-              />
-              <datalist id="aux-beneficiarios-datalist">
-                {sugerencias.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
-            </div>
-            <div className="field">
-              <label htmlFor="aux-aut">Núm. de autorización BI</label>
-              <input id="aux-aut" placeholder="AUT:000000" value={referenciaAut} onChange={(e) => setReferenciaAut(e.target.value)} />
-            </div>
-          </>
-        )}
-
-        {!info.requiereCuenta && (
-          <div className="field">
-            <label htmlFor="aux-doc">
-              {info.seccion === "BI"
-                ? "No. de cuenta"
-                : metodoPago === "CHEQUE"
-                ? "No. de boleta"
-                : "No. de recibo"}
-            </label>
-            <input
-              id="aux-doc"
-              value={docNo}
-              onChange={(e) => setDocNo(e.target.value)}
-              placeholder={info.seccion === "BI" ? "Ej. 00-0000000-0" : undefined}
-            />
-          </div>
-        )}
-        {info.requiereCuenta && (
-          <div className="field">
-            <label htmlFor="aux-doc-cuenta">
-              {metodoPago === "CHEQUE" ? "No. de boleta" : "No. de recibo"}
-            </label>
-            <input id="aux-doc-cuenta" value={docNo} onChange={(e) => setDocNo(e.target.value)} />
-          </div>
-        )}
-
-        <div className="field">
-          <label htmlFor="aux-monto">Monto</label>
-          <input
-            id="aux-monto"
-            type="number"
-            min="0.01"
-            step="0.01"
-            value={monto}
-            onChange={(e) => setMonto(e.target.value)}
-            required
-          />
-        </div>
-      </div>
-
-      {error && <div className="alert error">{error}</div>}
-
-      <button type="submit" className="btn" disabled={guardando}>
-        {guardando ? "Guardando…" : `Registrar ${info.tipo === "INGRESO" ? "ingreso" : "egreso"}`}
-      </button>
-    </form>
-  );
-}
-
-function CierreCajaForm({
-  diaId,
-  saldoEsperado,
-  onCerrada,
-}: {
-  diaId: string;
-  saldoEsperado: number;
-  onCerrada: () => void;
-}) {
-  const [cantidades, setCantidades] = useState<Record<number, string>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [guardando, setGuardando] = useState(false);
-
-  const totalContado = DENOMINACIONES_GT.reduce((acc, d) => acc + d * Number(cantidades[d] || 0), 0);
-  const diferencia = Math.round((totalContado - saldoEsperado) * 100) / 100;
-
-  async function cerrar() {
-    setError(null);
-    setGuardando(true);
-    try {
-      const conteo = DENOMINACIONES_GT.map((valor) => ({ valor, cantidad: Number(cantidades[valor] || 0) }));
-      await api.post(`/caja-auxiliar/${diaId}/cerrar`, { conteo });
-      onCerrada();
-    } catch (err) {
-      setError(mensajeError(err));
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  const billetes = DENOMINACIONES_GT.filter((d) => d >= 5);
-  const monedas = DENOMINACIONES_GT.filter((d) => d < 5);
-
-  return (
-    <div className="card" style={{ marginBottom: "1.5rem", maxWidth: 640 }}>
-      <h2 style={{ marginTop: 0 }}>Conteo de efectivo (arqueo)</h2>
-      <p className="sub">Cuenta los billetes y monedas para cuadrar la caja con el saldo calculado.</p>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
-        <div>
-          <h3>Billetes</h3>
-          {billetes.map((d) => (
-            <DenominacionRow key={d} valor={d} cantidad={cantidades[d] ?? ""} onCambiar={(v) => setCantidades((c) => ({ ...c, [d]: v }))} />
-          ))}
-        </div>
-        <div>
-          <h3>Monedas</h3>
-          {monedas.map((d) => (
-            <DenominacionRow key={d} valor={d} cantidad={cantidades[d] ?? ""} onCambiar={(v) => setCantidades((c) => ({ ...c, [d]: v }))} />
-          ))}
-        </div>
-      </div>
-
-      <div className="stat-grid" style={{ marginTop: "1.25rem", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 200px))" }}>
-        <div className="stat-card">
-          <span className="label">Total contado</span>
-          <span className="value">{formatoQ(totalContado)}</span>
-        </div>
-        <div className="stat-card">
-          <span className="label">Saldo esperado</span>
-          <span className="value">{formatoQ(saldoEsperado)}</span>
-        </div>
-        <div className={`stat-card ${diferencia === 0 ? "accent" : ""}`}>
-          <span className="label">Diferencia</span>
-          <span className="value" style={{ color: diferencia === 0 ? undefined : "var(--danger)" }}>
-            {formatoQ(diferencia)}
-          </span>
-        </div>
-      </div>
-
-      {error && <div className="alert error">{error}</div>}
-
-      <button className="btn" style={{ marginTop: "1rem" }} disabled={guardando} onClick={cerrar}>
-        {guardando ? "Cerrando…" : "Cerrar caja"}
-      </button>
-    </div>
-  );
-}
-
-function DenominacionRow({
-  valor,
-  cantidad,
-  onCambiar,
-}: {
-  valor: number;
-  cantidad: string;
-  onCambiar: (v: string) => void;
-}) {
-  const subtotal = valor * Number(cantidad || 0);
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
-      <span className="mono" style={{ width: 64 }}>
-        {labelDenominacion(valor)}
-      </span>
-      <input
-        type="number"
-        min="0"
-        step="1"
-        value={cantidad}
-        onChange={(e) => onCambiar(e.target.value)}
-        style={{ width: 80 }}
-        placeholder="0"
-      />
-      <span className="mono sub">= {formatoQ(subtotal)}</span>
     </div>
   );
 }
@@ -4688,9 +4832,9 @@ export default function Layout() {
             display: "flex", alignItems: "center", justifyContent: "center",
             fontWeight: 900, fontSize: "0.9rem",
           }}>M</div>
-          <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "var(--ink)" }}>COOP COMIF R.L.</span>
+          <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#ffffff", letterSpacing: "0.02em" }}>COOP COMIF R.L.</span>
         </div>
-        <button className="hamburger-btn" onClick={() => setSidebarOpen(true)}>☰</button>
+        <button className="hamburger-btn" onClick={() => setSidebarOpen(true)} title="Abrir Menú">☰</button>
       </div>
 
       <div className={`sidebar-backdrop ${sidebarOpen ? "show" : ""}`} onClick={closeSidebar} />
@@ -5491,6 +5635,21 @@ import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { formatoQ } from "../types";
 import type { ResumenDashboard } from "../types";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  Legend,
+} from "recharts";
 
 export default function Tablero() {
   const { usuario } = useAuth();
@@ -5502,6 +5661,10 @@ export default function Tablero() {
   const [mostrarOpciones, setMostrarOpciones] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const [driveConnected, setDriveConnected] = useState(false);
+
+  const [periodoAnalitica] = useState<"dia" | "mes">("dia");
+
   function cargarResumen(silencioso = false) {
     api
       .get<ResumenDashboard>("/dashboard/resumen")
@@ -5511,11 +5674,51 @@ export default function Tablero() {
       });
   }
 
+  function cargarAnalitica() {
+    api
+      .get("/caja-auxiliar/analitica-servicios", { params: { periodo: periodoAnalitica } })
+      .then(() => {})
+      .catch(console.error);
+  }
+
+  async function verificarDrive() {
+    try {
+      const { data } = await api.get("/auth/me");
+      setDriveConnected(!!data.driveConnected);
+    } catch (e) {
+      console.error("Error al verificar estado de Google Drive", e);
+    }
+  }
+
+  async function handleConectarDrive() {
+    try {
+      const { data } = await api.get("/auth/google");
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (e) {
+      alert("Error al intentar conectar con Google Drive.");
+    }
+  }
+
+  // Si regresa de Google Drive con un query param, mostrar éxito
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("drive_connected") === "true") {
+      alert("¡Cuenta de Google Drive vinculada exitosamente! Los respaldos en PDF se guardarán en tu nube automáticamente.");
+      window.history.replaceState({}, document.title, "/");
+      setDriveConnected(true);
+    }
+  }, []);
+
   // Actualización automática en tiempo real cada 10s y al recuperar foco
   useEffect(() => {
-    cargarResumen(false);
+    cargarResumen();
+    cargarAnalitica();
+    verificarDrive();
     const interval = setInterval(() => {
       cargarResumen(true);
+      cargarAnalitica();
     }, 10000);
 
     const onFocus = () => {
@@ -5531,7 +5734,7 @@ export default function Tablero() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
     };
-  }, []);
+  }, [periodoAnalitica]);
 
   // Cerrar menú de opciones al hacer clic afuera
   useEffect(() => {
@@ -5590,7 +5793,7 @@ export default function Tablero() {
     try {
       const { data } = await api.post<{ ok: boolean; mensaje: string }>("/sistema/recargar-datos");
       setMensajeExito(data.mensaje);
-      cargarResumen(false);
+      cargarResumen();
     } catch (err) {
       setError(mensajeError(err));
     } finally {
@@ -5603,7 +5806,7 @@ export default function Tablero() {
 
   const { global, porAgencia } = resumen;
   const varias = porAgencia.length > 1;
-  const puedeGestionarDatos = usuario?.rol === "ADMIN" || usuario?.rol === "SUPERVISOR" || usuario?.rol === "GERENCIA";
+  const puedeGestionarDatos = usuario?.rol === "ADMIN";
 
   return (
     <div className="dashboard-container">
@@ -5617,8 +5820,20 @@ export default function Tablero() {
               En Vivo · En Tiempo Real
             </span>
           </div>
-          <p>
-            COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."{varias ? " · Todas las Agencias" : ""}
+          <p style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+            <span>COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."{varias ? " · Todas las Agencias" : ""}</span>
+            {driveConnected ? (
+              <span style={{ fontSize: "0.75rem", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", padding: "0.2rem 0.6rem", borderRadius: "20px", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                ✅ Google Drive Conectado
+              </span>
+            ) : (
+              <button 
+                onClick={handleConectarDrive}
+                style={{ fontSize: "0.75rem", background: "#4285F4", color: "#fff", border: "none", padding: "0.2rem 0.6rem", borderRadius: "20px", display: "flex", alignItems: "center", gap: "0.3rem", cursor: "pointer", fontWeight: "bold" }}
+              >
+                ☁️ Conectar Google Drive para Respaldos
+              </button>
+            )}
           </p>
         </div>
 
@@ -5676,161 +5891,141 @@ export default function Tablero() {
       {mensajeExito && <div className="alert success" style={{ margin: "0.25rem 0", padding: "0.5rem 0.8rem", fontSize: "0.82rem" }}>{mensajeExito}</div>}
       {error && <div className="alert error" style={{ margin: "0.25rem 0", padding: "0.5rem 0.8rem", fontSize: "0.82rem" }}>{error}</div>}
 
-      {/* Banda Superior: 8 Tarjetas KPI Financieras */}
+      {/* Banda Superior: 8 Tarjetas KPI Financieras con Iconos y Acentos de Color */}
       <div className="dashboard-kpi-band">
-        {usuario?.rol !== "PROMOTOR" && (
-          <Link to="/caja-chica" className="kpi-tile">
-            <span className="kpi-tile-label">Caja chica</span>
-            <span className="kpi-tile-value">{formatoQ(global.cajaChica)}</span>
-            <span className="kpi-tile-sub">Fondo disponible</span>
-          </Link>
-        )}
-        <Link to="/ahorros/corriente" className="kpi-tile">
-          <span className="kpi-tile-label">Ahorro corriente</span>
-          <span className="kpi-tile-value" style={{ color: "var(--accent)" }}>{formatoQ(global.ahorroCorriente)}</span>
-          <span className="kpi-tile-sub">Disponible a la vista</span>
-        </Link>
-        <Link to="/ahorros/programado" className="kpi-tile">
-          <span className="kpi-tile-label">Ahorro programado</span>
-          <span className="kpi-tile-value">{formatoQ(global.ahorroProgramado)}</span>
-          <span className="kpi-tile-sub">Cuota pactada</span>
-        </Link>
-        <Link to="/ahorros/infanto-juvenil" className="kpi-tile">
-          <span className="kpi-tile-label">Ahorro infantil</span>
-          <span className="kpi-tile-value">{formatoQ(global.ahorroInfantoJuvenil)}</span>
-          <span className="kpi-tile-sub">Infanto juvenil</span>
-        </Link>
-        <Link to="/ahorros/plazo-fijo" className="kpi-tile">
-          <span className="kpi-tile-label">Ahorro Plazo Fijo</span>
-          <span className="kpi-tile-value" style={{ color: "#f59e0b" }}>
-            {global.plazoFijo && global.plazoFijo.monto > 0 ? formatoQ(global.plazoFijo.monto) : "Kardex PF"}
-          </span>
-          <span className="kpi-tile-sub">{global.plazoFijo?.count ?? 692} certificados</span>
-        </Link>
-        <Link to="/aportaciones" className="kpi-tile">
-          <span className="kpi-tile-label">Aportaciones Capital</span>
-          <span className="kpi-tile-value" style={{ color: "var(--accent)" }}>
+        <Link to="/aportaciones" className="kpi-tile" style={{ borderLeft: "3px solid #059669" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="kpi-tile-label">Aportaciones Capital</span>
+            <span style={{ fontSize: "0.85rem" }}>🏛️</span>
+          </div>
+          <span className="kpi-tile-value" style={{ color: "#059669" }}>
             {formatoQ(global.aportaciones?.saldo ?? 11600)}
           </span>
           <span className="kpi-tile-sub">{global.aportaciones?.count ?? 117} socios aportantes</span>
         </Link>
-        <Link to="/socios" className="kpi-tile">
-          <span className="kpi-tile-label">Socios activos</span>
-          <span className="kpi-tile-value mono">{global.totalSocios}</span>
-          <span className="kpi-tile-sub">{global.movimientosHoy} mov. hoy</span>
+
+        <Link to="/ahorros/corriente" className="kpi-tile" style={{ borderLeft: "3px solid #0284c7" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="kpi-tile-label">Ahorro Corriente</span>
+            <span style={{ fontSize: "0.85rem" }}>💰</span>
+          </div>
+          <span className="kpi-tile-value" style={{ color: "var(--accent)" }}>{formatoQ(global.ahorroCorriente)}</span>
+          <span className="kpi-tile-sub">Disponible a la vista</span>
         </Link>
-        {usuario?.rol !== "CAJERO" && (
-          <Link to="/creditos" className="kpi-tile accent">
-            <span className="kpi-tile-label">Cartera de Crédito</span>
-            <span className="kpi-tile-value" style={{ color: "#38bdf8" }}>
+
+        <Link to="/ahorros/plazo-fijo" className="kpi-tile" style={{ borderLeft: "3px solid #7c3aed" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="kpi-tile-label">Plazo Fijo (DPF)</span>
+            <span style={{ fontSize: "0.85rem" }}>🔒</span>
+          </div>
+          <span className="kpi-tile-value" style={{ color: "#7c3aed" }}>
+            {global.plazoFijo && global.plazoFijo.monto > 0 ? formatoQ(global.plazoFijo.monto) : "Kardex PF"}
+          </span>
+          <span className="kpi-tile-sub">{global.plazoFijo?.count ?? 692} certificados activos</span>
+        </Link>
+
+        {usuario?.rol !== "CAJERO" ? (
+          <Link to="/creditos" className="kpi-tile" style={{ borderLeft: "3px solid #38bdf8" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span className="kpi-tile-label">Cartera de Crédito</span>
+              <span style={{ fontSize: "0.85rem" }}>💼</span>
+            </div>
+            <span className="kpi-tile-value" style={{ color: "#0284c7" }}>
               {formatoQ(global.carteraPrestamos?.saldo ?? 15210193.13)}
             </span>
             <span className="kpi-tile-sub">{global.carteraPrestamos?.count ?? 65} préstamos activos</span>
           </Link>
+        ) : (
+          <Link to="/ahorros/programado" className="kpi-tile" style={{ borderLeft: "3px solid #0891b2" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span className="kpi-tile-label">Ahorro Programado</span>
+              <span style={{ fontSize: "0.85rem" }}>📅</span>
+            </div>
+            <span className="kpi-tile-value">{formatoQ(global.ahorroProgramado)}</span>
+            <span className="kpi-tile-sub">Cuotas pactadas</span>
+          </Link>
         )}
+
+        {usuario?.rol !== "PROMOTOR" && (
+          <Link to="/caja-chica" className="kpi-tile" style={{ borderLeft: "3px solid #f59e0b" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span className="kpi-tile-label">Caja Chica</span>
+              <span style={{ fontSize: "0.85rem" }}>☕</span>
+            </div>
+            <span className="kpi-tile-value" style={{ color: "#d97706" }}>{formatoQ(global.cajaChica)}</span>
+            <span className="kpi-tile-sub">Fondo disponible</span>
+          </Link>
+        )}
+
+        <Link to="/auxiliar-caja" className="kpi-tile" style={{ borderLeft: "3px solid #10b981" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="kpi-tile-label">Cuotas de Ingreso</span>
+            <span style={{ fontSize: "0.85rem" }}>🎫</span>
+          </div>
+          <span className="kpi-tile-value" style={{ color: "#10b981" }}>
+            {formatoQ(global.cuotasIngreso?.monto ?? 0)}
+          </span>
+          <span className="kpi-tile-sub">{global.cuotasIngreso?.count ?? 0} registradas en caja</span>
+        </Link>
+
+        <Link to="/ahorros/infanto-juvenil" className="kpi-tile" style={{ borderLeft: "3px solid #ec4899" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="kpi-tile-label">Ahorro Infantil</span>
+            <span style={{ fontSize: "0.85rem" }}>👶</span>
+          </div>
+          <span className="kpi-tile-value" style={{ color: "#ec4899" }}>{formatoQ(global.ahorroInfantoJuvenil)}</span>
+          <span className="kpi-tile-sub">Infanto juvenil</span>
+        </Link>
+
+        <Link to="/socios" className="kpi-tile" style={{ borderLeft: "3px solid #6366f1" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="kpi-tile-label">Membresía / Socios</span>
+            <span style={{ fontSize: "0.85rem" }}>👥</span>
+          </div>
+          <span className="kpi-tile-value mono" style={{ color: "#6366f1" }}>{global.totalSocios}</span>
+          <span className="kpi-tile-sub">{global.movimientosHoy} mov. registrados hoy</span>
+        </Link>
       </div>
 
-      {/* Cuadrícula Inferior: 2 Paneles Balanceados Lado a Lado */}
+      {/* Panel Panorámico de Monitoreo Estratégico & Analítica Financiera */}
       <div className="dashboard-lower-grid">
-        {/* Panel Izquierdo: Supervisión y Control / Accesos Rápidos */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-          <div className="dashboard-panel-card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h3 style={{ margin: 0, fontSize: "0.88rem", fontWeight: 700, color: "var(--ink)" }}>
-                {usuario?.rol === "SUPERVISOR" || usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA"
-                  ? "🛡️ Panel de Supervisión y Control de Agencia"
-                  : "⚡ Accesos Rápidos de Operación"}
-              </h3>
-              <span className="badge" style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}>
-                {usuario?.rol}
-              </span>
-            </div>
+        {(usuario?.rol === "SUPERVISOR" || usuario?.rol === "GERENCIA" || usuario?.rol === "ADMIN") && (
+          <PanelGraficaServicios agenciaIdInicial={usuario?.agenciaId ?? undefined} />
+        )}
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(115px, 1fr))", gap: "0.45rem" }}>
-              {usuario?.rol === "SUPERVISOR" || usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA" ? (
-                <>
-                  <Link to="/libro-mensual-arqueos" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
-                    📑 Libro Arqueos
-                  </Link>
-                  <Link to="/creditos" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
-                    🤝 Aprobar Créditos
-                  </Link>
-                  <Link to="/promotor/cartera" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
-                    📂 Kardex Cartera
-                  </Link>
-                  <Link to="/socios" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
-                    👥 Padrón Socios
-                  </Link>
-                  <Link to="/ahorros/plazo-fijo" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
-                    🔒 Plazos Fijos
-                  </Link>
-                  <Link to="/aportaciones" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
-                    🏛️ Aportaciones
-                  </Link>
-                  <Link to="/auxiliar-caja" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
-                    📊 Historial Cierres
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link to="/auxiliar-caja" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
-                    💵 Ventanilla Caja
-                  </Link>
-                  <Link to="/promotor/cartera" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
-                    📂 Kardex Cartera
-                  </Link>
-                  <Link to="/socios" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
-                    👥 Padrón Socios
-                  </Link>
-                  <Link to="/aportaciones" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
-                    🏛️ Aportaciones
-                  </Link>
-                  <Link to="/ahorros/corriente" className="btn secondary" style={{ justifyContent: "center", fontSize: "0.78rem", padding: "0.4rem 0.3rem" }}>
-                    💰 Ahorros
-                  </Link>
-                </>
-              )}
+        {/* Desglose por Agencia (si aplica más de 1 agencia) */}
+        {varias && (
+          <div className="dashboard-panel-card" style={{ padding: "0.65rem 0.85rem", marginTop: "0.25rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+              <h3 style={{ margin: 0, fontSize: "0.84rem", fontWeight: 700 }}>🏢 Estado en Vivo por Agencia</h3>
+              <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)" }}>{porAgencia.length} agencias</span>
+            </div>
+            <div className="table-wrap" style={{ maxHeight: "140px", overflowY: "auto", border: "1px solid var(--line)", borderRadius: "6px" }}>
+              <table style={{ fontSize: "0.76rem", width: "100%", margin: 0 }}>
+                <thead>
+                  <tr style={{ background: "var(--paper-raised)" }}>
+                    <th style={{ padding: "3px 6px" }}>Agencia</th>
+                    <th style={{ padding: "3px 6px", textAlign: "right" }}>Caja chica</th>
+                    <th style={{ padding: "3px 6px", textAlign: "right" }}>Ahorro corriente</th>
+                    <th style={{ padding: "3px 6px", textAlign: "right" }}>Cartera Crédito</th>
+                    <th style={{ padding: "3px 6px", textAlign: "center" }}>Socios</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {porAgencia.map((a) => (
+                    <tr key={a.agenciaId}>
+                      <td style={{ padding: "3px 6px", fontWeight: 600 }}>{a.agenciaNombre}</td>
+                      <td className="mono" style={{ padding: "3px 6px", textAlign: "right" }}>{formatoQ(a.cajaChica.saldo)}</td>
+                      <td className="mono" style={{ padding: "3px 6px", textAlign: "right", color: "var(--accent)" }}>{formatoQ(a.ahorroCorriente.saldoTotal)}</td>
+                      <td className="mono" style={{ padding: "3px 6px", textAlign: "right", color: "#0284c7" }}>{formatoQ(a.carteraPrestamos?.saldo ?? 0)}</td>
+                      <td className="mono" style={{ padding: "3px 6px", textAlign: "center" }}>{a.totalSocios}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-
-          {/* Desglose por Agencia (si aplica) */}
-          {varias && (
-            <div className="dashboard-panel-card">
-              <h3 style={{ margin: "0 0 0.35rem", fontSize: "0.85rem", fontWeight: 700 }}>Desglose por Agencia</h3>
-              <div className="table-wrap" style={{ maxHeight: "160px", overflowY: "auto" }}>
-                <table style={{ fontSize: "0.78rem" }}>
-                  <thead>
-                    <tr>
-                      <th style={{ padding: "0.35rem 0.5rem" }}>Agencia</th>
-                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Caja chica</th>
-                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Ahorro corriente</th>
-                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>Cartera Crédito</th>
-                      <th style={{ padding: "0.35rem 0.5rem", textAlign: "center" }}>Socios</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {porAgencia.map((a) => (
-                      <tr key={a.agenciaId}>
-                        <td style={{ padding: "0.35rem 0.5rem", fontWeight: 600 }}>{a.agenciaNombre}</td>
-                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>{formatoQ(a.cajaChica.saldo)}</td>
-                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>{formatoQ(a.ahorroCorriente.saldoTotal)}</td>
-                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "right", color: "#38bdf8" }}>{formatoQ(a.carteraPrestamos?.saldo ?? 0)}</td>
-                        <td className="mono" style={{ padding: "0.35rem 0.5rem", textAlign: "center" }}>{a.totalSocios}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Panel Derecho: Monitoreo Estratégico de Servicios */}
-        <div>
-          {(usuario?.rol === "SUPERVISOR" || usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA") && (
-            <PanelGraficaServicios agenciaIdInicial={usuario?.agenciaId ?? undefined} />
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
@@ -5838,7 +6033,9 @@ export default function Tablero() {
 
 interface ServicioItem {
   categoria: string;
-  modulo?: "AHORROS" | "CREDITOS" | "CAJA_CHICA" | "VENTANILLA";
+  producto: string;
+  modulo?: string;
+  flujo: "INGRESO" | "EGRESO";
   label: string;
   icon: string;
   cantidad: number;
@@ -5846,21 +6043,37 @@ interface ServicioItem {
   porcentaje: number;
 }
 
+interface PuntoTendencia {
+  fecha: string;
+  label: string;
+  ingresos: number;
+  egresos: number;
+  neto: number;
+  operaciones: number;
+}
+
 interface AnaliticaResponse {
-  periodo: "semana" | "mes" | "anio";
+  periodo: "dia" | "semana" | "mes" | "anio";
   totalOperaciones: number;
   volumenTotal: number;
+  totalIngresos: number;
+  totalEgresos: number;
+  flujoNeto: number;
+  operacionesIngreso: number;
+  operacionesEgreso: number;
   servicioTop: ServicioItem | null;
   servicios: ServicioItem[];
+  tendenciaTemporal: PuntoTendencia[];
 }
 
 function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string }) {
   const { usuario } = useAuth();
-  const puedeElegirAgencia = usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA";
+  const puedeElegirAgencia = usuario?.rol === "GERENCIA";
   const [agencias, setAgencias] = useState<any[]>([]);
   const [agenciaId, setAgenciaId] = useState(agenciaIdInicial || usuario?.agenciaId || "");
-  const [periodo, setPeriodo] = useState<"semana" | "mes" | "anio">("mes");
-  const [filtroModulo, setFiltroModulo] = useState<"TODOS" | "AHORROS" | "CREDITOS" | "CAJA_CHICA" | "VENTANILLA">("TODOS");
+  const [periodo, setPeriodo] = useState<"dia" | "semana" | "mes" | "anio">("mes");
+  const [filtroCuenta, setFiltroCuenta] = useState<string>("TODOS");
+  const [modoVista, setModoVista] = useState<"BALANCE" | "TENDENCIA">("BALANCE");
   const [datos, setDatos] = useState<AnaliticaResponse | null>(null);
   const [cargando, setCargando] = useState(false);
 
@@ -5906,31 +6119,52 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
     };
   }, [agenciaId, periodo]);
 
-  const periodoLabel = periodo === "semana" ? "Últimos 7 días" : periodo === "mes" ? "Últimos 30 días" : "Año actual";
+  const periodoLabel = periodo === "dia" ? "Día actual" : periodo === "semana" ? "Últimos 7 días" : periodo === "mes" ? "Últimos 30 días" : "Año actual";
 
+  // Filtrado específico por producto / cuenta
   const serviciosFiltrados = !datos
     ? []
-    : filtroModulo === "TODOS"
+    : filtroCuenta === "TODOS"
       ? datos.servicios
-      : datos.servicios.filter((s) => s.modulo === filtroModulo);
+      : datos.servicios.filter((s) => s.producto === filtroCuenta);
 
   const totalOperacionesFiltro = serviciosFiltrados.reduce((acc, s) => acc + s.cantidad, 0);
   const volumenTotalFiltro = serviciosFiltrados.reduce((acc, s) => acc + s.totalMonto, 0);
+  const totalIngresosFiltro = serviciosFiltrados.filter((s) => s.flujo === "INGRESO").reduce((acc, s) => acc + s.totalMonto, 0);
+  const totalEgresosFiltro = serviciosFiltrados.filter((s) => s.flujo === "EGRESO").reduce((acc, s) => acc + s.totalMonto, 0);
+  const opIngresosFiltro = serviciosFiltrados.filter((s) => s.flujo === "INGRESO").reduce((acc, s) => acc + s.cantidad, 0);
+  const opEgresosFiltro = serviciosFiltrados.filter((s) => s.flujo === "EGRESO").reduce((acc, s) => acc + s.cantidad, 0);
+  const flujoNetoFiltro = totalIngresosFiltro - totalEgresosFiltro;
   const servicioTopFiltro = serviciosFiltrados[0] ?? null;
+
+  // Cuentas disponibles con sus conteos
+  const CUENTAS_OPCIONES = [
+    { id: "TODOS", label: "Consolidado General", icon: "🌐" },
+    { id: "AHORRO_CORRIENTE", label: "Ahorro Corriente", icon: "💰" },
+    { id: "AHORRO_PROGRAMADO", label: "Ahorro Programado", icon: "📅" },
+    { id: "AHORRO_INFANTIL", label: "Ahorro Infantil", icon: "🧒" },
+    { id: "AHORRO_SOBRE_PRESTAMO", label: "Ahorro s/Préstamo", icon: "🛡️" },
+    { id: "PLAZO_FIJO", label: "Plazo Fijo (DPF)", icon: "🔒" },
+    { id: "APORTACIONES", label: "Aportaciones", icon: "🏛️" },
+    { id: "CREDITOS", label: "Cartera Créditos", icon: "💼" },
+    { id: "AGENTE_BI", label: "Agente BI & Servicios", icon: "🏦" },
+    { id: "CAJA_CHICA", label: "Caja Chica", icon: "☕" },
+    { id: "VENTANILLA_TESORERIA", label: "Tesorería & Ventanilla", icon: "💵" },
+  ];
 
   return (
     <div className="dashboard-panel-card" style={{ borderTop: "3px solid #0284c7" }}>
-      {/* Encabezado del Panel */}
+      {/* Encabezado Superior: Título, Filtros Temporales y Selector de Modo */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
-            <h2 style={{ margin: 0, fontSize: "0.98rem", fontWeight: 700 }}>📊 Monitoreo Estratégico de Servicios</h2>
+            <h2 style={{ margin: 0, fontSize: "0.98rem", fontWeight: 700 }}>📊 Inteligencia y Analítica Financiera por Cuenta</h2>
             <span className="live-badge" style={{ fontSize: "0.68rem", padding: "0.15rem 0.45rem" }}>
               <span className="live-dot" /> En Vivo
             </span>
           </div>
           <p style={{ margin: "0.15rem 0 0", fontSize: "0.74rem", color: "var(--ink-soft)" }}>
-            Demanda transaccional ({periodoLabel})
+            Desglose específico de entradas, salidas y flujo monetario ({periodoLabel})
           </p>
         </div>
 
@@ -5946,27 +6180,58 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
             </select>
           )}
 
+          {/* Conmutador de Modo Dual */}
           <div style={{ display: "inline-flex", background: "var(--mono-bg)", borderRadius: "6px", padding: "0.15rem", border: "1px solid var(--line)" }}>
             <button
               type="button"
-              className={`btn ${periodo === "semana" ? "" : "secondary"}`}
+              className={`btn btn-xs ${modoVista === "BALANCE" ? "" : "secondary"}`}
               style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
+              onClick={() => setModoVista("BALANCE")}
+              title="Ver balance de entradas vs salidas y ranking de movimientos"
+            >
+              📊 Balance & Distribución
+            </button>
+            <button
+              type="button"
+              className={`btn btn-xs ${modoVista === "TENDENCIA" ? "" : "secondary"}`}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
+              onClick={() => setModoVista("TENDENCIA")}
+              title="Ver evolución cronológica de captaciones y retiros"
+            >
+              📈 Tendencia Temporal
+            </button>
+          </div>
+
+          {/* Filtros de Período */}
+          <div style={{ display: "inline-flex", background: "var(--mono-bg)", borderRadius: "6px", padding: "0.15rem", border: "1px solid var(--line)" }}>
+            <button
+              type="button"
+              className={`btn btn-xs ${periodo === "dia" ? "" : "secondary"}`}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
+              onClick={() => setPeriodo("dia")}
+            >
+              Día
+            </button>
+            <button
+              type="button"
+              className={`btn btn-xs ${periodo === "semana" ? "" : "secondary"}`}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
               onClick={() => setPeriodo("semana")}
             >
               Semana
             </button>
             <button
               type="button"
-              className={`btn ${periodo === "mes" ? "" : "secondary"}`}
-              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
+              className={`btn btn-xs ${periodo === "mes" ? "" : "secondary"}`}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
               onClick={() => setPeriodo("mes")}
             >
               Mes
             </button>
             <button
               type="button"
-              className={`btn ${periodo === "anio" ? "" : "secondary"}`}
-              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
+              className={`btn btn-xs ${periodo === "anio" ? "" : "secondary"}`}
+              style={{ fontSize: "0.74rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
               onClick={() => setPeriodo("anio")}
             >
               Año
@@ -5975,165 +6240,368 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
         </div>
       </div>
 
-      {/* Pestañas de Segmentación por Área Financiera */}
-      <div style={{ display: "flex", gap: "0.25rem", flexWrap: "wrap", borderBottom: "1px solid var(--line)", paddingBottom: "0.4rem" }}>
-        <button
-          type="button"
-          className={`btn ${filtroModulo === "TODOS" ? "" : "secondary"}`}
-          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
-          onClick={() => setFiltroModulo("TODOS")}
-        >
-          🌐 Consolidado ({datos?.totalOperaciones ?? 0})
-        </button>
-        <button
-          type="button"
-          className={`btn ${filtroModulo === "AHORROS" ? "" : "secondary"}`}
-          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
-          onClick={() => setFiltroModulo("AHORROS")}
-        >
-          🏦 Ahorros & PF
-        </button>
-        <button
-          type="button"
-          className={`btn ${filtroModulo === "CREDITOS" ? "" : "secondary"}`}
-          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
-          onClick={() => setFiltroModulo("CREDITOS")}
-        >
-          💼 Créditos
-        </button>
-        <button
-          type="button"
-          className={`btn ${filtroModulo === "CAJA_CHICA" ? "" : "secondary"}`}
-          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
-          onClick={() => setFiltroModulo("CAJA_CHICA")}
-        >
-          ☕ Caja Chica
-        </button>
-        <button
-          type="button"
-          className={`btn ${filtroModulo === "VENTANILLA" ? "" : "secondary"}`}
-          style={{ fontSize: "0.72rem", padding: "0.22rem 0.45rem" }}
-          onClick={() => setFiltroModulo("VENTANILLA")}
-        >
-          💵 Ventanilla
-        </button>
+      {/* Pestañas de Selección Específica por Cuenta y Producto */}
+      <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", borderBottom: "1px solid var(--line)", paddingBottom: "0.4rem" }}>
+        {CUENTAS_OPCIONES.map((cta) => {
+          const isSelected = filtroCuenta === cta.id;
+          const count = !datos
+            ? 0
+            : cta.id === "TODOS"
+              ? datos.totalOperaciones
+              : datos.servicios.filter((s) => s.producto === cta.id).reduce((acc, s) => acc + s.cantidad, 0);
+
+          return (
+            <button
+              key={cta.id}
+              type="button"
+              className={`btn btn-xs ${isSelected ? "" : "secondary"}`}
+              style={{
+                fontSize: "0.72rem",
+                padding: "0.2rem 0.5rem",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.3rem",
+                borderRadius: "5px",
+                borderColor: isSelected ? "#0284c7" : undefined,
+              }}
+              onClick={() => setFiltroCuenta(cta.id)}
+            >
+              <span>{cta.icon}</span>
+              <span>{cta.label}</span>
+              {count > 0 && (
+                <span
+                  style={{
+                    background: isSelected ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.06)",
+                    borderRadius: "10px",
+                    padding: "0.05rem 0.35rem",
+                    fontSize: "0.64rem",
+                    fontWeight: 700,
+                  }}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {cargando && <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", padding: "0.5rem" }}>Cargando datos en vivo...</div>}
+      {cargando && <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", padding: "0.5rem" }}>Cargando analítica en vivo...</div>}
 
       {!cargando && (!datos || serviciosFiltrados.length === 0) && (
         <div className="alert info" style={{ margin: "0.5rem 0", padding: "0.5rem 0.75rem", fontSize: "0.78rem" }}>
-          No hay movimientos registrados en esta categoría durante el período seleccionado ({periodoLabel}).
+          No hay movimientos registrados para esta cuenta durante el período seleccionado ({periodoLabel}).
         </div>
       )}
 
       {datos && serviciosFiltrados.length > 0 && (
         <>
-          {/* Métricas destacadas de la categoría seleccionada */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.45rem" }}>
-            <div className="kpi-tile accent" style={{ minHeight: 52, padding: "0.4rem 0.6rem" }}>
-              <span className="kpi-tile-label">🏆 Mayor Demanda</span>
-              <span className="kpi-tile-value" style={{ fontSize: "0.86rem", margin: "0.1rem 0" }}>
+          {/* Cintillo Superior de 4 KPIs: Entradas, Salidas, Flujo Neto y Mayor Demanda */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.55rem" }}>
+            <div className="kpi-tile" style={{ minHeight: 50, padding: "0.4rem 0.65rem", borderLeft: "4px solid #10b981" }}>
+              <span className="kpi-tile-label" style={{ color: "#059669" }}>🟢 Entradas / Depósitos</span>
+              <span className="kpi-tile-value mono" style={{ color: "#059669", fontSize: "0.98rem", margin: "0.1rem 0" }}>
+                {formatoQ(totalIngresosFiltro)}
+              </span>
+              <span className="kpi-tile-sub" style={{ fontSize: "0.68rem" }}>{opIngresosFiltro} transacciones</span>
+            </div>
+
+            <div className="kpi-tile" style={{ minHeight: 50, padding: "0.4rem 0.65rem", borderLeft: "4px solid #ef4444" }}>
+              <span className="kpi-tile-label" style={{ color: "#dc2626" }}>🔴 Salidas / Retiros</span>
+              <span className="kpi-tile-value mono" style={{ color: "#dc2626", fontSize: "0.98rem", margin: "0.1rem 0" }}>
+                {formatoQ(totalEgresosFiltro)}
+              </span>
+              <span className="kpi-tile-sub" style={{ fontSize: "0.68rem" }}>{opEgresosFiltro} transacciones</span>
+            </div>
+
+            <div className="kpi-tile" style={{ minHeight: 50, padding: "0.4rem 0.65rem", borderLeft: `4px solid ${flujoNetoFiltro >= 0 ? "#0284c7" : "#f59e0b"}` }}>
+              <span className="kpi-tile-label">⚖️ Flujo Neto del Período</span>
+              <span className="kpi-tile-value mono" style={{ color: flujoNetoFiltro >= 0 ? "#0284c7" : "#d97706", fontSize: "0.98rem", margin: "0.1rem 0" }}>
+                {flujoNetoFiltro >= 0 ? "+" : ""}{formatoQ(flujoNetoFiltro)}
+              </span>
+              <span className="kpi-tile-sub" style={{ fontSize: "0.68rem" }}>
+                {flujoNetoFiltro >= 0 ? "Superávit neto de captación" : "Déficit / Colocación neta"}
+              </span>
+            </div>
+
+            <div className="kpi-tile accent" style={{ minHeight: 50, padding: "0.4rem 0.65rem", borderLeft: "4px solid #f59e0b" }}>
+              <span className="kpi-tile-label">🏆 Mayor Operación</span>
+              <span className="kpi-tile-value" style={{ fontSize: "0.85rem", margin: "0.1rem 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {servicioTopFiltro ? `${servicioTopFiltro.icon} ${servicioTopFiltro.label}` : "—"}
               </span>
-              <span className="kpi-tile-sub" style={{ fontSize: "0.65rem" }}>
+              <span className="kpi-tile-sub" style={{ fontSize: "0.68rem" }}>
                 {servicioTopFiltro
                   ? `${servicioTopFiltro.cantidad} op. (${totalOperacionesFiltro > 0 ? Math.round((servicioTopFiltro.cantidad / totalOperacionesFiltro) * 1000) / 10 : 0}%)`
                   : ""}
               </span>
             </div>
-
-            <div className="kpi-tile" style={{ minHeight: 52, padding: "0.4rem 0.6rem" }}>
-              <span className="kpi-tile-label">Operaciones</span>
-              <span className="kpi-tile-value mono" style={{ fontSize: "0.96rem", margin: "0.1rem 0" }}>{totalOperacionesFiltro}</span>
-              <span className="kpi-tile-sub" style={{ fontSize: "0.65rem" }}>En este rubro</span>
-            </div>
-
-            <div className="kpi-tile" style={{ minHeight: 52, padding: "0.4rem 0.6rem" }}>
-              <span className="kpi-tile-label">Volumen Operado</span>
-              <span className="kpi-tile-value mono" style={{ color: "var(--accent)", fontSize: "0.96rem", margin: "0.1rem 0" }}>
-                {formatoQ(volumenTotalFiltro)}
-              </span>
-              <span className="kpi-tile-sub" style={{ fontSize: "0.65rem" }}>Flujo monetario</span>
-            </div>
           </div>
 
-          {/* Gráfica de Barras Proporcionales de la Categoría */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", maxHeight: "200px", overflowY: "auto", paddingRight: "0.2rem" }}>
-            {serviciosFiltrados.map((s, idx) => {
-              const barColors = [
-                "linear-gradient(90deg, #0284c7, #38bdf8)",
-                "linear-gradient(90deg, #059669, #34d399)",
-                "linear-gradient(90deg, #7c3aed, #a78bfa)",
-                "linear-gradient(90deg, #ea580c, #fb923c)",
-                "linear-gradient(90deg, #0891b2, #22d3ee)",
-                "linear-gradient(90deg, #d97706, #fcd34d)",
-              ];
-              const bgGradient = barColors[idx % barColors.length];
-              const porcentajeRelativo = totalOperacionesFiltro > 0
-                ? Math.round((s.cantidad / totalOperacionesFiltro) * 1000) / 10
-                : 0;
+          {/* MODO 1: BALANCE & DISTRIBUCIÓN (3 Columnas Panorámicas) */}
+          {modoVista === "BALANCE" && (
+            <div className="dashboard-charts-grid">
+              {/* Card 1: Dona de Distribución con Tooltip Enriquecido */}
+              <div style={{ background: "var(--mono-bg)", borderRadius: "8px", border: "1px solid var(--line)", padding: "0.6rem 0.75rem", display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                  <h4 style={{ margin: 0, fontSize: "0.78rem", color: "var(--ink)", fontWeight: 700 }}>
+                    🍩 Distribución de Operaciones
+                  </h4>
+                  <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)" }}>{totalOperacionesFiltro} ops.</span>
+                </div>
+                <div style={{ width: "100%", height: 185, position: "relative" }}>
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie
+                        data={serviciosFiltrados.map((s) => ({
+                          ...s,
+                          pctMonto: volumenTotalFiltro > 0 ? Math.round((s.totalMonto / volumenTotalFiltro) * 1000) / 10 : 0,
+                        }))}
+                        dataKey="cantidad"
+                        nameKey="label"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={45}
+                        outerRadius={75}
+                        paddingAngle={3}
+                      >
+                        {serviciosFiltrados.map((s, index) => {
+                          const isIngreso = s.flujo === "INGRESO";
+                          const baseColors = isIngreso
+                            ? ["#10b981", "#059669", "#047857", "#065f46", "#34d399"]
+                            : ["#ef4444", "#dc2626", "#b91c1c", "#f97316", "#ea580c"];
+                          return <Cell key={`cell-${index}`} fill={baseColors[index % baseColors.length]} />;
+                        })}
+                      </Pie>
+                      <RechartsTooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const d = payload[0].payload as ServicioItem & { pctMonto: number };
+                            const isIngreso = d.flujo === "INGRESO";
+                            return (
+                              <div style={{ background: "rgba(15, 23, 42, 0.94)", color: "#fff", padding: "0.45rem 0.65rem", borderRadius: "6px", fontSize: "0.74rem", boxShadow: "0 4px 12px rgba(0,0,0,0.3)" }}>
+                                <div style={{ fontWeight: 700, marginBottom: "0.2rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                                  <span>{d.icon}</span> <span>{d.label}</span>
+                                </div>
+                                <div style={{ color: isIngreso ? "#34d399" : "#f87171", fontSize: "0.7rem", fontWeight: 700 }}>
+                                  {isIngreso ? "🟢 Entrada / Depósito" : "🔴 Salida / Retiro"}
+                                </div>
+                                <div style={{ marginTop: "0.2rem" }}>
+                                  💵 <strong>{formatoQ(d.totalMonto)}</strong> ({d.pctMonto}% del volumen)
+                                </div>
+                                <div style={{ color: "#94a3b8", fontSize: "0.68rem" }}>
+                                  ⚡ {d.cantidad} operaciones ({d.porcentaje}% de demanda)
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
 
-              return (
-                <div
-                  key={s.categoria}
-                  style={{
-                    background: "var(--mono-bg)",
-                    padding: "0.4rem 0.65rem",
-                    borderRadius: "6px",
-                    border: "1px solid var(--line)",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
-                      <span style={{ fontSize: "1rem" }}>{s.icon}</span>
-                      <strong style={{ fontSize: "0.78rem", color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.label}</strong>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
-                      <span
-                        className="badge"
+              {/* Card 2: Participación Proporcional en Volumen (%) con Tooltip en Quetzales */}
+              <div style={{ background: "var(--mono-bg)", borderRadius: "8px", border: "1px solid var(--line)", padding: "0.6rem 0.75rem", display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                  <h4 style={{ margin: 0, fontSize: "0.78rem", color: "var(--ink)", fontWeight: 700 }}>
+                    📊 Participación por Volumen (%)
+                  </h4>
+                  <span className="mono" style={{ fontSize: "0.68rem", color: "#0284c7", fontWeight: 700 }}>
+                    Total: {formatoQ(volumenTotalFiltro)}
+                  </span>
+                </div>
+                <div style={{ width: "100%", height: 185 }}>
+                  <ResponsiveContainer>
+                    <BarChart
+                      data={serviciosFiltrados.map((s) => ({
+                        ...s,
+                        pctMonto: volumenTotalFiltro > 0 ? Math.round((s.totalMonto / volumenTotalFiltro) * 1000) / 10 : 0,
+                      }))}
+                      layout="vertical"
+                      margin={{ left: 10, right: 25, top: 5, bottom: 5 }}
+                    >
+                      <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 9 }} tickFormatter={(val) => `${val}%`} />
+                      <YAxis dataKey="label" type="category" width={115} tick={{ fontSize: 9 }} />
+                      <RechartsTooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const d = payload[0].payload as ServicioItem & { pctMonto: number };
+                            const isIngreso = d.flujo === "INGRESO";
+                            return (
+                              <div style={{ background: "rgba(15, 23, 42, 0.94)", color: "#fff", padding: "0.45rem 0.65rem", borderRadius: "6px", fontSize: "0.74rem", boxShadow: "0 4px 12px rgba(0,0,0,0.3)" }}>
+                                <div style={{ fontWeight: 700, marginBottom: "0.2rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                                  <span>{d.icon}</span> <span>{d.label}</span>
+                                </div>
+                                <div style={{ color: isIngreso ? "#34d399" : "#f87171", fontSize: "0.7rem", fontWeight: 700 }}>
+                                  {isIngreso ? "🟢 Entrada / Depósito" : "🔴 Salida / Retiro"}
+                                </div>
+                                <div style={{ marginTop: "0.2rem" }}>
+                                  💵 Monto exacto: <strong>{formatoQ(d.totalMonto)}</strong>
+                                </div>
+                                <div style={{ color: "#38bdf8", fontSize: "0.7rem" }}>
+                                  📊 Participación: <strong>{d.pctMonto}%</strong>
+                                </div>
+                                <div style={{ color: "#94a3b8", fontSize: "0.68rem" }}>
+                                  ⚡ Transacciones: {d.cantidad} op. ({d.porcentaje}%)
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Bar dataKey="pctMonto" radius={[0, 4, 4, 0]}>
+                        {serviciosFiltrados.map((s, index) => {
+                          const fill = s.flujo === "INGRESO" ? "#10b981" : "#ef4444";
+                          return <Cell key={`cell-bar-${index}`} fill={fill} />;
+                        })}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Card 3: Ranking y Desglose Detallado con Porcentajes y Quetzales */}
+              <div style={{ background: "var(--mono-bg)", borderRadius: "8px", border: "1px solid var(--line)", padding: "0.6rem 0.75rem", display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+                  <h4 style={{ margin: 0, fontSize: "0.78rem", color: "var(--ink)", fontWeight: 700 }}>
+                    📋 Desglose de Movimientos
+                  </h4>
+                  <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)" }}>Porcentaje & Monto</span>
+                </div>
+                <div style={{ maxHeight: 185, overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.35rem", paddingRight: "0.2rem" }}>
+                  {serviciosFiltrados.map((s, idx) => {
+                    const pctOp = totalOperacionesFiltro > 0 ? Math.round((s.cantidad / totalOperacionesFiltro) * 1000) / 10 : 0;
+                    const pctVol = volumenTotalFiltro > 0 ? Math.round((s.totalMonto / volumenTotalFiltro) * 1000) / 10 : 0;
+                    const isIngreso = s.flujo === "INGRESO";
+                    const color = isIngreso ? "#10b981" : "#ef4444";
+
+                    return (
+                      <div
+                        key={s.categoria || idx}
                         style={{
                           background: "var(--paper-raised)",
-                          color: "var(--ink-soft)",
-                          fontWeight: 700,
-                          fontSize: "0.66rem",
                           border: "1px solid var(--line)",
-                          padding: "0.1rem 0.35rem",
+                          borderRadius: "6px",
+                          padding: "0.3rem 0.45rem",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.15rem",
                         }}
+                        title={`${s.label}: ${formatoQ(s.totalMonto)} (${pctVol}% volumen / ${s.cantidad} transacciones - ${pctOp}% de demanda)`}
                       >
-                        {s.cantidad} op. ({porcentajeRelativo}%)
-                      </span>
-                      <strong
-                        className="mono"
-                        style={{
-                          fontSize: "0.82rem",
-                          color: "var(--accent)",
-                          minWidth: 80,
-                          textAlign: "right",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {formatoQ(s.totalMonto)}
-                      </strong>
-                    </div>
-                  </div>
-
-                  {/* Barra Visual Proporcional */}
-                  <div style={{ background: "var(--line)", height: "6px", borderRadius: "999px", overflow: "hidden" }}>
-                    <div
-                      style={{
-                        background: bgGradient,
-                        height: "100%",
-                        width: `${Math.max(porcentajeRelativo, 3)}%`,
-                        borderRadius: "999px",
-                        transition: "width 0.4s ease",
-                      }}
-                    />
-                  </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.72rem" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <span
+                              style={{
+                                fontSize: "0.62rem",
+                                padding: "0.05rem 0.25rem",
+                                borderRadius: "3px",
+                                fontWeight: 700,
+                                background: isIngreso ? "rgba(16, 185, 129, 0.12)" : "rgba(239, 68, 68, 0.12)",
+                                color: color,
+                              }}
+                            >
+                              {isIngreso ? "🟢 ENT" : "🔴 SAL"}
+                            </span>
+                            <span>{s.icon}</span>
+                            <span style={{ fontWeight: 600, color: "var(--ink)" }}>{s.label}</span>
+                          </div>
+                          <span className="mono" style={{ fontWeight: 700, color: color }}>
+                            {formatoQ(s.totalMonto)}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                          <div style={{ flex: 1, background: "rgba(0,0,0,0.06)", height: 4, borderRadius: 2, overflow: "hidden" }}>
+                            <div style={{ width: `${Math.min(pctVol, 100)}%`, background: color, height: "100%", borderRadius: 2 }} />
+                          </div>
+                          <span style={{ fontSize: "0.64rem", color: "var(--ink-soft)", minWidth: "75px", textAlign: "right" }}>
+                            {pctVol}% vol. ({s.cantidad} op.)
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODO 2: TENDENCIA TEMPORAL (Evolución por Días/Semanas/Meses) */}
+          {modoVista === "TENDENCIA" && (
+            <div style={{ display: "grid", gridTemplateColumns: "2.1fr 1fr", gap: "0.65rem", marginTop: "0.45rem" }}>
+              {/* Gráfica de Área de Tendencia Temporal */}
+              <div style={{ background: "var(--mono-bg)", borderRadius: "8px", border: "1px solid var(--line)", padding: "0.6rem 0.75rem", display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                  <h4 style={{ margin: 0, fontSize: "0.78rem", color: "var(--ink)", fontWeight: 700 }}>
+                    📈 Evolución Cronológica: Entradas (Verde) vs Salidas (Rojo)
+                  </h4>
+                  <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)" }}>Curva de actividad diaria</span>
+                </div>
+                <div style={{ width: "100%", height: 185 }}>
+                  <ResponsiveContainer>
+                    <AreaChart data={datos.tendenciaTemporal} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="gradIngresos" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                        </linearGradient>
+                        <linearGradient id="gradEgresos" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <XAxis dataKey="label" tick={{ fontSize: 9.5 }} />
+                      <YAxis tick={{ fontSize: 9.5 }} tickFormatter={(val) => `Q${val >= 1000 ? `${Math.round(val / 1000)}k` : val}`} />
+                      <RechartsTooltip formatter={(val: any) => [formatoQ(Number(val) || 0)]} labelFormatter={(l) => `Fecha: ${l}`} />
+                      <Legend wrapperStyle={{ fontSize: "0.7rem", paddingTop: "0.2rem" }} />
+                      <Area type="monotone" dataKey="ingresos" name="🟢 Entradas / Depósitos" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#gradIngresos)" />
+                      <Area type="monotone" dataKey="egresos" name="🔴 Salidas / Retiros" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#gradEgresos)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Panel de Resumen de Tendencia Temporal */}
+              <div style={{ background: "var(--mono-bg)", borderRadius: "8px", border: "1px solid var(--line)", padding: "0.6rem 0.75rem", display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+                  <h4 style={{ margin: 0, fontSize: "0.78rem", color: "var(--ink)", fontWeight: 700 }}>
+                    🎯 Radiografía de Flujo
+                  </h4>
+                  <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)" }}>Por fecha</span>
+                </div>
+                <div style={{ maxHeight: 185, overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.35rem", paddingRight: "0.2rem" }}>
+                  {datos.tendenciaTemporal.slice(-6).reverse().map((t) => (
+                    <div
+                      key={t.fecha}
+                      style={{
+                        background: "var(--paper-raised)",
+                        border: "1px solid var(--line)",
+                        borderRadius: "6px",
+                        padding: "0.3rem 0.45rem",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontSize: "0.72rem",
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontWeight: 700, color: "var(--ink)" }}>📅 {t.fecha}</span>
+                        <div style={{ fontSize: "0.64rem", color: "var(--ink-soft)" }}>{t.operaciones} transacciones</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "0.68rem", color: "#059669", fontWeight: 700 }}>+{formatoQ(t.ingresos)}</div>
+                        <div style={{ fontSize: "0.68rem", color: "#dc2626", fontWeight: 700 }}>-{formatoQ(t.egresos)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

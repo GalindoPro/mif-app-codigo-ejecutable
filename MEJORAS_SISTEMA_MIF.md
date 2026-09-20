@@ -1092,4 +1092,104 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
   - `MEJORAS_SISTEMA_MIF.md`
 - **Sincronización Dual:** Downloads ↔ Documents completada.
 
+---
+
+## 62. Suite Panorámica de Inteligencia y Analítica Estratégica en Dashboard Principal (`Tablero.tsx` / `app.css`)
+
+- **Objetivo:** Eliminar la tarjeta de botones repetitiva "Panel de Supervisión y Control" del dashboard principal (cuyos accesos ya existen permanentemente en el menú lateral) y expandir el **Monitoreo Estratégico de Servicios** a un diseño panorámico moderno, profesional y de 100% de ancho útil (`100vh` sin scroll de ventana).
+- **Mejoras Implementadas:**
+  1. **Eliminación de Redundancia Operativa:**
+     - Se removió la tarjeta contenedora de 8 botones píldora (`Ventanilla`, `Libro Arqueos`, `Cartera Crédito`, `Kardex Cartera`, `Padrón Socios`, `Plazos Fijos`, `Aportaciones`, `Caja Chica`), liberando el 50% del espacio antes bloqueado.
+  2. **Suite Panorámica de 3 Columnas (`.dashboard-charts-grid`):**
+     - **Columna 1 — Distribución de Operaciones (Gráfica de Dona Recharts):** Donut Chart interactivo con radios estilizados (`innerRadius={45}`, `outerRadius={75}`, `paddingAngle={3}`), paleta Fintech y tooltips enriquecidos.
+     - **Columna 2 — Volumen Monetario en Quetzales (Gráfica de Barras Horizontal):** Gráfico de barras horizontales con ejes formateados en `Q`, barras redondeadas y leyendas limpias.
+     - **Columna 3 — Ranking de Demanda Transaccional y Participación:** Lista ejecutiva con insignias (`#1, #2, #3`), iconos temáticos, volumen monetario acumulado en `Q`, conteo de operaciones y **barras de progreso visuales** con porcentaje de demanda.
+  3. **Cintillo Superior de KPIs y Filtros Rápidos:**
+     - Selectores por Agencia, filtros temporales (`Día`, `Semana`, `Mes`, `Año`) y chips por categoría de servicio (`Consolidado`, `Ahorros & PF`, `Créditos`, `Caja Chica`, `Ventanilla`).
+     - 3 métricas clave superiores: Mayor Demanda, Operaciones Realizadas y Volumen Monetario Operado en Quetzales.
+  4. **Adaptabilidad Multi-Dispositivo:**
+     - Despliegue en 3 columnas en PC / Escritorio (`1fr 1fr 1.15fr`), colapso suave a 2 columnas en Tabletas y 1 columna en Teléfonos Móviles.
+- **Archivos Modificados:**
+  - `frontend/src/pages/Tablero.tsx`
+  - `frontend/src/styles/app.css`
+  - `MEJORAS_SISTEMA_MIF.md`
+  - `00-INDICE.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 63. Inteligencia y Analítica Financiera Específica por Cuenta, Entradas vs Salidas y Tendencia Temporal (`Tablero.tsx` / `service.ts`)
+
+- **Objetivo:** Abrir la analítica de movimientos de caja y cuentas a un nivel granular y específico por producto cooperativo (Ahorro Corriente, Programado, Infantil, Ahorro s/Préstamo, Plazo Fijo, Aportaciones, Créditos, Agente BI, Caja Chica, Tesorería & Ventanilla), integrando balance financiero de Entradas vs Salidas y un conmutador con Curva de Tendencia Temporal en una sola pantalla (`100vh`).
+- **Mejoras Implementadas:**
+  1. **Selector Granular de Cuentas y Productos Financieros:**
+     - 11 filtros temáticos directos con conteo en vivo de operaciones: `🌐 Consolidado General`, `💰 Ahorro Corriente`, `📅 Ahorro Programado`, `🧒 Ahorro Infantil`, `🛡️ Ahorro s/Préstamo`, `🔒 Plazo Fijo (DPF)`, `🏛️ Aportaciones`, `💼 Cartera Créditos`, `🏦 Agente BI & Servicios`, `☕ Caja Chica`, `💵 Tesorería & Ventanilla`.
+  2. **Cintillo de Balance Financiero Específico (4 KPIs Temáticos):**
+     - **🟢 Entradas / Depósitos:** Total captado en Quetzales (`Q`) y conteo de depósitos/cobros.
+     - **🔴 Salidas / Retiros:** Total colocado/retirado en Quetzales (`Q`) y conteo de retiros/desembolsos/gastos.
+     - **⚖️ Flujo Neto del Período:** Cálculo automático de superávit o colocación neta (`Entradas - Salidas`).
+     - **🏆 Mayor Operación:** Movimiento con mayor demanda relativa e icono temático.
+  3. **Conmutador de Vista Dual:**
+     - **Modo 1: 📊 Balance & Distribución:**
+       * Gráfica Donut de Recharts con colores de flujo diferenciados.
+       * Gráfica de Barras Horizontales comparativas (Verde `#10b981` para Ingresos y Carmesí `#ef4444` para Egresos).
+       * Desglose y ranking de movimientos con etiquetas `[🟢 ENT]` / `[🔴 SAL]`, montos en `Q` y barras de porcentaje.
+     - **Modo 2: 📈 Tendencia Temporal:**
+       * `AreaChart` de Recharts con doble curva y gradientes suaves para monitorear la evolución diaria/mensual de captaciones vs retiros.
+       * Radiografía de flujo por fechas cronológicas con balance neto diario.
+  4. **Mapeo Limpio Notarial y Bancario:**
+     - Eliminación de etiquetas técnicas crudas (ej. `TRASLADO_FONDOS` mapeado a `🚚 Traslado de Fondos a Banco / Bóveda`, remesas, comisiones y servicios BI).
+- **Archivos Modificados:**
+  - `backend/src/modules/cajaauxiliar/service.ts`
+  - `frontend/src/pages/Tablero.tsx`
+  - `02-codigo-frontend.md`
+  - `01-codigo-backend.md`
+  - `MEJORAS_SISTEMA_MIF.md`
+  - `00-INDICE.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 64. Normalización Visual Porcentual (1-100%) y Tooltips Flotantes en Quetzales Exactos (`Tablero.tsx`)
+
+- **Objetivo:** Resolver el problema visual donde transacciones de montos muy elevados (como traslados a banco o desembolsos de créditos) reducían las operaciones de menor monto (como cuotas o comisiones) a líneas casi invisibles, aplicando el estándar bancario de **escala porcentual de participación (0% - 100%)** con **tarjetas flotantes enriquecidas en Quetzales (`Q`) exactos**.
+- **Mejoras Implementadas:**
+  1. **Gráfica de Barras Normalizada por Participación de Volumen (0% - 100%):**
+     - El eje horizontal ahora representa el porcentaje relativo de participación (`0% - 100%`), permitiendo que cada barra conserve cuerpo visual y bordes redondeados limpios sin importar la disparidad de escala numérica.
+  2. **Tooltips Flotantes Glassmorphism en Quetzales Exactos:**
+     - Al pasar el cursor sobre cualquier porción de la Dona o barra horizontal, se despliega una tarjeta oscura ejecutiva con:
+       * Nombre oficial de la operación e icono institucional.
+       * Naturaleza financiera (`🟢 Entrada / Depósito` o `🔴 Salida / Retiro`).
+       * **Monto exacto en Quetzales (`Q XX,XXX.XX`)**.
+       * **Porcentaje de volumen monetario (`XX.X%`)**.
+       * **Conteo y porcentaje de transacciones (`N op. - XX.X%`)**.
+  3. **Desglose de Movimientos con Doble Indicador:**
+     - Muestra el monto formateado en Quetzales a la derecha y una barra de progreso que indica el porcentaje de volumen (`% vol.`) y cantidad de transacciones.
+- **Archivos Modificados:**
+  - `frontend/src/pages/Tablero.tsx`
+  - `02-codigo-frontend.md`
+  - `MEJORAS_SISTEMA_MIF.md`
+  - `00-INDICE.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+---
+
+## 65. Integración Integral de Aportaciones de Capital y Aperturas de Cuentas en la Analítica (`service.ts`)
+
+- **Objetivo:** Corregir la omisión de las Aportaciones de Capital y saldos iniciales de apertura en la suite analítica del dashboard, garantizando que los `Q 2,100.00` de aportaciones de los 21 asociados y las aperturas de cuentas se reflejen con exactitud en tiempo real.
+- **Mejoras Implementadas:**
+  1. **Inclusión de Aperturas Estatutarias (`cuentas.saldo_inicial`):**
+     - Se incorporó la consulta de aperturas de cuentas con saldo inicial (`saldo_inicial > 0`), capturando las 21 aportaciones estatutarias iniciales de `Q 100.00` (`Q 2,100.00` totales) y aperturas de ahorros dentro del período de consulta.
+  2. **Prevención de Doble Conteo (Anti-Duplicidad):**
+     - Se filtraron los registros de la tabla `movimientos` para evitar duplicar las operaciones que ya fueron registradas a través de ventanilla en `caja_movimientos_auxiliar` mediante la cláusula `not exists (select 1 from caja_movimientos_auxiliar cma where cma.movimiento_id = m.id)`.
+  3. **Concordancia Exacta 100%:**
+     - La tarjeta superior de *Aportaciones Capital (Q 2,100.00)*, el filtro chip *🏛️ Aportaciones (21)* y las gráficas de dona, barras y ranking ahora presentan sincronización y cuadre contable perfecto.
+- **Archivos Modificados:**
+  - `backend/src/modules/cajaauxiliar/service.ts`
+  - `01-codigo-backend.md`
+  - `MEJORAS_SISTEMA_MIF.md`
+  - `00-INDICE.md`
+- **Sincronización Dual:** Downloads ↔ Documents completada.
+
+
 
