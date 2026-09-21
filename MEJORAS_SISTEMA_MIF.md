@@ -1184,12 +1184,40 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
      - Se filtraron los registros de la tabla `movimientos` para evitar duplicar las operaciones que ya fueron registradas a través de ventanilla en `caja_movimientos_auxiliar` mediante la cláusula `not exists (select 1 from caja_movimientos_auxiliar cma where cma.movimiento_id = m.id)`.
   3. **Concordancia Exacta 100%:**
      - La tarjeta superior de *Aportaciones Capital (Q 2,100.00)*, el filtro chip *🏛️ Aportaciones (21)* y las gráficas de dona, barras y ranking ahora presentan sincronización y cuadre contable perfecto.
+---
+
+## 66. Arquitectura Global de Impresión con Portal (`createPortal`) y Aislamiento Limpio de Modales (`app.css`, `LibroCajaReporteModal.tsx`)
+
+- **Objetivo:** Resolver de forma definitiva y robusta el problema donde la vista previa de impresión arrojaba una hoja en blanco o desplazada fuera de página al intentar imprimir el "Comprobante del Libro de Caja Auxiliar" (`LibroCajaReporteModal`).
+- **Causa Raíz:** 
+  - `LibroCajaReporteModal` se renderizaba dentro del sub-árbol de `CajaAbierta.tsx` (contenido dentro de `.screen-container`). Al ocultar los fondos `.screen-container` con `@media print`, la cascada CSS ocultaba también el modal que residía en su interior.
+- **Mejoras Implementadas:**
+  1. **Renderizado Directo en `document.body` vía `createPortal`:**
+     - `LibroCajaReporteModal.tsx` ahora se monta directamente en el nodo raíz `document.body`, independizándolo completamente de la jerarquía de `.screen-container` y `#root`.
+  2. **Aislamiento Total del Fondo (`body:has(.libro-caja-modal-overlay) #root { display: none !important; }`):**
+     - Durante la impresión, se apaga de forma limpia la aplicación de fondo `#root`, garantizando que **únicamente** el comprobante oficial en `document.body` se proyecte al 100% de la página sin desplazamientos, márgenes ocultos ni saltos iniciales vacíos.
+---
+
+## 67. Habilitación Universal de Emisión de Actas de Arqueo Mensual y Formato Notarial con Saldo Cero (`LibroArqueoMensual.tsx`)
+
+- **Objetivo:** Permitir la generación, exportación a Excel y emisión notarial impresa de las Actas Oficiales de la Comisión de Vigilancia en cualquier mes seleccionado, incluso en períodos donde no existan cajas operadas o transacciones registradas (por ejemplo, meses históricos previos al inicio de operaciones o agencias en período de receso).
+- **Causa del Bloqueo Anterior:**
+  - Los botones de `📥 Excel (CSV)` e `🖨️ Imprimir Acta Oficial` contaban con la condición `disabled={!datos || datos.dias.length === 0}`. Si el usuario seleccionaba un mes sin registros (como Agosto de 2026), los botones se bloqueaban en gris y la sábana de cierres se ocultaba bajo un aviso informativo.
+- **Mejoras Implementadas:**
+  1. **Disponibilidad Continua de Botones:**
+     - Se desbloquearon los botones `🖨️ Imprimir Acta Oficial` y `📥 Excel (CSV)` permitiendo su uso inmediato en todo momento, condicionados únicamente al estado de carga activa (`disabled={cargando}`).
+  2. **Estructura Notarial Completa con Fila Notarial de Cero Operaciones:**
+     - La tabla oficial de la Sábana de Cierres ahora renderiza siempre su cabecera completa, agregando la fila notarial institucional *"Sin movimientos de caja registrados en este período mensual (0 operaciones registradas)"* y totalizadores en `Q 0.00`, permitiendo imprimir el acta oficial con sus 4 puntos estatutarios y las 4 firmas de rigor (Presidente, Secretaria, Vocal I y Receptor Pagador).
+  3. **Auto-selección Inteligente de Agencia para Roles Directivos:**
+     - Al ingresar usuarios con rol `GERENCIA_GENERAL` o `ADMIN` (que no tienen una agencia prefijada por defecto), el selector inicializa automáticamente la primera agencia activa (`Agencia Chajul`) sin requerir selección manual para consultar.
 - **Archivos Modificados:**
-  - `backend/src/modules/cajaauxiliar/service.ts`
-  - `01-codigo-backend.md`
+  - `frontend/src/pages/LibroArqueoMensual.tsx`
+  - `02-codigo-frontend.md`
   - `MEJORAS_SISTEMA_MIF.md`
   - `00-INDICE.md`
 - **Sincronización Dual:** Downloads ↔ Documents completada.
+
+
 
 
 

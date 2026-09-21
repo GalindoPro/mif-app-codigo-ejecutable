@@ -65,8 +65,13 @@ export default function LibroArqueoMensual() {
   }, [mes, mesNum, añoStr]);
 
   useEffect(() => {
-    api.get<Agencia[]>("/agencias").then(({ data }) => setAgencias(data));
-  }, []);
+    api.get<Agencia[]>("/agencias").then(({ data }) => {
+      setAgencias(data);
+      if (!agenciaId && data.length > 0) {
+        setAgenciaId(data[0].id);
+      }
+    });
+  }, [agenciaId]);
 
   function cargar() {
     if (!agenciaId) return;
@@ -101,7 +106,6 @@ export default function LibroArqueoMensual() {
   const ultimoDiaMes = new Date(Number(añoStr), Number(mesNum), 0).getDate();
 
   function exportarCSV() {
-    if (!datos || datos.dias.length === 0) return;
     const lineas: string[] = [];
     lineas.push(`LIBRO DE ACTAS DE ARQUEO MENSUAL DE CAJA - COMISION DE VIGILANCIA`);
     lineas.push(`COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."`);
@@ -110,26 +114,30 @@ export default function LibroArqueoMensual() {
     lineas.push(`Periodo: ${mesNombreLargo}`);
     lineas.push("");
     lineas.push("RESUMEN GENERAL DEL MES");
-    lineas.push(`Dias Operados,${datos.resumen.totalDiasOperados}`);
-    lineas.push(`Dias Cuadrados Exactos,${datos.resumen.diasCuadrados}`);
-    lineas.push(`Dias con Diferencia,${datos.resumen.diasConDiferencia}`);
-    lineas.push(`Total Ingresos del Mes (Q),${datos.resumen.totalIngresosMes.toFixed(2)}`);
-    lineas.push(`Total Egresos del Mes (Q),${datos.resumen.totalEgresosMes.toFixed(2)}`);
-    lineas.push(`Diferencia Neta (Q),${(datos.resumen.totalSobrante - datos.resumen.totalFaltante).toFixed(2)}`);
+    lineas.push(`Dias Operados,${datos?.resumen?.totalDiasOperados ?? 0}`);
+    lineas.push(`Dias Cuadrados Exactos,${datos?.resumen?.diasCuadrados ?? 0}`);
+    lineas.push(`Dias con Diferencia,${datos?.resumen?.diasConDiferencia ?? 0}`);
+    lineas.push(`Total Ingresos del Mes (Q),${(datos?.resumen?.totalIngresosMes ?? 0).toFixed(2)}`);
+    lineas.push(`Total Egresos del Mes (Q),${(datos?.resumen?.totalEgresosMes ?? 0).toFixed(2)}`);
+    lineas.push(`Diferencia Neta (Q),${((datos?.resumen?.totalSobrante ?? 0) - (datos?.resumen?.totalFaltante ?? 0)).toFixed(2)}`);
     lineas.push("");
     lineas.push("SABANA DE CIERRES DIARIOS");
     lineas.push("Fecha,Cajero / Operador,Saldo Inicial (Q),Ingresos (Q),Egresos (Q),Saldo Libro (Q),Efectivo Contado (Q),Diferencia (Q),Resultado");
-    datos.dias.forEach((d) => {
-      const fechaStr = new Date(d.fecha).toLocaleDateString("es-GT");
-      const cajero = `"${(d.cerrado_por_nombre || d.abierto_por_nombre || "").replace(/"/g, '""')}"`;
-      const esperado = Number(d.saldo_final ?? d.saldo_inicial);
-      const contado = Number(d.total_contado || esperado);
-      const dif = Number(d.diferencia || 0);
-      const res = dif === 0 ? "CUADRADO" : dif > 0 ? "SOBRANTE" : "FALTANTE";
-      lineas.push(
-        `${fechaStr},${cajero},${d.saldo_inicial.toFixed(2)},${d.total_ingresos.toFixed(2)},${d.total_egresos.toFixed(2)},${esperado.toFixed(2)},${contado.toFixed(2)},${dif.toFixed(2)},${res}`,
-      );
-    });
+    if (datos && datos.dias.length > 0) {
+      datos.dias.forEach((d) => {
+        const fechaStr = new Date(d.fecha).toLocaleDateString("es-GT");
+        const cajero = `"${(d.cerrado_por_nombre || d.abierto_por_nombre || "").replace(/"/g, '""')}"`;
+        const esperado = Number(d.saldo_final ?? d.saldo_inicial);
+        const contado = Number(d.total_contado || esperado);
+        const dif = Number(d.diferencia || 0);
+        const res = dif === 0 ? "CUADRADO" : dif > 0 ? "SOBRANTE" : "FALTANTE";
+        lineas.push(
+          `${fechaStr},${cajero},${d.saldo_inicial.toFixed(2)},${d.total_ingresos.toFixed(2)},${d.total_egresos.toFixed(2)},${esperado.toFixed(2)},${contado.toFixed(2)},${dif.toFixed(2)},${res}`,
+        );
+      });
+    } else {
+      lineas.push(`"Sin operaciones registradas en el mes de ${mesNombreLargo}",,,,,,,,`);
+    }
     lineas.push("");
     lineas.push(`Observaciones: "${observaciones.replace(/"/g, '""')}"`);
 
@@ -190,7 +198,7 @@ export default function LibroArqueoMensual() {
               type="button"
               className="btn secondary"
               onClick={exportarCSV}
-              disabled={!datos || datos.dias.length === 0}
+              disabled={cargando}
               style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem" }}
             >
               📥 Excel (CSV)
@@ -199,7 +207,7 @@ export default function LibroArqueoMensual() {
               type="button"
               className="btn"
               onClick={() => window.print()}
-              disabled={!datos || datos.dias.length === 0}
+              disabled={cargando}
               style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem" }}
             >
               🖨️ Imprimir Acta Oficial
@@ -386,222 +394,227 @@ export default function LibroArqueoMensual() {
         {cargando && <p style={{ textAlign: "center", padding: "1rem" }}>Cargando arqueos del mes…</p>}
 
         {!cargando && (!datos || datos.dias.length === 0) && (
-          <div className="alert info">
-            No se encontraron cajas registradas para el mes de {mesNombreLargo} en {agenciaNombre}.
+          <div className="alert info no-print" style={{ margin: "0.5rem 0" }}>
+            ℹ️ No se encontraron cajas operadas para el mes de {mesNombreLargo} en {agenciaNombre}. Se muestra el formato notarial oficial con saldo Q 0.00 para efectos de acta y dictamen.
           </div>
         )}
 
-        {datos && (
-          <div style={{ fontSize: "0.82rem", lineHeight: 1.5, color: "var(--ink)" }}>
-            {/* PUNTO PRIMERO */}
-            <div style={{ marginBottom: "0.75rem", textAlign: "justify" }}>
-              <strong style={{ textDecoration: "underline" }}>PUNTO PRIMERO (APERTURA Y QUÓRUM):</strong> En el municipio
-              de {lugarMunicipio}, departamento de Quiché, siendo las {horaInicio} horas del día {ultimoDiaMes} del mes
-              de {mesNombreLargo}, reunidos en las oficinas de la Agencia <strong>{agenciaNombre}</strong> de la{" "}
-              <strong>COOPERATIVA MAYA INVERSIONES FUTURAS R.L. &quot;COMIF R.L.&quot;</strong>, se
-              constituyen los miembros de la Comisión de Vigilancia: <strong>{nombrePresidente}</strong> (Presidente),{" "}
-              <strong>{nombreSecretaria}</strong> (Secretaria) y <strong>{nombreVocal}</strong> (Vocal I), en presencia del
-              Receptor Pagador <strong>{nombreCajero}</strong>, con el propósito de celebrar la sesión ordinaria de
-              verificación, cotejo y cierre mensual del libro auxiliar de caja.
+        <div style={{ fontSize: "0.82rem", lineHeight: 1.5, color: "var(--ink)" }}>
+          {/* PUNTO PRIMERO */}
+          <div style={{ marginBottom: "0.75rem", textAlign: "justify" }}>
+            <strong style={{ textDecoration: "underline" }}>PUNTO PRIMERO (APERTURA Y QUÓRUM):</strong> En el municipio
+            de {lugarMunicipio}, departamento de Quiché, siendo las {horaInicio} horas del día {ultimoDiaMes} del mes
+            de {mesNombreLargo}, reunidos en las oficinas de la Agencia <strong>{agenciaNombre}</strong> de la{" "}
+            <strong>COOPERATIVA MAYA INVERSIONES FUTURAS R.L. &quot;COMIF R.L.&quot;</strong>, se
+            constituyen los miembros de la Comisión de Vigilancia: <strong>{nombrePresidente}</strong> (Presidente),{" "}
+            <strong>{nombreSecretaria}</strong> (Secretaria) y <strong>{nombreVocal}</strong> (Vocal I), en presencia del
+            Receptor Pagador <strong>{nombreCajero}</strong>, con el propósito de celebrar la sesión ordinaria de
+            verificación, cotejo y cierre mensual del libro auxiliar de caja.
+          </div>
+
+          {/* PUNTO SEGUNDO */}
+          <div style={{ marginBottom: "0.5rem" }}>
+            <div style={{ textAlign: "justify", marginBottom: "0.4rem" }}>
+              <strong style={{ textDecoration: "underline" }}>PUNTO SEGUNDO (REVISIÓN DE OPERACIONES Y SÁBANA DE CIERRES):</strong>{" "}
+              La Comisión de Vigilancia procedió a la revisión minuciosa y cotejo diario de los comprobantes de ingreso y egreso
+              generados durante el mes, arrojando el siguiente resumen consolidado:
             </div>
 
-            {/* PUNTO SEGUNDO */}
-            <div style={{ marginBottom: "0.5rem" }}>
-              <div style={{ textAlign: "justify", marginBottom: "0.4rem" }}>
-                <strong style={{ textDecoration: "underline" }}>PUNTO SEGUNDO (REVISIÓN DE OPERACIONES Y SÁBANA DE CIERRES):</strong>{" "}
-                La Comisión de Vigilancia procedió a la revisión minuciosa y cotejo diario de los comprobantes de ingreso y egreso
-                generados durante el mes, arrojando el siguiente resumen consolidado:
+            {/* Cintillo de Cifras Clave */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                gap: "0.45rem",
+                marginBottom: "0.5rem",
+                background: "var(--paper-raised)",
+                padding: "0.4rem 0.6rem",
+                borderRadius: "6px",
+                border: "1px solid var(--line)",
+                fontSize: "0.72rem",
+              }}
+            >
+              <div>
+                <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                  Días Operados
+                </span>
+                <strong className="mono" style={{ fontSize: "0.9rem" }}>
+                  {datos?.resumen?.totalDiasOperados ?? 0} días
+                </strong>
               </div>
 
-              {/* Cintillo de Cifras Clave */}
+              <div>
+                <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                  Efectividad de Cuadre
+                </span>
+                <strong className="mono" style={{ fontSize: "0.9rem", color: "#16a34a" }}>
+                  {datos?.resumen ? `${datos.resumen.diasCuadrados} / ${datos.resumen.totalDiasOperados}` : "0 / 0"} (
+                  {datos?.resumen && datos.resumen.totalDiasOperados > 0
+                    ? Math.round((datos.resumen.diasCuadrados / datos.resumen.totalDiasOperados) * 100)
+                    : 100}
+                  %)
+                </strong>
+              </div>
+
+              <div>
+                <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                  Total Ingresos del Mes
+                </span>
+                <strong className="mono" style={{ fontSize: "0.9rem", color: "#16a34a" }}>
+                  + {formatoQ(datos?.resumen?.totalIngresosMes ?? 0)}
+                </strong>
+              </div>
+
+              <div>
+                <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                  Total Egresos del Mes
+                </span>
+                <strong className="mono" style={{ fontSize: "0.9rem", color: "#dc2626" }}>
+                  − {formatoQ(datos?.resumen?.totalEgresosMes ?? 0)}
+                </strong>
+              </div>
+
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-                  gap: "0.45rem",
-                  marginBottom: "0.5rem",
-                  background: "var(--paper-raised)",
-                  padding: "0.4rem 0.6rem",
-                  borderRadius: "6px",
-                  border: "1px solid var(--line)",
-                  fontSize: "0.72rem",
+                  background: (datos?.resumen?.diasConDiferencia ?? 0) === 0 ? "rgba(22, 163, 74, 0.1)" : "rgba(220, 38, 38, 0.1)",
+                  padding: "2px 4px",
+                  borderRadius: "4px",
                 }}
               >
-                <div>
-                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
-                    Días Operados
-                  </span>
-                  <strong className="mono" style={{ fontSize: "0.9rem" }}>
-                    {datos.resumen.totalDiasOperados} días
-                  </strong>
-                </div>
-
-                <div>
-                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
-                    Efectividad de Cuadre
-                  </span>
-                  <strong className="mono" style={{ fontSize: "0.9rem", color: "#16a34a" }}>
-                    {datos.resumen.diasCuadrados} / {datos.resumen.totalDiasOperados} (
-                    {datos.resumen.totalDiasOperados > 0
-                      ? Math.round((datos.resumen.diasCuadrados / datos.resumen.totalDiasOperados) * 100)
-                      : 100}
-                    %)
-                  </strong>
-                </div>
-
-                <div>
-                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
-                    Total Ingresos del Mes
-                  </span>
-                  <strong className="mono" style={{ fontSize: "0.9rem", color: "#16a34a" }}>
-                    + {formatoQ(datos.resumen.totalIngresosMes)}
-                  </strong>
-                </div>
-
-                <div>
-                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
-                    Total Egresos del Mes
-                  </span>
-                  <strong className="mono" style={{ fontSize: "0.9rem", color: "#dc2626" }}>
-                    − {formatoQ(datos.resumen.totalEgresosMes)}
-                  </strong>
-                </div>
-
-                <div
+                <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                  Diferencia de Caja
+                </span>
+                <strong
+                  className="mono"
                   style={{
-                    background: datos.resumen.diasConDiferencia === 0 ? "rgba(22, 163, 74, 0.1)" : "rgba(220, 38, 38, 0.1)",
-                    padding: "2px 4px",
-                    borderRadius: "4px",
+                    fontSize: "0.9rem",
+                    color: (datos?.resumen?.diasConDiferencia ?? 0) === 0 ? "#16a34a" : "#dc2626",
                   }}
                 >
-                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
-                    Diferencia de Caja
-                  </span>
-                  <strong
-                    className="mono"
-                    style={{
-                      fontSize: "0.9rem",
-                      color: datos.resumen.diasConDiferencia === 0 ? "#16a34a" : "#dc2626",
-                    }}
-                  >
-                    {datos.resumen.diasConDiferencia === 0
-                      ? "Cuadrado (Q 0.00)"
-                      : `${datos.resumen.diasConDiferencia} día(s)`}
-                  </strong>
-                </div>
+                  {(datos?.resumen?.diasConDiferencia ?? 0) === 0
+                    ? "Cuadrado (Q 0.00)"
+                    : `${datos?.resumen?.diasConDiferencia} día(s)`}
+                </strong>
               </div>
+            </div>
 
-              {/* Sábana de Cierres Diarios */}
-              {datos.dias.length > 0 && (
-                <div className="table-wrap" style={{ border: "1px solid var(--line)" }}>
-                  <table style={{ fontSize: "0.75rem", width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr style={{ background: "var(--paper-raised)" }}>
-                        <th style={{ width: "70px", padding: "2px 4px" }}>Fecha</th>
-                        <th style={{ padding: "2px 4px" }}>Cajero / Operador</th>
-                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Saldo Inicial</th>
-                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Ingresos (+)</th>
-                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Egresos (−)</th>
-                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Saldo Libro</th>
-                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Contado</th>
-                        <th style={{ width: "75px", textAlign: "right", padding: "2px 4px" }}>Diferencia</th>
-                        <th style={{ width: "75px", textAlign: "center", padding: "2px 4px" }}>Resultado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {datos.dias.map((d) => {
-                        const dif = Number(d.diferencia || 0);
-                        const esperado = Number(d.saldo_final ?? d.saldo_inicial);
-                        const contado = Number(d.total_contado || esperado);
-                        return (
-                          <tr key={d.id}>
-                            <td className="mono" style={{ fontWeight: 600, padding: "2px 4px" }}>
-                              {new Date(d.fecha).toLocaleDateString("es-GT", {
-                                weekday: "short",
-                                day: "2-digit",
-                                month: "2-digit",
-                              })}
-                            </td>
-                            <td style={{ padding: "2px 4px" }}>
-                              {d.cerrado_por_nombre || d.abierto_por_nombre || nombreCajero}
-                            </td>
-                            <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
-                              {formatoQ(d.saldo_inicial)}
-                            </td>
-                            <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "2px 4px" }}>
-                              {formatoQ(d.total_ingresos)}
-                            </td>
-                            <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "2px 4px" }}>
-                              {formatoQ(d.total_egresos)}
-                            </td>
-                            <td className="mono" style={{ textAlign: "right", fontWeight: 700, padding: "2px 4px" }}>
-                              {formatoQ(esperado)}
-                            </td>
-                            <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
-                              {formatoQ(contado)}
-                            </td>
-                            <td
-                              className="mono"
+            {/* Sábana de Cierres Diarios */}
+            <div className="table-wrap" style={{ border: "1px solid var(--line)" }}>
+              <table style={{ fontSize: "0.75rem", width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "var(--paper-raised)" }}>
+                    <th style={{ width: "70px", padding: "2px 4px" }}>Fecha</th>
+                    <th style={{ padding: "2px 4px" }}>Cajero / Operador</th>
+                    <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Saldo Inicial</th>
+                    <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Ingresos (+)</th>
+                    <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Egresos (−)</th>
+                    <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Saldo Libro</th>
+                    <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Contado</th>
+                    <th style={{ width: "75px", textAlign: "right", padding: "2px 4px" }}>Diferencia</th>
+                    <th style={{ width: "75px", textAlign: "center", padding: "2px 4px" }}>Resultado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {datos && datos.dias.length > 0 ? (
+                    datos.dias.map((d) => {
+                      const dif = Number(d.diferencia || 0);
+                      const esperado = Number(d.saldo_final ?? d.saldo_inicial);
+                      const contado = Number(d.total_contado || esperado);
+                      return (
+                        <tr key={d.id}>
+                          <td className="mono" style={{ fontWeight: 600, padding: "2px 4px" }}>
+                            {new Date(d.fecha).toLocaleDateString("es-GT", {
+                              weekday: "short",
+                              day: "2-digit",
+                              month: "2-digit",
+                            })}
+                          </td>
+                          <td style={{ padding: "2px 4px" }}>
+                            {d.cerrado_por_nombre || d.abierto_por_nombre || nombreCajero}
+                          </td>
+                          <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
+                            {formatoQ(d.saldo_inicial)}
+                          </td>
+                          <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "2px 4px" }}>
+                            {formatoQ(d.total_ingresos)}
+                          </td>
+                          <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "2px 4px" }}>
+                            {formatoQ(d.total_egresos)}
+                          </td>
+                          <td className="mono" style={{ textAlign: "right", fontWeight: 700, padding: "2px 4px" }}>
+                            {formatoQ(esperado)}
+                          </td>
+                          <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
+                            {formatoQ(contado)}
+                          </td>
+                          <td
+                            className="mono"
+                            style={{
+                              textAlign: "right",
+                              fontWeight: 700,
+                              color: dif === 0 ? "#16a34a" : dif > 0 ? "#2563eb" : "#dc2626",
+                              padding: "2px 4px",
+                            }}
+                          >
+                            {dif === 0 ? "Q 0.00" : dif > 0 ? `+${formatoQ(dif)}` : `-${formatoQ(Math.abs(dif))}`}
+                          </td>
+                          <td style={{ textAlign: "center", padding: "2px 4px" }}>
+                            <span
                               style={{
-                                textAlign: "right",
+                                color: dif === 0 ? "#16a34a" : "#dc2626",
                                 fontWeight: 700,
-                                color: dif === 0 ? "#16a34a" : dif > 0 ? "#2563eb" : "#dc2626",
-                                padding: "2px 4px",
+                                fontSize: "0.72rem",
                               }}
                             >
-                              {dif === 0 ? "Q 0.00" : dif > 0 ? `+${formatoQ(dif)}` : `-${formatoQ(Math.abs(dif))}`}
-                            </td>
-                            <td style={{ textAlign: "center", padding: "2px 4px" }}>
-                              <span
-                                style={{
-                                  color: dif === 0 ? "#16a34a" : "#dc2626",
-                                  fontWeight: 700,
-                                  fontSize: "0.72rem",
-                                }}
-                              >
-                                {dif === 0 ? "✓ Cuadrado" : dif > 0 ? "Sobrante" : "Faltante"}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr style={{ background: "rgba(0,0,0,0.04)", fontWeight: 800, borderTop: "2px solid #0f172a" }}>
-                        <td colSpan={2} style={{ padding: "3px 4px" }}>
-                          TOTALES DEL MES:
-                        </td>
-                        <td style={{ padding: "3px 4px" }}>—</td>
-                        <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "3px 4px" }}>
-                          {formatoQ(datos.resumen.totalIngresosMes)}
-                        </td>
-                        <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "3px 4px" }}>
-                          {formatoQ(datos.resumen.totalEgresosMes)}
-                        </td>
-                        <td colSpan={2} style={{ padding: "3px 4px" }}></td>
-                        <td
-                          className="mono"
-                          style={{
-                            textAlign: "right",
-                            color: datos.resumen.diasConDiferencia === 0 ? "#16a34a" : "#dc2626",
-                            padding: "3px 4px",
-                          }}
-                        >
-                          {datos.resumen.diasConDiferencia === 0
-                            ? "Q 0.00"
-                            : datos.resumen.totalSobrante > 0
-                            ? `+${formatoQ(datos.resumen.totalSobrante)}`
-                            : `-${formatoQ(datos.resumen.totalFaltante)}`}
-                        </td>
-                        <td style={{ textAlign: "center", padding: "3px 4px" }}>
-                          {datos.resumen.diasConDiferencia === 0 ? "✓ CONFORME" : "REVISADO"}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              )}
+                              {dif === 0 ? "✓ Cuadrado" : dif > 0 ? "Sobrante" : "Faltante"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={9} style={{ textAlign: "center", padding: "14px 8px", color: "var(--ink-soft)", fontStyle: "italic" }}>
+                        Sin movimientos de caja registrados en este período mensual (0 operaciones registradas)
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: "rgba(0,0,0,0.04)", fontWeight: 800, borderTop: "2px solid #0f172a" }}>
+                    <td colSpan={2} style={{ padding: "3px 4px" }}>
+                      TOTALES DEL MES:
+                    </td>
+                    <td style={{ padding: "3px 4px" }}>—</td>
+                    <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "3px 4px" }}>
+                      {formatoQ(datos?.resumen?.totalIngresosMes ?? 0)}
+                    </td>
+                    <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "3px 4px" }}>
+                      {formatoQ(datos?.resumen?.totalEgresosMes ?? 0)}
+                    </td>
+                    <td colSpan={2} style={{ padding: "3px 4px" }}></td>
+                    <td
+                      className="mono"
+                      style={{
+                        textAlign: "right",
+                        color: (datos?.resumen?.diasConDiferencia ?? 0) === 0 ? "#16a34a" : "#dc2626",
+                        padding: "3px 4px",
+                      }}
+                    >
+                      {(datos?.resumen?.diasConDiferencia ?? 0) === 0
+                        ? "Q 0.00"
+                        : (datos?.resumen?.totalSobrante ?? 0) > 0
+                        ? `+${formatoQ(datos?.resumen?.totalSobrante ?? 0)}`
+                        : `-${formatoQ(datos?.resumen?.totalFaltante ?? 0)}`}
+                    </td>
+                    <td style={{ textAlign: "center", padding: "3px 4px" }}>
+                      {(datos?.resumen?.diasConDiferencia ?? 0) === 0 ? "✓ CONFORME" : "REVISADO"}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
+          </div>
 
             {/* PUNTO TERCERO */}
             <div style={{ marginTop: "0.6rem", marginBottom: "0.6rem", textAlign: "justify" }}>
@@ -659,7 +672,6 @@ export default function LibroArqueoMensual() {
               </div>
             </div>
           </div>
-        )}
       </div>
     </div>
   );

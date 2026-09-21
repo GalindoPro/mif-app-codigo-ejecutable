@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { api, mensajeError } from "../../lib/api";
 import { formatoQ } from "../../types";
 import type { DetalleCajaAuxiliar, CajaMovimientoAuxiliar, OrigenFondos } from "../../types";
@@ -216,7 +217,7 @@ export default function LibroCajaReporteModal({
   const totEgr = datosReporte?.totalEgreso ?? 0;
   const saldoFin = datosReporte?.saldoFinal ?? (saldoIni + totIng - totEgr);
 
-  return (
+  return createPortal(
     <div className="modal libro-caja-modal-overlay">
       <div
         className="modal-content libro-caja-modal-card"
@@ -560,6 +561,7 @@ export default function LibroCajaReporteModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
