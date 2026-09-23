@@ -250,6 +250,24 @@ export default function NuevoMovimientoForm({
   const [verificandoDocNo, setVerificandoDocNo] = useState(false);
   const [metodoPago, setMetodoPago] = useState<"EFECTIVO" | "CHEQUE">("EFECTIVO");
   const [bancoCheque, setBancoCheque] = useState("Banrural");
+  const [infoCorrelativoBi, setInfoCorrelativoBi] = useState<{
+    correlativo: number;
+    codigo: string;
+    periodoMes: string;
+    mesNombre: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (info.seccion === "BI") {
+      api
+        .get<{ correlativo: number; codigo: string; periodoMes: string; mesNombre: string }>(
+          "/caja-auxiliar/siguiente-correlativo-bi",
+          { params: { agenciaId } }
+        )
+        .then(({ data }) => setInfoCorrelativoBi(data))
+        .catch(() => {});
+    }
+  }, [info.seccion, agenciaId]);
 
   function cambiarGrupo(nuevo: (typeof GRUPOS)[number]["key"]) {
     setGrupo(nuevo);
@@ -489,8 +507,38 @@ export default function NuevoMovimientoForm({
               <datalist id="aux-beneficiarios-datalist">{sugerencias.map((s) => <option key={s} value={s} />)}</datalist>
             </div>
             <div className="field">
-              <label htmlFor="aux-aut">Num. de autorizacion BI</label>
-              <input id="aux-aut" placeholder="AUT:000000" value={referenciaAut} onChange={(e) => setReferenciaAut(e.target.value)} />
+              <label htmlFor="aux-aut">
+                Num. de autorizacion BI / Correlativo
+              </label>
+              <input
+                id="aux-aut"
+                placeholder={infoCorrelativoBi ? `Ej. ${infoCorrelativoBi.codigo}` : "Ej. AUT:000000"}
+                value={referenciaAut}
+                onChange={(e) => setReferenciaAut(e.target.value)}
+              />
+              {infoCorrelativoBi && (
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                    marginTop: "0.35rem",
+                    padding: "0.25rem 0.5rem",
+                    background: "#eff6ff",
+                    border: "1px solid #bfdbfe",
+                    borderRadius: "5px",
+                    fontSize: "0.75rem",
+                    color: "#1d4ed8",
+                    fontWeight: 500,
+                  }}
+                >
+                  <span>🏷️ Correlativo del mes:</span>
+                  <strong>{infoCorrelativoBi.codigo}</strong>
+                  <span style={{ color: "#60a5fa" }}>
+                    (Movimiento #{infoCorrelativoBi.correlativo} de {infoCorrelativoBi.mesNombre})
+                  </span>
+                </div>
+              )}
             </div>
           </>
         )}

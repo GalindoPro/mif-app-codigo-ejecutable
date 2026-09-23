@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import type { FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { TIPOS_AHORRO, PARENTESCOS_BENEFICIARIO_MENOR } from "../types";
 import type { Agencia, Socio, Prestamo } from "../types";
-import { formatearDPI } from "../lib/formatters";
+import { formatearDPI, calcularEdad } from "../lib/formatters";
 import BuscadorSocio from "../components/BuscadorSocio";
 import InputNombreAutoCompletar from "../components/InputNombreAutoCompletar";
 
@@ -38,6 +38,14 @@ export default function AhorroCuentaForm() {
   const esProgramadoOInfanto =
     config?.tipo === "AHORRO_PROGRAMADO" || config?.tipo === "AHORRO_INFANTO_JUVENIL";
   const esInfanto = config?.tipo === "AHORRO_INFANTO_JUVENIL";
+
+  const edadMenor = useMemo(() => {
+    if (!esInfanto || !titularMenorFechaNacimiento) return null;
+    return calcularEdad(titularMenorFechaNacimiento);
+  }, [esInfanto, titularMenorFechaNacimiento]);
+
+  const esMayorDeEdad = edadMenor !== null && edadMenor >= 18;
+  const esFechaFutura = edadMenor !== null && edadMenor < 0;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -131,13 +139,29 @@ export default function AhorroCuentaForm() {
       );
       return;
     }
-    if (esInfanto && !titularMenorNombre.trim()) {
-      setError("Indica el nombre completo del menor titular de la cuenta.");
-      return;
-    }
-    if (esInfanto && !titularMenorParentesco.trim()) {
-      setError("Indica el parentesco del menor con el socio responsable.");
-      return;
+    if (esInfanto) {
+      if (!titularMenorNombre.trim()) {
+        setError("Indica el nombre completo del menor titular de la cuenta.");
+        return;
+      }
+      if (!titularMenorParentesco.trim()) {
+        setError("Indica el parentesco del menor con el socio responsable.");
+        return;
+      }
+      if (!titularMenorFechaNacimiento) {
+        setError("Indica la fecha de nacimiento del menor titular.");
+        return;
+      }
+      if (esFechaFutura) {
+        setError("La fecha de nacimiento no puede ser una fecha futura.");
+        return;
+      }
+      if (esMayorDeEdad) {
+        setError(
+          `Titular mayor de edad (${edadMenor} años): Las cuentas de Ahorro Infanto Juvenil son exclusivas para menores de 18 años.`
+        );
+        return;
+      }
     }
     setError(null);
     setGuardando(true);
@@ -308,7 +332,9 @@ export default function AhorroCuentaForm() {
             </p>
 
             <div className="field" style={{ marginBottom: "0.6rem" }}>
-              <label htmlFor="menor-nombre">Nombre completo del menor</label>
+              <label htmlFor="menor-nombre">
+                Nombre completo del menor <span style={{ color: "var(--danger, #dc2626)" }}>*</span>
+              </label>
               <InputNombreAutoCompletar
                 id="menor-nombre"
                 value={titularMenorNombre}
@@ -319,7 +345,9 @@ export default function AhorroCuentaForm() {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
               <div className="field" style={{ marginBottom: "0.6rem" }}>
-                <label htmlFor="menor-parentesco">Parentesco con el socio responsable</label>
+                <label htmlFor="menor-parentesco">
+                  Parentesco con el tutor <span style={{ color: "var(--danger, #dc2626)" }}>*</span>
+                </label>
                 <select
                   id="menor-parentesco"
                   value={titularMenorParentesco}
@@ -334,15 +362,55 @@ export default function AhorroCuentaForm() {
                 </select>
               </div>
               <div className="field" style={{ marginBottom: "0.6rem" }}>
-                <label htmlFor="menor-fecha-nac">Fecha de nacimiento (opcional)</label>
+                <label htmlFor="menor-fecha-nac">
+                  Fecha de nacimiento <span style={{ color: "var(--danger, #dc2626)" }}>*</span>
+                </label>
                 <input
                   id="menor-fecha-nac"
                   type="date"
                   value={titularMenorFechaNacimiento}
                   onChange={(e) => setTitularMenorFechaNacimiento(e.target.value)}
+                  max={new Date().toISOString().split("T")[0]}
+                  required
                 />
               </div>
             </div>
+
+            {edadMenor !== null && (
+              <div
+                style={{
+                  marginTop: "0.25rem",
+                  marginBottom: "0.75rem",
+                  padding: "0.6rem 0.85rem",
+                  borderRadius: "6px",
+                  fontSize: "0.85rem",
+                  fontWeight: 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  backgroundColor:
+                    esMayorDeEdad || esFechaFutura
+                      ? "rgba(220, 38, 38, 0.1)"
+                      : "rgba(16, 185, 129, 0.12)",
+                  color: esMayorDeEdad || esFechaFutura ? "#b91c1c" : "#047857",
+                  border: `1px solid ${
+                    esMayorDeEdad || esFechaFutura ? "#fca5a5" : "#a7f3d0"
+                  }`,
+                }}
+              >
+                {esFechaFutura ? (
+                  <span>⚠️ <strong>Fecha inválida:</strong> La fecha de nacimiento no puede ser una fecha futura.</span>
+                ) : esMayorDeEdad ? (
+                  <span>
+                    🚫 <strong>Titular mayor de edad ({edadMenor} años):</strong> No es apto para crear esta cuenta. Las cuentas Infanto Juvenil son exclusivas para menores de 18 años.
+                  </span>
+                ) : (
+                  <span>
+                    🎂 <strong>Edad calculada:</strong> {edadMenor} {edadMenor === 1 ? "año" : "años"} (Menor de edad apto para Cuenta Juvenil).
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="field" style={{ marginBottom: 0 }}>
               <label htmlFor="menor-cui">CUI del menor (RENAP) — opcional</label>
@@ -443,7 +511,14 @@ export default function AhorroCuentaForm() {
               !agenciaId ||
               Boolean(cuentaExistente) ||
               (saldoAportacion !== null && saldoAportacion < 100) ||
-              (esInfanto && (!titularMenorNombre.trim() || !titularMenorParentesco.trim()))
+              (config.tipo === "AHORRO_SOBRE_PRESTAMO" && !prestamoSeleccionadoId) ||
+              (esInfanto && (
+                !titularMenorNombre.trim() ||
+                !titularMenorParentesco.trim() ||
+                !titularMenorFechaNacimiento ||
+                esMayorDeEdad ||
+                esFechaFutura
+              ))
             }
           >
             {guardando ? "Guardando…" : "Abrir cuenta"}

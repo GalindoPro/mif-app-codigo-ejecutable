@@ -153,6 +153,33 @@ export async function crear(data: DatosCuenta, usuarioId: string) {
     if (!data.titularMenorParentesco || !data.titularMenorParentesco.trim()) {
       throw badRequest("Debes indicar el parentesco del menor con el socio responsable de la cuenta.");
     }
+    if (!data.titularMenorFechaNacimiento || !data.titularMenorFechaNacimiento.trim()) {
+      throw badRequest("Debes indicar la fecha de nacimiento del menor titular de la cuenta.");
+    }
+    const str = String(data.titularMenorFechaNacimiento).slice(0, 10);
+    const parts = str.split("-");
+    if (parts.length !== 3) {
+      throw badRequest("La fecha de nacimiento no tiene un formato válido (YYYY-MM-DD).");
+    }
+    const [y, m, d] = parts.map(Number);
+    if (isNaN(y) || isNaN(m) || isNaN(d)) {
+      throw badRequest("La fecha de nacimiento no es válida.");
+    }
+    const hoy = new Date();
+    let edad = hoy.getFullYear() - y;
+    const mesActual = hoy.getMonth() + 1;
+    const diaActual = hoy.getDate();
+    if (mesActual < m || (mesActual === m && diaActual < d)) {
+      edad--;
+    }
+    if (edad < 0) {
+      throw badRequest("La fecha de nacimiento del menor no puede ser una fecha futura.");
+    }
+    if (edad >= 18) {
+      throw badRequest(
+        `Titular mayor de edad (${edad} años): Las cuentas de Ahorro Infanto Juvenil son exclusivas para menores de 18 años.`
+      );
+    }
   }
 
   return withTransaction(async (client) => {

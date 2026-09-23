@@ -30,6 +30,16 @@ cajaAuxiliarRouter.get(
 );
 
 cajaAuxiliarRouter.get(
+  "/siguiente-correlativo-bi",
+  asyncHandler(async (req, res) => {
+    const agenciaId = (req.query.agenciaId as string) || req.user?.agenciaId;
+    if (!agenciaId) throw badRequest("Falta indicar la agencia");
+    const fecha = typeof req.query.fecha === "string" ? req.query.fecha : undefined;
+    res.json(await service.siguienteCorrelativoBi(agenciaId, agenciaVisible(req), fecha));
+  }),
+);
+
+cajaAuxiliarRouter.get(
   "/historial",
   requireRole("GERENCIA", "SUPERVISOR"),
   asyncHandler(async (req, res) => {

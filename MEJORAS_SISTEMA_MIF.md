@@ -1326,12 +1326,65 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
   - `backend/src/services/googleDriveService.ts`
   - `MEJORAS_SISTEMA_MIF.md`
   - `00-INDICE.md`
+---
 
+## 72. Estandarización de Emisión e Impresión de Padrones Oficiales en Todas las Cuentas de Ahorro y Plazo Fijo (`AhorroList.tsx`, `PlazoFijoList.tsx`)
 
+- **Objetivo:** Incorporar la emisión notarial e impresión completa de padrones en todos los tipos de cuentas de captación (*Ahorro Corriente, Ahorro Programado, Ahorro Infanto Juvenil, Ahorro sobre Préstamo y Plazo Fijo DPF*), permitiendo a la administración auditar e imprimir la totalidad de socios activos y saldos captados sin verse limitados por la paginación visual de pantalla.
+- **Mejoras Implementadas:**
+  1. **Botón Institucional `🖨️ Imprimir Padrón` en Todas las Captaciones:**
+     - Integrado en la cabecera superior de [AhorroList.tsx](file:///Users/galindo/Documents/proyects/carpet/mif-app-codigo-ejecutable/frontend/src/pages/AhorroList.tsx) (para todas las líneas de ahorro) y en [PlazoFijoList.tsx](file:///Users/galindo/Documents/proyects/carpet/mif-app-codigo-ejecutable/frontend/src/pages/PlazoFijoList.tsx) (para certificados de depósito a plazo fijo).
+  2. **Arquitectura de Impresión Desacoplada (`.print-only`):**
+     - En pantalla se mantiene la paginación de 10 cuentas por página con scroll interno.
+     - Al imprimir en papel o PDF se genera automáticamente el **Padrón Oficial Completo** con todos los asociados inscritos:
+       * Membrete institucional: **`COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."`**.
+       * Subtítulo: *San Gaspar Chajul, El Quiché, Guatemala · Sistema Contable y Financiero COMIF-R.L.*
+       * Resumen financiero de 4 tarjetas (*Saldo Total Captado, Total Cuentas, Ingresos/Depósitos Acumulados y Egresos/Retiros Acumulados*).
+       * Tabla continua completa con numeración consecutiva (1 a N), No. de Cuenta, Nombre del Titular / Asociado, DPI, Saldo Actual y Estado.
+       * Fila `<tfoot>` con la sumatoria del **Total General Captado** verificado.
+       * Bloque formal de 3 firmas (*Encargado de Captaciones / Cajero, Comisión de Vigilancia y Contador General / Gerencia*).
+---
 
+## 73. Validación Automatizada de Edad y Requisitos para Cuentas de Ahorro Infanto Juvenil (`AhorroCuentaForm.tsx`, `formatters.ts`, `cuentas/service.ts`)
 
+- **Objetivo:** Automatizar el cálculo de la edad actual a partir de la fecha de nacimiento ingresada para el menor titular al abrir una cuenta de *Ahorro Infanto Juvenil*, garantizando el cumplimiento estricto del límite estatutario de minoría de edad (< 18 años) y bloqueando intentos de creación con titulares mayores de edad.
+- **Mejoras Implementadas:**
+  1. **Función de Cálculo Preciso de Edad (`calcularEdad` en `formatters.ts`):**
+     - Calcula los años cumplidos en base al año, mes y día de nacimiento contra la fecha del sistema sin desfases de zona horaria.
+  2. **Cálculo en Tiempo Real y Badge Visual Interactivo (`AhorroCuentaForm.tsx`):**
+     - Al seleccionar la fecha de nacimiento se calcula instantáneamente la edad.
+     - Si el menor tiene menos de 18 años: Se despliega un distintivo verde interactivo: `🎂 Edad calculada: X años (Menor de edad apto para Cuenta Juvenil)`.
+     - Si tiene 18 años o más: Se muestra una alerta en rojo: `🚫 Titular mayor de edad (X años): No es apto para crear esta cuenta. Las cuentas Infanto Juvenil son exclusivas para menores de 18 años.`
+     - Si es una fecha futura: Se alerta `⚠️ Fecha inválida: La fecha de nacimiento no puede ser una fecha futura.`
+  3. **Protección y Bloqueo de Formulario:**
+     - El botón *Abrir cuenta* se inhabilita de inmediato si la edad calculada es $\ge 18$ años, si la fecha es futura o si falta la fecha de nacimiento obligatoria.
+  4. **Validación Férrea en Backend (`backend/src/modules/cuentas/service.ts`):**
+     - Se valida que `titularMenorFechaNacimiento` esté presente, sea una fecha válida y que la edad del menor sea estrictamente menor a 18 años, arrojando error HTTP 400 en caso contrario.
+  5. **Visualización en Detalle de Cuenta (`AhorroCuentaDetail.tsx`):**
+     - Se visualiza la edad calculada en años al lado de la fecha de nacimiento del menor titular.
+---
 
+## 74. Correlativo Mensual de Operaciones BI (Banco Inmobiliario), Filtrado por Flujo y Segregación de Roles en Reportes (`cajaauxiliar`, `NuevoMovimientoForm.tsx`, `LibroCajaReporteModal.tsx`)
 
-
-
-
+- **Objetivo:** Automatizar la numeración correlativa mensual (iniciando en 1 al comenzar cada mes natural) para todas las operaciones de corresponsalía bancaria (Ingreso BI / Egreso BI), implementar la emisión de reportes contables filtrados por tipo de flujo (*Fondos Propios COMIF-R.L.* vs *Corresponsalía Banco Inmobiliario BI* vs *Ingresos* vs *Egresos*) y establecer la política de control interno y permisos por rol.
+- **Mejoras Implementadas:**
+  1. **Correlativo Mensual Automático de Operaciones BI (`backend/src/modules/cajaauxiliar/service.ts`):**
+     - Al registrar un movimiento de la sección `BI`, el sistema calcula el total de operaciones registradas en esa agencia durante el año y mes en curso (`YYYY-MM`).
+     - El conteo reinicia obligatoriamente en 1 al comenzar cada mes (ej. Mayo: 1 a 20; Junio: inicia en 1 con código `BI-2026-06-001`).
+     - Se expone el endpoint `GET /caja-auxiliar/siguiente-correlativo-bi` para consulta previa.
+  2. **Badge Visual y Sugerencia en Ventanilla (`NuevoMovimientoForm.tsx`):**
+     - Al seleccionar las pestañas *Ingreso BI* o *Egreso BI*, se despliega una tarjeta azul: `🏷️ Correlativo del mes: BI-YYYY-MM-XXX (Movimiento #N de Mes Año)` y se sugiere automáticamente como número de referencia o autorización.
+  3. **Filtros por Tipo de Flujo en el Libro de Caja (`LibroCajaReporteModal.tsx`):**
+     - Botones de filtrado rápido: `📋 Todos`, `🏛️ Operaciones Propias COMIF`, `🏦 Corresponsalía BI`, `📥 Ingresos` y `📤 Egresos`.
+     - Recálculo dinámico en tiempo real de ingresos, egresos, saldo acumulado y flujo neto según el filtro activo.
+     - En la impresión de reportes y exportación a Excel (CSV), el encabezado se adapta automáticamente al flujo seleccionado (ej. *LIBRO DE CAJA — CORRESPONSALÍA BANCO INMOBILIARIO (BI)*).
+  4. **Segregación de Roles y Control Interno:**
+     - **Ventanilla / Operación diaria:** Roles operativos (`CAJERO`, `SUPERVISOR`, `ADMIN`) pueden registrar operaciones y generar los recibos de ventanilla.
+     - **Reportes Históricos y Consolidados:** Los períodos extendidos (*Esta Semana, Este Mes, Personalizado*) están reservados para `GERENCIA`, `ADMIN` y `SUPERVISOR`. Los cajeros acceden al reporte de su *Turno Activo* y del día actual (*Hoy*).
+- **Archivos Modificados:**
+  - `backend/src/modules/cajaauxiliar/service.ts`
+  - `backend/src/modules/cajaauxiliar/routes.ts`
+  - `frontend/src/components/cajaauxiliar/NuevoMovimientoForm.tsx`
+  - `frontend/src/components/cajaauxiliar/LibroCajaReporteModal.tsx`
+  - `MEJORAS_SISTEMA_MIF.md`
+  - `00-INDICE.md`

@@ -254,18 +254,38 @@ export async function crearMovimiento(
       }
     }
 
-    const { rows: contadorRows } = await client.query(
-      `select count(*)::int as total from caja_movimientos_auxiliar
-       where agencia_id = $1 and categoria::text = any($2::text[])`,
-      [dia.agencia_id, categoriasDelGrupo(info.grupoContador)],
-    );
-    const contador = contadorRows[0].total + 1;
+    let contador = 1;
+    let referencia: string | null = data.referenciaAut?.trim() || null;
+
+    if (info.seccion === "BI") {
+      const fechaMov = new Date(dia.fecha);
+      const anio = fechaMov.getFullYear();
+      const mesStr = String(fechaMov.getMonth() + 1).padStart(2, "0");
+      const periodoMes = `${anio}-${mesStr}`;
+      const { rows: biRows } = await client.query(
+        `select count(*)::int as total from caja_movimientos_auxiliar
+         where agencia_id = $1 and seccion = 'BI' and to_char(fecha, 'YYYY-MM') = $2`,
+        [dia.agencia_id, periodoMes],
+      );
+      const biTotalMes = biRows[0] ? Number(biRows[0].total) : 0;
+      contador = biTotalMes + 1;
+      const codigoBiMes = `BI-${periodoMes}-${String(contador).padStart(3, "0")}`;
+      if (!referencia) {
+        referencia = codigoBiMes;
+      }
+    } else {
+      const { rows: contadorRows } = await client.query(
+        `select count(*)::int as total from caja_movimientos_auxiliar
+         where agencia_id = $1 and categoria::text = any($2::text[])`,
+        [dia.agencia_id, categoriasDelGrupo(info.grupoContador)],
+      );
+      contador = contadorRows[0].total + 1;
+    }
 
     let socioId: string | null = data.socioId ?? null;
     let cuentaId: string | null = null;
     let movimientoId: string | null = null;
     let ingresoComifId: string | null = null;
-    let referencia: string | null = data.referenciaAut ?? null;
     let beneficiario = data.beneficiario?.trim() ?? "";
 
     if (info.requiereCuenta) {
@@ -1991,3 +2011,43 @@ export async function reporteMovimientos(
   };
 }
 
+export async function siguienteCorrelativoBi(
+  agenciaId: string,
+  agenciaVisible?: string | null,
+  fechaStr?: string,
+) {
+  if (agenciaVisible && agenciaId !== agenciaVisible) {
+    throw forbidden("No tienes acceso a esta agencia");
+  }
+  const fecha = fechaStr ? new Date(fechaStr + "T00:00:00") : new Date();
+  const anio = fecha.getFullYear();
+  const mes = fecha.getMonth() + 1;
+  const mesStr = String(mes).padStart(2, "0");
+  const periodoMes = `${anio}-${mesStr}`;
+
+  const { rows } = await pool.query(
+    `select count(*)::int as total
+     from caja_movimientos_auxiliar
+     where agencia_id = $1
+       and seccion = 'BI'
+       and to_char(fecha, 'YYYY-MM') = $2`,
+    [agenciaId, periodoMes],
+  );
+  const total = rows[0] ? Number(rows[0].total) : 0;
+  const siguiente = total + 1;
+  const codigo = `BI-${periodoMes}-${String(siguiente).padStart(3, "0")}`;
+
+  const meses = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+  ];
+  const mesNombre = `${meses[mes - 1]} ${anio}`;
+
+  return {
+    correlativo: siguiente,
+    codigo,
+    periodoMes,
+    mesNombre,
+    totalMes: total,
+  };
+}

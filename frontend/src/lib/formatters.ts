@@ -116,5 +116,24 @@ export function formatearFechaLocal(fecha: string | Date | null | undefined): st
   return str;
 }
 
+/**
+ * Calcula la edad exacta en años a partir de una fecha de nacimiento (YYYY-MM-DD).
+ */
+export function calcularEdad(fechaNacStr?: string | null): number | null {
+  if (!fechaNacStr) return null;
+  const str = String(fechaNacStr).slice(0, 10);
+  const parts = str.split("-");
+  if (parts.length !== 3) return null;
+  const [y, m, d] = parts.map(Number);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
 
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - y;
+  const mesActual = hoy.getMonth() + 1;
+  const diaActual = hoy.getDate();
 
+  if (mesActual < m || (mesActual === m && diaActual < d)) {
+    edad--;
+  }
+  return edad;
+}

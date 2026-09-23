@@ -79,7 +79,15 @@ export default function PlazoFijoList() {
           </span>
         </div>
 
-        <div>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <button
+            type="button"
+            className="btn secondary"
+            onClick={() => window.print()}
+            style={{ padding: "0.3rem 0.65rem", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.3rem" }}
+          >
+            <span>🖨️</span> Imprimir Padrón
+          </button>
           <Link
             to="/ahorros/plazo-fijo/nuevo"
             className="btn"
@@ -266,8 +274,8 @@ export default function PlazoFijoList() {
         </div>
       </div>
 
-      {/* TABLA CON SCROLL INTERNO Y CABECERA PEGAJOSA */}
-      <div className="table-scroll-container">
+      {/* TABLA CON SCROLL INTERNO Y CABECERA PEGAJOSA (SÓLO PANTALLA) */}
+      <div className="table-scroll-container no-print">
         <table className="table-compact">
           <thead>
             <tr>
@@ -358,8 +366,8 @@ export default function PlazoFijoList() {
         )}
       </div>
 
-      {/* FOOTER FIJO CON PAGINACIÓN */}
-      <div className="screen-footer">
+      {/* FOOTER FIJO CON PAGINACIÓN (SÓLO PANTALLA) */}
+      <div className="screen-footer no-print">
         <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
           Mostrando {contratosPaginados.length} de {totalCertificados} certificados · Pág. {page} de {totalPaginas}
         </span>
@@ -382,6 +390,138 @@ export default function PlazoFijoList() {
           >
             Siguiente →
           </button>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          REPORTE OFICIAL DE IMPRESIÓN COMPLETO (TODOS LOS CERTIFICADOS SIN CORTES)
+          ══════════════════════════════════════════════════════════════════════ */}
+      <div className="print-only" style={{ width: "100%", margin: "0", padding: "0" }}>
+        {/* MEMBRETE INSTITUCIONAL OFICIAL */}
+        <div style={{ borderBottom: "2px solid #0f172a", paddingBottom: "6px", marginBottom: "10px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: "11pt", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.5px", color: "#0f172a" }}>
+              COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."
+            </div>
+            <div style={{ fontSize: "9.5pt", fontWeight: 700, color: "#7c3aed", marginTop: "2px" }}>
+              KARDEX Y PADRÓN GENERAL OFICIAL DE CERTIFICADOS A PLAZO FIJO (DPF)
+            </div>
+            <div style={{ fontSize: "7.5pt", color: "#475569", marginTop: "2px" }}>
+              San Gaspar Chajul, El Quiché, Guatemala · Sistema Contable y Financiero COMIF-R.L.
+            </div>
+          </div>
+          <div style={{ textAlign: "right", fontSize: "7.5pt", color: "#334155" }}>
+            <div><strong>Emisión:</strong> {new Date().toLocaleDateString("es-GT", { day: "2-digit", month: "2-digit", year: "numeric" })} {new Date().toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}</div>
+            <div><strong>Total Certificados:</strong> {totalCertificados} ({activos.length} activos)</div>
+            {q && <div><strong>Filtro aplicado:</strong> "{q}"</div>}
+          </div>
+        </div>
+
+        {/* RESUMEN FINANCIERO OFICIAL */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginBottom: "10px" }}>
+          <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>CAPITAL TOTAL CAPTADO</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#7c3aed", fontFamily: "monospace" }}>{formatoQ(totalInversionActiva)}</div>
+          </div>
+          <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>CERTIFICADOS VIGENTES</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#1e293b", fontFamily: "monospace" }}>{activos.length}</div>
+          </div>
+          <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>INTERESES COMPROMETIDOS</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#d97706", fontFamily: "monospace" }}>{formatoQ(totalInteresesComprometidos)}</div>
+          </div>
+          <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>VENCIDOS / POR VENCER</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: porVencerOyaVencidos > 0 ? "#dc2626" : "#059669", fontFamily: "monospace" }}>{porVencerOyaVencidos}</div>
+          </div>
+        </div>
+
+        {/* TABLA COMPLETA CON TODOS LOS CERTIFICADOS REGISTRADOS */}
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "7.2pt", marginBottom: "15px" }}>
+          <thead>
+            <tr style={{ background: "#0f172a", color: "#ffffff" }}>
+              <th style={{ width: "3%", textAlign: "center", padding: "4px 2px", color: "#ffffff" }}>#</th>
+              <th style={{ width: "12%", textAlign: "left", padding: "4px 4px", color: "#ffffff" }}>CERTIFICADO</th>
+              <th style={{ width: "12%", textAlign: "left", padding: "4px 4px", color: "#ffffff" }}>NO. CUENTA</th>
+              <th style={{ width: "30%", textAlign: "left", padding: "4px 4px", color: "#ffffff" }}>SOCIO INVERSIONISTA</th>
+              <th style={{ width: "13%", textAlign: "right", padding: "4px 4px", color: "#ffffff" }}>DEPÓSITO (Q)</th>
+              <th style={{ width: "10%", textAlign: "center", padding: "4px 4px", color: "#ffffff" }}>PLAZO / TASA</th>
+              <th style={{ width: "10%", textAlign: "center", padding: "4px 4px", color: "#ffffff" }}>VENCE</th>
+              <th style={{ width: "10%", textAlign: "center", padding: "4px 4px", color: "#ffffff" }}>ESTADO</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(contratos ?? []).map((c, index) => {
+              const estaVencido = c.estado === "ACTIVO" && c.fecha_vencimiento <= hoy;
+              return (
+                <tr key={c.id} style={{ background: index % 2 === 0 ? "#ffffff" : "#f8fafc" }}>
+                  <td style={{ textAlign: "center", border: "1px solid #cbd5e1", padding: "3px 2px" }}>
+                    {index + 1}
+                  </td>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "3px 4px", fontFamily: "monospace", fontWeight: 700 }}>
+                    Cert. #{c.numero_certificacion ?? "—"}
+                  </td>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "3px 4px", fontFamily: "monospace" }}>
+                    {c.numero_cuenta}
+                  </td>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "3px 4px" }}>
+                    <div style={{ fontWeight: 600 }}>{c.socio_nombres}</div>
+                    {c.socio_dpi && <div style={{ fontSize: "6.5pt", color: "#64748b" }}>DPI: {formatearDPI(c.socio_dpi)}</div>}
+                  </td>
+                  <td style={{ textAlign: "right", border: "1px solid #cbd5e1", padding: "3px 4px", fontFamily: "monospace", fontWeight: 700, color: "#7c3aed" }}>
+                    {formatoQ(c.monto_deposito)}
+                  </td>
+                  <td style={{ textAlign: "center", border: "1px solid #cbd5e1", padding: "3px 4px", fontFamily: "monospace" }}>
+                    {c.plazo_meses}m · {c.tasa_anual}%
+                  </td>
+                  <td style={{ textAlign: "center", border: "1px solid #cbd5e1", padding: "3px 4px", fontFamily: "monospace", fontWeight: estaVencido ? 700 : 500, color: estaVencido ? "#dc2626" : "inherit" }}>
+                    {formatearFechaCorta(c.fecha_vencimiento)}
+                  </td>
+                  <td style={{ textAlign: "center", border: "1px solid #cbd5e1", padding: "3px 4px", fontWeight: 700, fontSize: "6.8pt" }}>
+                    {c.estado === "ACTIVO" ? (estaVencido ? "VENCIDO" : "ACTIVO") : "LIQUIDADO"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr style={{ background: "#e2e8f0", fontWeight: "bold" }}>
+              <td colSpan={4} style={{ border: "1px solid #94a3b8", padding: "5px", textAlign: "right", fontWeight: 800 }}>
+                TOTAL GENERAL DEPOSITADO ({totalCertificados} CERTIFICADOS):
+              </td>
+              <td style={{ border: "1px solid #94a3b8", padding: "5px", textAlign: "right", fontFamily: "monospace", fontWeight: 800, color: "#7c3aed", fontSize: "8pt" }}>
+                {formatoQ((contratos ?? []).reduce((acc, c) => acc + Number(c.monto_deposito), 0))}
+              </td>
+              <td colSpan={3} style={{ border: "1px solid #94a3b8", padding: "5px", textAlign: "center", color: "#475569", fontSize: "7pt" }}>
+                Verificado COMIF-R.L.
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+
+        {/* BLOQUE DE FIRMAS OFICIALES DE LEGALIZACIÓN */}
+        <div style={{ pageBreakInside: "avoid", breakInside: "avoid", marginTop: "24px", paddingTop: "8px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px", textAlign: "center" }}>
+            <div>
+              <div style={{ borderTop: "1px solid #000", margin: "0 10px", paddingTop: "4px", fontSize: "7.5pt", fontWeight: 700 }}>
+                Oficial de Inversiones / DPF
+              </div>
+              <div style={{ fontSize: "6.5pt", color: "#475569" }}>Captaciones a Plazo Fijo</div>
+            </div>
+            <div>
+              <div style={{ borderTop: "1px solid #000", margin: "0 10px", paddingTop: "4px", fontSize: "7.5pt", fontWeight: 700 }}>
+                Comisión de Vigilancia
+              </div>
+              <div style={{ fontSize: "6.5pt", color: "#475569" }}>Fiscalización Interna</div>
+            </div>
+            <div>
+              <div style={{ borderTop: "1px solid #000", margin: "0 10px", paddingTop: "4px", fontSize: "7.5pt", fontWeight: 700 }}>
+                Gerencia General
+              </div>
+              <div style={{ fontSize: "6.5pt", color: "#475569" }}>Certificación Contable COMIF-R.L.</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { formatoQ, TIPOS_AHORRO } from "../types";
 import type { CuentaConMovimientos } from "../types";
+import { calcularEdad } from "../lib/formatters";
 
 export default function AhorroCuentaDetail() {
   const { slug, id } = useParams<{ slug: string; id: string }>();
@@ -94,7 +95,18 @@ export default function AhorroCuentaDetail() {
             <p style={{ fontSize: "0.84rem", margin: "0.35rem 0 0", lineHeight: 1.4 }}>
               <strong>{cuenta.titular_menor_nombre}</strong>
               {cuenta.titular_menor_parentesco ? ` · ${cuenta.titular_menor_parentesco} de ${cuenta.socio_nombres}` : ""}
-              {cuenta.titular_menor_fecha_nacimiento ? ` · Nacimiento: ${new Date(cuenta.titular_menor_fecha_nacimiento).toLocaleDateString("es-GT")}` : ""}
+              {cuenta.titular_menor_fecha_nacimiento ? (
+                <>
+                  {` · Nacimiento: ${new Date(
+                    cuenta.titular_menor_fecha_nacimiento + "T00:00:00"
+                  ).toLocaleDateString("es-GT")}`}
+                  {calcularEdad(cuenta.titular_menor_fecha_nacimiento) !== null && (
+                    <span style={{ marginLeft: "4px", color: "#0369a1", fontWeight: 600 }}>
+                      ({calcularEdad(cuenta.titular_menor_fecha_nacimiento)} años)
+                    </span>
+                  )}
+                </>
+              ) : ""}
               {cuenta.titular_menor_cui ? ` · CUI: ${cuenta.titular_menor_cui}` : ""}
             </p>
           ) : (

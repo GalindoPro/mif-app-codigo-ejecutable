@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { api, mensajeError } from "../../lib/api";
 import { formatoQ } from "../../types";
 import type { DetalleCajaAuxiliar, CajaMovimientoAuxiliar, OrigenFondos } from "../../types";
+import { useAuth } from "../../context/AuthContext";
 
 export interface LibroCajaReporteModalProps {
   agenciaId: string;
@@ -12,6 +13,7 @@ export interface LibroCajaReporteModalProps {
 }
 
 type PeriodoFiltro = "TURNO_ACTUAL" | "HOY" | "SEMANA" | "MES" | "PERSONALIZADO";
+type FlujoFiltro = "TODOS" | "PROPIO" | "BI" | "INGRESO" | "EGRESO";
 
 export default function LibroCajaReporteModal({
   agenciaId,
@@ -19,6 +21,10 @@ export default function LibroCajaReporteModal({
   detalleActual,
   onClose,
 }: LibroCajaReporteModalProps) {
+  const { usuario } = useAuth();
+  const puedeVerHistorico =
+    usuario?.rol === "GERENCIA" || usuario?.rol === "ADMIN" || usuario?.rol === "SUPERVISOR";
+
   const hoyStr = new Date().toISOString().slice(0, 10);
 
   function getLunesEstaSemana(): string {
@@ -35,6 +41,7 @@ export default function LibroCajaReporteModal({
   }
 
   const [periodo, setPeriodo] = useState<PeriodoFiltro>(detalleActual ? "TURNO_ACTUAL" : "HOY");
+  const [filtroFlujo, setFiltroFlujo] = useState<FlujoFiltro>("TODOS");
   const [fechaInicio, setFechaInicio] = useState(hoyStr);
   const [fechaFin, setFechaFin] = useState(hoyStr);
 
@@ -130,16 +137,37 @@ export default function LibroCajaReporteModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const movimientosOrdenados = useMemo(() => {
+  const movimientosFiltrados = useMemo(() => {
     if (!datosReporte?.movimientos) return [];
-    // Orden cronológico ascendente para el libro contable de movimientos
-    return [...datosReporte.movimientos].sort(
+    let list = [...datosReporte.movimientos];
+    if (filtroFlujo === "PROPIO") {
+      list = list.filter((m) => m.seccion === "PROPIO" || !m.seccion);
+    } else if (filtroFlujo === "BI") {
+      list = list.filter((m) => m.seccion === "BI");
+    } else if (filtroFlujo === "INGRESO") {
+      list = list.filter((m) => m.tipo === "INGRESO");
+    } else if (filtroFlujo === "EGRESO") {
+      list = list.filter((m) => m.tipo === "EGRESO");
+    }
+    return list.sort(
       (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
-  }, [datosReporte?.movimientos]);
+  }, [datosReporte?.movimientos, filtroFlujo]);
+
+  const totIngFiltrado = useMemo(() => {
+    return movimientosFiltrados
+      .filter((m) => m.tipo === "INGRESO")
+      .reduce((acc, m) => acc + Number(m.monto), 0);
+  }, [movimientosFiltrados]);
+
+  const totEgrFiltrado = useMemo(() => {
+    return movimientosFiltrados
+      .filter((m) => m.tipo === "EGRESO")
+      .reduce((acc, m) => acc + Number(m.monto), 0);
+  }, [movimientosFiltrados]);
 
   const resumenFuentes = useMemo(() => {
-    if (datosReporte?.desgloseFuentes) return datosReporte.desgloseFuentes;
+    if (datosReporte?.desgloseFuentes && filtroFlujo === "TODOS") return datosReporte.desgloseFuentes;
     const r: Record<
       OrigenFondos,
       { cobros: number; colocacion: number; countCobros: number; countColocacion: number }
@@ -149,7 +177,7 @@ export default function LibroCajaReporteModal({
       CHN_GUATEMALA: { cobros: 0, colocacion: 0, countCobros: 0, countColocacion: 0 },
     };
 
-    movimientosOrdenados.forEach((m) => {
+    movimientosFiltrados.forEach((m) => {
       let origen: OrigenFondos = (m.origen_fondos as OrigenFondos) || "FONDOS_PROPIOS";
       if (!r[origen]) origen = "FONDOS_PROPIOS";
       const monto = Number(m.monto);
@@ -167,7 +195,15 @@ export default function LibroCajaReporteModal({
       FEDERURAL: { ...r.FEDERURAL, total: r.FEDERURAL.cobros - r.FEDERURAL.colocacion, ops: r.FEDERURAL.countCobros + r.FEDERURAL.countColocacion },
       CHN_GUATEMALA: { ...r.CHN_GUATEMALA, total: r.CHN_GUATEMALA.cobros - r.CHN_GUATEMALA.colocacion, ops: r.CHN_GUATEMALA.countCobros + r.CHN_GUATEMALA.countColocacion },
     };
-  }, [datosReporte?.desgloseFuentes, movimientosOrdenados]);
+  }, [datosReporte?.desgloseFuentes, movimientosFiltrados, filtroFlujo]);
+
+  const tituloReporteFiltrado = useMemo(() => {
+    if (filtroFlujo === "PROPIO") return "LIBRO DE CAJA — FONDOS Y OPERACIONES PROPIAS COMIF-R.L.";
+    if (filtroFlujo === "BI") return "LIBRO DE CAJA — CORRESPONSALÍA BANCO INMOBILIARIO (BI)";
+    if (filtroFlujo === "INGRESO") return "LIBRO DE CAJA — REPORTE CONSOLIDADO DE INGRESOS";
+    if (filtroFlujo === "EGRESO") return "LIBRO DE CAJA — REPORTE CONSOLIDADO DE EGRESOS";
+    return "LIBRO DIARIO DE MOVIMIENTOS Y CUADRE DE CAJA AUXILIAR";
+  }, [filtroFlujo]);
 
   function handleImprimir() {
     window.print();
@@ -177,21 +213,22 @@ export default function LibroCajaReporteModal({
     if (!datosReporte) return;
     const rows = [
       ["COOPERATIVA MAYA INVERSIONES FUTURAS R.L \"COMIF-R.L.\""],
-      ["LIBRO DE MOVIMIENTOS Y CUADRE DE CAJA AUXILIAR"],
-      [`Agencia: ${agenciaNombre}`, `Periodo: ${fechaInicio} al ${fechaFin}`],
+      [tituloReporteFiltrado],
+      [`Agencia: ${agenciaNombre}`, `Periodo: ${fechaInicio} al ${fechaFin}`, `Filtro: ${filtroFlujo}`],
       [""],
       ["RESUMEN DE CAJA"],
       ["Saldo Inicial", Number(datosReporte.saldoInicial).toFixed(2)],
-      ["Total Ingresos", Number(datosReporte.totalIngreso).toFixed(2)],
-      ["Total Egresos", Number(datosReporte.totalEgreso).toFixed(2)],
+      ["Total Ingresos (Filtrado)", totIngFiltrado.toFixed(2)],
+      ["Total Egresos (Filtrado)", totEgrFiltrado.toFixed(2)],
       ["Saldo Final", Number(datosReporte.saldoFinal).toFixed(2)],
       [""],
-      ["No.", "Fecha", "Hora", "No. Doc / Recibo", "Tipo", "Concepto", "Beneficiario / Socio", "Ingreso (Q)", "Egreso (Q)", "Saldo Acumulado (Q)", "Operador / Responsable"],
-      ...movimientosOrdenados.map((m, idx) => [
+      ["No.", "Fecha", "Hora", "No. Doc / Recibo", "Correlativo / Ref", "Tipo", "Concepto", "Beneficiario / Socio", "Ingreso (Q)", "Egreso (Q)", "Saldo Acumulado (Q)", "Operador / Responsable"],
+      ...movimientosFiltrados.map((m, idx) => [
         idx + 1,
         new Date(m.created_at).toLocaleDateString("es-GT"),
         new Date(m.created_at).toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" }),
         m.doc_no || "—",
+        m.referencia || "—",
         m.tipo,
         m.descripcion || m.categoria,
         m.beneficiario || "—",
@@ -206,15 +243,15 @@ export default function LibroCajaReporteModal({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Libro_Caja_${agenciaNombre.replace(/\s+/g, "_")}_${fechaInicio}_${fechaFin}.csv`);
+    link.setAttribute("download", `Libro_Caja_${filtroFlujo}_${agenciaNombre.replace(/\s+/g, "_")}_${fechaInicio}_${fechaFin}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   }
 
   const saldoIni = datosReporte?.saldoInicial ?? 0;
-  const totIng = datosReporte?.totalIngreso ?? 0;
-  const totEgr = datosReporte?.totalEgreso ?? 0;
+  const totIng = filtroFlujo === "TODOS" ? (datosReporte?.totalIngreso ?? 0) : totIngFiltrado;
+  const totEgr = filtroFlujo === "TODOS" ? (datosReporte?.totalEgreso ?? 0) : totEgrFiltrado;
   const saldoFin = Math.round((saldoIni + totIng - totEgr) * 100) / 100;
 
   return createPortal(
@@ -222,7 +259,7 @@ export default function LibroCajaReporteModal({
       <div
         className="modal-content libro-caja-modal-card"
         style={{
-          maxWidth: 960,
+          maxWidth: 980,
           width: "95vw",
           maxHeight: "92vh",
           display: "flex",
@@ -231,13 +268,13 @@ export default function LibroCajaReporteModal({
         }}
       >
         {/* ── BARRA SUPERIOR DE ACCIONES (NO IMPRIMIBLE) ── */}
-        <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", borderBottom: "1px solid var(--line)", paddingBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
+        <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", borderBottom: "1px solid var(--line)", paddingBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
           <div>
             <h2 style={{ margin: 0, fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
               <span>🖨️</span> Comprobante del Libro de Caja Auxiliar
             </h2>
             <p className="sub" style={{ margin: 0, fontSize: "0.76rem" }}>
-              Reporte oficial para cuadre diario, arqueos y auditoría de ventanilla
+              Reporte oficial para cuadre diario, arqueos, liquidación BI y auditoría de ventanilla
             </p>
           </div>
 
@@ -257,7 +294,7 @@ export default function LibroCajaReporteModal({
               onClick={handleImprimir}
               style={{ fontSize: "0.8rem", padding: "0.38rem 0.85rem" }}
             >
-              <span>🖨️</span> Imprimir Comprobante (1-2 Hojas)
+              <span>🖨️</span> Imprimir Reporte
             </button>
             <button
               type="button"
@@ -270,14 +307,14 @@ export default function LibroCajaReporteModal({
           </div>
         </div>
 
-        {/* ── SELECTOR DE PERÍODOS RÁPIDOS (NO IMPRIMIBLE) ── */}
+        {/* ── SELECTOR DE PERÍODOS Y ROLES (NO IMPRIMIBLE) ── */}
         <div
           className="no-print"
           style={{
             display: "flex",
             alignItems: "center",
             gap: "0.4rem",
-            marginBottom: "0.85rem",
+            marginBottom: "0.5rem",
             background: "rgba(15, 23, 42, 0.03)",
             padding: "0.45rem 0.65rem",
             borderRadius: "8px",
@@ -302,29 +339,37 @@ export default function LibroCajaReporteModal({
           >
             Hoy
           </button>
-          <button
-            type="button"
-            className={`btn btn-xs ${periodo === "SEMANA" ? "" : "secondary"}`}
-            onClick={() => handleCambiarPeriodo("SEMANA")}
-          >
-            Esta Semana
-          </button>
-          <button
-            type="button"
-            className={`btn btn-xs ${periodo === "MES" ? "" : "secondary"}`}
-            onClick={() => handleCambiarPeriodo("MES")}
-          >
-            Este Mes
-          </button>
-          <button
-            type="button"
-            className={`btn btn-xs ${periodo === "PERSONALIZADO" ? "" : "secondary"}`}
-            onClick={() => setPeriodo("PERSONALIZADO")}
-          >
-            Personalizado
-          </button>
+          {puedeVerHistorico ? (
+            <>
+              <button
+                type="button"
+                className={`btn btn-xs ${periodo === "SEMANA" ? "" : "secondary"}`}
+                onClick={() => handleCambiarPeriodo("SEMANA")}
+              >
+                Esta Semana
+              </button>
+              <button
+                type="button"
+                className={`btn btn-xs ${periodo === "MES" ? "" : "secondary"}`}
+                onClick={() => handleCambiarPeriodo("MES")}
+              >
+                Este Mes
+              </button>
+              <button
+                type="button"
+                className={`btn btn-xs ${periodo === "PERSONALIZADO" ? "" : "secondary"}`}
+                onClick={() => setPeriodo("PERSONALIZADO")}
+              >
+                Personalizado
+              </button>
+            </>
+          ) : (
+            <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)", fontStyle: "italic", marginLeft: "0.3rem" }}>
+              (Consolidados semanales/mensuales disponibles para Supervisión y Gerencia)
+            </span>
+          )}
 
-          {periodo === "PERSONALIZADO" && (
+          {puedeVerHistorico && periodo === "PERSONALIZADO" && (
             <div style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", marginLeft: "0.4rem" }}>
               <input
                 type="date"
@@ -350,6 +395,59 @@ export default function LibroCajaReporteModal({
           )}
 
           {cargando && <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>⏳ Consultando…</span>}
+        </div>
+
+        {/* ── SELECTOR DE FILTRO POR TIPO DE MOVIMIENTO (NO IMPRIMIBLE) ── */}
+        <div
+          className="no-print"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.35rem",
+            marginBottom: "0.75rem",
+            background: "rgba(15, 23, 42, 0.02)",
+            padding: "0.4rem 0.65rem",
+            borderRadius: "8px",
+            border: "1px solid var(--line)",
+            flexWrap: "wrap",
+          }}
+        >
+          <span style={{ fontSize: "0.76rem", fontWeight: 700, color: "var(--ink-soft)" }}>Filtrar Tipo:</span>
+          <button
+            type="button"
+            className={`btn btn-xs ${filtroFlujo === "TODOS" ? "" : "secondary"}`}
+            onClick={() => setFiltroFlujo("TODOS")}
+          >
+            📋 Todos ({datosReporte?.movimientos?.length || 0})
+          </button>
+          <button
+            type="button"
+            className={`btn btn-xs ${filtroFlujo === "PROPIO" ? "" : "secondary"}`}
+            onClick={() => setFiltroFlujo("PROPIO")}
+          >
+            🏛️ Operaciones Propias COMIF
+          </button>
+          <button
+            type="button"
+            className={`btn btn-xs ${filtroFlujo === "BI" ? "" : "secondary"}`}
+            onClick={() => setFiltroFlujo("BI")}
+          >
+            🏦 Corresponsalía BI (Banco Inmobiliario)
+          </button>
+          <button
+            type="button"
+            className={`btn btn-xs ${filtroFlujo === "INGRESO" ? "" : "secondary"}`}
+            onClick={() => setFiltroFlujo("INGRESO")}
+          >
+            📥 Ingresos
+          </button>
+          <button
+            type="button"
+            className={`btn btn-xs ${filtroFlujo === "EGRESO" ? "" : "secondary"}`}
+            onClick={() => setFiltroFlujo("EGRESO")}
+          >
+            📤 Egresos
+          </button>
         </div>
 
         {error && <div className="alert error no-print" style={{ margin: "0.25rem 0", fontSize: "0.8rem" }}>{error}</div>}
@@ -379,11 +477,12 @@ export default function LibroCajaReporteModal({
               COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."
             </div>
             <div style={{ fontSize: "0.92rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.02em", marginTop: "2px" }}>
-              LIBRO DIARIO DE MOVIMIENTOS Y CUADRE DE CAJA AUXILIAR
+              {tituloReporteFiltrado}
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.74rem", fontWeight: 600, color: "#334155", marginTop: "4px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.74rem", fontWeight: 600, color: "#334155", marginTop: "4px", flexWrap: "wrap", gap: "0.4rem" }}>
               <span>🏢 <strong>Agencia:</strong> {agenciaNombre}</span>
               <span>📅 <strong>Período:</strong> {periodo === "TURNO_ACTUAL" ? `Turno Activo (${hoyStr})` : `${fechaInicio} al ${fechaFin}`}</span>
+              <span>🎯 <strong>Flujo:</strong> {filtroFlujo === "TODOS" ? "Consolidado General" : filtroFlujo === "BI" ? "Corresponsalía BI" : filtroFlujo === "PROPIO" ? "Operaciones Propias" : filtroFlujo}</span>
               <span>💵 <strong>Moneda:</strong> Quetzales (Q)</span>
               <span>⏱️ <strong>Emisión:</strong> {new Date().toLocaleDateString("es-GT")} {new Date().toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}</span>
             </div>
@@ -428,29 +527,31 @@ export default function LibroCajaReporteModal({
           </div>
 
           {/* ── RESUMEN POR FUENTES DE FONDOS ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.5rem", marginBottom: "0.75rem" }}>
-            <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "0.35rem 0.55rem", fontSize: "0.72rem" }}>
-              <strong style={{ color: "#047857" }}>🏛️ COMIF Propios:</strong>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2px" }}>
-                <span>Cobros: {formatoQ(resumenFuentes.FONDOS_PROPIOS?.cobros ?? 0)}</span>
-                <span>Coloc: {formatoQ(resumenFuentes.FONDOS_PROPIOS?.colocacion ?? 0)}</span>
+          {filtroFlujo === "TODOS" && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.5rem", marginBottom: "0.75rem" }}>
+              <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "0.35rem 0.55rem", fontSize: "0.72rem" }}>
+                <strong style={{ color: "#047857" }}>🏛️ COMIF Propios:</strong>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2px" }}>
+                  <span>Cobros: {formatoQ(resumenFuentes.FONDOS_PROPIOS?.cobros ?? 0)}</span>
+                  <span>Coloc: {formatoQ(resumenFuentes.FONDOS_PROPIOS?.colocacion ?? 0)}</span>
+                </div>
+              </div>
+              <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "0.35rem 0.55rem", fontSize: "0.72rem" }}>
+                <strong style={{ color: "#d97706" }}>🌾 FEDERURAL:</strong>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2px" }}>
+                  <span>Cobros: {formatoQ(resumenFuentes.FEDERURAL?.cobros ?? 0)}</span>
+                  <span>Coloc: {formatoQ(resumenFuentes.FEDERURAL?.colocacion ?? 0)}</span>
+                </div>
+              </div>
+              <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "0.35rem 0.55rem", fontSize: "0.72rem" }}>
+                <strong style={{ color: "#2563eb" }}>🏦 CHN-Guatemala:</strong>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2px" }}>
+                  <span>Cobros: {formatoQ(resumenFuentes.CHN_GUATEMALA?.cobros ?? 0)}</span>
+                  <span>Coloc: {formatoQ(resumenFuentes.CHN_GUATEMALA?.colocacion ?? 0)}</span>
+                </div>
               </div>
             </div>
-            <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "0.35rem 0.55rem", fontSize: "0.72rem" }}>
-              <strong style={{ color: "#d97706" }}>🌾 FEDERURAL:</strong>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2px" }}>
-                <span>Cobros: {formatoQ(resumenFuentes.FEDERURAL?.cobros ?? 0)}</span>
-                <span>Coloc: {formatoQ(resumenFuentes.FEDERURAL?.colocacion ?? 0)}</span>
-              </div>
-            </div>
-            <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "0.35rem 0.55rem", fontSize: "0.72rem" }}>
-              <strong style={{ color: "#2563eb" }}>🏦 CHN-Guatemala:</strong>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2px" }}>
-                <span>Cobros: {formatoQ(resumenFuentes.CHN_GUATEMALA?.cobros ?? 0)}</span>
-                <span>Coloc: {formatoQ(resumenFuentes.CHN_GUATEMALA?.colocacion ?? 0)}</span>
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* ── TABLA CRONOLÓGICA DE MOVIMIENTOS ── */}
           <div className="table-wrap" style={{ marginBottom: "1rem" }}>
@@ -469,14 +570,14 @@ export default function LibroCajaReporteModal({
                 </tr>
               </thead>
               <tbody>
-                {movimientosOrdenados.length === 0 && (
+                {movimientosFiltrados.length === 0 && (
                   <tr>
                     <td colSpan={9} style={{ textAlign: "center", padding: "1rem", color: "#64748b" }}>
-                      No se registraron movimientos en este período.
+                      No se registraron movimientos en este período con el filtro seleccionado ({filtroFlujo}).
                     </td>
                   </tr>
                 )}
-                {movimientosOrdenados.map((m, idx) => {
+                {movimientosFiltrados.map((m, idx) => {
                   const horaStr = new Date(m.created_at).toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" });
                   const esIngreso = m.tipo === "INGRESO";
                   const montoNum = Number(m.monto);
@@ -488,7 +589,11 @@ export default function LibroCajaReporteModal({
                       <td className="mono" style={{ padding: "3px 5px", fontWeight: 600 }}>{m.doc_no || "—"}</td>
                       <td style={{ padding: "3px 5px" }}>
                         <div style={{ fontWeight: 600, color: "#0f172a" }}>{m.descripcion || m.categoria}</div>
-                        {m.referencia && <div style={{ fontSize: "0.65rem", color: "#64748b" }}>Ref: {m.referencia}</div>}
+                        {m.referencia && (
+                          <div style={{ fontSize: "0.68rem", color: m.seccion === "BI" ? "#1d4ed8" : "#64748b", fontWeight: m.seccion === "BI" ? 600 : 400 }}>
+                            {m.seccion === "BI" ? "Correlativo BI:" : "Ref:"} {m.referencia}
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: "3px 5px" }}>{m.beneficiario || "—"}</td>
                       <td className="mono" style={{ textAlign: "right", padding: "3px 5px", color: esIngreso ? "#059669" : "#94a3b8", fontWeight: esIngreso ? 700 : 400 }}>
@@ -510,7 +615,7 @@ export default function LibroCajaReporteModal({
               <tfoot>
                 <tr style={{ background: "#f8fafc", borderTop: "2px solid #0f172a", fontWeight: 800 }}>
                   <td colSpan={5} style={{ padding: "6px 8px", textAlign: "right", textTransform: "uppercase" }}>
-                    TOTALES CONSOLIDADOS DEL PERÍODO:
+                    TOTALES DEL PERÍODO ({filtroFlujo}):
                   </td>
                   <td className="mono" style={{ textAlign: "right", padding: "6px 8px", color: "#059669", fontSize: "0.82rem" }}>
                     {formatoQ(totIng)}
