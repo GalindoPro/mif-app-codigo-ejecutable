@@ -144,7 +144,9 @@ export async function detalle(id: string, agenciaVisible: string | null) {
 
   const totalIngreso = movimientos.filter((m) => m.tipo === "INGRESO").reduce((acc, m) => acc + Number(m.monto), 0);
   const totalEgreso = movimientos.filter((m) => m.tipo === "EGRESO").reduce((acc, m) => acc + Number(m.monto), 0);
-  const saldoActual = movimientos.length ? Number(movimientos[movimientos.length - 1].saldo_acumulado) : Number(dia.saldo_inicial);
+  const saldoActual = movimientos.length
+    ? Number(movimientos[0].saldo_acumulado ?? (Number(dia.saldo_inicial) + totalIngreso - totalEgreso))
+    : Number(dia.saldo_inicial);
 
   let arqueo = null;
   if (dia.estado === "CERRADO") {
@@ -1710,20 +1712,45 @@ export async function arqueosMensuales(
   let totalIngresosMes = 0;
   let totalEgresosMes = 0;
 
-  for (const r of rows) {
-    totalMovimientosMes += Number(r.total_movimientos || 0);
-    totalIngresosMes += Number(r.total_ingresos || 0);
-    totalEgresosMes += Number(r.total_egresos || 0);
+  const mappedRows = rows.map((r) => {
+    const sIni = Number(r.saldo_inicial || 0);
+    const ing = Number(r.total_ingresos || 0);
+    const egr = Number(r.total_egresos || 0);
+    const flujoNeto = Math.round((ing - egr) * 100) / 100;
+    const saldoEsperado = Math.round((sIni + ing - egr) * 100) / 100;
+    const totalContado = r.total_contado != null 
+      ? Number(r.total_contado) 
+      : (r.estado === "CERRADO" ? Number(r.saldo_final ?? saldoEsperado) : saldoEsperado);
+    const diferencia = r.diferencia != null 
+      ? Number(r.diferencia) 
+      : (r.estado === "CERRADO" ? Math.round((totalContado - saldoEsperado) * 100) / 100 : 0);
 
-    const dif = Number(r.diferencia || 0);
-    if (dif === 0) {
+    totalMovimientosMes += Number(r.total_movimientos || 0);
+    totalIngresosMes += ing;
+    totalEgresosMes += egr;
+
+    if (diferencia === 0) {
       diasCuadrados++;
     } else {
       diasConDiferencia++;
-      if (dif > 0) totalSobrante += dif;
-      else totalFaltante += Math.abs(dif);
+      if (diferencia > 0) totalSobrante += diferencia;
+      else totalFaltante += Math.abs(diferencia);
     }
-  }
+
+    return {
+      ...r,
+      saldo_inicial: sIni,
+      total_ingresos: ing,
+      total_egresos: egr,
+      flujo_neto: flujoNeto,
+      saldo_final: r.saldo_final != null && r.estado === "CERRADO" ? Number(r.saldo_final) : saldoEsperado,
+      saldo_esperado: saldoEsperado,
+      total_contado: totalContado,
+      diferencia: diferencia,
+    };
+  });
+
+  const totalFlujoNetoMes = Math.round((totalIngresosMes - totalEgresosMes) * 100) / 100;
 
   return {
     mes: mesParam,
@@ -1736,8 +1763,9 @@ export async function arqueosMensuales(
       totalMovimientosMes,
       totalIngresosMes,
       totalEgresosMes,
+      totalFlujoNetoMes,
     },
-    dias: rows,
+    dias: mappedRows,
   };
 }
 

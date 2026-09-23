@@ -215,7 +215,7 @@ export default function LibroCajaReporteModal({
   const saldoIni = datosReporte?.saldoInicial ?? 0;
   const totIng = datosReporte?.totalIngreso ?? 0;
   const totEgr = datosReporte?.totalEgreso ?? 0;
-  const saldoFin = datosReporte?.saldoFinal ?? (saldoIni + totIng - totEgr);
+  const saldoFin = Math.round((saldoIni + totIng - totEgr) * 100) / 100;
 
   return createPortal(
     <div className="modal libro-caja-modal-overlay">

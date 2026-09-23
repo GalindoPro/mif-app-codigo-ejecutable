@@ -10,6 +10,8 @@ interface DiaArqueo {
   estado: string;
   saldo_inicial: number;
   saldo_final: number | null;
+  saldo_esperado?: number;
+  flujo_neto?: number;
   total_ingresos: number;
   total_egresos: number;
   total_contado: number | null;
@@ -30,6 +32,7 @@ interface ArqueoMensualResponse {
     totalMovimientosMes: number;
     totalIngresosMes: number;
     totalEgresosMes: number;
+    totalFlujoNetoMes?: number;
   };
   dias: DiaArqueo[];
 }
@@ -119,24 +122,29 @@ export default function LibroArqueoMensual() {
     lineas.push(`Dias con Diferencia,${datos?.resumen?.diasConDiferencia ?? 0}`);
     lineas.push(`Total Ingresos del Mes (Q),${(datos?.resumen?.totalIngresosMes ?? 0).toFixed(2)}`);
     lineas.push(`Total Egresos del Mes (Q),${(datos?.resumen?.totalEgresosMes ?? 0).toFixed(2)}`);
+    lineas.push(`Flujo Neto del Mes (Q),${((datos?.resumen?.totalIngresosMes ?? 0) - (datos?.resumen?.totalEgresosMes ?? 0)).toFixed(2)}`);
     lineas.push(`Diferencia Neta (Q),${((datos?.resumen?.totalSobrante ?? 0) - (datos?.resumen?.totalFaltante ?? 0)).toFixed(2)}`);
     lineas.push("");
     lineas.push("SABANA DE CIERRES DIARIOS");
-    lineas.push("Fecha,Cajero / Operador,Saldo Inicial (Q),Ingresos (Q),Egresos (Q),Saldo Libro (Q),Efectivo Contado (Q),Diferencia (Q),Resultado");
+    lineas.push("Fecha,Cajero / Operador,Saldo Inicial (Q),Ingresos (Q),Egresos (Q),Flujo Neto (Q),Saldo Libro (Q),Efectivo Contado (Q),Diferencia (Q),Resultado");
     if (datos && datos.dias.length > 0) {
       datos.dias.forEach((d) => {
         const fechaStr = new Date(d.fecha).toLocaleDateString("es-GT");
         const cajero = `"${(d.cerrado_por_nombre || d.abierto_por_nombre || "").replace(/"/g, '""')}"`;
-        const esperado = Number(d.saldo_final ?? d.saldo_inicial);
-        const contado = Number(d.total_contado || esperado);
-        const dif = Number(d.diferencia || 0);
-        const res = dif === 0 ? "CUADRADO" : dif > 0 ? "SOBRANTE" : "FALTANTE";
+        const sIni = Number(d.saldo_inicial || 0);
+        const ing = Number(d.total_ingresos || 0);
+        const egr = Number(d.total_egresos || 0);
+        const flujo = Number(d.flujo_neto ?? (ing - egr));
+        const esperado = Number(d.saldo_esperado ?? (sIni + ing - egr));
+        const contado = Number(d.total_contado ?? (d.estado === "CERRADO" ? (d.saldo_final ?? esperado) : esperado));
+        const dif = Number(d.diferencia ?? (d.estado === "CERRADO" ? contado - esperado : 0));
+        const res = d.estado === "ABIERTO" ? "EN TURNO ACTIVO" : dif === 0 ? "CUADRADO" : dif > 0 ? "SOBRANTE" : "FALTANTE";
         lineas.push(
-          `${fechaStr},${cajero},${d.saldo_inicial.toFixed(2)},${d.total_ingresos.toFixed(2)},${d.total_egresos.toFixed(2)},${esperado.toFixed(2)},${contado.toFixed(2)},${dif.toFixed(2)},${res}`,
+          `${fechaStr},${cajero},${sIni.toFixed(2)},${ing.toFixed(2)},${egr.toFixed(2)},${flujo.toFixed(2)},${esperado.toFixed(2)},${contado.toFixed(2)},${dif.toFixed(2)},${res}`,
         );
       });
     } else {
-      lineas.push(`"Sin operaciones registradas en el mes de ${mesNombreLargo}",,,,,,,,`);
+      lineas.push(`"Sin operaciones registradas en el mes de ${mesNombreLargo}",,,,,,,,,`);
     }
     lineas.push("");
     lineas.push(`Observaciones: "${observaciones.replace(/"/g, '""')}"`);
@@ -500,26 +508,31 @@ export default function LibroArqueoMensual() {
 
             {/* Sábana de Cierres Diarios */}
             <div className="table-wrap" style={{ border: "1px solid var(--line)" }}>
-              <table style={{ fontSize: "0.75rem", width: "100%", borderCollapse: "collapse" }}>
+              <table style={{ fontSize: "0.74rem", width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: "var(--paper-raised)" }}>
-                    <th style={{ width: "70px", padding: "2px 4px" }}>Fecha</th>
+                    <th style={{ width: "65px", padding: "2px 4px" }}>Fecha</th>
                     <th style={{ padding: "2px 4px" }}>Cajero / Operador</th>
-                    <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Saldo Inicial</th>
-                    <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Ingresos (+)</th>
-                    <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Egresos (−)</th>
+                    <th style={{ width: "80px", textAlign: "right", padding: "2px 4px" }}>Saldo Inicial</th>
+                    <th style={{ width: "80px", textAlign: "right", padding: "2px 4px" }}>Ingresos (+)</th>
+                    <th style={{ width: "80px", textAlign: "right", padding: "2px 4px" }}>Egresos (−)</th>
+                    <th style={{ width: "80px", textAlign: "right", padding: "2px 4px" }}>Flujo Neto (±)</th>
                     <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Saldo Libro</th>
                     <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Contado</th>
-                    <th style={{ width: "75px", textAlign: "right", padding: "2px 4px" }}>Diferencia</th>
-                    <th style={{ width: "75px", textAlign: "center", padding: "2px 4px" }}>Resultado</th>
+                    <th style={{ width: "70px", textAlign: "right", padding: "2px 4px" }}>Diferencia</th>
+                    <th style={{ width: "85px", textAlign: "center", padding: "2px 4px" }}>Resultado</th>
                   </tr>
                 </thead>
                 <tbody>
                   {datos && datos.dias.length > 0 ? (
                     datos.dias.map((d) => {
-                      const dif = Number(d.diferencia || 0);
-                      const esperado = Number(d.saldo_final ?? d.saldo_inicial);
-                      const contado = Number(d.total_contado || esperado);
+                      const sIni = Number(d.saldo_inicial || 0);
+                      const ing = Number(d.total_ingresos || 0);
+                      const egr = Number(d.total_egresos || 0);
+                      const flujo = Number(d.flujo_neto ?? (ing - egr));
+                      const esperado = Number(d.saldo_esperado ?? (sIni + ing - egr));
+                      const contado = Number(d.total_contado ?? (d.estado === "CERRADO" ? (d.saldo_final ?? esperado) : esperado));
+                      const dif = Number(d.diferencia ?? (d.estado === "CERRADO" ? contado - esperado : 0));
                       return (
                         <tr key={d.id}>
                           <td className="mono" style={{ fontWeight: 600, padding: "2px 4px" }}>
@@ -533,15 +546,26 @@ export default function LibroArqueoMensual() {
                             {d.cerrado_por_nombre || d.abierto_por_nombre || nombreCajero}
                           </td>
                           <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
-                            {formatoQ(d.saldo_inicial)}
+                            {formatoQ(sIni)}
                           </td>
                           <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "2px 4px" }}>
-                            {formatoQ(d.total_ingresos)}
+                            {formatoQ(ing)}
                           </td>
                           <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "2px 4px" }}>
-                            {formatoQ(d.total_egresos)}
+                            {formatoQ(egr)}
                           </td>
-                          <td className="mono" style={{ textAlign: "right", fontWeight: 700, padding: "2px 4px" }}>
+                          <td
+                            className="mono"
+                            style={{
+                              textAlign: "right",
+                              fontWeight: 700,
+                              color: flujo >= 0 ? "#16a34a" : "#dc2626",
+                              padding: "2px 4px",
+                            }}
+                          >
+                            {flujo >= 0 ? `+${formatoQ(flujo)}` : `-${formatoQ(Math.abs(flujo))}`}
+                          </td>
+                          <td className="mono" style={{ textAlign: "right", fontWeight: 800, color: "var(--ink)", padding: "2px 4px" }}>
                             {formatoQ(esperado)}
                           </td>
                           <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
@@ -561,12 +585,12 @@ export default function LibroArqueoMensual() {
                           <td style={{ textAlign: "center", padding: "2px 4px" }}>
                             <span
                               style={{
-                                color: dif === 0 ? "#16a34a" : "#dc2626",
+                                color: d.estado === "ABIERTO" ? "#2563eb" : dif === 0 ? "#16a34a" : "#dc2626",
                                 fontWeight: 700,
                                 fontSize: "0.72rem",
                               }}
                             >
-                              {dif === 0 ? "✓ Cuadrado" : dif > 0 ? "Sobrante" : "Faltante"}
+                              {d.estado === "ABIERTO" ? "⏳ En Turno" : dif === 0 ? "✓ Cuadrado" : dif > 0 ? "Sobrante" : "Faltante"}
                             </span>
                           </td>
                         </tr>
@@ -574,7 +598,7 @@ export default function LibroArqueoMensual() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={9} style={{ textAlign: "center", padding: "14px 8px", color: "var(--ink-soft)", fontStyle: "italic" }}>
+                      <td colSpan={10} style={{ textAlign: "center", padding: "14px 8px", color: "var(--ink-soft)", fontStyle: "italic" }}>
                         Sin movimientos de caja registrados en este período mensual (0 operaciones registradas)
                       </td>
                     </tr>
@@ -591,6 +615,18 @@ export default function LibroArqueoMensual() {
                     </td>
                     <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "3px 4px" }}>
                       {formatoQ(datos?.resumen?.totalEgresosMes ?? 0)}
+                    </td>
+                    <td
+                      className="mono"
+                      style={{
+                        textAlign: "right",
+                        color: (datos?.resumen ? (datos.resumen.totalIngresosMes - datos.resumen.totalEgresosMes) : 0) >= 0 ? "#16a34a" : "#dc2626",
+                        padding: "3px 4px",
+                      }}
+                    >
+                      {datos?.resumen && (datos.resumen.totalIngresosMes - datos.resumen.totalEgresosMes) >= 0
+                        ? `+${formatoQ(datos.resumen.totalIngresosMes - datos.resumen.totalEgresosMes)}`
+                        : `-${formatoQ(Math.abs((datos?.resumen?.totalIngresosMes ?? 0) - (datos?.resumen?.totalEgresosMes ?? 0)))}`}
                     </td>
                     <td colSpan={2} style={{ padding: "3px 4px" }}></td>
                     <td

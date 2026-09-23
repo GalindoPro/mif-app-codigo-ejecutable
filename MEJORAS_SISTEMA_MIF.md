@@ -1210,12 +1210,46 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
      - La tabla oficial de la Sábana de Cierres ahora renderiza siempre su cabecera completa, agregando la fila notarial institucional *"Sin movimientos de caja registrados en este período mensual (0 operaciones registradas)"* y totalizadores en `Q 0.00`, permitiendo imprimir el acta oficial con sus 4 puntos estatutarios y las 4 firmas de rigor (Presidente, Secretaria, Vocal I y Receptor Pagador).
   3. **Auto-selección Inteligente de Agencia para Roles Directivos:**
      - Al ingresar usuarios con rol `GERENCIA_GENERAL` o `ADMIN` (que no tienen una agencia prefijada por defecto), el selector inicializa automáticamente la primera agencia activa (`Agencia Chajul`) sin requerir selección manual para consultar.
+---
+
+## 68. Estandarización Contable de la Sábana de Cierres: Saldo Libro Dinámico, Flujo Neto y Estado de Turno (`service.ts`, `LibroArqueoMensual.tsx`)
+
+- **Objetivo:** Resolver el descuadre visual en el Libro de Actas de Arqueo Mensual de Caja, donde la columna `Saldo Libro` mostraba el saldo inicial estático (`Q 236,000.00`) en lugar del saldo final esperado calculado (`Q 336,034.60`), e incorporar la transparencia contable con desglose de Flujo Neto y estado del turno operativo.
+- **Causa Raíz:**
+  - Al consultar los arqueos del mes, el campo `saldo_final` en cajas que aún se encontraban en turno activo (`ABIERTO`) no calculaba la sumatoria de ingresos menos egresos sobre el saldo inicial, evaluándose al valor base de apertura y generando una incongruencia matemática aparente en la tabla impresa.
+- **Mejoras Implementadas:**
+  1. **Ecuación Contable Universal en Backend y Frontend:**
+     $$\text{Saldo Libro (Esperado)} = \text{Saldo Inicial} + \text{Total Ingresos} - \text{Total Egresos}$$
+     - Se corrigió el cálculo exacto: `Q 236,000.00` (Saldo Inicial) + `Q 126,058.94` (Ingresos) − `Q 26,024.34` (Egresos) = **`Q 336,034.60`**.
+  2. **Incorporación de la Columna `Flujo Neto (±)`:**
+     - Se añadió la columna de Flujo Neto tanto en la vista web, en el documento impreso notarial y en el archivo exportable CSV, reflejando el superávit/déficit neto de la jornada (`+ Q 100,034.60`).
+  3. **Insignias Claras de Estado de Turno:**
+     - La columna `Resultado` ahora distingue de forma transparente entre cajas que están en operación (`⏳ En Turno`) y cajas formalmente cerradas con arqueo físico (`✓ Cuadrado`, `Sobrante`, `Faltante`).
+---
+
+## 69. Cuadre Contable y Corrección de Saldo Final en Comprobante de Libro de Caja Auxiliar (`service.ts`, `LibroCajaReporteModal.tsx`, `app.css`)
+
+- **Objetivo:** Corregir el descuadre visual en el **Comprobante del Libro de Caja Auxiliar** (`LibroCajaReporteModal`), donde la tarjeta de resumen superior (Tarjeta 4: `(=) SALDO FINAL EN CAJA`) y el pie de tabla (`TOTALES CONSOLIDADOS DEL PERÍODO`) mostraban incorrectamente `Q 237,824.76` en lugar del saldo final real acumulado al cierre del movimiento número 19 (`Q 336,034.60`).
+- **Causa Raíz:**
+  - En la consulta del detalle del día en el backend (`service.ts` / `obtenerDia`), la lista de movimientos viene ordenada en forma descendente (`ORDER BY created_at DESC`). La expresión `movimientos[movimientos.length - 1]` seleccionaba el movimiento más antiguo (el primer movimiento de la mañana con saldo `Q 237,824.76`) en lugar del más reciente (`movimientos[0]` con saldo `Q 336,034.60`), asignándolo como saldo actual.
+- **Mejoras Implementadas:**
+  1. **Corrección del Índice de Saldo Actual en Backend (`service.ts`):**
+     - Se actualizó para tomar `movimientos[0].saldo_acumulado` (el movimiento más reciente) con respaldo en la fórmula contable `saldo_inicial + totalIngreso - totalEgreso`.
+  2. **Cálculo Matemático Universal en Frontend (`LibroCajaReporteModal.tsx`):**
+     - La tarjeta 4 y el pie de tabla ahora calculan directamente `saldoFin = saldoIni (Q 236,000.00) + totIng (Q 126,058.94) − totEgr (Q 26,024.34) = Q 336,034.60`, coincidiendo exactamente con la última fila del libro (fila 19: `Q 336,034.60`).
+  3. **Estabilización de Pie de Tabla en Impresión (`app.css`):**
+     - Se configuró `tfoot { display: table-row-group !important; }` para que la fila de Totales Consolidados se imprima limpiamente una sola vez al final del listado de operaciones (en la página 2 justo antes de las firmas), en lugar de fragmentarse de forma duplicada al pie de cada página.
 - **Archivos Modificados:**
-  - `frontend/src/pages/LibroArqueoMensual.tsx`
+  - `backend/src/modules/cajaauxiliar/service.ts`
+  - `frontend/src/components/cajaauxiliar/LibroCajaReporteModal.tsx`
+  - `frontend/src/styles/app.css`
+  - `01-codigo-backend.md`
   - `02-codigo-frontend.md`
   - `MEJORAS_SISTEMA_MIF.md`
   - `00-INDICE.md`
 - **Sincronización Dual:** Downloads ↔ Documents completada.
+
+
 
 
 

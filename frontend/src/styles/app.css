@@ -1644,6 +1644,10 @@ td a {
     font-weight: 700 !important;
   }
 
+  tfoot {
+    display: table-row-group !important;
+  }
+
   tfoot tr {
     border-top: 2px solid #000000 !important;
     font-weight: bold !important;
