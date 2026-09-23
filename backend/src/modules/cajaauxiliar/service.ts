@@ -1,5 +1,5 @@
 import { PoolClient } from "pg";
-import { pool } from "../../db/pool";
+import { pool, queryWithRetry } from "../../db/pool";
 import { withTransaction } from "../../db/transaction";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
@@ -1558,8 +1558,8 @@ export async function analiticaServicios(
   `;
 
   const [{ rows }, { rows: rowsTendencia }] = await Promise.all([
-    pool.query(query, params),
-    pool.query(queryTendencia, params),
+    queryWithRetry(query, params),
+    queryWithRetry(queryTendencia, params),
   ]);
 
   const GRUPOS: Record<string, { label: string; icon: string; producto: string }> = {

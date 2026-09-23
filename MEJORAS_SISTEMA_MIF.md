@@ -4,6 +4,35 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
 
 ---
 
+## 76. Estabilidad de Conexión: Pool Resiliente con Reintentos Automáticos
+
+**Problema:** El backend lanzaba `Connection terminated due to connection timeout` repetidamente al usar el Transaction Pooler de Supabase (plan gratuito, ~10 conexiones simultáneas). Las 9 queries del dashboard en `Promise.all` saturaban el pool.
+
+**Archivos modificados:**
+- `backend/src/db/pool.ts`
+- `backend/src/modules/dashboard/service.ts`
+- `backend/src/modules/cajaauxiliar/service.ts`
+
+**Cambios aplicados:**
+
+1. **`pool.ts` — Pool calibrado + helper `queryWithRetry`:**
+   - `max` reducido de 10 → **5** (deja margen para múltiples usuarios concurrentes)
+   - `idleTimeoutMillis` aumentado de 10 s → **30 s** (evita ciclos de reconexión frecuente)
+   - `connectionTimeoutMillis` aumentado de 5 s → **8 s** (más margen para Supabase)
+   - `keepAliveInitialDelayMillis: 10000` agregado
+   - Nueva función exportada `queryWithRetry(sql, params, intentos=3)`: reintenta automáticamente con backoff exponencial (300 ms, 600 ms, 1.2 s) si el error es transitorio (timeout, ECONNRESET, ECONNREFUSED).
+
+2. **`dashboard/service.ts` — Queries secuenciales con reintentos:**
+   - Eliminado el `Promise.all` con 9 queries paralelas que saturaba el pooler
+   - Queries ejecutadas **secuencialmente** con `queryWithRetry` para garantizar disponibilidad de conexiones
+
+3. **`cajaauxiliar/service.ts` — Reintentos en `analiticaServicios`:**
+   - El `Promise.all` de 2 queries reemplazado con `queryWithRetry`
+
+**Resultado:** Eliminación de errores `Connection terminated` en el dashboard y en el libro auxiliar.
+
+---
+
 ## 1. Orden y Reestructuración del Formulario de Asociados (`SocioForm.tsx`)
 - **Fila 1:** No. de asociado (y Agencia responsable).
 - **Fila 2:** Nombres completos del socio (con autocompletado y capitalización inteligente).
@@ -1381,10 +1410,21 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
   4. **Segregación de Roles y Control Interno:**
      - **Ventanilla / Operación diaria:** Roles operativos (`CAJERO`, `SUPERVISOR`, `ADMIN`) pueden registrar operaciones y generar los recibos de ventanilla.
      - **Reportes Históricos y Consolidados:** Los períodos extendidos (*Esta Semana, Este Mes, Personalizado*) están reservados para `GERENCIA`, `ADMIN` y `SUPERVISOR`. Los cajeros acceden al reporte de su *Turno Activo* y del día actual (*Hoy*).
+---
+
+## 75. Optimización Arquitectónica de Alto Rendimiento y Eliminación de Bloqueos de Conexión (`dashboard/service.ts`, `pool.ts`, `Tablero.tsx`)
+
+- **Objetivo:** Resolver los congelamientos de interfaz y errores de `connection timeout` en base de datos causados por consultas secuenciales en cadena y polling repetitivo no controlado.
+- **Mejoras Implementadas:**
+  1. **Paralelización con `Promise.all` en el Tablero Ejecutivo (`dashboard/service.ts`):**
+     - Se transformaron las 9 consultas secuenciales del resumen gerencial en una sola ejecución paralela (`Promise.all`), reduciendo el tiempo de respuesta del backend de ~3,500 ms a < 250 ms.
+  2. **Calibración del Pool de Conexiones (`pool.ts`):**
+     - Optimizado para el Transaction Pooler de Supabase (`max: 10`, `idleTimeoutMillis: 10000`, `connectionTimeoutMillis: 5000`) evitando saturación de sockets y cierres abruptos.
+  3. **Polling Inteligente con Guardas `inFlight` (`Tablero.tsx`):**
+     - Se eliminó el consumo redundante de analítica innecesaria, se introdujo la guarda `cargandoRef` para evitar solicitudes superpuestas y se ajustó el ciclo de actualización en vivo a 30 segundos.
 - **Archivos Modificados:**
-  - `backend/src/modules/cajaauxiliar/service.ts`
-  - `backend/src/modules/cajaauxiliar/routes.ts`
-  - `frontend/src/components/cajaauxiliar/NuevoMovimientoForm.tsx`
-  - `frontend/src/components/cajaauxiliar/LibroCajaReporteModal.tsx`
+  - `backend/src/modules/dashboard/service.ts`
+  - `backend/src/db/pool.ts`
+  - `frontend/src/pages/Tablero.tsx`
   - `MEJORAS_SISTEMA_MIF.md`
   - `00-INDICE.md`

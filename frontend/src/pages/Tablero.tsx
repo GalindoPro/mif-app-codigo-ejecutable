@@ -32,22 +32,20 @@ export default function Tablero() {
 
   const [driveConnected, setDriveConnected] = useState(false);
 
-  const [periodoAnalitica] = useState<"dia" | "mes">("dia");
+  const cargandoRef = useRef(false);
 
   function cargarResumen(silencioso = false) {
+    if (cargandoRef.current) return;
+    cargandoRef.current = true;
     api
       .get<ResumenDashboard>("/dashboard/resumen")
       .then(({ data }) => setResumen(data))
       .catch((err) => {
         if (!silencioso) setError(mensajeError(err));
+      })
+      .finally(() => {
+        cargandoRef.current = false;
       });
-  }
-
-  function cargarAnalitica() {
-    api
-      .get("/caja-auxiliar/analitica-servicios", { params: { periodo: periodoAnalitica } })
-      .then(() => {})
-      .catch(console.error);
   }
 
   async function verificarDrive() {
@@ -80,15 +78,13 @@ export default function Tablero() {
     }
   }, []);
 
-  // Actualización automática en tiempo real cada 10s y al recuperar foco
+  // Actualización automática en tiempo real cada 30s y al recuperar foco
   useEffect(() => {
     cargarResumen();
-    cargarAnalitica();
     verificarDrive();
     const interval = setInterval(() => {
       cargarResumen(true);
-      cargarAnalitica();
-    }, 10000);
+    }, 30000);
 
     const onFocus = () => {
       if (!document.hidden) {
@@ -103,7 +99,7 @@ export default function Tablero() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
     };
-  }, [periodoAnalitica]);
+  }, []);
 
   // Cerrar menú de opciones al hacer clic afuera
   useEffect(() => {

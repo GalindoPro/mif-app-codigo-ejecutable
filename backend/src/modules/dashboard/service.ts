@@ -1,18 +1,20 @@
-import { pool } from "../../db/pool";
+import { queryWithRetry } from "../../db/pool";
 
 // Resumen para el tablero del jefe de agencia: saldo de caja chica y saldo
 // total de cada tipo de ahorro, por agencia. Si agenciaId es null (Admin o
 // Gerencia), se calcula para todas las agencias visibles.
+// Las queries se ejecutan de forma SECUENCIAL (no en paralelo) para no saturar
+// el Transaction Pooler de Supabase (plan gratuito: máx ~10 conexiones).
 export async function resumen(agenciaId: string | null) {
   const filtroAgencia = agenciaId ? "where a.id = $1" : "";
   const valores = agenciaId ? [agenciaId] : [];
 
-  const { rows: agencias } = await pool.query(
+  const { rows: agencias } = await queryWithRetry(
     `select a.id, a.nombre, a.codigo from agencias a ${filtroAgencia} order by a.nombre`,
     valores,
   );
 
-  const { rows: cajaChica } = await pool.query(
+  const { rows: cajaChica } = await queryWithRetry(
     `select agencia_id,
             coalesce(sum(case when tipo = 'INGRESO' then monto else 0 end), 0)
               - coalesce(sum(case when tipo = 'EGRESO' then monto else 0 end), 0) as saldo
@@ -20,7 +22,7 @@ export async function resumen(agenciaId: string | null) {
      group by agencia_id`,
   );
 
-  const { rows: ahorros } = await pool.query(
+  const { rows: ahorros } = await queryWithRetry(
     `select c.agencia_id, c.tipo,
             count(*)::int as total_cuentas,
             coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0) as saldo_total
@@ -30,18 +32,18 @@ export async function resumen(agenciaId: string | null) {
      group by c.agencia_id, c.tipo`,
   );
 
-  const { rows: socios } = await pool.query(
+  const { rows: socios } = await queryWithRetry(
     `select agencia_id, count(*)::int as total from socios where estado = 'ACTIVO' group by agencia_id`,
   );
 
-  const { rows: movimientosHoy } = await pool.query(
+  const { rows: movimientosHoy } = await queryWithRetry(
     `select cu.agencia_id, count(*)::int as total
      from movimientos m join cuentas cu on cu.id = m.cuenta_id
      where m.fecha = current_date
      group by cu.agencia_id`,
   );
 
-  const { rows: prestamos } = await pool.query(
+  const { rows: prestamos } = await queryWithRetry(
     `select p.agencia_id,
             count(*)::int as total_prestamos,
             coalesce(sum(coalesce(p.saldo_capital, p.monto_aprobado)), 0)::numeric(14,2) as saldo_total
@@ -50,7 +52,7 @@ export async function resumen(agenciaId: string | null) {
      group by p.agencia_id`,
   );
 
-  const { rows: plazoFijo } = await pool.query(
+  const { rows: plazoFijo } = await queryWithRetry(
     `select c.agencia_id,
             count(*)::int as total_certificados,
             coalesce(sum(pf.monto_deposito), 0)::numeric(14,2) as monto_total
@@ -59,7 +61,7 @@ export async function resumen(agenciaId: string | null) {
      group by c.agencia_id`,
   );
 
-  const { rows: aportaciones } = await pool.query(
+  const { rows: aportaciones } = await queryWithRetry(
     `select c.agencia_id,
             count(*)::int as total_aportantes,
             coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0)::numeric(14,2) as saldo_total
@@ -69,7 +71,7 @@ export async function resumen(agenciaId: string | null) {
      group by c.agencia_id`,
   );
 
-  const { rows: cuotasIngresoRows } = await pool.query(
+  const { rows: cuotasIngresoRows } = await queryWithRetry(
     `select agencia_id,
             count(*)::int as total_cuotas,
             coalesce(sum(monto), 0)::numeric(14,2) as monto_total
