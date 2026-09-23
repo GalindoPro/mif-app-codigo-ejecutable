@@ -176,7 +176,7 @@ export default function LibroCajaReporteModal({
   function handleExportarCSV() {
     if (!datosReporte) return;
     const rows = [
-      ["COOPERATIVA MAYA INVERSIONES FUTURAS R.L \"COMIF R.L.\""],
+      ["COOPERATIVA MAYA INVERSIONES FUTURAS R.L \"COMIF-R.L.\""],
       ["LIBRO DE MOVIMIENTOS Y CUADRE DE CAJA AUXILIAR"],
       [`Agencia: ${agenciaNombre}`, `Periodo: ${fechaInicio} al ${fechaFin}`],
       [""],
@@ -376,7 +376,7 @@ export default function LibroCajaReporteModal({
             }}
           >
             <div style={{ fontSize: "1.1rem", fontWeight: 900, letterSpacing: "0.04em", textTransform: "uppercase", color: "#047857" }}>
-              COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."
+              COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."
             </div>
             <div style={{ fontSize: "0.92rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.02em", marginTop: "2px" }}>
               LIBRO DIARIO DE MOVIMIENTOS Y CUADRE DE CAJA AUXILIAR

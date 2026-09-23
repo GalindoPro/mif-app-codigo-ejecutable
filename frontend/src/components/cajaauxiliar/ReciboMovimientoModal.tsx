@@ -85,7 +85,7 @@ export default function ReciboMovimientoModal({ movimiento, onClose }: Props) {
       {/* CONTENIDO DEL RECIBO TIPO TICKET */}
       <div className="printable-ticket print-only" style={{ fontFamily: "monospace", fontSize: "12px", lineHeight: "1.4", color: "#000" }}>
           <div style={{ textAlign: "center", marginBottom: "1rem" }}>
-            <h2 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800 }}>COOP COMIF R.L.</h2>
+            <h2 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800 }}>COOP COMIF-R.L.</h2>
             <div style={{ fontSize: "0.75rem" }}>Maya Inversiones Futuras R.L.</div>
             <div style={{ fontSize: "0.75rem", marginTop: "0.2rem" }}>
               Comprobante de Caja Auxiliar

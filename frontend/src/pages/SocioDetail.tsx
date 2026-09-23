@@ -667,7 +667,7 @@ export default function SocioDetail() {
               ⚠️ Asociado sin Cuenta de Aportaciones Estatutaria ({socio.cuentas.length} cuentas registradas)
             </strong>
             <p style={{ margin: "0.25rem 0 0", fontSize: "0.82rem", color: "var(--ink-soft)" }}>
-              Por estatuto cooperativo de COMIF R.L., todo asociado debe contar con su <strong>Cuenta de Aportación Inicial (Mínimo Q 100.00)</strong> para aperturar cuentas de ahorro o solicitar créditos.
+              Por estatuto cooperativo de COMIF-R.L., todo asociado debe contar con su <strong>Cuenta de Aportación Inicial (Mínimo Q 100.00)</strong> para aperturar cuentas de ahorro o solicitar créditos.
             </p>
           </div>
           <button

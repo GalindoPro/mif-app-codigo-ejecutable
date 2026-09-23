@@ -490,7 +490,7 @@ export default function CreditoDetail() {
                   {ORIGEN_FONDOS_LABEL[prestamo.origen_fondos]}
                 </span>
               ) : (
-                "Fondos Propios (COOP COMIF R.L.)"
+                "Fondos Propios (COOP COMIF-R.L.)"
               )}
             </dd>
           </dl>
@@ -503,7 +503,7 @@ export default function CreditoDetail() {
             <div>
               <h2 style={{ margin: 0, fontSize: "1.05rem" }}>Historial de Pagos de Cuotas (Ventanilla)</h2>
               <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--ink-soft)" }}>
-                Cobros registrados en caja según libro de Ingresos COMIF.
+                Cobros registrados en caja según libro de Ingresos COMIF-R.L.
               </p>
             </div>
           </div>

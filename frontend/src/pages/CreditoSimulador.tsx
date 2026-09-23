@@ -119,7 +119,7 @@ export default function CreditoSimulador() {
               onChange={(e) => setTasaMensual(e.target.value)}
               required
             />
-            <span className="hint">Tasa estándar MIF: 2.0% mensual (24% anual)</span>
+            <span className="hint">Tasa estándar COMIF-R.L.: 2.0% mensual (24% anual)</span>
           </div>
 
           <div className="field">

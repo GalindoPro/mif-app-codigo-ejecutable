@@ -90,7 +90,7 @@ export default function ActaArqueoModal({
             COOPERATIVA MAYA INVERSIONES FUTURAS R.L.
           </h2>
           <h3 style={{ margin: "0.2rem 0", fontSize: "1.2rem", color: "#047857", fontWeight: 800 }}>
-            "COMIF R.L."
+            "COMIF-R.L."
           </h3>
           <h4 style={{ margin: "0.4rem 0 0.2rem", fontSize: "0.95rem", textDecoration: "underline" }}>
             ACTA DE ARQUEO DE CAJA

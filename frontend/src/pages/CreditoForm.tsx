@@ -363,7 +363,7 @@ export default function CreditoForm() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "0.5rem" }}>
               {(
                 [
-                  { id: "FONDOS_PROPIOS", label: "🏦 Fondos Propios (COMIF R.L.)", desc: "Recursos propios" },
+                  { id: "FONDOS_PROPIOS", label: "🏦 Fondos Propios (COMIF-R.L.)", desc: "Recursos propios" },
                   { id: "FEDERURAL", label: "🌾 FEDERURAL", desc: "Línea Federural" },
                   { id: "CHN_GUATEMALA", label: "🏛️ CHN-GUATEMALA", desc: "Crédito Hipotecario Nal." },
                 ] as const
@@ -498,7 +498,7 @@ export default function CreditoForm() {
                 color: "var(--ink)",
               }}
             />
-            <span className="hint">🔒 Sistema oficial MIF: Amortización sobre saldos</span>
+            <span className="hint">🔒 Sistema oficial COMIF-R.L.: Amortización sobre saldos</span>
           </div>
 
           <div className="field" style={{ gridColumn: "1 / -1" }}>

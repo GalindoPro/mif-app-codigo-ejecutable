@@ -285,7 +285,7 @@ export default function KardexCarteraPromotor() {
       )}
 
       {!cargando && itemsFiltrados.length > 0 && (
-        <div className="card" style={{ padding: 0, overflowX: "auto" }}>
+        <div className="card no-print" style={{ padding: 0, overflowX: "auto" }}>
           <table className="table" style={{ width: "100%", margin: 0, fontSize: "0.85rem" }}>
             <thead>
               <tr style={{ background: "var(--mono-bg)" }}>
@@ -521,7 +521,7 @@ export default function KardexCarteraPromotor() {
 
       {totalItems > pageSize && (
         <div
-          className="pagination"
+          className="pagination no-print"
           style={{ display: "flex", gap: "1rem", alignItems: "center", justifyContent: "center", marginTop: "1rem" }}
         >
           <button className="btn secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
@@ -535,6 +535,127 @@ export default function KardexCarteraPromotor() {
           </button>
         </div>
       )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          REPORTE OFICIAL DE IMPRESIÓN COMPLETO (TODOS LOS CRÉDITOS SIN CORTES)
+          ══════════════════════════════════════════════════════════════════════ */}
+      <div className="print-only" style={{ width: "100%", margin: "0", padding: "0" }}>
+        {/* MEMBRETE INSTITUCIONAL OFICIAL */}
+        <div style={{ borderBottom: "2px solid #0f172a", paddingBottom: "6px", marginBottom: "10px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: "11pt", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.5px", color: "#0f172a" }}>
+              COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."
+            </div>
+            <div style={{ fontSize: "9.5pt", fontWeight: 700, color: "#0284c7", marginTop: "2px" }}>
+              KARDEX Y ESTADO OFICIAL DE CARTERA DE CRÉDITOS — MES {mes}
+            </div>
+            <div style={{ fontSize: "7.5pt", color: "#475569", marginTop: "2px" }}>
+              San Gaspar Chajul, El Quiché, Guatemala · Sistema Contable y Financiero COMIF-R.L.
+            </div>
+          </div>
+          <div style={{ textAlign: "right", fontSize: "7.5pt", color: "#334155" }}>
+            <div><strong>Emisión:</strong> {new Date().toLocaleDateString("es-GT", { day: "2-digit", month: "2-digit", year: "numeric" })} {new Date().toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}</div>
+            <div><strong>Total Préstamos:</strong> {totalItems} créditos</div>
+            {busqueda && <div><strong>Filtro:</strong> "{busqueda}"</div>}
+          </div>
+        </div>
+
+        {/* TABLA COMPLETA CON TODOS LOS CRÉDITOS DE LA CARTERA */}
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "7.2pt", marginBottom: "15px" }}>
+          <thead>
+            <tr style={{ background: "#0f172a", color: "#ffffff" }}>
+              <th style={{ width: "3%", textAlign: "center", padding: "4px 2px", color: "#ffffff" }}>#</th>
+              <th style={{ width: "10%", textAlign: "left", padding: "4px 4px", color: "#ffffff" }}>CÓDIGO</th>
+              <th style={{ width: "20%", textAlign: "left", padding: "4px 4px", color: "#ffffff" }}>ASOCIADO / TITULAR</th>
+              <th style={{ width: "14%", textAlign: "left", padding: "4px 4px", color: "#ffffff" }}>UBICACIÓN / GARANTÍA</th>
+              <th style={{ width: "14%", textAlign: "left", padding: "4px 4px", color: "#ffffff" }}>FIADOR SOLIDARIO</th>
+              <th style={{ width: "7%", textAlign: "center", padding: "4px 2px", color: "#ffffff" }}>PLAZO</th>
+              <th style={{ width: "11%", textAlign: "right", padding: "4px 4px", color: "#ffffff" }}>MONTO (Q)</th>
+              <th style={{ width: "11%", textAlign: "right", padding: "4px 4px", color: "#ffffff" }}>SALDO VIVO (Q)</th>
+              <th style={{ width: "10%", textAlign: "center", padding: "4px 4px", color: "#ffffff" }}>ESTADO {mes}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {itemsFiltrados.map((p, index) => {
+              const montoOriginal = Number(p.monto_aprobado || p.monto_solicitado);
+              const saldoActual = Number(p.saldo_capital ?? montoOriginal);
+              return (
+                <tr key={p.id} style={{ background: index % 2 === 0 ? "#ffffff" : "#f8fafc" }}>
+                  <td style={{ textAlign: "center", border: "1px solid #cbd5e1", padding: "3px 2px" }}>
+                    {index + 1}
+                  </td>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "3px 4px", fontFamily: "monospace", fontWeight: 700 }}>
+                    {p.codigo}
+                  </td>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "3px 4px" }}>
+                    <div style={{ fontWeight: 600 }}>{p.socio_nombres}</div>
+                    <div style={{ fontSize: "6.5pt", color: "#64748b" }}>{p.numero_asociado} · {p.tipo}</div>
+                  </td>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "3px 4px" }}>
+                    <div>{p.ubicacion_garantia || "Chajul"}</div>
+                    <div style={{ fontSize: "6.5pt", color: "#64748b" }}>{p.garantia || "Garantía registrada"}</div>
+                  </td>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "3px 4px" }}>
+                    <div>{p.nombre_fiador || "—"}</div>
+                  </td>
+                  <td style={{ textAlign: "center", border: "1px solid #cbd5e1", padding: "3px 2px" }}>
+                    {p.plazo_meses}m
+                  </td>
+                  <td style={{ textAlign: "right", border: "1px solid #cbd5e1", padding: "3px 4px", fontFamily: "monospace", fontWeight: 600 }}>
+                    {formatoQ(montoOriginal)}
+                  </td>
+                  <td style={{ textAlign: "right", border: "1px solid #cbd5e1", padding: "3px 4px", fontFamily: "monospace", fontWeight: 700, color: saldoActual > 0 ? "#b45309" : "#15803d" }}>
+                    {formatoQ(saldoActual)}
+                  </td>
+                  <td style={{ textAlign: "center", border: "1px solid #cbd5e1", padding: "3px 4px", fontSize: "6.8pt", fontWeight: 700 }}>
+                    {p.estadoCuotaMes === "CANCELADO" ? "LIQUIDADO" : p.estadoCuotaMes === "AL_DIA" ? `AL DÍA (${formatoQ(p.totalPagadoMes)})` : "PENDIENTE"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr style={{ background: "#e2e8f0", fontWeight: "bold" }}>
+              <td colSpan={6} style={{ border: "1px solid #94a3b8", padding: "5px", textAlign: "right", fontWeight: 800 }}>
+                TOTAL CARTERA AUDITADA ({totalItems} PRÉSTAMOS):
+              </td>
+              <td style={{ border: "1px solid #94a3b8", padding: "5px", textAlign: "right", fontFamily: "monospace", fontWeight: 800, fontSize: "8pt" }}>
+                {formatoQ(itemsFiltrados.reduce((acc, x) => acc + Number(x.monto_aprobado || x.monto_solicitado), 0))}
+              </td>
+              <td style={{ border: "1px solid #94a3b8", padding: "5px", textAlign: "right", fontFamily: "monospace", fontWeight: 800, color: "#b45309", fontSize: "8pt" }}>
+                {formatoQ(itemsFiltrados.reduce((acc, x) => acc + Number(x.saldo_capital ?? (x.monto_aprobado || x.monto_solicitado)), 0))}
+              </td>
+              <td style={{ border: "1px solid #94a3b8", padding: "5px", textAlign: "center", color: "#475569", fontSize: "7pt" }}>
+                Cierre {mes}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+
+        {/* BLOQUE DE FIRMAS OFICIALES DE LEGALIZACIÓN */}
+        <div style={{ pageBreakInside: "avoid", breakInside: "avoid", marginTop: "20px", paddingTop: "6px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px", textAlign: "center" }}>
+            <div>
+              <div style={{ borderTop: "1px solid #000", margin: "0 10px", paddingTop: "4px", fontSize: "7.5pt", fontWeight: 700 }}>
+                Comité de Créditos
+              </div>
+              <div style={{ fontSize: "6.5pt", color: "#475569" }}>Aprobación y Dictamen</div>
+            </div>
+            <div>
+              <div style={{ borderTop: "1px solid #000", margin: "0 10px", paddingTop: "4px", fontSize: "7.5pt", fontWeight: 700 }}>
+                Promotor / Oficial de Campo
+              </div>
+              <div style={{ fontSize: "6.5pt", color: "#475569" }}>Seguimiento y Cobranza</div>
+            </div>
+            <div>
+              <div style={{ borderTop: "1px solid #000", margin: "0 10px", paddingTop: "4px", fontSize: "7.5pt", fontWeight: 700 }}>
+                Gerencia General
+              </div>
+              <div style={{ fontSize: "6.5pt", color: "#475569" }}>Visto Bueno Oficial COMIF-R.L.</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

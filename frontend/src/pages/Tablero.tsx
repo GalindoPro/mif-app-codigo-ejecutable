@@ -190,7 +190,7 @@ export default function Tablero() {
             </span>
           </div>
           <p style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-            <span>COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."{varias ? " · Todas las Agencias" : ""}</span>
+            <span>COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."{varias ? " · Todas las Agencias" : ""}</span>
             {driveConnected ? (
               <span style={{ fontSize: "0.75rem", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", padding: "0.2rem 0.6rem", borderRadius: "20px", display: "flex", alignItems: "center", gap: "0.3rem" }}>
                 ✅ Google Drive Conectado

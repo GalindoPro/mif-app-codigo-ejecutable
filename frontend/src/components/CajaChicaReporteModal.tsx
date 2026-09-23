@@ -106,7 +106,7 @@ export default function CajaChicaReporteModal({
   function exportarCSV() {
     if (!reporte) return;
     const lineas: string[] = [];
-    lineas.push(`INFORME DE RENDICION DE GASTOS DE CAJA CHICA - COOP COMIF R.L.`);
+    lineas.push(`INFORME DE RENDICION DE GASTOS DE CAJA CHICA - COOP COMIF-R.L.`);
     lineas.push(`Agencia: ${reporte.agencia.nombre}`);
     lineas.push(
       `Periodo: ${fechaInicio ? new Date(fechaInicio + "T00:00:00").toLocaleDateString("es-GT") : "Inicio"} al ${
@@ -436,7 +436,7 @@ export default function CajaChicaReporteModal({
             >
               <div>
                 <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "#065f46", letterSpacing: "0.02em" }}>
-                  COOPERATIVA MAYA INVERSIONES FUTURAS R.L. &quot;COMIF R.L.&quot;
+                  COOPERATIVA MAYA INVERSIONES FUTURAS R.L. &quot;COMIF-R.L.&quot;
                 </div>
                 <div style={{ fontSize: "0.92rem", fontWeight: 700, color: "#0284c7", marginTop: "2px" }}>
                   INFORME DE RENDICIÓN Y LIQUIDACIÓN DE GASTOS DE CAJA CHICA
@@ -770,7 +770,7 @@ export default function CajaChicaReporteModal({
             </div>
 
             <div style={{ textAlign: "center", marginTop: "0.65rem", fontSize: "0.68rem", color: "#94a3b8" }}>
-              Sistema Integral COOP COMIF R.L. · Documento Oficial de Control y Liquidación de Caja Chica
+              Sistema Integral COOP COMIF-R.L. · Documento Oficial de Control y Liquidación de Caja Chica
             </div>
 
             {/* ESTILOS ESPECÍFICOS DE IMPRESIÓN PARA 1 SOLA PÁGINA EXACTA SIN PÁGINAS EN BLANCO */}

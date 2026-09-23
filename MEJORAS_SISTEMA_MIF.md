@@ -1248,6 +1248,86 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
   - `MEJORAS_SISTEMA_MIF.md`
   - `00-INDICE.md`
 - **Sincronización Dual:** Downloads ↔ Documents completada.
+---
+
+## 70. Impresión Oficial de Listados y Padrones Completos sin Cortes de Paginación (`AportacionesList.tsx`, `KardexCarteraPromotor.tsx`, `app.css`)
+
+- **Objetivo:** Resolver el problema de impresión en las pantallas con paginación del cliente (ej. Padrón de Aportaciones y Kardex de Cartera), donde al presionar "Imprimir" solo salían en papel los 10 registros visibles de la página 1 en vez de la totalidad de asociados o créditos cargados.
+- **Causa Raíz:**
+  - Para optimizar la navegación en pantalla, el componente React realiza un `.slice((page - 1) * pageSize, page * pageSize)`. Como solo los 10 elementos de la página activa están montados en el árbol DOM, la función `window.print()` del navegador solo captaba y enviaba a la impresora esa porción.
+- **Mejoras Implementadas:**
+  1. **Separación Limpia entre Vista de Pantalla y Vista de Impresión:**
+     - En pantalla (`@media screen`), el usuario sigue disfrutando de la navegación ágil con 10 registros por página, buscador en vivo y botones de paginación fija al pie (`.no-print`).
+     - En impresión (`@media print`):
+       * Se ocultan automáticamente la barra de búsqueda, botones y paginadores (`.screen-toolbar`, `.screen-footer`, `.no-print`).
+       * Se activa un reporte oficial continuo (`.print-only`) que itera sobre **todos** los registros cargados (`(aportaciones ?? [])` o `itemsFiltrados`), imprimiendo los 21 asociados (o los 568 de la base general) sin cortes arbitrarios.
+  2. **Estructura Notarial e Institucional de Impresión en Padrón de Aportaciones:**
+     - Membrete formal: *Asociación Integral Chajulense Va'l Vaq Quyol / Padrón General Oficial de Asociados y Capital Social Aportado*.
+     - Metadatos con fecha y hora exacta de emisión, total de asociados inscritos y filtro activo.
+     - Cintillo de 4 KPIs financieros consolidados (*Capital Social Total, Total Asociados, Aportación Promedio y Estatuto Mínimo Requerido*).
+     - Tabla completa con numeración correlativa consecutiva (1 a N), código de asociado, nombre completo con teléfono, DPI formateado, género, capital aportado, beneficiario completo con parentesco y fecha de ingreso.
+     - Fila de pie de tabla (`<tfoot>`) con el **Total General del Capital Social Aportado** verificado al 100%.
+     - Bloque de 3 firmas oficiales de certificación y legalización (*Presidente Consejo de Administración, Comisión de Vigilancia y Contador General / Gerencia*).
+  3. **Impresión Completa en Kardex de Cartera de Préstamos:**
+     - Reporte oficial que incluye la totalidad de los créditos colocados con saldos vivos, amortizaciones, cuotas y firmas de auditoría de cartera.
+- **Archivos Modificados:**
+  - `frontend/src/pages/AportacionesList.tsx`
+  - `frontend/src/pages/KardexCarteraPromotor.tsx`
+  - `frontend/src/styles/app.css`
+  - `MEJORAS_SISTEMA_MIF.md`
+  - `00-INDICE.md`
+---
+
+## 71. Estandarización Global de Identidad Institucional: `COMIF-R.L.` (`AportacionesList.tsx`, `KardexCarteraPromotor.tsx`, `Login.tsx`, `index.html`, `vite.config.ts`, `ContratoPagareCreditoModal.tsx`, `ReciboCobroCreditoModal.tsx`, `CajaChicaReporteModal.tsx`, `LibroCajaReporteModal.tsx`, `ActaArqueoModal.tsx`, `googleDriveService.ts`)
+
+- **Objetivo:** Retirar cualquier denominación asociativa no oficial (*"ASOCIACIÓN INTEGRAL CHAJULENSE VA'L VAQ QUYOL"*) y reemplazar todas las menciones del acrónimo genérico *"MIF"* por la razón social e institucional oficial **`COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."`** y **`COMIF-R.L.`**.
+- **Cambios Realizados Globalmente:**
+  1. **Membretes de Impresión Oficial y Padrones:**
+     - En `AportacionesList.tsx` y `KardexCarteraPromotor.tsx`:
+       * Encabezado institucional actualizado a: **`COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."`**.
+       * Subtítulo contable actualizado a: *San Gaspar Chajul, El Quiché, Guatemala · Sistema Contable y Financiero COMIF-R.L.*
+       * Firmas de certificación: *Certificación Contable COMIF-R.L.* y *Visto Bueno Oficial COMIF-R.L.*
+  2. **Aplicación Web, Manifiesto PWA y Acceso:**
+     - En `index.html`: `<title>Sistema Integral COMIF-R.L.</title>` y meta-descripción actualizada.
+     - En `vite.config.ts`: Nombre PWA `Sistema Integral COMIF-R.L.` y short name `COMIF-R.L.`.
+     - En `Login.tsx`: Título de acceso `Sistema Integral COMIF-R.L.` y subtítulo institucional.
+     - En `Layout.tsx`: Barra móvil y menú lateral con insignia oficial **`COOP COMIF-R.L.`**.
+  3. **Comprobantes, Contratos y Actas Notariales:**
+     - `ContratoPagareCreditoModal.tsx`: Pagarés libres de protesto, cláusulas de fondeo propio y firmas de representación legal actualizadas a `COOP COMIF-R.L.` y `COMIF-R.L.`.
+     - `ReciboCobroCreditoModal.tsx` y `ReciboMovimientoModal.tsx`: Encabezados y pie de página de comprobantes en caja actualizados a `COOP COMIF-R.L.`.
+     - `CajaChicaReporteModal.tsx` y `LibroCajaReporteModal.tsx`: Membretes, libros de movimientos y exportaciones CSV actualizados a `COMIF-R.L.`.
+     - `ActaArqueoModal.tsx` y `LibroArqueoMensual.tsx`: Actas notariales y sesiones de la Comisión de Vigilancia alineadas a `COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."`.
+  4. **Servicios de Nube y Respaldos:**
+     - En `googleDriveService.ts`: Carpeta principal de almacenamiento en Google Drive estandarizada a `"COMIF_Respaldos"`.
+- **Archivos Modificados:**
+  - `frontend/index.html`
+  - `frontend/vite.config.ts`
+  - `frontend/src/pages/Login.tsx`
+  - `frontend/src/pages/Layout.tsx`
+  - `frontend/src/pages/Tablero.tsx`
+  - `frontend/src/pages/AportacionesList.tsx`
+  - `frontend/src/pages/KardexCarteraPromotor.tsx`
+  - `frontend/src/pages/CreditoSimulador.tsx`
+  - `frontend/src/pages/CreditoForm.tsx`
+  - `frontend/src/pages/CreditoDetail.tsx`
+  - `frontend/src/pages/SocioDetail.tsx`
+  - `frontend/src/pages/LibroArqueoMensual.tsx`
+  - `frontend/src/pages/Auditoria.tsx`
+  - `frontend/src/components/ContratoPagareCreditoModal.tsx`
+  - `frontend/src/components/ReciboCobroCreditoModal.tsx`
+  - `frontend/src/components/CajaChicaReporteModal.tsx`
+  - `frontend/src/components/cajaauxiliar/ActaArqueoModal.tsx`
+  - `frontend/src/components/cajaauxiliar/LibroCajaReporteModal.tsx`
+  - `frontend/src/components/cajaauxiliar/ReciboMovimientoModal.tsx`
+  - `frontend/src/components/cajaauxiliar/DesembolsoCreditoForm.tsx`
+  - `frontend/src/components/cajaauxiliar/CobroCreditoVentanilla.tsx`
+  - `frontend/src/components/cajaauxiliar/NuevoMovimientoForm.tsx`
+  - `frontend/src/types.ts`
+  - `backend/src/services/googleDriveService.ts`
+  - `MEJORAS_SISTEMA_MIF.md`
+  - `00-INDICE.md`
+
+
 
 
 

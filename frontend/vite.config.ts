@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg"],
       manifest: {
-        name: "Sistema Integral MIF",
-        short_name: "MIF",
-        description: "Caja chica, ahorros, aportaciones e ingresos de la Cooperativa MIF",
+        name: "Sistema Integral COMIF-R.L.",
+        short_name: "COMIF-R.L.",
+        description: "Caja chica, ahorros, aportaciones e ingresos de la Cooperativa COMIF-R.L.",
         theme_color: "#1f6f5c",
         background_color: "#eef1ea",
         display: "standalone",

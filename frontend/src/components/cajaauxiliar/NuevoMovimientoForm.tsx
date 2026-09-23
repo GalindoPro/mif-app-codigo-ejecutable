@@ -354,7 +354,7 @@ export default function NuevoMovimientoForm({
         setCategoria("TRASLADO_FONDOS");
         
         const origen = (socio || cuenta) ? "asociado" : "tercero";
-        const nombreQuienEntrego = socio?.nombres || (cuenta as any)?.socio_nombres || beneficiarioFinal || "COMIF R.L.";
+        const nombreQuienEntrego = socio?.nombres || (cuenta as any)?.socio_nombres || beneficiarioFinal || "COMIF-R.L.";
         setBeneficiario(`Traslado-${origen} - ${nombreQuienEntrego} (${bancoCheque})`);
         
         setSocio(null);

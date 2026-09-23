@@ -30,8 +30,8 @@ export default function Login() {
   return (
     <div className="login-wrap">
       <div className="card login-card">
-        <h1>Sistema Integral MIF</h1>
-        <p className="sub">COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."</p>
+        <h1>Sistema Integral COMIF-R.L.</h1>
+        <p className="sub">COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."</p>
 
         {error && <div className="alert error">{error}</div>}
 

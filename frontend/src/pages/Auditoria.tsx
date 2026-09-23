@@ -49,7 +49,7 @@ const CAMPO_LABEL: Record<string, string> = {
   usuario_id: "Usuario", usuario_nombre: "Usuario", creado_por_id: "Creado por",
   cuenta_id: "Cuenta", prestamo_id: "Préstamo", caja_dia_id: "Caja del día",
   caja_movimiento_id: "Movimiento de caja", movimiento_id: "Movimiento",
-  ingreso_comif_id: "Ingreso COMIF", promotor_id: "Promotor", promotor_nombre: "Promotor",
+  ingreso_comif_id: "Ingreso COMIF-R.L.", promotor_id: "Promotor", promotor_nombre: "Promotor",
   estado: "Estado", tipo: "Tipo", fecha: "Fecha", descripcion: "Descripción",
   observaciones: "Observaciones", observaciones_apertura: "Observaciones de apertura",
   motivo: "Motivo", categoria: "Categoría", seccion: "Sección", contador: "Contador",

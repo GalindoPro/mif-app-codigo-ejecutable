@@ -161,7 +161,7 @@ export default function Layout() {
             display: "flex", alignItems: "center", justifyContent: "center",
             fontWeight: 900, fontSize: "0.9rem",
           }}>M</div>
-          <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#ffffff", letterSpacing: "0.02em" }}>COOP COMIF R.L.</span>
+          <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#ffffff", letterSpacing: "0.02em" }}>COOP COMIF-R.L.</span>
         </div>
         <button className="hamburger-btn" onClick={() => setSidebarOpen(true)} title="Abrir Menú">☰</button>
       </div>
@@ -182,7 +182,7 @@ export default function Layout() {
           >
             <div className="sidebar-toggle-logo">M</div>
             <div className="sidebar-toggle-text">
-              <span className="name">COOP COMIF R.L.</span>
+              <span className="name">COOP COMIF-R.L.</span>
               <span className="sub">Maya Inversiones Futuras</span>
             </div>
             <i className="sidebar-chevron">‹</i>

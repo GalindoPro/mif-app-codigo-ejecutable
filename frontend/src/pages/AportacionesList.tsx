@@ -225,8 +225,8 @@ export default function AportacionesList() {
         </div>
       </div>
 
-      {/* TABLA CON SCROLL INTERNO Y CABECERA PEGAJOSA */}
-      <div className="table-scroll-container">
+      {/* TABLA DE PANTALLA CON SCROLL INTERNO Y PAGINACIÓN (SÓLO PANTALLA) */}
+      <div className="table-scroll-container no-print">
         <table className="table-compact">
           <thead>
             <tr>
@@ -325,8 +325,8 @@ export default function AportacionesList() {
         )}
       </div>
 
-      {/* FOOTER FIJO CON PAGINACIÓN */}
-      <div className="screen-footer">
+      {/* FOOTER FIJO CON PAGINACIÓN (SÓLO PANTALLA) */}
+      <div className="screen-footer no-print">
         <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
           Mostrando {aportacionesPaginadas.length} de {totalSocios} asociados · Pág. {page} de {totalPaginas}
         </span>
@@ -349,6 +349,144 @@ export default function AportacionesList() {
           >
             Siguiente →
           </button>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          REPORTE OFICIAL DE IMPRESIÓN COMPLETO (TODOS LOS ASOCIADOS SIN CORTES)
+          ══════════════════════════════════════════════════════════════════════ */}
+      <div className="print-only" style={{ width: "100%", margin: "0", padding: "0" }}>
+        {/* MEMBRETE INSTITUCIONAL OFICIAL */}
+        <div style={{ borderBottom: "2px solid #0f172a", paddingBottom: "6px", marginBottom: "10px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: "11pt", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.5px", color: "#0f172a" }}>
+              COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."
+            </div>
+            <div style={{ fontSize: "9.5pt", fontWeight: 700, color: "#059669", marginTop: "2px" }}>
+              PADRÓN GENERAL OFICIAL DE ASOCIADOS Y CAPITAL SOCIAL APORTADO
+            </div>
+            <div style={{ fontSize: "7.5pt", color: "#475569", marginTop: "2px" }}>
+              San Gaspar Chajul, El Quiché, Guatemala · Sistema Contable y Financiero COMIF-R.L.
+            </div>
+          </div>
+          <div style={{ textAlign: "right", fontSize: "7.5pt", color: "#334155" }}>
+            <div><strong>Emisión:</strong> {new Date().toLocaleDateString("es-GT", { day: "2-digit", month: "2-digit", year: "numeric" })} {new Date().toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}</div>
+            <div><strong>Total Asociados:</strong> {totalSocios} inscritos</div>
+            {q && <div><strong>Filtro aplicado:</strong> "{q}"</div>}
+          </div>
+        </div>
+
+        {/* RESUMEN FINANCIERO OFICIAL */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginBottom: "10px" }}>
+          <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>CAPITAL SOCIAL TOTAL</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#059669", fontFamily: "monospace" }}>{formatoQ(totalCapital)}</div>
+          </div>
+          <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>TOTAL ASOCIADOS</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#1e293b", fontFamily: "monospace" }}>{totalSocios}</div>
+          </div>
+          <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>APORTACIÓN PROMEDIO</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#0284c7", fontFamily: "monospace" }}>{formatoQ(promedioAportacion)}</div>
+          </div>
+          <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>ESTATUTO MIN. REQUERIDO</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#10b981", fontFamily: "monospace" }}>Min. Q 100.00</div>
+          </div>
+        </div>
+
+        {/* TABLA COMPLETA CON TODOS LOS ASOCIADOS REGISTRADOS */}
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "7.5pt", marginBottom: "15px" }}>
+          <thead>
+            <tr style={{ background: "#0f172a", color: "#ffffff" }}>
+              <th style={{ width: "3%", textAlign: "center", padding: "4px 2px", color: "#ffffff" }}>#</th>
+              <th style={{ width: "12%", textAlign: "left", padding: "4px 4px", color: "#ffffff" }}>NO. ASOCIADO</th>
+              <th style={{ width: "22%", textAlign: "left", padding: "4px 4px", color: "#ffffff" }}>NOMBRES Y APELLIDOS</th>
+              <th style={{ width: "14%", textAlign: "left", padding: "4px 4px", color: "#ffffff" }}>DPI</th>
+              <th style={{ width: "5%", textAlign: "center", padding: "4px 2px", color: "#ffffff" }}>GÉN</th>
+              <th style={{ width: "12%", textAlign: "right", padding: "4px 4px", color: "#ffffff" }}>CAPITAL (Q)</th>
+              <th style={{ width: "20%", textAlign: "left", padding: "4px 4px", color: "#ffffff" }}>BENEFICIARIO</th>
+              <th style={{ width: "12%", textAlign: "center", padding: "4px 4px", color: "#ffffff" }}>INGRESO</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(aportaciones ?? []).map((a, index) => (
+              <tr key={a.socio_id} style={{ background: index % 2 === 0 ? "#ffffff" : "#f8fafc" }}>
+                <td style={{ textAlign: "center", border: "1px solid #cbd5e1", padding: "3px 2px" }}>
+                  {index + 1}
+                </td>
+                <td style={{ border: "1px solid #cbd5e1", padding: "3px 4px", fontFamily: "monospace", fontWeight: 700 }}>
+                  {a.numero_asociado}
+                </td>
+                <td style={{ border: "1px solid #cbd5e1", padding: "3px 4px" }}>
+                  <div style={{ fontWeight: 600 }}>{a.nombres}</div>
+                  {a.telefono && <div style={{ fontSize: "6.5pt", color: "#64748b" }}>Tel: {a.telefono}</div>}
+                </td>
+                <td style={{ border: "1px solid #cbd5e1", padding: "3px 4px", fontFamily: "monospace" }}>
+                  {a.dpi ? formatearDPI(a.dpi) : "—"}
+                </td>
+                <td style={{ textAlign: "center", border: "1px solid #cbd5e1", padding: "3px 2px", fontWeight: 700 }}>
+                  {a.genero || "—"}
+                </td>
+                <td style={{ textAlign: "right", border: "1px solid #cbd5e1", padding: "3px 4px", fontFamily: "monospace", fontWeight: 700, color: "#059669" }}>
+                  {formatoQ(a.total_aportaciones)}
+                </td>
+                <td style={{ border: "1px solid #cbd5e1", padding: "3px 4px" }}>
+                  <div style={{ fontWeight: 600 }}>{a.nombre_beneficiario || "—"}</div>
+                  {a.parentesco_beneficiario && (
+                    <div style={{ fontSize: "6.5pt", color: "#64748b" }}>
+                      Parentesco: {a.parentesco_beneficiario}
+                      {a.telefono_beneficiario ? ` · Tel: ${a.telefono_beneficiario}` : ""}
+                    </div>
+                  )}
+                </td>
+                <td style={{ textAlign: "center", border: "1px solid #cbd5e1", padding: "3px 4px", fontFamily: "monospace" }}>
+                  {formatearFechaCorta(a.fecha_ingreso)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr style={{ background: "#e2e8f0", fontWeight: "bold" }}>
+              <td colSpan={5} style={{ border: "1px solid #94a3b8", padding: "5px", textAlign: "right", fontWeight: 800 }}>
+                TOTAL GENERAL CAPITAL SOCIAL APORTADO ({totalSocios} ASOCIADOS):
+              </td>
+              <td style={{ border: "1px solid #94a3b8", padding: "5px", textAlign: "right", fontFamily: "monospace", fontWeight: 800, color: "#059669", fontSize: "8.5pt" }}>
+                {formatoQ(totalCapital)}
+              </td>
+              <td colSpan={2} style={{ border: "1px solid #94a3b8", padding: "5px", textAlign: "center", color: "#475569", fontSize: "7pt" }}>
+                100% Verificado Conforme Estatuto
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+
+        {/* BLOQUE DE FIRMAS OFICIALES DE LEGALIZACIÓN */}
+        <div style={{ pageBreakInside: "avoid", breakInside: "avoid", marginTop: "24px", paddingTop: "8px" }}>
+          <div style={{ fontSize: "7pt", fontStyle: "italic", textAlign: "center", color: "#64748b", marginBottom: "20px" }}>
+            El suscrito certifica que el presente Padrón de Asociados y Capital Social refleja fielmente los registros contables y estatutarios de la institución al día de hoy.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px", textAlign: "center" }}>
+            <div>
+              <div style={{ borderTop: "1px solid #000", margin: "0 10px", paddingTop: "4px", fontSize: "7.5pt", fontWeight: 700 }}>
+                Presidente
+              </div>
+              <div style={{ fontSize: "6.5pt", color: "#475569" }}>Consejo de Administración</div>
+            </div>
+            <div>
+              <div style={{ borderTop: "1px solid #000", margin: "0 10px", paddingTop: "4px", fontSize: "7.5pt", fontWeight: 700 }}>
+                Comisión de Vigilancia
+              </div>
+              <div style={{ fontSize: "6.5pt", color: "#475569" }}>Fiscalización Interna</div>
+            </div>
+            <div>
+              <div style={{ borderTop: "1px solid #000", margin: "0 10px", paddingTop: "4px", fontSize: "7.5pt", fontWeight: 700 }}>
+                Contador General / Gerencia
+              </div>
+              <div style={{ fontSize: "6.5pt", color: "#475569" }}>Certificación Contable COMIF-R.L.</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -98,13 +98,13 @@ async function getOrCreateFolder(drive: drive_v3.Drive, folderName: string, pare
 }
 
 /**
- * Sube un archivo PDF a la nube en una subcarpeta específica dentro de "MIF_Respaldos".
+ * Sube un archivo PDF a la nube en una subcarpeta específica dentro de "COMIF_Respaldos".
  */
 export async function uploadPdfToDrive(usuarioId: string, base64Data: string, fileName: string, subfolderName: string) {
   const drive = await getUserDrive(usuarioId);
   
-  // 1. Obtener/Crear la carpeta principal "MIF_Respaldos"
-  const rootFolderId = await getOrCreateFolder(drive, "MIF_Respaldos");
+  // 1. Obtener/Crear la carpeta principal "COMIF_Respaldos"
+  const rootFolderId = await getOrCreateFolder(drive, "COMIF_Respaldos");
   
   // 2. Obtener/Crear la subcarpeta
   const destFolderId = await getOrCreateFolder(drive, subfolderName, rootFolderId);

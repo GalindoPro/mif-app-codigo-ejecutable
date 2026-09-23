@@ -525,7 +525,7 @@ export interface CuotaAmortizacion {
 export type OrigenFondos = "FONDOS_PROPIOS" | "FEDERURAL" | "CHN_GUATEMALA";
 
 export const ORIGEN_FONDOS_LABEL: Record<OrigenFondos, string> = {
-  FONDOS_PROPIOS: "Fondos Propios (COOP COMIF R.L.)",
+  FONDOS_PROPIOS: "Fondos Propios (COOP COMIF-R.L.)",
   FEDERURAL: "FEDERURAL",
   CHN_GUATEMALA: "CHN - Guatemala",
 };
