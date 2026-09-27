@@ -27,6 +27,8 @@ import LibroArqueoMensual from "./pages/LibroArqueoMensual";
 import Auditoria from "./pages/Auditoria";
 import Alertas from "./pages/Alertas";
 import Sesiones from "./pages/Sesiones";
+import TrasladosInterAgencia from "./pages/TrasladosInterAgencia";
+
 import { useAuth } from "./context/AuthContext";
 
 function InicioRedirect() {
@@ -82,6 +84,8 @@ export default function App() {
           <Route path="/auditoria" element={<Auditoria />} />
           <Route path="/alertas" element={<Alertas />} />
           <Route path="/sesiones" element={<Sesiones />} />
+          <Route path="/traslados" element={<TrasladosInterAgencia />} />
+
         </Route>
         <Route path="*" element={<InicioRedirect />} />
       </Routes>

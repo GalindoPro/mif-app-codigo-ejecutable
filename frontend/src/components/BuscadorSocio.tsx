@@ -4,10 +4,12 @@ import type { Socio } from "../types";
 
 export default function BuscadorSocio({
   agenciaId,
+  permitirInterAgencia = false,
   seleccionado,
   onSeleccionar,
 }: {
   agenciaId?: string;
+  permitirInterAgencia?: boolean;
   seleccionado: Socio | null;
   onSeleccionar: (socio: Socio | null) => void;
 }) {
@@ -23,11 +25,24 @@ export default function BuscadorSocio({
     }
     const timeout = setTimeout(() => {
       api
-        .get<{ data: Socio[] }>("/socios", { params: { q, pageSize: 8, estado: "ACTIVO" } })
-        .then(({ data }) => setResultados(data.data.filter((s) => !agenciaId || s.agencia_id === agenciaId)));
+        .get<{ data: Socio[] }>("/socios", {
+          params: {
+            q,
+            pageSize: 8,
+            estado: "ACTIVO",
+            interAgencia: permitirInterAgencia ? "true" : undefined,
+          },
+        })
+        .then(({ data }) => {
+          if (permitirInterAgencia) {
+            setResultados(data.data);
+          } else {
+            setResultados(data.data.filter((s) => !agenciaId || s.agencia_id === agenciaId));
+          }
+        });
     }, 250);
     return () => clearTimeout(timeout);
-  }, [q, agenciaId]);
+  }, [q, agenciaId, permitirInterAgencia]);
 
   useEffect(() => {
     function onClickFuera(e: MouseEvent) {
@@ -38,11 +53,27 @@ export default function BuscadorSocio({
   }, []);
 
   if (seleccionado) {
+    const esInterAgencia = Boolean(agenciaId && seleccionado.agencia_id && seleccionado.agencia_id !== agenciaId);
     return (
       <div className="socio-chip">
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
           <strong>{seleccionado.nombres}</strong>
           <span className="mono"> · {seleccionado.numero_asociado}</span>
+          {esInterAgencia && (
+            <span
+              className="badge"
+              style={{
+                background: "rgba(147, 51, 234, 0.15)",
+                color: "#c084fc",
+                border: "1px solid rgba(147, 51, 234, 0.4)",
+                fontSize: "0.72rem",
+                fontWeight: 700,
+                padding: "0.15rem 0.5rem",
+              }}
+            >
+              🔄 Inter-Agencia: {seleccionado.agencia_nombre || seleccionado.agencia_codigo}
+            </span>
+          )}
         </div>
         <button type="button" className="link-btn" onClick={() => onSeleccionar(null)}>
           Cambiar
@@ -54,7 +85,7 @@ export default function BuscadorSocio({
   return (
     <div className="buscador-socio" ref={cajaRef}>
       <input
-        placeholder="Escribe el nombre o número de asociado…"
+        placeholder={permitirInterAgencia ? "Escribe el nombre, DPI o número de asociado (búsqueda inter-agencia)…" : "Escribe el nombre o número de asociado…"}
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
@@ -64,21 +95,42 @@ export default function BuscadorSocio({
       />
       {abierto && resultados.length > 0 && (
         <ul className="buscador-dropdown">
-          {resultados.map((s) => (
-            <li key={s.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  onSeleccionar(s);
-                  setAbierto(false);
-                  setQ("");
-                }}
-              >
-                <span>{s.nombres}</span>
-                <span className="mono">{s.numero_asociado}</span>
-              </button>
-            </li>
-          ))}
+          {resultados.map((s) => {
+            const esOtraAgencia = Boolean(agenciaId && s.agencia_id && s.agencia_id !== agenciaId);
+            return (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSeleccionar(s);
+                    setAbierto(false);
+                    setQ("");
+                  }}
+                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <span>{s.nombres}</span>
+                    {esOtraAgencia && (
+                      <span
+                        style={{
+                          fontSize: "0.68rem",
+                          background: "rgba(147, 51, 234, 0.12)",
+                          color: "#c084fc",
+                          border: "1px solid rgba(147, 51, 234, 0.35)",
+                          padding: "0.1rem 0.4rem",
+                          borderRadius: "4px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        🔄 {s.agencia_nombre || s.agencia_codigo}
+                      </span>
+                    )}
+                  </div>
+                  <span className="mono">{s.numero_asociado}</span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
       {abierto && q.length >= 2 && resultados.length === 0 && (

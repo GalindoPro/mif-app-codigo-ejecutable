@@ -16,6 +16,33 @@ export interface Agencia {
   activa: boolean;
 }
 
+export interface Traslado {
+  id: string;
+  socio_id: string;
+  socio_nombre: string;
+  numero_asociado: string;
+  socio_dpi: string | null;
+  agencia_origen_id: string;
+  agencia_origen_nombre: string;
+  agencia_origen_codigo: string;
+  agencia_destino_id: string;
+  agencia_destino_nombre: string;
+  agencia_destino_codigo: string;
+  solicitado_por_id: string;
+  solicitado_por_nombre: string;
+  solicitado_por_rol: string;
+  aprobado_por_id: string | null;
+  aprobado_por_nombre: string | null;
+  estado: "PENDIENTE" | "APROBADO" | "RECHAZADO";
+  motivo: string;
+  notas_admin: string | null;
+  fecha_solicitud: string;
+  fecha_resolucion: string | null;
+  tiene_credito_activo: boolean;
+  tiene_saldo_ahorro: boolean;
+  created_at: string;
+}
+
 export interface Socio {
   id: string;
   numero_asociado: string;

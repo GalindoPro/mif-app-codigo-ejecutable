@@ -20,6 +20,8 @@ export default function AhorroList() {
   useEffect(() => {
     if (!config) return;
     setCuentas(null);
+    setResumen(null);
+    setError(null);
     setPage(1);
     const timeout = setTimeout(() => {
       api

@@ -1564,3 +1564,209 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
   - `frontend/src/pages/Tablero.tsx`
   - `MEJORAS_SISTEMA_MIF.md`
   - `00-INDICE.md`
+
+---
+
+## 81. Fase 5: Importación Oficial de Ingresos COMIF y Cartera de Créditos — Cuadre Exacto al Centavo (Q 2,010,110.11)
+
+**Objetivo:** Migrar el libro diario de Ingresos COMIF de Julio y Agosto 2026 (514 partidas contables) y estructurar la cartera de créditos activos con su historial de amortizaciones.
+
+**Archivos fuente:**
+- `importar/ingresos/INGRESOS COMIF CHAJUL 31-07-26.xlsx` — Julio 2026 / 260 partidas / Q 1,107,588.54
+- `importar/ingresos/INGRESOS COMIF CHAJUL 31-08-26.xlsx` — Agosto 2026 / 254 partidas / Q 902,521.57
+
+**Reglas de Negocio Aplicadas:**
+1. **Clasificación 1:1 de 9 Categorías COMIF:** ABONO_PRESTAMO, INTERES_PRESTAMO, COMISION_PRESTAMO, ABONO_PRESTAMO_FIDUCIARIO, INTERES_FIDUCIARIO, MORA_PRESTAMO, APORTACION_VOLUNTARIA, CUOTA_INGRESO, INGRESO_VARIO. Mapeo directo por columna Excel.
+2. **Corrección de Tipografías en Nombres:** Mapa `TYPO_MAP` para 5 variantes detectadas en el archivo original.
+3. **Búsqueda Inteligente de Socios:** Coincidencia exacta primero; si falla, coincidencia parcial por ≥2 palabras con >3 caracteres contra los 691 socios registrados.
+4. **Cartera de Créditos Activos:** 121 socios identificados con créditos. Capital estimado por fórmula `interés / tasa` redondeado a múltiplos de Q500. Estado: DESEMBOLSADO / FIDUCIARIO / CUOTA_NIVELADA al 2% mensual.
+5. **Historial de Amortizaciones:** 197 recibos de pago registrados en `prestamo_pagos` con desglose: Abono Capital Q1,065,704.50 / Intereses Q858,970.71 / Mora Q17,218.68.
+6. **Optimización Batch para Supabase:** Migración de inserciones individuales a batch con `unnest()` — de ~830 queries a 5 queries, eliminando timeouts en la conexión remota vía pgBouncer.
+
+**Cuadre Contable Final:**
+| Categoría | Partidas | Q |
+|---|---|---|
+| ABONO_PRESTAMO | 161 | 1,041,819.88 |
+| INTERES_PRESTAMO | 171 | 855,301.20 |
+| COMISION_PRESTAMO | 23 | 63,391.22 |
+| ABONO_PRESTAMO_FIDUCIARIO | 25 | 23,884.62 |
+| MORA_PRESTAMO | 40 | 17,218.68 |
+| INTERES_FIDUCIARIO | 25 | 3,669.51 |
+| APORTACION_VOLUNTARIA | 32 | 3,200.00 |
+| CUOTA_INGRESO | 32 | 1,600.00 |
+| INGRESO_VARIO | 5 | 25.00 |
+| **TOTAL** | **514** | **2,010,110.11 ✅** |
+
+**Diferencia: Q 0.00 — CUADRE EXACTO AL CENTAVO**
+
+**Archivos Modificados:**
+- `backend/src/db/importar-ingresos-creditos.ts` (nuevo + optimizado con batch inserts)
+- `MEJORAS_SISTEMA_MIF.md`
+- `00-INDICE.md`
+
+---
+
+## 82. Fase 6: Importación del Libro de Caja General y Arqueos Históricos — Cuadre Exacto (Q 11,220,843.10 / Q 11,161,637.59)
+
+**Objetivo:** Migrar el auxiliar de caja de la Agencia Chajul (Enero–Julio 2026) y los 10 arqueos históricos (2023–2026) desde el archivo `integracionesCaja COMIF CHAJUL 31-07-2026.xlsx`.
+
+**Archivos fuente:**
+- `importar/integracionesCaja COMIF CHAJUL 31-07-2026.xlsx`
+  - Hoja: `LIBRO DE CAJA (2)` — 2,627 movimientos 2026
+  - Hojas: 10 arqueos históricos (Nov 2023 – Abr 2026)
+
+**Reglas de Negocio:**
+1. **Mapeo de 20 descripciones Excel a tipos internos:** DEPOSITO_AHORRO, RETIRO_AHORRO, RETIRO_PLAZO_FIJO, ABONO_HIPOTECARIO, ABONO_FIDUCIARIO, INTERES_HIPOTECARIO, INTERES_FIDUCIARIO, MORA_PRESTAMO, COMISION_PRESTAMO, DESEMBOLSO_CREDITO, APORTACION_ORDINARIA, CUOTA_INGRESO, GASTO_ADMINISTRATIVO, GASTO_CAJA_CHICA, SERVICIO_BANCARIO.
+2. **Creación de tablas nuevas:** `movimientos_caja` con índices por agencia/fecha/tipo_interno. `arqueos_caja` con saldo inicial, ingresos, egresos, depósitos y saldo final.
+3. **Batch insert con unnest():** 2,627 movimientos + 10 arqueos en 2 queries.
+4. **Filtrado exclusivo 2026:** Solo se procesan filas con `Año = 2026`.
+
+**Cuadre Contable Final:**
+- Total Ingresos en Caja: **Q 11,220,843.10 ✅ Cuadre exacto**
+- Total Egresos en Caja:  **Q 11,161,637.59 ✅ Cuadre exacto**
+- Arqueos históricos: **10 registros importados**
+
+**Archivos Creados:**
+- `backend/src/db/importar-caja-general.ts` (nuevo)
+- Tabla nueva: `movimientos_caja`
+- Tabla nueva: `arqueos_caja`
+
+---
+
+## 83. Fase 7: Módulo de Traslados Inter-Agencia (CHAJUL ↔ NEBAJ ↔ ACUL)
+
+**Objetivo:** Implementar el flujo completo de solicitud, revisión y aprobación/rechazo de traslados de asociados entre las 3 agencias del sistema (Chajul, Nebaj, Acul).
+
+**Reglas de Negocio Implementadas:**
+1. **Restricción de crédito activo:** No se puede aprobar un traslado si el socio tiene préstamo con estado `DESEMBOLSADO`. El sistema detecta el crédito automáticamente al crear la solicitud y bloquea la aprobación si persiste.
+2. **Traslado histórico completo:** Al aprobar, todas las cuentas de ahorro del socio se reasignan automáticamente a la agencia destino (campo `agencia_id` en `cuentas` y `socios`).
+3. **Permisos por rol:** Solo `SUPERVISOR` (de la agencia de origen), `GERENCIA` o `ADMIN` pueden aprobar/rechazar. El cajero/promotor solo puede solicitar.
+4. **Anti-duplicados:** No puede haber dos traslados `PENDIENTE` para el mismo socio simultáneamente.
+5. **Motivo obligatorio al rechazar:** El sistema exige una justificación escrita para los rechazos (auditoría).
+
+**Componentes Creados:**
+- **Backend:** `backend/src/modules/traslados/service.ts` + `routes.ts`
+- **BD:** Tabla `traslados` con índices en `socio_id`, `estado`, `agencia_origen_id`, `agencia_destino_id`
+- **Frontend:** `frontend/src/pages/TrasladosInterAgencia.tsx`
+  - KPIs: Pendientes, Aprobados, Rechazados, Total
+  - Tabla con filtros por estado y búsqueda libre
+  - Modal de nueva solicitud con búsqueda de socios en tiempo real
+  - Modal de aprobación/rechazo con validaciones
+- **Tipo:** `Traslado` añadido a `frontend/src/types.ts`
+- **Menú:** Enlace 🔀 en sección Administración del Sidebar
+- **Ruta:** `/traslados` registrada en `App.tsx`
+
+---
+
+## 84. Corrección de Enum `APORTACION_INFANTIL` en Backend y Soporte Integral en Vistas de Cuentas
+
+**Objetivo:** Solucionar el error de validación `Invalid enum value. Expected 'AHORRO_CORRIENTE' | ... | 'APORTACION', received 'APORTACION_INFANTIL'` presentado en la ruta `/ahorros/aportacion-infantil` y sincronizar el soporte de titulares menores para este tipo de aportación estatutaria inicial.
+
+**Archivos Modificados:**
+- `backend/src/modules/cuentas/routes.ts`:
+  - Se agregó `"APORTACION_INFANTIL"` a la constante de validación `TIPOS` (`z.enum(TIPOS)`).
+  - Se amplió la regla de validación de titular menor en `crearSchema` para exigir datos de menor titular tanto para `AHORRO_INFANTO_JUVENIL` como para `APORTACION_INFANTIL`.
+- `backend/src/modules/cuentas/service.ts`:
+  - Se agregó validación completa de fecha de nacimiento, edad (<18 años) y parentesco en `crear()` para `APORTACION_INFANTIL`.
+  - Se exoneró `APORTACION_INFANTIL` de la regla de requerir saldo previo de aportación >= Q100 (al ser ella misma una aportación).
+  - Se habilitó la persistencia de `titular_menor_nombre`, `titular_menor_parentesco`, `titular_menor_cui` y `titular_menor_fecha_nacimiento` al registrar cuentas de aportación infantil.
+- `backend/src/modules/traslados/routes.ts`:
+  - Corrección de tipo en autenticación: uso correcto de `req.user!.agenciaId` en lugar de `agencia_id`.
+- `frontend/src/pages/AhorroList.tsx`:
+  - Reseteo proactivo de estados de `resumen` y `error` al cambiar de slug/producto de ahorro para evitar retención de datos en caché entre pestañas.
+- `frontend/src/pages/AhorroCuentaForm.tsx`:
+  - Habilitación de campos de titular menor y validación de edad cuando se selecciona `APORTACION_INFANTIL`.
+  - Excepción de saldo previo de aportación al aperturar cuentas de aportación.
+- `frontend/src/pages/AhorroCuentaDetail.tsx`:
+  - Visualización del bloque de información del menor titular (nombre, parentesco, CUI, edad) también para `APORTACION_INFANTIL`.
+- `frontend/src/pages/SocioDetail.tsx`:
+  - Integración de `APORTACION_INFANTIL` en mapas de etiquetas (`TIPO_CUENTA_LABEL`) y slugs de navegación (`TIPO_SLUG`), permitiendo acceder directamente a la cuenta del menor.
+  - Reconocimiento de `APORTACION_INFANTIL` en la verificación de aportación estatutaria del asociado.
+
+**Resultado:**
+- Acceso inmediato y sin errores a `/ahorros/aportacion-infantil`.
+- Carga de los 2 registros reales migrados con su saldo total captado (Q 200.00).
+- Flujo de alta de nuevas cuentas de aportación infantil 100% operativo con validaciones de minoridad y auditoría.
+
+---
+
+## 85. Fase 8: Ventanilla Multi-Agencia e Inter-Agencia (Operaciones Cruzadas CHAJUL ↔ NEBAJ ↔ ACUL con Recibo Dual)
+
+**Objetivo:** Permitir que los asociados pertenecientes a cualquiera de las 3 agencias de la cooperativa (Chajul, Nebaj, Acul) puedan realizar depósitos, retiros y pagos de cuotas de créditos en cualquier ventanilla de cualquier agencia, registrando el flujo de efectivo en la gaveta física de la agencia que atiende y acreditando la cuenta o crédito en su agencia de origen con emisión de recibo dual legal.
+
+**Reglas de Negocio Implementadas:**
+1. **Búsqueda e Identificación Inter-Agencia:** Los componentes `BuscadorSocio` y `BuscadorCuenta` ahora admiten el parámetro opcional `permitirInterAgencia`. Cuando el asociado o la cuenta pertenece a una agencia distinta a la del cajero activo, se despliega una insignia destacada `🔄 Inter-Agencia: {Nombre Agencia}` tanto en la lista desplegable de resultados como en el chip seleccionado.
+2. **Afectación de la Gaveta Local del Cajero:** El dinero en efectivo ingresa o sale de la gaveta de la agencia donde el cajero opera físicamente (`dia.agencia_id`), manteniendo el cuadre diario de caja exacto y sin desfasar libros contables locales.
+3. **Amortización y Acreditación al Producto en Agencia de Origen:** La cuenta de ahorro o crédito se amortiza correctamente sin error `403 Forbidden` mediante el bypass controlado `permitirInterAgencia` en `cuentas/service.ts`, `cuentas/routes.ts` y `cajaauxiliar/service.ts`.
+4. **Trazabilidad y Recibo Dual Legal:**
+   - La tabla `caja_movimientos_auxiliar` y `prestamo_pagos` registran el nuevo campo `agencia_origen_id` (`UUID REFERENCES agencias(id)`).
+   - Los recibos oficiales de ventanilla (`ReciboCobroCreditoModal` y `ReciboMovimientoModal`) despliegan con claridad jurídica ambas agencias:
+     - **Agencia de Operación:** Agencia física donde se procesa la transacción (ej. Nebaj).
+     - **Agencia de Origen:** Agencia a la que pertenece el socio o crédito (ej. Chajul).
+5. **Auditoría y Anotaciones Contables:** Las descripciones de los movimientos de caja incorporan automáticamente la etiqueta `(Inter-Agencia: Cuenta de {agencia_nombre})` para total transparencia en auditorías, sábanas de cierres y arqueos.
+
+**Archivos Modificados:**
+- **Base de Datos:**
+  - `ALTER TABLE caja_movimientos_auxiliar ADD COLUMN IF NOT EXISTS agencia_origen_id UUID REFERENCES agencias(id);`
+  - `ALTER TABLE prestamo_pagos ADD COLUMN IF NOT EXISTS agencia_origen_id UUID REFERENCES agencias(id);`
+- **Backend:**
+  - `backend/src/modules/cuentas/service.ts`: Parámetro `permitirInterAgencia` en `registrarMovimientoConClient`, inclusión de `agencia_nombre` y `agencia_codigo` en `listar`.
+  - `backend/src/modules/cuentas/routes.ts`: Soporte de `interAgencia: true` y filtro `socioId` para consulta entre agencias.
+  - `backend/src/modules/prestamos/routes.ts`: Admite `interAgencia: true` o `socioId` para consultar créditos de cualquier agencia.
+  - `backend/src/modules/socios/routes.ts`: Admite `interAgencia: true` para búsqueda de asociados en cualquier agencia.
+  - `backend/src/modules/cajaauxiliar/service.ts`: `crearMovimiento` y `cobroCuota` adaptados para registrar `agencia_origen_id`, omitir restricción cruzada de agencia y devolver datos duales en recibo.
+- **Frontend:**
+  - `frontend/src/components/BuscadorSocio.tsx`: Soporte de `permitirInterAgencia`, badge `🔄 Inter-Agencia` en opciones y chip seleccionado.
+  - `frontend/src/components/BuscadorCuenta.tsx`: Soporte de `permitirInterAgencia`, badge `🔄 Inter-Agencia`.
+  - `frontend/src/components/cajaauxiliar/NuevoMovimientoForm.tsx`: Habilitado `permitirInterAgencia={true}` para depósitos y retiros.
+  - `frontend/src/components/cajaauxiliar/CobroCreditoVentanilla.tsx`: Habilitado `permitirInterAgencia={true}`, aviso morado de operación inter-agencia y apertura automática de `ReciboCobroCreditoModal`.
+
+**Resultado:**
+- Cajeros en Nebaj o Acul pueden cobrar cuotas de créditos y recibir depósitos para socios de Chajul.
+- Cuadre de caja local 100% exacto en la agencia operadora.
+- Saldos de crédito y ahorros amortizados al centavo en la agencia de origen.
+- Recibos impresos con validez notarial y trazabilidad multi-agencia.
+
+---
+
+## 86. Fase 9: Importación Oficial del Libro de Caja Chica Histórico de Agencia Chajul (Enero–Julio 2026) y Cuadre Matemático Exacto (Q 51,586.37 / Q 48,586.37 / Q 3,000.00)
+
+**Objetivo:** Migrar los 257 comprobantes históricos reales del libro oficial `caja/Caja Chica 30-07-2026.xlsx` de la Agencia Chajul correspondientes al período Enero a Julio 2026, cuadrando al centavo los gastos operativos por categoría contable, las reposiciones de fondo fijo mediante cheque institucional y el saldo remanente oficial.
+
+**Archivos Fuente y Reglas de Negocio Aplicadas:**
+- **Archivo fuente:** `caja/Caja Chica 30-07-2026.xlsx` (Hoja: `Caja Chica`).
+- **Apertura de Fondo Fijo 2026:** Asignación inicial de Q 2,000.00 al 2026-01-01 con documento `APERTURA-2026` a nombre de la cooperativa.
+- **Clasificación Contable Automática en 10 Categorías Estatutarias:**
+  1. `CAFETERIA_LIMPIEZA`: Q 13,876.00 (56 compras de café tostado a Asociación Chajulense, almuerzos de personal y vigilancia, toallas, insumos de limpieza).
+  2. `COMBUSTIBLES_LUBRICANTES`: Q 12,109.97 (92 facturas DTE de gasolineras Maranatha, Campo Alegre, América y Río Azul para supervisión de garantías en Ilom, Chel y traslados oficiales).
+  3. `INTERNET`: Q 5,095.00 (Servicios de conectividad con Asociación Filantropis).
+  4. `GASTOS_DIVERSOS`: Q 4,989.80 (Gastos de operación, viáticos y gestiones varias).
+  5. `SUMINISTROS_OFICINA`: Q 4,642.60 (26 comprobantes de librería Yeshua: papel bond, folders manila, engrapadoras, clips, tóner).
+  6. `TELEFONO`: Q 3,533.00 (15 pagos de telefonía móvil e institucional a Comunicaciones Celulares / Tigo).
+  7. `ENERGIA_ELECTRICA`: Q 1,569.00 (11 recibos de fluido eléctrico Deocsa / Energuate de la agencia).
+  8. `COMISIONES_GASTOS`: Q 1,331.00 (Honorarios legales notariales por contratos de mutuo hipotecario y arrendamiento de parqueo).
+  9. `REPARACION_MANTENIMIENTO`: Q 1,140.00 (Mantenimiento de planta eléctrica por cortes de luz y tablas para remodelación de agencia).
+  10. `FLETES_ACARREO`: Q 300.00 (Transporte de directivos para licitamiento de asociados).
+- **Reposiciones de Fondo Fijo:** 26 cheques institucionales oficiales (No. CH 615, 616, 3360, 3369, 3374, 3375, etc.) emitidos a favor de la encargada de caja chica por un monto acumulado de Q 49,586.37.
+- **Incremento Estatutario de Fondo Fijo:** Reflejo del incremento de fondo fijo en Mayo 2026 de Q 2,000.00 a Q 3,000.00.
+
+**Cuadre Contable y Conciliación Exacta en Base de Datos:**
+| Concepto | Monto en Quetzales (Q) | Diferencia con Excel |
+|---|---|:---:|
+| **Fondo Inicial de Apertura (2026-01-01)** | Q 2,000.00 | Q 0.00 |
+| **Reposiciones con Cheque (26 cheques)** | Q 49,586.37 | Q 0.00 |
+| **Total Ingresos en Caja Chica** | **Q 51,586.37** | **Q 0.00 ✅** |
+| **Total Egresos en Gastos Operativos (230 facturas DTE)** | **Q 48,586.37** | **Q 0.00 ✅** |
+| **Saldo Final Disponible en Caja Chica al 30/07/2026** | **Q 3,000.00** | **Q 0.00 ✅** |
+
+**Archivos Creados y Modificados:**
+- `backend/src/db/importar-caja-chica.ts` (nuevo script de importación con batch insert y validación de cuadre)
+- `backend/package.json` (comando registrado: `npm run db:importar:caja-chica`)
+- `MEJORAS_SISTEMA_MIF.md`
+- `00-INDICE.md`
+
+**Resultado:**
+- El módulo de Caja Chica (`/caja-chica`) en la interfaz web despliega de inmediato los 257 comprobantes históricos de Chajul.
+- Las tarjetas de KPIs, filtros de búsqueda, gráficos de gastos por categoría y la vista de Rendición de Gastos (`CajaChicaReporteView`) reflejan los datos exactos del libro oficial.
+- La diferencia contable final es **Q 0.00** exacta al centavo.
+

@@ -77,7 +77,7 @@ export default function AhorroCuentaDetail() {
         </div>
       </div>
 
-      {cuenta.tipo === "AHORRO_INFANTO_JUVENIL" && (
+      {(cuenta.tipo === "AHORRO_INFANTO_JUVENIL" || cuenta.tipo === "APORTACION_INFANTIL") && (
         <div
           style={{
             background: "rgba(14, 165, 233, 0.08)",

@@ -29,6 +29,7 @@ export async function listar(params: {
   tipo: TipoCuentaAhorro;
   agenciaId: string | null;
   q?: string;
+  socioId?: string;
 }) {
   const condiciones = ["c.tipo = $1"];
   const valores: unknown[] = [params.tipo];
@@ -36,6 +37,10 @@ export async function listar(params: {
   if (params.agenciaId) {
     valores.push(params.agenciaId);
     condiciones.push(`c.agencia_id = $${valores.length}`);
+  }
+  if (params.socioId) {
+    valores.push(params.socioId);
+    condiciones.push(`c.socio_id = $${valores.length}`);
   }
   if (params.q) {
     valores.push(`%${params.q.toLowerCase()}%`);
@@ -45,10 +50,12 @@ export async function listar(params: {
 
   const { rows } = await pool.query(
     `select c.*, s.nombres as socio_nombres, s.numero_asociado,
+            a.nombre as agencia_nombre, a.codigo as agencia_codigo,
             p.codigo as prestamo_codigo, p.estado as prestamo_estado,
             coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
      from cuentas c
      join socios s on s.id = c.socio_id
+     join agencias a on a.id = c.agencia_id
      left join prestamos p on p.id = c.prestamo_id
      left join saldos_cuenta sc on sc.cuenta_id = c.id
      where ${condiciones.join(" and ")}
@@ -148,7 +155,7 @@ export interface DatosCuenta {
 }
 
 export async function crear(data: DatosCuenta, usuarioId: string) {
-  if (data.tipo === "AHORRO_INFANTO_JUVENIL") {
+  if (data.tipo === "AHORRO_INFANTO_JUVENIL" || data.tipo === "APORTACION_INFANTIL") {
     if (!data.titularMenorNombre || !data.titularMenorNombre.trim()) {
       throw badRequest("Debes indicar el nombre completo del menor titular de la cuenta.");
     }
@@ -179,25 +186,27 @@ export async function crear(data: DatosCuenta, usuarioId: string) {
     }
     if (edad >= 18) {
       throw badRequest(
-        `Titular mayor de edad (${edad} años): Las cuentas de Ahorro Infanto Juvenil son exclusivas para menores de 18 años.`
+        `Titular mayor de edad (${edad} años): Las cuentas Infanto Juveniles son exclusivas para menores de 18 años.`
       );
     }
   }
 
   return withTransaction(async (client) => {
-    const { rows: aporRows } = await client.query(
-      `select coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_aportacion
-       from cuentas c
-       left join saldos_cuenta sc on sc.cuenta_id = c.id
-       where c.socio_id = $1 and c.tipo = 'APORTACION' and c.estado = 'ACTIVA'
-       limit 1`,
-      [data.socioId],
-    );
-    const saldoApor = aporRows[0] ? Number(aporRows[0].saldo_aportacion) : 0;
-    if (saldoApor < 100) {
-      throw badRequest(
-        `Regla de la cooperativa: El asociado debe tener una aportación mínima de Q 100.00 para poder abrir cuentas de ahorro infantil, corriente, programado o sobre préstamo (saldo actual de aportaciones: Q ${saldoApor.toFixed(2)}).`,
+    if (data.tipo !== "APORTACION" && data.tipo !== "APORTACION_INFANTIL") {
+      const { rows: aporRows } = await client.query(
+        `select coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_aportacion
+         from cuentas c
+         left join saldos_cuenta sc on sc.cuenta_id = c.id
+         where c.socio_id = $1 and c.tipo in ('APORTACION', 'APORTACION_INFANTIL') and c.estado = 'ACTIVA'
+         limit 1`,
+        [data.socioId],
       );
+      const saldoApor = aporRows[0] ? Number(aporRows[0].saldo_aportacion) : 0;
+      if (saldoApor < 100) {
+        throw badRequest(
+          `Regla de la cooperativa: El asociado debe tener una aportación mínima de Q 100.00 para poder abrir cuentas de ahorro infantil, corriente, programado o sobre préstamo (saldo actual de aportaciones: Q ${saldoApor.toFixed(2)}).`,
+        );
+      }
     }
 
     // Verificación de cuenta existente
@@ -251,10 +260,10 @@ export async function crear(data: DatosCuenta, usuarioId: string) {
         data.observacionesApertura ?? null,
         data.prestamoId ?? null,
         usuarioId,
-        data.tipo === "AHORRO_INFANTO_JUVENIL" ? data.titularMenorNombre!.trim() : null,
-        data.tipo === "AHORRO_INFANTO_JUVENIL" ? data.titularMenorParentesco!.trim() : null,
-        data.tipo === "AHORRO_INFANTO_JUVENIL" ? (data.titularMenorCui?.trim() || null) : null,
-        data.tipo === "AHORRO_INFANTO_JUVENIL" ? (data.titularMenorFechaNacimiento || null) : null,
+        (data.tipo === "AHORRO_INFANTO_JUVENIL" || data.tipo === "APORTACION_INFANTIL") ? data.titularMenorNombre!.trim() : null,
+        (data.tipo === "AHORRO_INFANTO_JUVENIL" || data.tipo === "APORTACION_INFANTIL") ? data.titularMenorParentesco!.trim() : null,
+        (data.tipo === "AHORRO_INFANTO_JUVENIL" || data.tipo === "APORTACION_INFANTIL") ? (data.titularMenorCui?.trim() || null) : null,
+        (data.tipo === "AHORRO_INFANTO_JUVENIL" || data.tipo === "APORTACION_INFANTIL") ? (data.titularMenorFechaNacimiento || null) : null,
       ],
     );
     const cuenta = rows[0];
@@ -296,6 +305,7 @@ export async function registrarMovimientoConClient(
   data: DatosMovimiento,
   usuarioId: string,
   agenciaVisible: string | null,
+  permitirInterAgencia = false,
 ) {
   const { rows: ctaRows } = await client.query(
     `select c.*, s.nombres as socio_nombres, s.numero_asociado, a.nombre as agencia_nombre,
@@ -311,7 +321,9 @@ export async function registrarMovimientoConClient(
   );
   const cuenta = ctaRows[0];
   if (!cuenta) throw notFound("Cuenta no encontrada");
-  if (agenciaVisible && cuenta.agencia_id !== agenciaVisible) throw forbidden("Esa cuenta pertenece a otra agencia");
+  if (agenciaVisible && cuenta.agencia_id !== agenciaVisible && !permitirInterAgencia) {
+    throw forbidden("Esa cuenta pertenece a otra agencia");
+  }
   if (cuenta.estado !== "ACTIVA") throw badRequest("Esta cuenta está cerrada; no se pueden registrar movimientos");
 
   if (data.tipo === "RETIRO") {

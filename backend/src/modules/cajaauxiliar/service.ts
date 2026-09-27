@@ -143,7 +143,7 @@ export async function detalle(id: string, agenciaVisible: string | null) {
      join agencias ag_op on ag_op.id = d.agencia_id
      join usuarios u on u.id = m.usuario_id
      left join socios s on s.id = m.socio_id
-     left join agencias ag_orig on ag_orig.id = s.agencia_id
+     left join agencias ag_orig on ag_orig.id = coalesce(m.agencia_origen_id, s.agencia_id)
      where m.caja_dia_id = $1
      order by m.created_at desc`,
     [id],
@@ -291,6 +291,8 @@ export async function crearMovimiento(
 
     let socioId: string | null = data.socioId ?? null;
     let cuentaId: string | null = null;
+    let cuenta: any = null;
+    let descFinal: string = info.descripcion;
     let movimientoId: string | null = null;
     let ingresoComifId: string | null = null;
     let beneficiario = data.beneficiario?.trim() ?? "";
@@ -298,13 +300,21 @@ export async function crearMovimiento(
     if (info.requiereCuenta) {
       if (!data.cuentaId) throw badRequest("Selecciona la cuenta del socio");
       const { rows: ctaRows } = await client.query(
-        `select c.*, s.nombres as socio_nombres, s.id as socio_id from cuentas c join socios s on s.id = c.socio_id where c.id = $1`,
+        `select c.*, s.nombres as socio_nombres, s.id as socio_id, a.nombre as agencia_nombre, a.codigo as agencia_codigo
+         from cuentas c
+         join socios s on s.id = c.socio_id
+         join agencias a on a.id = c.agencia_id
+         where c.id = $1`,
         [data.cuentaId],
       );
-      const cuenta = ctaRows[0];
+      cuenta = ctaRows[0];
       if (!cuenta) throw notFound("Cuenta no encontrada");
-      if (agenciaVisible && cuenta.agencia_id !== agenciaVisible) throw forbidden("Esa cuenta pertenece a otra agencia");
       if (cuenta.tipo !== info.requiereCuenta) throw badRequest("La cuenta seleccionada no corresponde a este tipo de ahorro");
+
+      const esInterAgencia = dia.agencia_id !== cuenta.agencia_id;
+      descFinal = esInterAgencia
+        ? `${info.descripcion} (Inter-Agencia: Cuenta de ${cuenta.agencia_nombre})`
+        : info.descripcion;
 
       const movimiento = await cuentasService.registrarMovimientoConClient(
         client,
@@ -314,10 +324,11 @@ export async function crearMovimiento(
           monto: data.monto,
           fecha: new Date(dia.fecha).toISOString().slice(0, 10),
           numeroRecibo: data.docNo,
-          descripcion: info.descripcion,
+          descripcion: descFinal,
         },
         usuarioId,
         agenciaVisible,
+        true, // permitirInterAgencia
       );
 
       cuentaId = data.cuentaId;
@@ -351,12 +362,14 @@ export async function crearMovimiento(
       );
     }
 
+    const agenciaOrigenId = (cuenta && cuenta.agencia_id !== dia.agencia_id) ? cuenta.agencia_id : null;
+
     const { rows } = await client.query(
       `insert into caja_movimientos_auxiliar
          (caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador, referencia,
           socio_id, cuenta_id, movimiento_id, ingreso_comif_id, beneficiario, descripcion, doc_no,
-          monto, saldo_acumulado, usuario_id)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+          monto, saldo_acumulado, usuario_id, agencia_origen_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
        returning *`,
       [
         diaId,
@@ -372,11 +385,12 @@ export async function crearMovimiento(
         movimientoId,
         ingresoComifId,
         beneficiario,
-        info.descripcion,
+        descFinal,
         data.docNo ?? null,
         data.monto,
         saldoAcumulado,
         usuarioId,
+        agenciaOrigenId,
       ],
     );
     const registro = rows[0];
@@ -608,20 +622,21 @@ export async function cobrarCuotaCredito(
     }
 
     const { rows: prestamoRows } = await client.query(
-      `select p.*, s.nombres as socio_nombres, s.numero_asociado
+      `select p.*, s.nombres as socio_nombres, s.numero_asociado, s.dpi as socio_dpi, s.telefono as socio_telefono,
+              a.nombre as agencia_nombre, a.codigo as agencia_codigo
        from prestamos p
        join socios s on s.id = p.socio_id
+       join agencias a on a.id = p.agencia_id
        where p.id = $1`,
       [data.prestamoId],
     );
     const prestamo = prestamoRows[0];
     if (!prestamo) throw notFound("Préstamo no encontrado");
-    if (agenciaVisible && prestamo.agencia_id !== agenciaVisible) {
-      throw forbidden("Ese préstamo pertenece a otra agencia");
-    }
     if (prestamo.estado !== "DESEMBOLSADO" && prestamo.estado !== "APROBADO") {
       throw badRequest(`El préstamo no está activo para cobro (estado actual: ${prestamo.estado})`);
     }
+
+    const esInterAgencia = dia.agencia_id !== prestamo.agencia_id;
 
     const abonoCapital = Number(data.abonoCapital) || 0;
     const interes = Number(data.interes) || 0;
@@ -821,12 +836,14 @@ export async function cobrarCuotaCredito(
     const baseDescripcion = `Cobro cuota crédito ${prestamo.codigo} (Cap: Q${abonoCapital.toFixed(2)}, Int: Q${interes.toFixed(2)}${detalleAsp}${mora > 0 ? `, Mora: Q${mora.toFixed(2)}` : ""})${detalleDebito}`;
     const descripcion = data.descripcion ? `${baseDescripcion} - Obs: ${data.descripcion}` : baseDescripcion;
 
+    const agenciaOrigenId = prestamo.agencia_id !== dia.agencia_id ? prestamo.agencia_id : null;
+
     const { rows: cajaMovRows } = await client.query(
       `insert into caja_movimientos_auxiliar (
          caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador,
          referencia, socio_id, beneficiario, descripcion, doc_no, monto, saldo_acumulado, origen_fondos, usuario_id,
-         saldo_anterior_reportado, saldo_actual_reportado, numero_cuota
-       ) values ($1, $2, $3, 'PROPIO', $4, 'INGRESO', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         saldo_anterior_reportado, saldo_actual_reportado, numero_cuota, agencia_origen_id
+       ) values ($1, $2, $3, 'PROPIO', $4, 'INGRESO', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        returning *`,
       [
         diaId,
@@ -846,6 +863,7 @@ export async function cobrarCuotaCredito(
         data.saldoAnteriorReportado ?? null,
         data.saldoActualReportado ?? null,
         data.numeroCuota ?? null,
+        agenciaOrigenId,
       ],
     );
     const cajaMov = cajaMovRows[0];
@@ -885,8 +903,8 @@ export async function cobrarCuotaCredito(
       `insert into prestamo_pagos (
          prestamo_id, socio_id, agencia_id, caja_dia_id, caja_movimiento_id,
          fecha, numero_recibo, abono_capital, interes, mora, total_pagado,
-         saldo_capital_restante, origen_fondos, usuario_id
-       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         saldo_capital_restante, origen_fondos, usuario_id, agencia_origen_id
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        returning *`,
       [
         prestamo.id,
@@ -903,6 +921,7 @@ export async function cobrarCuotaCredito(
         nuevoSaldoCapital,
         origenFondosFinal,
         usuarioId,
+        agenciaOrigenId,
       ],
     );
 
@@ -921,6 +940,12 @@ export async function cobrarCuotaCredito(
       },
     });
 
+    const { rows: agCobroRows } = await client.query(
+      `select id, nombre, codigo from agencias where id = $1`,
+      [dia.agencia_id],
+    );
+    const agCobro = agCobroRows[0] || { id: dia.agencia_id, nombre: "Agencia", codigo: "AG" };
+
     return {
       pago: pagoRows[0],
       cajaMovimiento: cajaMov,
@@ -928,6 +953,13 @@ export async function cobrarCuotaCredito(
       ahorroSobrePrestamoAcreditado: ahorroSobrePrestamo,
       cuentaAsp: cuentaAspInfo,
       prestamoCancelado: nuevoEstadoPrestamo === "CANCELADO",
+      esInterAgencia,
+      agenciaCobro: agCobro,
+      agenciaOrigen: {
+        id: prestamo.agencia_id,
+        nombre: prestamo.agencia_nombre,
+        codigo: prestamo.agencia_codigo,
+      },
     };
   });
 }

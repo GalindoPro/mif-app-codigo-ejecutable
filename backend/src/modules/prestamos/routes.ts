@@ -58,10 +58,13 @@ prestamosRouter.get(
 prestamosRouter.get(
   "/",
   asyncHandler(async (req, res) => {
+    const interAgencia = req.query.interAgencia === "true";
+    const socioId = req.query.socioId as string | undefined;
+    const agId = interAgencia || socioId ? null : (agenciaVisible(req) ?? (req.query.agenciaId as string) ?? null);
     const prestamos = await service.listar({
-      agenciaId: agenciaVisible(req) ?? (req.query.agenciaId as string) ?? null,
+      agenciaId: agId,
       promotorId: req.query.promotorId as string,
-      socioId: req.query.socioId as string,
+      socioId,
       estado: req.query.estado as any,
       q: req.query.q as string,
     });

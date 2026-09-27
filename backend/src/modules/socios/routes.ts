@@ -15,8 +15,10 @@ sociosRouter.get(
     const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 10));
     const estado = req.query.estado as "ACTIVO" | "INACTIVO" | undefined;
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
+    const interAgencia = req.query.interAgencia === "true";
+    const agId = interAgencia ? null : agenciaVisible(req);
 
-    res.json(await service.listar({ agenciaId: agenciaVisible(req), q, estado, page, pageSize }));
+    res.json(await service.listar({ agenciaId: agId, q, estado, page, pageSize }));
   }),
 );
 

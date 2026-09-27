@@ -15,6 +15,7 @@ const TIPOS = [
   "AHORRO_SOBRE_PRESTAMO",
   "AHORRO_PLAZO_FIJO",
   "APORTACION",
+  "APORTACION_INFANTIL",
 ] as const;
 const tipoSchema = z.enum(TIPOS);
 
@@ -23,7 +24,10 @@ cuentasRouter.get(
   asyncHandler(async (req, res) => {
     const tipo = tipoSchema.parse(req.query.tipo);
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
-    res.json(await service.listar({ tipo, agenciaId: agenciaVisible(req), q }));
+    const socioId = typeof req.query.socioId === "string" ? req.query.socioId : undefined;
+    const interAgencia = req.query.interAgencia === "true";
+    const agId = interAgencia || socioId ? null : agenciaVisible(req);
+    res.json(await service.listar({ tipo, agenciaId: agId, q, socioId }));
   }),
 );
 
@@ -77,10 +81,10 @@ const crearSchema = z
   })
   .refine(
     (data) =>
-      data.tipo !== "AHORRO_INFANTO_JUVENIL" ||
+      (data.tipo !== "AHORRO_INFANTO_JUVENIL" && data.tipo !== "APORTACION_INFANTIL") ||
       (!!data.titularMenorNombre?.trim() && !!data.titularMenorParentesco?.trim()),
     {
-      message: "Para Ahorro Infanto Juvenil debes indicar el nombre del menor y su parentesco con el socio responsable.",
+      message: "Para Ahorro o Aportación Infanto Juvenil debes indicar el nombre del menor y su parentesco con el socio responsable.",
       path: ["titularMenorNombre"],
     },
   );

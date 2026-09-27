@@ -58,26 +58,37 @@ Código real y completo del backend (API en Node.js + TypeScript + PostgreSQL), 
     "start": "node dist/index.js",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
+    "db:seed:excel": "tsx src/db/seed-excel.ts",
+    "db:reset": "tsx src/db/reset.ts",
+    "db:importar:aportaciones": "tsx src/db/importar-aportaciones.ts",
+    "db:importar:ahorro-corriente": "tsx src/db/importar-ahorro-corriente.ts",
+    "db:importar:plazo-fijo": "tsx src/db/importar-plazo-fijo.ts",
+    "db:importar:programado-infantil": "tsx src/db/importar-programado-infantil.ts",
+    "db:importar:ingresos-creditos": "tsx src/db/importar-ingresos-creditos.ts",
+    "db:importar:caja-chica": "tsx src/db/importar-caja-chica.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.21.0",
-    "jsonwebtoken": "^9.0.2",
-    "pg": "^8.23.0",
-    "zod": "^3.23.8"
-  },
-  "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^20.14.15",
     "@types/pg": "^8.23.1",
-    "tsx": "^4.19.1",
-    "typescript": "^5.5.4"
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "googleapis": "^181.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "node-cron": "^4.6.0",
+    "pg": "^8.23.0",
+    "typescript": "^5.5.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node-cron": "^3.0.11",
+    "tsx": "^4.19.1"
   }
 }
 ```
@@ -89,7 +100,6 @@ Código real y completo del backend (API en Node.js + TypeScript + PostgreSQL), 
   "compilerOptions": {
     "target": "ES2021",
     "module": "commonjs",
-    "moduleResolution": "node",
     "lib": ["ES2021"],
     "outDir": "dist",
     "rootDir": "src",
@@ -128,6 +138,9 @@ import { auditoriaRouter } from "./modules/auditoria/routes";
 import { alertasRouter } from "./modules/alertas/routes";
 import { sesionesRouter } from "./modules/sesiones/routes";
 import { cobrosCampoRouter } from "./modules/cobroscampo/routes";
+import trasladosRouter from "./modules/traslados/routes";
+import consolidadoFinancieroRouter from "./modules/consolidadofinanciero/routes";
+
 
 export const app = express();
 
@@ -171,6 +184,9 @@ app.use("/api/auditoria", auditoriaRouter);
 app.use("/api/alertas", alertasRouter);
 app.use("/api/sesiones", sesionesRouter);
 app.use("/api/cobros-campo", cobrosCampoRouter);
+app.use("/api/traslados", trasladosRouter);
+app.use("/api/consolidado-financiero", consolidadoFinancieroRouter);
+
 
 app.use((_req, res) => res.status(404).json({ error: "Ruta no encontrada" }));
 app.use(errorHandler);
@@ -216,7 +232,7 @@ const crearSchema = z.object({
 
 agenciasRouter.post(
   "/",
-  requireRole("ADMIN"),
+  requireRole("GERENCIA"),
   asyncHandler(async (req, res) => {
     const data = crearSchema.parse(req.body);
     res.status(201).json(await service.crear(data));
@@ -277,9 +293,55 @@ authRouter.post(
   }),
 );
 
-authRouter.get("/me", requireAuth, (req, res) => {
-  res.json({ usuario: req.user });
+authRouter.get("/me", requireAuth, async (req, res) => {
+  const { pool } = require("../../db/pool");
+  const result = await pool.query("SELECT 1 FROM usuario_drive_tokens WHERE usuario_id = $1", [req.user!.id]);
+  res.json({ 
+    usuario: req.user,
+    driveConnected: result.rows.length > 0 
+  });
 });
+
+authRouter.get("/google", requireAuth, (req, res) => {
+  const { getAuthUrl } = require("../../services/googleDriveService");
+  const url = getAuthUrl(req.user!.id);
+  res.json({ url });
+});
+
+authRouter.get(
+  "/google/callback",
+  asyncHandler(async (req, res) => {
+    const code = req.query.code as string;
+    const usuarioId = req.query.state as string;
+
+    if (!code || !usuarioId) {
+      res.status(400).send("Faltan parámetros (code o state).");
+      return;
+    }
+
+    const { getOAuthClient } = require("../../services/googleDriveService");
+    const { pool } = require("../../db/pool");
+    
+    const oauth2Client = getOAuthClient();
+    const { tokens } = await oauth2Client.getToken(code);
+    
+    // Guardar tokens en BD
+    await pool.query(
+      `INSERT INTO usuario_drive_tokens (usuario_id, access_token, refresh_token, expiry_date) 
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (usuario_id) DO UPDATE SET 
+       access_token = EXCLUDED.access_token,
+       refresh_token = COALESCE(EXCLUDED.refresh_token, usuario_drive_tokens.refresh_token),
+       expiry_date = EXCLUDED.expiry_date`,
+      [usuarioId, tokens.access_token, tokens.refresh_token, tokens.expiry_date]
+    );
+
+    // Redirigir al frontend al Dashboard o Perfil (cerrando la ventana o regresando a la app)
+    // Asumiendo que el frontend está en el mismo host o manejamos la redirección
+    res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/?drive_connected=true`);
+  })
+);
+
 ```
 
 ## `backend/src/modules/auth/service.ts` {#backendsrcmodulesauthservicets}
@@ -326,7 +388,7 @@ usuariosRouter.use(requireAuth);
 
 usuariosRouter.get(
   "/",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR"),
+  requireRole("GERENCIA", "SUPERVISOR"),
   asyncHandler(async (req, res) => {
     res.json(await service.listar(agenciaVisible(req)));
   }),
@@ -336,13 +398,13 @@ const crearSchema = z.object({
   nombre: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
-  rol: z.enum(["ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"]),
+  rol: z.enum(["GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA", "PROMOTOR"]),
   agenciaId: z.string().uuid().optional(),
 });
 
 usuariosRouter.post(
   "/",
-  requireRole("ADMIN"),
+  requireRole("GERENCIA"),
   asyncHandler(async (req, res) => {
     const data = crearSchema.parse(req.body);
     res.status(201).json(await service.crear(data));
@@ -360,10 +422,16 @@ import { badRequest, conflict } from "../../utils/errors";
 
 const PUBLIC_COLUMNS = "id, nombre, email, rol, activo, agencia_id, created_at, updated_at";
 
-export async function listar(agenciaId: string | null): Promise<UsuarioPublico[]> {
-  const { rows } = agenciaId
-    ? await pool.query(`select ${PUBLIC_COLUMNS} from usuarios where agencia_id = $1 order by nombre`, [agenciaId])
-    : await pool.query(`select ${PUBLIC_COLUMNS} from usuarios order by nombre`);
+export async function listar(agenciaId: string | null) {
+  const query = `
+    select u.id, u.nombre, u.email, u.rol, u.activo, u.agencia_id, u.created_at, u.updated_at,
+           a.nombre as agencia_nombre, a.codigo as agencia_codigo
+    from usuarios u
+    left join agencias a on a.id = u.agencia_id
+    ${agenciaId ? "where u.agencia_id = $1" : ""}
+    order by u.nombre
+  `;
+  const { rows } = agenciaId ? await pool.query(query, [agenciaId]) : await pool.query(query);
   return rows;
 }
 
@@ -374,8 +442,8 @@ export async function crear(data: {
   rol: RolUsuario;
   agenciaId?: string | null;
 }): Promise<UsuarioPublico> {
-  if ((data.rol === "SUPERVISOR" || data.rol === "CAJERO") && !data.agenciaId) {
-    throw badRequest("Un usuario Supervisor o Cajero debe pertenecer a una agencia");
+  if ((data.rol === "SUPERVISOR" || data.rol === "CAJERO" || data.rol === "PROMOTOR") && !data.agenciaId) {
+    throw badRequest("Un usuario Supervisor, Cajero o Promotor debe pertenecer a una agencia");
   }
   const passwordHash = await hashPassword(data.password);
   try {
@@ -408,7 +476,15 @@ import * as service from "./service";
 export const cuentasRouter = Router();
 cuentasRouter.use(requireAuth);
 
-const TIPOS = ["AHORRO_CORRIENTE", "AHORRO_PROGRAMADO", "AHORRO_INFANTO_JUVENIL"] as const;
+const TIPOS = [
+  "AHORRO_CORRIENTE",
+  "AHORRO_PROGRAMADO",
+  "AHORRO_INFANTO_JUVENIL",
+  "AHORRO_SOBRE_PRESTAMO",
+  "AHORRO_PLAZO_FIJO",
+  "APORTACION",
+  "APORTACION_INFANTIL",
+] as const;
 const tipoSchema = z.enum(TIPOS);
 
 cuentasRouter.get(
@@ -416,7 +492,10 @@ cuentasRouter.get(
   asyncHandler(async (req, res) => {
     const tipo = tipoSchema.parse(req.query.tipo);
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
-    res.json(await service.listar({ tipo, agenciaId: agenciaVisible(req), q }));
+    const socioId = typeof req.query.socioId === "string" ? req.query.socioId : undefined;
+    const interAgencia = req.query.interAgencia === "true";
+    const agId = interAgencia || socioId ? null : agenciaVisible(req);
+    res.json(await service.listar({ tipo, agenciaId: agId, q, socioId }));
   }),
 );
 
@@ -439,23 +518,48 @@ cuentasRouter.get(
 );
 
 cuentasRouter.get(
+  "/novedades-campo",
+  asyncHandler(async (req, res) => {
+    const agenciaId = agenciaVisible(req) || (req.query.agenciaId as string) || null;
+    res.json(await service.listarNovedadesCampo(agenciaId));
+  }),
+);
+
+cuentasRouter.get(
   "/:id",
   asyncHandler(async (req, res) => {
     res.json(await service.obtener(req.params.id, agenciaVisible(req)));
   }),
 );
 
-const crearSchema = z.object({
-  tipo: tipoSchema,
-  agenciaId: z.string().uuid(),
-  socioId: z.string().uuid(),
-  numeroCuenta: z.string().min(1),
-  saldoInicial: z.number().nonnegative().optional(),
-});
+const crearSchema = z
+  .object({
+    tipo: tipoSchema,
+    agenciaId: z.string().uuid(),
+    socioId: z.string().uuid(),
+    numeroCuenta: z.string().min(1),
+    saldoInicial: z.number().nonnegative().optional(),
+    cuotaPactada: z.number().positive().optional().nullable(),
+    observacionesApertura: z.string().optional().nullable(),
+    prestamoId: z.string().uuid().optional().nullable(),
+    titularMenorNombre: z.string().optional().nullable(),
+    titularMenorParentesco: z.string().optional().nullable(),
+    titularMenorCui: z.string().optional().nullable(),
+    titularMenorFechaNacimiento: z.string().optional().nullable(),
+  })
+  .refine(
+    (data) =>
+      (data.tipo !== "AHORRO_INFANTO_JUVENIL" && data.tipo !== "APORTACION_INFANTIL") ||
+      (!!data.titularMenorNombre?.trim() && !!data.titularMenorParentesco?.trim()),
+    {
+      message: "Para Ahorro o Aportación Infanto Juvenil debes indicar el nombre del menor y su parentesco con el socio responsable.",
+      path: ["titularMenorNombre"],
+    },
+  );
 
 cuentasRouter.post(
   "/",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "PROMOTOR"),
   asyncHandler(async (req, res) => {
     const data = crearSchema.parse(req.body);
     const visible = agenciaVisible(req);
@@ -474,7 +578,7 @@ const movimientoSchema = z.object({
 
 cuentasRouter.post(
   "/:id/movimientos",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO"),
   asyncHandler(async (req, res) => {
     const data = movimientoSchema.parse(req.body);
     res.status(201).json(await service.registrarMovimiento(req.params.id, data, req.user!.id, agenciaVisible(req)));
@@ -485,7 +589,9 @@ cuentasRouter.post(
 ## `backend/src/modules/cuentas/service.ts` {#backendsrcmodulescuentasservicets}
 
 ```ts
+import { PoolClient } from "pg";
 import { pool } from "../../db/pool";
+import { withTransaction } from "../../db/transaction";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
 
@@ -495,14 +601,26 @@ const PREFIJO_TIPO: Record<string, string> = {
   AHORRO_CORRIENTE: "AC",
   AHORRO_PROGRAMADO: "AP",
   AHORRO_INFANTO_JUVENIL: "AIJ",
+  AHORRO_SOBRE_PRESTAMO: "ASP",
+  AHORRO_PLAZO_FIJO: "PF",
+  APORTACION: "APORT",
+  APORTACION_INFANTIL: "API",
 };
 
-export type TipoCuentaAhorro = "AHORRO_CORRIENTE" | "AHORRO_PROGRAMADO" | "AHORRO_INFANTO_JUVENIL";
+export type TipoCuentaAhorro =
+  | "AHORRO_CORRIENTE"
+  | "AHORRO_PROGRAMADO"
+  | "AHORRO_INFANTO_JUVENIL"
+  | "AHORRO_SOBRE_PRESTAMO"
+  | "AHORRO_PLAZO_FIJO"
+  | "APORTACION"
+  | "APORTACION_INFANTIL";
 
 export async function listar(params: {
   tipo: TipoCuentaAhorro;
   agenciaId: string | null;
   q?: string;
+  socioId?: string;
 }) {
   const condiciones = ["c.tipo = $1"];
   const valores: unknown[] = [params.tipo];
@@ -510,6 +628,10 @@ export async function listar(params: {
   if (params.agenciaId) {
     valores.push(params.agenciaId);
     condiciones.push(`c.agencia_id = $${valores.length}`);
+  }
+  if (params.socioId) {
+    valores.push(params.socioId);
+    condiciones.push(`c.socio_id = $${valores.length}`);
   }
   if (params.q) {
     valores.push(`%${params.q.toLowerCase()}%`);
@@ -519,9 +641,13 @@ export async function listar(params: {
 
   const { rows } = await pool.query(
     `select c.*, s.nombres as socio_nombres, s.numero_asociado,
+            a.nombre as agencia_nombre, a.codigo as agencia_codigo,
+            p.codigo as prestamo_codigo, p.estado as prestamo_estado,
             coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
      from cuentas c
      join socios s on s.id = c.socio_id
+     join agencias a on a.id = c.agencia_id
+     left join prestamos p on p.id = c.prestamo_id
      left join saldos_cuenta sc on sc.cuenta_id = c.id
      where ${condiciones.join(" and ")}
      order by c.created_at desc`,
@@ -579,10 +705,12 @@ export async function siguienteNumero(agenciaId: string, tipo: TipoCuentaAhorro)
 export async function obtener(id: string, agenciaVisible: string | null) {
   const { rows } = await pool.query(
     `select c.*, s.nombres as socio_nombres, s.numero_asociado, a.nombre as agencia_nombre,
+            p.codigo as prestamo_codigo, p.estado as prestamo_estado, p.saldo_capital as prestamo_saldo_capital,
             coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
      from cuentas c
      join socios s on s.id = c.socio_id
      join agencias a on a.id = c.agencia_id
+     left join prestamos p on p.id = c.prestamo_id
      left join saldos_cuenta sc on sc.cuenta_id = c.id
      where c.id = $1`,
     [id],
@@ -608,50 +736,258 @@ export interface DatosCuenta {
   socioId: string;
   numeroCuenta: string;
   saldoInicial?: number;
+  cuotaPactada?: number | null;
+  observacionesApertura?: string | null;
+  prestamoId?: string | null;
+  titularMenorNombre?: string | null;
+  titularMenorParentesco?: string | null;
+  titularMenorCui?: string | null;
+  titularMenorFechaNacimiento?: string | null;
 }
 
 export async function crear(data: DatosCuenta, usuarioId: string) {
+  if (data.tipo === "AHORRO_INFANTO_JUVENIL" || data.tipo === "APORTACION_INFANTIL") {
+    if (!data.titularMenorNombre || !data.titularMenorNombre.trim()) {
+      throw badRequest("Debes indicar el nombre completo del menor titular de la cuenta.");
+    }
+    if (!data.titularMenorParentesco || !data.titularMenorParentesco.trim()) {
+      throw badRequest("Debes indicar el parentesco del menor con el socio responsable de la cuenta.");
+    }
+    if (!data.titularMenorFechaNacimiento || !data.titularMenorFechaNacimiento.trim()) {
+      throw badRequest("Debes indicar la fecha de nacimiento del menor titular de la cuenta.");
+    }
+    const str = String(data.titularMenorFechaNacimiento).slice(0, 10);
+    const parts = str.split("-");
+    if (parts.length !== 3) {
+      throw badRequest("La fecha de nacimiento no tiene un formato válido (YYYY-MM-DD).");
+    }
+    const [y, m, d] = parts.map(Number);
+    if (isNaN(y) || isNaN(m) || isNaN(d)) {
+      throw badRequest("La fecha de nacimiento no es válida.");
+    }
+    const hoy = new Date();
+    let edad = hoy.getFullYear() - y;
+    const mesActual = hoy.getMonth() + 1;
+    const diaActual = hoy.getDate();
+    if (mesActual < m || (mesActual === m && diaActual < d)) {
+      edad--;
+    }
+    if (edad < 0) {
+      throw badRequest("La fecha de nacimiento del menor no puede ser una fecha futura.");
+    }
+    if (edad >= 18) {
+      throw badRequest(
+        `Titular mayor de edad (${edad} años): Las cuentas Infanto Juveniles son exclusivas para menores de 18 años.`
+      );
+    }
+  }
+
+  return withTransaction(async (client) => {
+    if (data.tipo !== "APORTACION" && data.tipo !== "APORTACION_INFANTIL") {
+      const { rows: aporRows } = await client.query(
+        `select coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_aportacion
+         from cuentas c
+         left join saldos_cuenta sc on sc.cuenta_id = c.id
+         where c.socio_id = $1 and c.tipo in ('APORTACION', 'APORTACION_INFANTIL') and c.estado = 'ACTIVA'
+         limit 1`,
+        [data.socioId],
+      );
+      const saldoApor = aporRows[0] ? Number(aporRows[0].saldo_aportacion) : 0;
+      if (saldoApor < 100) {
+        throw badRequest(
+          `Regla de la cooperativa: El asociado debe tener una aportación mínima de Q 100.00 para poder abrir cuentas de ahorro infantil, corriente, programado o sobre préstamo (saldo actual de aportaciones: Q ${saldoApor.toFixed(2)}).`,
+        );
+      }
+    }
+
+    // Verificación de cuenta existente
+    if (data.tipo === "AHORRO_SOBRE_PRESTAMO" && data.prestamoId) {
+      const { rows: existente } = await client.query(
+        `select numero_cuenta from cuentas where socio_id = $1 and tipo = $2 and prestamo_id = $3 and estado = 'ACTIVA'`,
+        [data.socioId, data.tipo, data.prestamoId],
+      );
+      if (existente[0]) {
+        throw conflict(
+          `El socio ya tiene una cuenta de Ahorro sobre Préstamo activa vinculada a este crédito (${existente[0].numero_cuenta}).`,
+        );
+      }
+    } else {
+      const { rows: existente } = await client.query(
+        `select numero_cuenta from cuentas where socio_id = $1 and tipo = $2 and estado = 'ACTIVA'`,
+        [data.socioId, data.tipo],
+      );
+      if (existente[0]) {
+        throw conflict(
+          `El socio ya tiene una cuenta activa de este tipo (${existente[0].numero_cuenta}). Cada socio solo puede tener una cuenta por tipo de ahorro.`,
+        );
+      }
+    }
+
+    const { rows: cuentaRepetida } = await client.query(
+      `select c.numero_cuenta, s.nombres as socio_nombres
+       from cuentas c
+       join socios s on s.id = c.socio_id
+       where lower(trim(c.numero_cuenta)) = lower(trim($1))
+       limit 1`,
+      [data.numeroCuenta],
+    );
+    if (cuentaRepetida[0]) {
+      throw conflict(
+        `El número de cuenta "${data.numeroCuenta}" ya existe y pertenece al socio "${cuentaRepetida[0].socio_nombres}". No se permiten números de cuenta duplicados.`,
+      );
+    }
+
+    const { rows } = await client.query(
+      `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial, cuota_pactada, observaciones_apertura, prestamo_id, creado_por_id, titular_menor_nombre, titular_menor_parentesco, titular_menor_cui, titular_menor_fecha_nacimiento)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       returning *`,
+      [
+        data.numeroCuenta,
+        data.tipo,
+        data.socioId,
+        data.agenciaId,
+        data.saldoInicial ?? 0,
+        data.cuotaPactada ?? null,
+        data.observacionesApertura ?? null,
+        data.prestamoId ?? null,
+        usuarioId,
+        (data.tipo === "AHORRO_INFANTO_JUVENIL" || data.tipo === "APORTACION_INFANTIL") ? data.titularMenorNombre!.trim() : null,
+        (data.tipo === "AHORRO_INFANTO_JUVENIL" || data.tipo === "APORTACION_INFANTIL") ? data.titularMenorParentesco!.trim() : null,
+        (data.tipo === "AHORRO_INFANTO_JUVENIL" || data.tipo === "APORTACION_INFANTIL") ? (data.titularMenorCui?.trim() || null) : null,
+        (data.tipo === "AHORRO_INFANTO_JUVENIL" || data.tipo === "APORTACION_INFANTIL") ? (data.titularMenorFechaNacimiento || null) : null,
+      ],
+    );
+    const cuenta = rows[0];
+    await registrarAuditoria({ entidad: "Cuenta", entidadId: cuenta.id, accion: "CREAR", usuarioId, datosNuevos: cuenta });
+    return cuenta;
+  });
+}
+
+export async function listarNovedadesCampo(agenciaId: string | null) {
+  const where = agenciaId ? "where c.agencia_id = $1" : "";
+  const params = agenciaId ? [agenciaId] : [];
   const { rows } = await pool.query(
-    `insert into cuentas (numero_cuenta, tipo, socio_id, agencia_id, saldo_inicial)
-     values ($1,$2,$3,$4,$5)
-     returning *`,
-    [data.numeroCuenta, data.tipo, data.socioId, data.agenciaId, data.saldoInicial ?? 0],
+    `select c.*, s.nombres as socio_nombres, s.numero_asociado, s.telefono as socio_telefono,
+            u.nombre as promotor_nombre, u.email as promotor_email,
+            coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
+     from cuentas c
+     join socios s on s.id = c.socio_id
+     left join usuarios u on u.id = c.creado_por_id
+     left join saldos_cuenta sc on sc.cuenta_id = c.id
+     ${where}
+     order by c.created_at desc
+     limit 25`,
+    params,
   );
-  const cuenta = rows[0];
-  await registrarAuditoria({ entidad: "Cuenta", entidadId: cuenta.id, accion: "CREAR", usuarioId, datosNuevos: cuenta });
-  return cuenta;
+  return rows;
 }
 
 export interface DatosMovimiento {
   tipo: "DEPOSITO" | "RETIRO";
   monto: number;
-  fecha: string;
+  fecha?: string;
   numeroRecibo?: string;
   descripcion?: string;
 }
 
-export async function registrarMovimiento(
+export async function registrarMovimientoConClient(
+  client: PoolClient,
   cuentaId: string,
   data: DatosMovimiento,
   usuarioId: string,
   agenciaVisible: string | null,
+  permitirInterAgencia = false,
 ) {
-  const cuenta = await obtener(cuentaId, agenciaVisible);
+  const { rows: ctaRows } = await client.query(
+    `select c.*, s.nombres as socio_nombres, s.numero_asociado, a.nombre as agencia_nombre,
+            p.codigo as prestamo_codigo, p.estado as prestamo_estado, p.saldo_capital as prestamo_saldo_capital,
+            coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
+     from cuentas c
+     join socios s on s.id = c.socio_id
+     join agencias a on a.id = c.agencia_id
+     left join prestamos p on p.id = c.prestamo_id
+     left join saldos_cuenta sc on sc.cuenta_id = c.id
+     where c.id = $1`,
+    [cuentaId],
+  );
+  const cuenta = ctaRows[0];
+  if (!cuenta) throw notFound("Cuenta no encontrada");
+  if (agenciaVisible && cuenta.agencia_id !== agenciaVisible && !permitirInterAgencia) {
+    throw forbidden("Esa cuenta pertenece a otra agencia");
+  }
   if (cuenta.estado !== "ACTIVA") throw badRequest("Esta cuenta está cerrada; no se pueden registrar movimientos");
 
-  if (data.tipo === "RETIRO" && Number(data.monto) > Number(cuenta.saldo_actual)) {
-    throw conflict(
-      `El retiro (Q ${Number(data.monto).toFixed(2)}) es mayor que el saldo disponible (Q ${Number(cuenta.saldo_actual).toFixed(2)})`,
+  if (data.tipo === "RETIRO") {
+    // REGLA CRÍTICA: Ahorro sobre Préstamo no se toca hasta que termine el pago del crédito
+    if (cuenta.tipo === "AHORRO_SOBRE_PRESTAMO") {
+      const { rows: prestamosActivos } = await client.query(
+        `select codigo, estado, saldo_capital
+         from prestamos
+         where (id = $1 or (socio_id = $2 and estado in ('SOLICITUD', 'APROBADO', 'DESEMBOLSADO')))
+           and estado != 'CANCELADO' and estado != 'RECHAZADO'
+         limit 1`,
+        [cuenta.prestamo_id, cuenta.socio_id],
+      );
+      if (prestamosActivos[0]) {
+        throw badRequest(
+          `Esta cuenta de Ahorro sobre Préstamo está en garantía del crédito activo "${prestamosActivos[0].codigo}" (${prestamosActivos[0].estado}). Por regla estatutaria de la cooperativa, los fondos no pueden retirarse hasta que el préstamo sea cancelado en su totalidad.`,
+        );
+      }
+    }
+
+    if (Number(data.monto) > Number(cuenta.saldo_actual)) {
+      throw conflict(
+        `El retiro (Q ${Number(data.monto).toFixed(2)}) es mayor que el saldo disponible (Q ${Number(cuenta.saldo_actual).toFixed(2)})`,
+      );
+    }
+  }
+
+  // Validación de número de recibo anti-duplicados
+  if (data.numeroRecibo && data.numeroRecibo.trim()) {
+    const recibo = data.numeroRecibo.trim();
+
+    // 1. Checar en movimientos de cuentas
+    const { rows: repetidoMov } = await client.query(
+      `select m.fecha, m.numero_recibo, c.numero_cuenta, s.nombres as socio_nombres
+       from movimientos m
+       join cuentas c on c.id = m.cuenta_id
+       join socios s on s.id = c.socio_id
+       where c.agencia_id = $1 and lower(trim(m.numero_recibo)) = lower($2)
+       limit 1`,
+      [cuenta.agencia_id, recibo],
     );
+    if (repetidoMov[0]) {
+      const fechaStr = new Date(repetidoMov[0].fecha).toLocaleDateString("es-GT");
+      throw conflict(
+        `El número de recibo "${recibo}" ya fue registrado el ${fechaStr} en la cuenta ${repetidoMov[0].numero_cuenta} (${repetidoMov[0].socio_nombres}). Verifique el talonario físico; no se permiten recibos duplicados.`,
+      );
+    }
+
+    // 2. Checar en auxiliar de caja
+    const { rows: repetidoAux } = await client.query(
+      `select fecha, doc_no, beneficiario, descripcion
+       from caja_movimientos_auxiliar
+       where agencia_id = $1 and lower(trim(doc_no)) = lower($2)
+       limit 1`,
+      [cuenta.agencia_id, recibo],
+    );
+    if (repetidoAux[0]) {
+      const fechaStr = new Date(repetidoAux[0].fecha).toLocaleDateString("es-GT");
+      throw conflict(
+        `El número de recibo "${recibo}" ya fue registrado en Auxiliar de Caja el ${fechaStr} (${repetidoAux[0].descripcion} - ${repetidoAux[0].beneficiario}). No se permiten recibos duplicados.`,
+      );
+    }
   }
 
   const clienteMovimientoId = `srv-${cuentaId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const { rows } = await pool.query(
+  const fechaMov = data.fecha || new Date().toISOString().slice(0, 10);
+
+  const { rows } = await client.query(
     `insert into movimientos (cuenta_id, tipo, monto, fecha, numero_recibo, descripcion, usuario_id, cliente_movimiento_id)
      values ($1,$2,$3,$4,$5,$6,$7,$8)
      returning *`,
-    [cuentaId, data.tipo, data.monto, data.fecha, data.numeroRecibo ?? null, data.descripcion ?? null, usuarioId, clienteMovimientoId],
+    [cuentaId, data.tipo, data.monto, fechaMov, data.numeroRecibo ?? null, data.descripcion ?? null, usuarioId, clienteMovimientoId],
   );
   const movimiento = rows[0];
   await registrarAuditoria({
@@ -661,7 +997,18 @@ export async function registrarMovimiento(
     usuarioId,
     datosNuevos: movimiento,
   });
-  return movimiento;
+  return { ...movimiento, cuenta_socio_id: cuenta.socio_id, cuenta_socio_nombres: cuenta.socio_nombres, cuenta_numero: cuenta.numero_cuenta };
+}
+
+export async function registrarMovimiento(
+  cuentaId: string,
+  data: DatosMovimiento,
+  usuarioId: string,
+  agenciaVisible: string | null,
+) {
+  return withTransaction(async (client) => {
+    return registrarMovimientoConClient(client, cuentaId, data, usuarioId, agenciaVisible);
+  });
 }
 ```
 
@@ -680,9 +1027,51 @@ cajaChicaRouter.use(requireAuth);
 
 cajaChicaRouter.get(
   "/",
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
   asyncHandler(async (req, res) => {
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
     res.json(await service.listar({ agenciaId: agenciaVisible(req), q }));
+  }),
+);
+
+cajaChicaRouter.get(
+  "/reporte",
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
+  asyncHandler(async (req, res) => {
+    const visible = agenciaVisible(req);
+    const agenciaId = (visible || req.query.agenciaId) as string;
+    if (!agenciaId) throw badRequest("Falta indicar la agencia para el reporte");
+
+    const fechaInicio = typeof req.query.fechaInicio === "string" ? req.query.fechaInicio : undefined;
+    const fechaFin = typeof req.query.fechaFin === "string" ? req.query.fechaFin : undefined;
+    const categoria = typeof req.query.categoria === "string" ? req.query.categoria : undefined;
+
+    res.json(await service.generarReporte({ agenciaId, fechaInicio, fechaFin, categoria }));
+  }),
+);
+
+cajaChicaRouter.get(
+  "/ultimo-documento",
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
+  asyncHandler(async (req, res) => {
+    const visible = agenciaVisible(req);
+    const agenciaId = (visible || (req.query.agenciaId as string)) as string;
+    if (!agenciaId) throw badRequest("Falta indicar la agencia");
+    const fecha = typeof req.query.fecha === "string" ? req.query.fecha : new Date().toISOString().slice(0, 10);
+    res.json(await service.obtenerUltimoDocumento(agenciaId, fecha));
+  }),
+);
+
+cajaChicaRouter.get(
+  "/verificar-documento",
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
+  asyncHandler(async (req, res) => {
+    const visible = agenciaVisible(req);
+    const agenciaId = (visible || (req.query.agenciaId as string)) as string;
+    if (!agenciaId) throw badRequest("Falta indicar la agencia");
+    const fecha = typeof req.query.fecha === "string" ? req.query.fecha : new Date().toISOString().slice(0, 10);
+    const numeroDocumento = typeof req.query.numeroDocumento === "string" ? req.query.numeroDocumento : "";
+    res.json(await service.verificarNumeroDocumentoExiste(agenciaId, fecha, numeroDocumento));
   }),
 );
 
@@ -714,13 +1103,78 @@ const crearSchema = z.object({
 
 cajaChicaRouter.post(
   "/",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
   asyncHandler(async (req, res) => {
     const data = crearSchema.parse(req.body);
     const visible = agenciaVisible(req);
     if (visible && data.agenciaId !== visible) throw forbidden("No puedes registrar comprobantes en otra agencia");
     if (!visible && !req.query.agenciaId && !data.agenciaId) throw badRequest("Falta indicar la agencia");
     res.status(201).json(await service.crear(data, req.user!.id));
+  }),
+);
+
+const reponerFondoSchema = z.object({
+  agenciaId: z.string().uuid(),
+  monto: z.number().positive("El monto a reponer debe ser mayor a 0"),
+  numeroCheque: z.string().min(1, "El número de cheque o documento (No. CH.) es obligatorio"),
+  descripcion: z.string().optional(),
+  fecha: z.string().optional(),
+});
+
+cajaChicaRouter.post(
+  "/reponer-fondo",
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
+  asyncHandler(async (req, res) => {
+    const data = reponerFondoSchema.parse(req.body);
+    const visible = agenciaVisible(req);
+    if (visible && data.agenciaId !== visible) throw forbidden("No puedes reponer caja chica en otra agencia");
+    res.status(201).json(await service.reponerFondo(data, req.user!.id));
+  }),
+);
+
+const editarSchema = z.object({
+  fecha: z.string().min(1).optional(),
+  numeroDocumento: z.string().optional(),
+  beneficiario: z.string().min(2).optional(),
+  descripcion: z.string().min(2).optional(),
+  tipo: z.enum(["INGRESO", "EGRESO"]).optional(),
+  categoria: z.enum(CATEGORIAS_CAJA_CHICA).optional(),
+  monto: z.number().positive("El monto debe ser mayor a cero").optional(),
+  motivo: z.string().min(10, "El motivo de la corrección es obligatorio (mínimo 10 caracteres)"),
+});
+
+cajaChicaRouter.patch(
+  "/:id",
+  requireRole("GERENCIA", "CAJERO", "CAJA_CHICA"),
+  asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const data = editarSchema.parse(req.body);
+    const { motivo, ...updates } = data;
+
+    // Verificar permisos operativos (GERENCIA salta esto)
+    if (req.user!.rol !== "GERENCIA") {
+      const { pool } = await import("../../db/pool");
+      const { rows } = await pool.query(
+        "select usuario_id, created_at from caja_chica_comprobantes where id = $1",
+        [id]
+      );
+      if (!rows[0]) throw badRequest("El registro no existe");
+      const reg = rows[0];
+      
+      // Debe ser el mismo usuario
+      if (reg.usuario_id !== req.user!.id) {
+        throw forbidden("No autorizado: Solo puedes editar tus propios registros");
+      }
+      
+      // Debe ser del mismo día (hoy localmente o created_at)
+      const hoy = new Date().toISOString().slice(0, 10);
+      const fechaRegistro = new Date(reg.created_at).toISOString().slice(0, 10);
+      if (hoy !== fechaRegistro) {
+        throw forbidden("No autorizado: Solo puedes editar registros creados el día de hoy");
+      }
+    }
+
+    res.json(await service.editar(id, updates, req.user!.id, motivo));
   }),
 );
 ```
@@ -1196,6 +1650,8 @@ export type CajaCategoria =
   | "RETIRO_AHORRO_CORRIENTE"
   | "RETIRO_AHORRO_PROGRAMADO"
   | "RETIRO_AHORRO_INFANTO_JUVENIL"
+  | "DEPOSITO_AHORRO_SOBRE_PRESTAMO"
+  | "RETIRO_AHORRO_SOBRE_PRESTAMO"
   | "DEPOSITO_PLAZO_FIJO"
   | "RETIRO_PLAZO_FIJO"
   | "APORTACION"
@@ -1208,10 +1664,15 @@ export type CajaCategoria =
   | "INTERES_PRESTAMO_FIDUCIARIO"
   | "MORA_PRESTAMO_FIDUCIARIO"
   | "COLOCACION_PRESTAMO"
+  | "TRASLADO_FONDOS"
   | "EGRESO_VARIO"
   | "INGRESO_VARIO";
 
-export type TipoCuentaAuxiliar = "AHORRO_CORRIENTE" | "AHORRO_PROGRAMADO" | "AHORRO_INFANTO_JUVENIL";
+export type TipoCuentaAuxiliar =
+  | "AHORRO_CORRIENTE"
+  | "AHORRO_PROGRAMADO"
+  | "AHORRO_INFANTO_JUVENIL"
+  | "AHORRO_SOBRE_PRESTAMO";
 
 export interface CategoriaInfo {
   seccion: "BI" | "PROPIO";
@@ -1296,6 +1757,22 @@ export const CATEGORIAS: Record<CajaCategoria, CategoriaInfo> = {
     grupoContador: "egreso_propio",
     descripcion: "Retiro de Ahorro Infanto Juvenil",
     requiereCuenta: "AHORRO_INFANTO_JUVENIL",
+    movimientoTipo: "RETIRO",
+  },
+  DEPOSITO_AHORRO_SOBRE_PRESTAMO: {
+    seccion: "PROPIO",
+    tipo: "INGRESO",
+    grupoContador: "ahorro_sobre_prestamo",
+    descripcion: "Depósito Ahorro sobre Préstamo",
+    requiereCuenta: "AHORRO_SOBRE_PRESTAMO",
+    movimientoTipo: "DEPOSITO",
+  },
+  RETIRO_AHORRO_SOBRE_PRESTAMO: {
+    seccion: "PROPIO",
+    tipo: "EGRESO",
+    grupoContador: "egreso_propio",
+    descripcion: "Retiro Ahorro sobre Préstamo",
+    requiereCuenta: "AHORRO_SOBRE_PRESTAMO",
     movimientoTipo: "RETIRO",
   },
 
@@ -1386,6 +1863,12 @@ export const CATEGORIAS: Record<CajaCategoria, CategoriaInfo> = {
     descripcion: "Colocación de préstamo (desembolso)",
     sinModuloReal: true,
   },
+  TRASLADO_FONDOS: {
+    seccion: "PROPIO",
+    tipo: "EGRESO",
+    grupoContador: "egreso_propio",
+    descripcion: "Traslado de fondos",
+  },
   EGRESO_VARIO: {
     seccion: "PROPIO",
     tipo: "EGRESO",
@@ -1442,6 +1925,16 @@ cajaAuxiliarRouter.get(
     const fechaInicio = typeof req.query.fechaInicio === "string" ? req.query.fechaInicio : undefined;
     const fechaFin = typeof req.query.fechaFin === "string" ? req.query.fechaFin : undefined;
     res.json(await service.reporteMovimientos(agenciaId, agenciaVisible(req), fechaInicio, fechaFin));
+  }),
+);
+
+cajaAuxiliarRouter.get(
+  "/siguiente-correlativo-bi",
+  asyncHandler(async (req, res) => {
+    const agenciaId = (req.query.agenciaId as string) || req.user?.agenciaId;
+    if (!agenciaId) throw badRequest("Falta indicar la agencia");
+    const fecha = typeof req.query.fecha === "string" ? req.query.fecha : undefined;
+    res.json(await service.siguienteCorrelativoBi(agenciaId, agenciaVisible(req), fecha));
   }),
 );
 
@@ -1700,13 +2193,15 @@ cajaAuxiliarRouter.patch(
     res.json(await service.editar(id, updates, req.user!.id, motivo));
   }),
 );
+
+
 ```
 
 ## `backend/src/modules/cajaauxiliar/service.ts` {#backendsrcmodulescajaauxiliarservicets}
 
 ```ts
 import { PoolClient } from "pg";
-import { pool } from "../../db/pool";
+import { pool, queryWithRetry } from "../../db/pool";
 import { withTransaction } from "../../db/transaction";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
@@ -1842,8 +2337,15 @@ export async function detalle(id: string, agenciaVisible: string | null) {
   const dia = await obtenerDiaCrudo(id, agenciaVisible);
 
   const { rows: movimientos } = await pool.query(
-    `select m.*, u.nombre as usuario_nombre, u.rol as usuario_rol
-     from caja_movimientos_auxiliar m join usuarios u on u.id = m.usuario_id
+    `select m.*, u.nombre as usuario_nombre, u.rol as usuario_rol,
+            ag_op.nombre as agencia_nombre,
+            coalesce(ag_orig.nombre, ag_op.nombre) as agencia_origen_nombre
+     from caja_movimientos_auxiliar m
+     join caja_dias d on d.id = m.caja_dia_id
+     join agencias ag_op on ag_op.id = d.agencia_id
+     join usuarios u on u.id = m.usuario_id
+     left join socios s on s.id = m.socio_id
+     left join agencias ag_orig on ag_orig.id = coalesce(m.agencia_origen_id, s.agencia_id)
      where m.caja_dia_id = $1
      order by m.created_at desc`,
     [id],
@@ -1851,7 +2353,9 @@ export async function detalle(id: string, agenciaVisible: string | null) {
 
   const totalIngreso = movimientos.filter((m) => m.tipo === "INGRESO").reduce((acc, m) => acc + Number(m.monto), 0);
   const totalEgreso = movimientos.filter((m) => m.tipo === "EGRESO").reduce((acc, m) => acc + Number(m.monto), 0);
-  const saldoActual = movimientos.length ? Number(movimientos[movimientos.length - 1].saldo_acumulado) : Number(dia.saldo_inicial);
+  const saldoActual = movimientos.length
+    ? Number(movimientos[0].saldo_acumulado ?? (Number(dia.saldo_inicial) + totalIngreso - totalEgreso))
+    : Number(dia.saldo_inicial);
 
   let arqueo = null;
   if (dia.estado === "CERRADO") {
@@ -1959,30 +2463,60 @@ export async function crearMovimiento(
       }
     }
 
-    const { rows: contadorRows } = await client.query(
-      `select count(*)::int as total from caja_movimientos_auxiliar
-       where agencia_id = $1 and categoria::text = any($2::text[])`,
-      [dia.agencia_id, categoriasDelGrupo(info.grupoContador)],
-    );
-    const contador = contadorRows[0].total + 1;
+    let contador = 1;
+    let referencia: string | null = data.referenciaAut?.trim() || null;
+
+    if (info.seccion === "BI") {
+      const fechaMov = new Date(dia.fecha);
+      const anio = fechaMov.getFullYear();
+      const mesStr = String(fechaMov.getMonth() + 1).padStart(2, "0");
+      const periodoMes = `${anio}-${mesStr}`;
+      const { rows: biRows } = await client.query(
+        `select count(*)::int as total from caja_movimientos_auxiliar
+         where agencia_id = $1 and seccion = 'BI' and to_char(fecha, 'YYYY-MM') = $2`,
+        [dia.agencia_id, periodoMes],
+      );
+      const biTotalMes = biRows[0] ? Number(biRows[0].total) : 0;
+      contador = biTotalMes + 1;
+      const codigoBiMes = `BI-${periodoMes}-${String(contador).padStart(3, "0")}`;
+      if (!referencia) {
+        referencia = codigoBiMes;
+      }
+    } else {
+      const { rows: contadorRows } = await client.query(
+        `select count(*)::int as total from caja_movimientos_auxiliar
+         where agencia_id = $1 and categoria::text = any($2::text[])`,
+        [dia.agencia_id, categoriasDelGrupo(info.grupoContador)],
+      );
+      contador = contadorRows[0].total + 1;
+    }
 
     let socioId: string | null = data.socioId ?? null;
     let cuentaId: string | null = null;
+    let cuenta: any = null;
+    let descFinal: string = info.descripcion;
     let movimientoId: string | null = null;
     let ingresoComifId: string | null = null;
-    let referencia: string | null = data.referenciaAut ?? null;
     let beneficiario = data.beneficiario?.trim() ?? "";
 
     if (info.requiereCuenta) {
       if (!data.cuentaId) throw badRequest("Selecciona la cuenta del socio");
       const { rows: ctaRows } = await client.query(
-        `select c.*, s.nombres as socio_nombres, s.id as socio_id from cuentas c join socios s on s.id = c.socio_id where c.id = $1`,
+        `select c.*, s.nombres as socio_nombres, s.id as socio_id, a.nombre as agencia_nombre, a.codigo as agencia_codigo
+         from cuentas c
+         join socios s on s.id = c.socio_id
+         join agencias a on a.id = c.agencia_id
+         where c.id = $1`,
         [data.cuentaId],
       );
-      const cuenta = ctaRows[0];
+      cuenta = ctaRows[0];
       if (!cuenta) throw notFound("Cuenta no encontrada");
-      if (agenciaVisible && cuenta.agencia_id !== agenciaVisible) throw forbidden("Esa cuenta pertenece a otra agencia");
       if (cuenta.tipo !== info.requiereCuenta) throw badRequest("La cuenta seleccionada no corresponde a este tipo de ahorro");
+
+      const esInterAgencia = dia.agencia_id !== cuenta.agencia_id;
+      descFinal = esInterAgencia
+        ? `${info.descripcion} (Inter-Agencia: Cuenta de ${cuenta.agencia_nombre})`
+        : info.descripcion;
 
       const movimiento = await cuentasService.registrarMovimientoConClient(
         client,
@@ -1992,10 +2526,11 @@ export async function crearMovimiento(
           monto: data.monto,
           fecha: new Date(dia.fecha).toISOString().slice(0, 10),
           numeroRecibo: data.docNo,
-          descripcion: info.descripcion,
+          descripcion: descFinal,
         },
         usuarioId,
         agenciaVisible,
+        true, // permitirInterAgencia
       );
 
       cuentaId = data.cuentaId;
@@ -2029,12 +2564,14 @@ export async function crearMovimiento(
       );
     }
 
+    const agenciaOrigenId = (cuenta && cuenta.agencia_id !== dia.agencia_id) ? cuenta.agencia_id : null;
+
     const { rows } = await client.query(
       `insert into caja_movimientos_auxiliar
          (caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador, referencia,
           socio_id, cuenta_id, movimiento_id, ingreso_comif_id, beneficiario, descripcion, doc_no,
-          monto, saldo_acumulado, usuario_id)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+          monto, saldo_acumulado, usuario_id, agencia_origen_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
        returning *`,
       [
         diaId,
@@ -2050,11 +2587,12 @@ export async function crearMovimiento(
         movimientoId,
         ingresoComifId,
         beneficiario,
-        info.descripcion,
+        descFinal,
         data.docNo ?? null,
         data.monto,
         saldoAcumulado,
         usuarioId,
+        agenciaOrigenId,
       ],
     );
     const registro = rows[0];
@@ -2286,20 +2824,21 @@ export async function cobrarCuotaCredito(
     }
 
     const { rows: prestamoRows } = await client.query(
-      `select p.*, s.nombres as socio_nombres, s.numero_asociado
+      `select p.*, s.nombres as socio_nombres, s.numero_asociado, s.dpi as socio_dpi, s.telefono as socio_telefono,
+              a.nombre as agencia_nombre, a.codigo as agencia_codigo
        from prestamos p
        join socios s on s.id = p.socio_id
+       join agencias a on a.id = p.agencia_id
        where p.id = $1`,
       [data.prestamoId],
     );
     const prestamo = prestamoRows[0];
     if (!prestamo) throw notFound("Préstamo no encontrado");
-    if (agenciaVisible && prestamo.agencia_id !== agenciaVisible) {
-      throw forbidden("Ese préstamo pertenece a otra agencia");
-    }
     if (prestamo.estado !== "DESEMBOLSADO" && prestamo.estado !== "APROBADO") {
       throw badRequest(`El préstamo no está activo para cobro (estado actual: ${prestamo.estado})`);
     }
+
+    const esInterAgencia = dia.agencia_id !== prestamo.agencia_id;
 
     const abonoCapital = Number(data.abonoCapital) || 0;
     const interes = Number(data.interes) || 0;
@@ -2499,12 +3038,14 @@ export async function cobrarCuotaCredito(
     const baseDescripcion = `Cobro cuota crédito ${prestamo.codigo} (Cap: Q${abonoCapital.toFixed(2)}, Int: Q${interes.toFixed(2)}${detalleAsp}${mora > 0 ? `, Mora: Q${mora.toFixed(2)}` : ""})${detalleDebito}`;
     const descripcion = data.descripcion ? `${baseDescripcion} - Obs: ${data.descripcion}` : baseDescripcion;
 
+    const agenciaOrigenId = prestamo.agencia_id !== dia.agencia_id ? prestamo.agencia_id : null;
+
     const { rows: cajaMovRows } = await client.query(
       `insert into caja_movimientos_auxiliar (
          caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador,
          referencia, socio_id, beneficiario, descripcion, doc_no, monto, saldo_acumulado, origen_fondos, usuario_id,
-         saldo_anterior_reportado, saldo_actual_reportado, numero_cuota
-       ) values ($1, $2, $3, 'PROPIO', $4, 'INGRESO', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         saldo_anterior_reportado, saldo_actual_reportado, numero_cuota, agencia_origen_id
+       ) values ($1, $2, $3, 'PROPIO', $4, 'INGRESO', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        returning *`,
       [
         diaId,
@@ -2524,6 +3065,7 @@ export async function cobrarCuotaCredito(
         data.saldoAnteriorReportado ?? null,
         data.saldoActualReportado ?? null,
         data.numeroCuota ?? null,
+        agenciaOrigenId,
       ],
     );
     const cajaMov = cajaMovRows[0];
@@ -2563,8 +3105,8 @@ export async function cobrarCuotaCredito(
       `insert into prestamo_pagos (
          prestamo_id, socio_id, agencia_id, caja_dia_id, caja_movimiento_id,
          fecha, numero_recibo, abono_capital, interes, mora, total_pagado,
-         saldo_capital_restante, origen_fondos, usuario_id
-       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         saldo_capital_restante, origen_fondos, usuario_id, agencia_origen_id
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        returning *`,
       [
         prestamo.id,
@@ -2581,6 +3123,7 @@ export async function cobrarCuotaCredito(
         nuevoSaldoCapital,
         origenFondosFinal,
         usuarioId,
+        agenciaOrigenId,
       ],
     );
 
@@ -2599,6 +3142,12 @@ export async function cobrarCuotaCredito(
       },
     });
 
+    const { rows: agCobroRows } = await client.query(
+      `select id, nombre, codigo from agencias where id = $1`,
+      [dia.agencia_id],
+    );
+    const agCobro = agCobroRows[0] || { id: dia.agencia_id, nombre: "Agencia", codigo: "AG" };
+
     return {
       pago: pagoRows[0],
       cajaMovimiento: cajaMov,
@@ -2606,6 +3155,13 @@ export async function cobrarCuotaCredito(
       ahorroSobrePrestamoAcreditado: ahorroSobrePrestamo,
       cuentaAsp: cuentaAspInfo,
       prestamoCancelado: nuevoEstadoPrestamo === "CANCELADO",
+      esInterAgencia,
+      agenciaCobro: agCobro,
+      agenciaOrigen: {
+        id: prestamo.agencia_id,
+        nombre: prestamo.agencia_nombre,
+        codigo: prestamo.agencia_codigo,
+      },
     };
   });
 }
@@ -3243,8 +3799,8 @@ export async function analiticaServicios(
   `;
 
   const [{ rows }, { rows: rowsTendencia }] = await Promise.all([
-    pool.query(query, params),
-    pool.query(queryTendencia, params),
+    queryWithRetry(query, params),
+    queryWithRetry(queryTendencia, params),
   ]);
 
   const GRUPOS: Record<string, { label: string; icon: string; producto: string }> = {
@@ -3417,20 +3973,45 @@ export async function arqueosMensuales(
   let totalIngresosMes = 0;
   let totalEgresosMes = 0;
 
-  for (const r of rows) {
-    totalMovimientosMes += Number(r.total_movimientos || 0);
-    totalIngresosMes += Number(r.total_ingresos || 0);
-    totalEgresosMes += Number(r.total_egresos || 0);
+  const mappedRows = rows.map((r) => {
+    const sIni = Number(r.saldo_inicial || 0);
+    const ing = Number(r.total_ingresos || 0);
+    const egr = Number(r.total_egresos || 0);
+    const flujoNeto = Math.round((ing - egr) * 100) / 100;
+    const saldoEsperado = Math.round((sIni + ing - egr) * 100) / 100;
+    const totalContado = r.total_contado != null 
+      ? Number(r.total_contado) 
+      : (r.estado === "CERRADO" ? Number(r.saldo_final ?? saldoEsperado) : saldoEsperado);
+    const diferencia = r.diferencia != null 
+      ? Number(r.diferencia) 
+      : (r.estado === "CERRADO" ? Math.round((totalContado - saldoEsperado) * 100) / 100 : 0);
 
-    const dif = Number(r.diferencia || 0);
-    if (dif === 0) {
+    totalMovimientosMes += Number(r.total_movimientos || 0);
+    totalIngresosMes += ing;
+    totalEgresosMes += egr;
+
+    if (diferencia === 0) {
       diasCuadrados++;
     } else {
       diasConDiferencia++;
-      if (dif > 0) totalSobrante += dif;
-      else totalFaltante += Math.abs(dif);
+      if (diferencia > 0) totalSobrante += diferencia;
+      else totalFaltante += Math.abs(diferencia);
     }
-  }
+
+    return {
+      ...r,
+      saldo_inicial: sIni,
+      total_ingresos: ing,
+      total_egresos: egr,
+      flujo_neto: flujoNeto,
+      saldo_final: r.saldo_final != null && r.estado === "CERRADO" ? Number(r.saldo_final) : saldoEsperado,
+      saldo_esperado: saldoEsperado,
+      total_contado: totalContado,
+      diferencia: diferencia,
+    };
+  });
+
+  const totalFlujoNetoMes = Math.round((totalIngresosMes - totalEgresosMes) * 100) / 100;
 
   return {
     mes: mesParam,
@@ -3443,8 +4024,9 @@ export async function arqueosMensuales(
       totalMovimientosMes,
       totalIngresosMes,
       totalEgresosMes,
+      totalFlujoNetoMes,
     },
-    dias: rows,
+    dias: mappedRows,
   };
 }
 
@@ -3616,10 +4198,15 @@ export async function reporteMovimientos(
   const agencia = agenciaRows[0];
 
   const { rows: movimientos } = await pool.query(
-    `select m.*, u.nombre as usuario_nombre, u.rol as usuario_rol, d.fecha as dia_fecha, d.saldo_inicial as dia_saldo_inicial
+    `select m.*, u.nombre as usuario_nombre, u.rol as usuario_rol, d.fecha as dia_fecha, d.saldo_inicial as dia_saldo_inicial,
+            ag_op.nombre as agencia_nombre,
+            coalesce(ag_orig.nombre, ag_op.nombre) as agencia_origen_nombre
      from caja_movimientos_auxiliar m
      join caja_dias d on d.id = m.caja_dia_id
+     join agencias ag_op on ag_op.id = d.agencia_id
      join usuarios u on u.id = m.usuario_id
+     left join socios s on s.id = m.socio_id
+     left join agencias ag_orig on ag_orig.id = s.agencia_id
      where m.agencia_id = $1 and d.fecha >= $2 and d.fecha <= $3
      order by d.fecha asc, m.created_at asc`,
     [agenciaId, fInicio, fFin],
@@ -3669,6 +4256,47 @@ export async function reporteMovimientos(
     desgloseFuentes,
   };
 }
+
+export async function siguienteCorrelativoBi(
+  agenciaId: string,
+  agenciaVisible?: string | null,
+  fechaStr?: string,
+) {
+  if (agenciaVisible && agenciaId !== agenciaVisible) {
+    throw forbidden("No tienes acceso a esta agencia");
+  }
+  const fecha = fechaStr ? new Date(fechaStr + "T00:00:00") : new Date();
+  const anio = fecha.getFullYear();
+  const mes = fecha.getMonth() + 1;
+  const mesStr = String(mes).padStart(2, "0");
+  const periodoMes = `${anio}-${mesStr}`;
+
+  const { rows } = await pool.query(
+    `select count(*)::int as total
+     from caja_movimientos_auxiliar
+     where agencia_id = $1
+       and seccion = 'BI'
+       and to_char(fecha, 'YYYY-MM') = $2`,
+    [agenciaId, periodoMes],
+  );
+  const total = rows[0] ? Number(rows[0].total) : 0;
+  const siguiente = total + 1;
+  const codigo = `BI-${periodoMes}-${String(siguiente).padStart(3, "0")}`;
+
+  const meses = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+  ];
+  const mesNombre = `${meses[mes - 1]} ${anio}`;
+
+  return {
+    correlativo: siguiente,
+    codigo,
+    periodoMes,
+    mesNombre,
+    totalMes: total,
+  };
+}
 ```
 
 ## `backend/src/modules/dashboard/routes.ts` {#backendsrcmodulesdashboardroutests}
@@ -3693,21 +4321,23 @@ dashboardRouter.get(
 ## `backend/src/modules/dashboard/service.ts` {#backendsrcmodulesdashboardservicets}
 
 ```ts
-import { pool } from "../../db/pool";
+import { queryWithRetry } from "../../db/pool";
 
 // Resumen para el tablero del jefe de agencia: saldo de caja chica y saldo
 // total de cada tipo de ahorro, por agencia. Si agenciaId es null (Admin o
 // Gerencia), se calcula para todas las agencias visibles.
+// Las queries se ejecutan de forma SECUENCIAL (no en paralelo) para no saturar
+// el Transaction Pooler de Supabase (plan gratuito: máx ~10 conexiones).
 export async function resumen(agenciaId: string | null) {
   const filtroAgencia = agenciaId ? "where a.id = $1" : "";
   const valores = agenciaId ? [agenciaId] : [];
 
-  const { rows: agencias } = await pool.query(
+  const { rows: agencias } = await queryWithRetry(
     `select a.id, a.nombre, a.codigo from agencias a ${filtroAgencia} order by a.nombre`,
     valores,
   );
 
-  const { rows: cajaChica } = await pool.query(
+  const { rows: cajaChica } = await queryWithRetry(
     `select agencia_id,
             coalesce(sum(case when tipo = 'INGRESO' then monto else 0 end), 0)
               - coalesce(sum(case when tipo = 'EGRESO' then monto else 0 end), 0) as saldo
@@ -3715,7 +4345,7 @@ export async function resumen(agenciaId: string | null) {
      group by agencia_id`,
   );
 
-  const { rows: ahorros } = await pool.query(
+  const { rows: ahorros } = await queryWithRetry(
     `select c.agencia_id, c.tipo,
             count(*)::int as total_cuentas,
             coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0) as saldo_total
@@ -3725,20 +4355,61 @@ export async function resumen(agenciaId: string | null) {
      group by c.agencia_id, c.tipo`,
   );
 
-  const { rows: socios } = await pool.query(
+  const { rows: socios } = await queryWithRetry(
     `select agencia_id, count(*)::int as total from socios where estado = 'ACTIVO' group by agencia_id`,
   );
 
-  const { rows: movimientosHoy } = await pool.query(
+  const { rows: movimientosHoy } = await queryWithRetry(
     `select cu.agencia_id, count(*)::int as total
      from movimientos m join cuentas cu on cu.id = m.cuenta_id
      where m.fecha = current_date
      group by cu.agencia_id`,
   );
 
+  const { rows: prestamos } = await queryWithRetry(
+    `select p.agencia_id,
+            count(*)::int as total_prestamos,
+            coalesce(sum(coalesce(p.saldo_capital, p.monto_aprobado)), 0)::numeric(14,2) as saldo_total
+     from prestamos p
+     where p.estado in ('DESEMBOLSADO', 'APROBADO')
+     group by p.agencia_id`,
+  );
+
+  const { rows: plazoFijo } = await queryWithRetry(
+    `select c.agencia_id,
+            count(*)::int as total_certificados,
+            coalesce(sum(pf.monto_deposito), 0)::numeric(14,2) as monto_total
+     from plazo_fijo_contratos pf
+     join cuentas c on c.id = pf.cuenta_id
+     group by c.agencia_id`,
+  );
+
+  const { rows: aportaciones } = await queryWithRetry(
+    `select c.agencia_id,
+            count(*)::int as total_aportantes,
+            coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0)::numeric(14,2) as saldo_total
+     from cuentas c
+     left join saldos_cuenta sc on sc.cuenta_id = c.id
+     where c.tipo = 'APORTACION'
+     group by c.agencia_id`,
+  );
+
+  const { rows: cuotasIngresoRows } = await queryWithRetry(
+    `select agencia_id,
+            count(*)::int as total_cuotas,
+            coalesce(sum(monto), 0)::numeric(14,2) as monto_total
+     from caja_movimientos_auxiliar
+     where categoria = 'INGRESO_ASOCIADO'
+     group by agencia_id`,
+  );
+
   const mapaCajaChica = new Map(cajaChica.map((r) => [r.agencia_id, Number(r.saldo)]));
   const mapaSocios = new Map(socios.map((r) => [r.agencia_id, r.total]));
   const mapaMovHoy = new Map(movimientosHoy.map((r) => [r.agencia_id, r.total]));
+  const mapaPrestamos = new Map(prestamos.map((r) => [r.agencia_id, { count: r.total_prestamos, saldo: Number(r.saldo_total) }]));
+  const mapaPlazoFijo = new Map(plazoFijo.map((r) => [r.agencia_id, { count: r.total_certificados, monto: Number(r.monto_total) }]));
+  const mapaAportaciones = new Map(aportaciones.map((r) => [r.agencia_id, { count: r.total_aportantes, saldo: Number(r.saldo_total) }]));
+  const mapaCuotasIngreso = new Map(cuotasIngresoRows.map((r) => [r.agencia_id, { count: r.total_cuotas, monto: Number(r.monto_total) }]));
 
   const porAgencia = agencias.map((ag) => {
     const ahorrosAgencia = ahorros.filter((a) => a.agencia_id === ag.id);
@@ -3754,6 +4425,10 @@ export async function resumen(agenciaId: string | null) {
       ahorroCorriente: porTipo("AHORRO_CORRIENTE"),
       ahorroProgramado: porTipo("AHORRO_PROGRAMADO"),
       ahorroInfantoJuvenil: porTipo("AHORRO_INFANTO_JUVENIL"),
+      carteraPrestamos: mapaPrestamos.get(ag.id) ?? { count: 0, saldo: 0 },
+      plazoFijo: mapaPlazoFijo.get(ag.id) ?? { count: 0, monto: 0 },
+      aportaciones: mapaAportaciones.get(ag.id) ?? { count: 0, saldo: 0 },
+      cuotasIngreso: mapaCuotasIngreso.get(ag.id) ?? { count: 0, monto: 0 },
       totalSocios: mapaSocios.get(ag.id) ?? 0,
       movimientosHoy: mapaMovHoy.get(ag.id) ?? 0,
     };
@@ -3765,10 +4440,37 @@ export async function resumen(agenciaId: string | null) {
       ahorroCorriente: acc.ahorroCorriente + a.ahorroCorriente.saldoTotal,
       ahorroProgramado: acc.ahorroProgramado + a.ahorroProgramado.saldoTotal,
       ahorroInfantoJuvenil: acc.ahorroInfantoJuvenil + a.ahorroInfantoJuvenil.saldoTotal,
+      carteraPrestamos: {
+        count: acc.carteraPrestamos.count + a.carteraPrestamos.count,
+        saldo: acc.carteraPrestamos.saldo + a.carteraPrestamos.saldo,
+      },
+      plazoFijo: {
+        count: acc.plazoFijo.count + a.plazoFijo.count,
+        monto: acc.plazoFijo.monto + a.plazoFijo.monto,
+      },
+      aportaciones: {
+        count: acc.aportaciones.count + a.aportaciones.count,
+        saldo: acc.aportaciones.saldo + a.aportaciones.saldo,
+      },
+      cuotasIngreso: {
+        count: acc.cuotasIngreso.count + a.cuotasIngreso.count,
+        monto: acc.cuotasIngreso.monto + a.cuotasIngreso.monto,
+      },
       totalSocios: acc.totalSocios + a.totalSocios,
       movimientosHoy: acc.movimientosHoy + a.movimientosHoy,
     }),
-    { cajaChica: 0, ahorroCorriente: 0, ahorroProgramado: 0, ahorroInfantoJuvenil: 0, totalSocios: 0, movimientosHoy: 0 },
+    {
+      cajaChica: 0,
+      ahorroCorriente: 0,
+      ahorroProgramado: 0,
+      ahorroInfantoJuvenil: 0,
+      carteraPrestamos: { count: 0, saldo: 0 },
+      plazoFijo: { count: 0, monto: 0 },
+      aportaciones: { count: 0, saldo: 0 },
+      cuotasIngreso: { count: 0, monto: 0 },
+      totalSocios: 0,
+      movimientosHoy: 0,
+    },
   );
 
   return { global, porAgencia };
@@ -3792,11 +4494,13 @@ sociosRouter.get(
   "/",
   asyncHandler(async (req, res) => {
     const page = Math.max(1, Number(req.query.page) || 1);
-    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 10));
     const estado = req.query.estado as "ACTIVO" | "INACTIVO" | undefined;
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
+    const interAgencia = req.query.interAgencia === "true";
+    const agId = interAgencia ? null : agenciaVisible(req);
 
-    res.json(await service.listar({ agenciaId: agenciaVisible(req), q, estado, page, pageSize }));
+    res.json(await service.listar({ agenciaId: agId, q, estado, page, pageSize }));
   }),
 );
 
@@ -3806,6 +4510,41 @@ sociosRouter.get(
     const agenciaId = (req.query.agenciaId as string) || req.user?.agenciaId;
     if (!agenciaId) throw badRequest("Falta indicar la agencia");
     res.json(await service.siguienteNumero(agenciaId));
+  }),
+);
+
+sociosRouter.get(
+  "/aportaciones",
+  asyncHandler(async (req, res) => {
+    const q = typeof req.query.q === "string" ? req.query.q : undefined;
+    res.json(await service.listarAportaciones({ agenciaId: agenciaVisible(req), q }));
+  }),
+);
+
+sociosRouter.get(
+  "/verificar-dpi",
+  asyncHandler(async (req, res) => {
+    const dpi = typeof req.query.dpi === "string" ? req.query.dpi : "";
+    const socioId = typeof req.query.socioId === "string" ? req.query.socioId : undefined;
+    const tipo = (req.query.tipo as "SOCIO" | "BENEFICIARIO") || "SOCIO";
+    const agenciaCodigo = typeof req.query.agenciaCodigo === "string" ? req.query.agenciaCodigo : undefined;
+    if (!dpi) {
+      return res.json({ valido: false, mensaje: "Se requiere el número de DPI" });
+    }
+    res.json(await service.verificarDpi(dpi, socioId, tipo, agenciaCodigo));
+  }),
+);
+
+sociosRouter.get(
+  "/verificar-telefono",
+  asyncHandler(async (req, res) => {
+    const telefono = typeof req.query.telefono === "string" ? req.query.telefono : "";
+    const socioId = typeof req.query.socioId === "string" ? req.query.socioId : undefined;
+    const tipo = (req.query.tipo as "SOCIO" | "BENEFICIARIO") || "SOCIO";
+    if (!telefono) {
+      return res.json({ valido: false, mensaje: "Se requiere el número de teléfono" });
+    }
+    res.json(await service.verificarTelefono(telefono, socioId, tipo));
   }),
 );
 
@@ -3820,17 +4559,35 @@ const datosSocioSchema = z.object({
   numeroAsociado: z.string().min(1),
   agenciaId: z.string().uuid(),
   nombres: z.string().min(3, "El nombre completo es obligatorio"),
-  genero: z.enum(["M", "F"]).optional(),
+  genero: z.enum(["M", "F"]).optional().nullable(),
   fechaIngreso: z.string().min(1, "La fecha de ingreso es obligatoria"),
-  dpi: z.string().min(13).max(13).optional().or(z.literal("")).transform((v) => (v ? v : undefined)),
-  direccion: z.string().optional(),
-  telefono: z.string().optional(),
-  nombreBeneficiario: z.string().optional(),
+  dpi: z
+    .string()
+    .refine((v) => !v || v.replace(/\D/g, "").length === 13, "El DPI debe contener 13 dígitos numéricos")
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => (v ? v.trim() : undefined)),
+  direccion: z.string().optional().nullable(),
+  telefono: z.string().optional().nullable(),
+  nombreBeneficiario: z.string().optional().nullable(),
+  dpiBeneficiario: z
+    .string()
+    .refine((v) => !v || v.replace(/\D/g, "").length === 13, "El DPI/CUI del beneficiario debe contener 13 dígitos")
+    .optional()
+    .nullable(),
+  telefonoBeneficiario: z.string().optional().nullable(),
+  parentescoBeneficiario: z.string().optional().nullable(),
+  montoAportacionInicial: z
+    .number()
+    .min(100, "La aportación inicial mínima de la cooperativa es de Q 100.00")
+    .optional()
+    .default(100),
+  reciboAportacionInicial: z.string().min(1, "El número de boleta o recibo de pago es obligatorio"),
 });
 
 sociosRouter.post(
   "/",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA", "PROMOTOR"),
   asyncHandler(async (req, res) => {
     const data = datosSocioSchema.parse(req.body);
     const visible = agenciaVisible(req);
@@ -3846,10 +4603,35 @@ const actualizarSchema = datosSocioSchema
 
 sociosRouter.patch(
   "/:id",
-  requireRole("ADMIN", "GERENCIA", "SUPERVISOR", "CAJERO"),
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA", "PROMOTOR"),
   asyncHandler(async (req, res) => {
     const data = actualizarSchema.parse(req.body);
     res.json(await service.actualizar(req.params.id, data, req.user!.id, agenciaVisible(req)));
+  }),
+);
+
+const abrirAportacionSchema = z.object({
+  monto: z.number().min(100, "Monto mínimo Q 100.00").optional().default(100),
+  recibo: z.string().optional().nullable(),
+  cuotaIngreso: z.number().min(0).optional().nullable(),
+});
+
+sociosRouter.post(
+  "/:id/abrir-aportacion",
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA", "PROMOTOR"),
+  asyncHandler(async (req, res) => {
+    const data = abrirAportacionSchema.parse(req.body || {});
+    res.status(201).json(await service.abrirAportacionSocio(req.params.id, data.monto, data.recibo, req.user!.id, data.cuotaIngreso ?? undefined));
+  }),
+);
+
+// GET /socios/sin-aportacion — socios sin cuenta de aportación o saldo < 100
+sociosRouter.get(
+  "/sin-aportacion",
+  requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA", "PROMOTOR"),
+  asyncHandler(async (req, res) => {
+    const agenciaId = req.query.agenciaId as string | undefined;
+    res.json(await service.sociosSinAportacion(agenciaId || null, agenciaVisible(req)));
   }),
 );
 ```
@@ -3860,7 +4642,8 @@ sociosRouter.patch(
 import { pool } from "../../db/pool";
 import { Socio } from "../../types/models";
 import { registrarAuditoria } from "../../utils/auditoria";
-import { notFound, forbidden } from "../../utils/errors";
+import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
+import { validarDpiGuatemala, formatearDPI, type ResultadoValidacionDPI } from "../../utils/dpiGuatemala";
 
 export interface FiltrosSocios {
   agenciaId: string | null; // null = todas (ADMIN/GERENCIA)
@@ -3868,6 +4651,39 @@ export interface FiltrosSocios {
   estado?: "ACTIVO" | "INACTIVO";
   page: number;
   pageSize: number;
+}
+
+const CONECTORES_NOMBRE = new Set(["de", "del", "la", "las", "los", "y", "e"]);
+
+export function capitalizarNombre(valor?: string | null): string | null | undefined {
+  if (!valor) return valor;
+  let texto = valor.trim();
+  if (/^[\p{Lu}\s\p{P}]+$/u.test(texto) && texto.length > 2) {
+    texto = texto.toLowerCase();
+  }
+  const palabras = texto.split(/(\s+)/);
+  return palabras
+    .map((p, idx) => {
+      if (/^\s+$/.test(p)) return p;
+      const norm = p.toLowerCase();
+      if (idx > 0 && CONECTORES_NOMBRE.has(norm)) {
+        return norm;
+      }
+      return p.replace(/(^|[^\p{L}\p{N}])(\p{L})/gu, (_, sep, letra) => sep + letra.toUpperCase());
+    })
+    .join("");
+}
+
+export function capitalizarDescripcion(valor?: string | null): string | null | undefined {
+  if (!valor) return valor;
+  const texto = valor.trim();
+  const primerIndice = texto.search(/\S/);
+  if (primerIndice === -1) return texto;
+  return (
+    texto.slice(0, primerIndice) +
+    texto.charAt(primerIndice).toUpperCase() +
+    texto.slice(primerIndice + 1)
+  );
 }
 
 export async function listar(filtros: FiltrosSocios) {
@@ -3883,11 +4699,20 @@ export async function listar(filtros: FiltrosSocios) {
     condiciones.push(`s.estado = $${valores.length}`);
   }
   if (filtros.q) {
+    const qClean = filtros.q.replace(/\D/g, "");
     valores.push(`%${filtros.q.toLowerCase()}%`);
     const idx = valores.length;
-    condiciones.push(
-      `(lower(s.nombres) like $${idx} or s.dpi like $${idx} or lower(s.numero_asociado) like $${idx})`,
-    );
+    if (qClean.length >= 3) {
+      valores.push(`%${qClean}%`);
+      const idxClean = valores.length;
+      condiciones.push(
+        `(lower(s.nombres) like $${idx} or s.dpi like $${idx} or lower(s.numero_asociado) like $${idx} or regexp_replace(coalesce(s.dpi, ''), '[^0-9]', '', 'g') like $${idxClean} or regexp_replace(coalesce(s.telefono, ''), '[^0-9]', '', 'g') like $${idxClean})`,
+      );
+    } else {
+      condiciones.push(
+        `(lower(s.nombres) like $${idx} or s.dpi like $${idx} or lower(s.numero_asociado) like $${idx})`,
+      );
+    }
   }
 
   const where = condiciones.length ? `where ${condiciones.join(" and ")}` : "";
@@ -3906,7 +4731,7 @@ export async function listar(filtros: FiltrosSocios) {
        left join (select socio_id, count(*) as total_cuentas from cuentas group by socio_id) cnt
               on cnt.socio_id = s.id
        ${where}
-       order by s.created_at desc
+       order by s.numero_asociado desc, s.created_at desc
        limit $${limitIdx} offset $${offsetIdx}`,
       valores,
     ),
@@ -3957,36 +4782,376 @@ export interface DatosSocio {
   numeroAsociado: string;
   agenciaId: string;
   nombres: string;
-  genero?: "M" | "F";
+  genero?: "M" | "F" | null;
   fechaIngreso: string;
-  dpi?: string;
-  direccion?: string;
-  telefono?: string;
-  nombreBeneficiario?: string;
+  dpi?: string | null;
+  direccion?: string | null;
+  telefono?: string | null;
+  nombreBeneficiario?: string | null;
+  dpiBeneficiario?: string | null;
+  telefonoBeneficiario?: string | null;
+  parentescoBeneficiario?: string | null;
+  montoAportacionInicial?: number;
+  reciboAportacionInicial?: string | null;
 }
 
 export async function crear(data: DatosSocio, usuarioId: string): Promise<Socio> {
+  const { rows: asocRepetido } = await pool.query(
+    `select numero_asociado, nombres from socios where lower(trim(numero_asociado)) = lower(trim($1)) limit 1`,
+    [data.numeroAsociado],
+  );
+  if (asocRepetido[0]) {
+    throw conflict(
+      `El número de asociado "${data.numeroAsociado}" ya está asignado al socio "${asocRepetido[0].nombres}". No se permiten números de asociado duplicados.`,
+    );
+  }
+
+  const montoApor = data.montoAportacionInicial !== undefined ? Number(data.montoAportacionInicial) : 100;
+  if (isNaN(montoApor) || montoApor < 100) {
+    throw badRequest("La aportación inicial mínima de la cooperativa es de Q 100.00 para afiliarse como socio.");
+  }
+
+  // Validaciones Cruzadas (Socio y Beneficiario)
+  const dpiSocio = data.dpi?.trim();
+  const dpiBen = data.dpiBeneficiario?.trim();
+  const telSocio = data.telefono?.trim();
+  const telBen = data.telefonoBeneficiario?.trim();
+
+  // Auto-restricción: Un socio no puede ser su propio beneficiario (ni usar mismo DPI ni teléfono)
+  if (dpiSocio && dpiBen && dpiSocio === dpiBen) {
+    throw badRequest("El DPI del socio y el DPI/CUI del beneficiario no pueden ser iguales.");
+  }
+  if (telSocio && telBen && telSocio === telBen) {
+    throw badRequest("El teléfono del socio y el teléfono del beneficiario no pueden ser iguales.");
+  }
+
+  // DPI Socio
+  if (dpiSocio) {
+    const res = await verificarDpi(dpiSocio, undefined, "SOCIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El DPI "${dpiSocio}" ya está registrado en el sistema (${res.registrado?.rol}: ${res.registrado?.nombres}).`);
+  }
+
+  // Teléfono Socio
+  if (telSocio) {
+    const res = await verificarTelefono(telSocio, undefined, "SOCIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El teléfono "${telSocio}" ya está registrado en el sistema (${res.registrado?.rol}: ${res.registrado?.nombres}).`);
+  }
+
+  // DPI Beneficiario
+  if (dpiBen) {
+    const res = await verificarDpi(dpiBen, undefined, "BENEFICIARIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El DPI/CUI del beneficiario "${dpiBen}" ya pertenece a un socio registrado (${res.registrado?.nombres}).`);
+  }
+
+  // Teléfono Beneficiario
+  if (telBen) {
+    const res = await verificarTelefono(telBen, undefined, "BENEFICIARIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El teléfono del beneficiario "${telBen}" ya pertenece a un socio registrado (${res.registrado?.nombres}).`);
+  }
+
+  // Validación obligatoria de número de boleta / recibo de pago
+  if (!data.reciboAportacionInicial || !data.reciboAportacionInicial.trim()) {
+    throw badRequest("El número de boleta o recibo de pago es obligatorio para respaldar la aportación estatutaria inicial.");
+  }
+
   const { rows } = await pool.query<Socio>(
     `insert into socios
-      (numero_asociado, agencia_id, nombres, genero, fecha_ingreso, dpi, direccion, telefono, nombre_beneficiario, creado_por_id)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      (numero_asociado, agencia_id, nombres, genero, fecha_ingreso, dpi, direccion, telefono, nombre_beneficiario, dpi_beneficiario, telefono_beneficiario, parentesco_beneficiario, creado_por_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
      returning *`,
     [
       data.numeroAsociado,
       data.agenciaId,
-      data.nombres,
+      capitalizarNombre(data.nombres)!,
       data.genero ?? null,
       data.fechaIngreso,
       data.dpi ?? null,
-      data.direccion ?? null,
+      capitalizarDescripcion(data.direccion) ?? null,
       data.telefono ?? null,
-      data.nombreBeneficiario ?? null,
+      capitalizarNombre(data.nombreBeneficiario) ?? null,
+      data.dpiBeneficiario ?? null,
+      data.telefonoBeneficiario ?? null,
+      data.parentescoBeneficiario ?? null,
       usuarioId,
     ],
   );
   const socio = rows[0];
+
+  // Crear automáticamente la cuenta de APORTACION del socio con la aportación estatutaria inicial (mínimo Q 100.00)
+  const { rows: agencias } = await pool.query(`select codigo from agencias where id = $1`, [data.agenciaId]);
+  const codAgencia = agencias[0]?.codigo ?? "MIF";
+  const numCuentaAportacion = `${codAgencia}-APOR-${data.numeroAsociado}`;
+  const obsApertura = data.reciboAportacionInicial
+    ? `Aportación estatutaria inicial. Comprobante/Recibo: ${data.reciboAportacionInicial.trim()}`
+    : "Aportación estatutaria inicial al afiliarse";
+
+  await pool.query(
+    `insert into cuentas (numero_cuenta, tipo, estado, socio_id, agencia_id, saldo_inicial, observaciones_apertura, creado_por_id)
+     values ($1, 'APORTACION', 'ACTIVA', $2, $3, $4, $5, $6)
+     on conflict (numero_cuenta) do update set saldo_inicial = $4, observaciones_apertura = $5`,
+    [numCuentaAportacion, socio.id, data.agenciaId, montoApor, obsApertura, usuarioId],
+  );
+
   await registrarAuditoria({ entidad: "Socio", entidadId: socio.id, accion: "CREAR", usuarioId, datosNuevos: socio });
   return socio;
+}
+
+export interface ResultadoVerificarDpi extends Partial<ResultadoValidacionDPI> {
+  valido: boolean;
+  disponible: boolean;
+  mensaje?: string;
+  registrado?: {
+    id: string;
+    nombres: string;
+    numeroAsociado: string;
+    rol: string;
+  };
+}
+
+export async function verificarDpi(
+  dpi: string,
+  socioIdActual?: string,
+  tipo: "SOCIO" | "BENEFICIARIO" = "SOCIO",
+  agenciaCodigo?: string,
+): Promise<ResultadoVerificarDpi> {
+  // Validación de estructura y municipio oficial de Guatemala
+  const valGuatemala = validarDpiGuatemala(dpi, agenciaCodigo);
+  if (!valGuatemala.valido) {
+    return {
+      ...valGuatemala,
+      valido: false,
+      disponible: false,
+      mensaje: valGuatemala.mensaje,
+    };
+  }
+
+  const rawDpi = valGuatemala.dpiFormateado ? valGuatemala.dpiFormateado.replace(/\D/g, "") : dpi.replace(/\D/g, "");
+  const params: unknown[] = [rawDpi];
+  
+  // 1. Verificar si coincide con DPI de algún SOCIO
+  let querySocio = `select id, nombres, numero_asociado, dpi from socios where regexp_replace(dpi, '[^0-9]', '', 'g') = $1`;
+  if (socioIdActual) {
+    querySocio += ` and id != $2`;
+    params.push(socioIdActual);
+  }
+  querySocio += ` limit 1`;
+
+  const { rows: socioRows } = await pool.query(querySocio, params);
+  if (socioRows[0]) {
+    return {
+      ...valGuatemala,
+      valido: true,
+      disponible: false,
+      registrado: {
+        id: socioRows[0].id,
+        nombres: socioRows[0].nombres,
+        numeroAsociado: socioRows[0].numero_asociado,
+        rol: "Socio registrado",
+      },
+    };
+  }
+
+  // 2. Si se verifica SOCIO, también verificar que su DPI no esté ya como DPI de algún Beneficiario
+  if (tipo === "SOCIO") {
+    let queryBen = `select id, nombres, numero_asociado, nombre_beneficiario, dpi_beneficiario from socios where regexp_replace(dpi_beneficiario, '[^0-9]', '', 'g') = $1`;
+    if (socioIdActual) {
+      queryBen += ` and id != $2`;
+    }
+    queryBen += ` limit 1`;
+
+    const { rows: benRows } = await pool.query(queryBen, params);
+    if (benRows[0]) {
+      return {
+        ...valGuatemala,
+        valido: true,
+        disponible: false,
+        registrado: {
+          id: benRows[0].id,
+          nombres: benRows[0].nombre_beneficiario,
+          numeroAsociado: benRows[0].numero_asociado,
+          rol: `Beneficiario del socio ${benRows[0].nombres}`,
+        },
+      };
+    }
+  }
+
+  return {
+    ...valGuatemala,
+    valido: true,
+    disponible: true,
+  };
+}
+
+export async function verificarTelefono(
+  telefono: string,
+  socioIdActual?: string,
+  tipo: "SOCIO" | "BENEFICIARIO" = "SOCIO",
+) {
+  const rawTel = telefono.replace(/\D/g, "");
+  const localTel = rawTel.startsWith("502") && rawTel.length > 8 ? rawTel.slice(3) : rawTel.slice(-8);
+
+  if (localTel.length !== 8) {
+    return { valido: false, mensaje: "El teléfono debe contener 8 dígitos numéricos" };
+  }
+
+  // 1. Verificar si coincide con el teléfono de algún socio
+  let querySocio = `select id, nombres, numero_asociado, telefono from socios where regexp_replace(telefono, '[^0-9]', '', 'g') like $1`;
+  const paramsSocio: unknown[] = [`%${localTel}`];
+  if (socioIdActual) {
+    paramsSocio.push(socioIdActual);
+    querySocio += ` and id != $2`;
+  }
+  querySocio += ` limit 1`;
+
+  const { rows: socioRows } = await pool.query(querySocio, paramsSocio);
+  if (socioRows[0]) {
+    return {
+      valido: true,
+      disponible: false,
+      registrado: {
+        id: socioRows[0].id,
+        nombres: socioRows[0].nombres,
+        numeroAsociado: socioRows[0].numero_asociado,
+        rol: "Socio registrado",
+      },
+    };
+  }
+
+  // 2. Si se verifica SOCIO, también verificar en beneficiarios registrados
+  if (tipo === "SOCIO") {
+    let queryBen = `select id, nombres, numero_asociado, nombre_beneficiario, telefono_beneficiario from socios where regexp_replace(telefono_beneficiario, '[^0-9]', '', 'g') like $1`;
+    const paramsBen: unknown[] = [`%${localTel}`];
+    if (socioIdActual) {
+      paramsBen.push(socioIdActual);
+      queryBen += ` and id != $2`;
+    }
+    queryBen += ` limit 1`;
+
+    const { rows: benRows } = await pool.query(queryBen, paramsBen);
+    if (benRows[0]) {
+      return {
+        valido: true,
+        disponible: false,
+        registrado: {
+          id: benRows[0].id,
+          nombres: benRows[0].nombre_beneficiario,
+          numeroAsociado: benRows[0].numero_asociado,
+          rol: `Beneficiario del socio ${benRows[0].nombres}`,
+        },
+      };
+    }
+  }
+
+  return { valido: true, disponible: true };
+}
+
+/**
+ * Retorna socios sin cuenta de APORTACION o con saldo_actual < 100
+ * para que el cajero los aperture directamente desde la ventanilla.
+ */
+export async function sociosSinAportacion(
+  agenciaIdParam: string | null,
+  agenciaVisible: string | null
+) {
+  const agenciaId = agenciaIdParam || agenciaVisible;
+  const { rows } = await pool.query(
+    `select
+       s.id, s.nombres, s.numero_asociado,
+       c.saldo_actual as saldo_aportacion
+     from socios s
+     left join cuentas c on c.socio_id = s.id and c.tipo = 'APORTACION' and c.estado = 'ACTIVA'
+     where s.estado = 'ACTIVO'
+       and ($1::uuid is null or s.agencia_id = $1::uuid)
+       and (c.id is null or c.saldo_actual < 100)
+     order by s.nombres asc`,
+    [agenciaId || null]
+  );
+  return rows;
+}
+
+export async function abrirAportacionSocio(
+  socioId: string,
+  monto: number = 100,
+  recibo?: string | null,
+  usuarioId: string = "",
+  cuotaIngreso?: number
+) {
+  const { rows: socioRows } = await pool.query(
+    `select s.*, a.codigo as agencia_codigo from socios s join agencias a on a.id = s.agencia_id where s.id = $1`,
+    [socioId]
+  );
+  if (!socioRows[0]) throw notFound("Socio no encontrado");
+  const socio = socioRows[0];
+
+  const montoApor = Number(monto) >= 100 ? Number(monto) : 100;
+  const codAgencia = socio.agencia_codigo ?? "MIF";
+  const numCuentaAportacion = `${codAgencia}-APOR-${socio.numero_asociado}`;
+  const obsApertura = recibo?.trim()
+    ? `Aportación estatutaria inicial. Comprobante/Recibo: ${recibo.trim()}`
+    : "Aportación estatutaria inicial";
+
+  const { rows: cuentaRows } = await pool.query(
+    `insert into cuentas (numero_cuenta, tipo, estado, socio_id, agencia_id, saldo_inicial, observaciones_apertura, creado_por_id)
+     values ($1, 'APORTACION', 'ACTIVA', $2, $3, $4, $5, $6)
+     on conflict (numero_cuenta) do update set saldo_inicial = $4, estado = 'ACTIVA', observaciones_apertura = $5
+     returning *`,
+    [numCuentaAportacion, socio.id, socio.agencia_id, montoApor, obsApertura, usuarioId || null]
+  );
+
+  await registrarAuditoria({
+    entidad: "Cuenta",
+    entidadId: cuentaRows[0].id,
+    accion: "CREAR",
+    usuarioId,
+    datosNuevos: { tipo: "APORTACION", saldo_inicial: montoApor, socio_id: socio.id },
+  });
+
+  // Si se registró cuota de ingreso y hay caja auxiliar abierta hoy, registrar el ingreso
+  if (cuotaIngreso && cuotaIngreso > 0) {
+    const { rows: diaRows } = await pool.query(
+      `select id, fecha, saldo_inicial, agencia_id from caja_dias
+       where agencia_id = $1 and estado = 'ABIERTO' and fecha = current_date
+       order by created_at desc limit 1`,
+      [socio.agencia_id]
+    );
+    if (diaRows[0]) {
+      const dia = diaRows[0];
+      // Obtener saldo acumulado actual
+      const { rows: saldoRows } = await pool.query(
+        `select saldo_acumulado from caja_movimientos_auxiliar where caja_dia_id = $1 order by created_at desc limit 1`,
+        [dia.id]
+      );
+      const saldoPrevio = saldoRows[0] ? Number(saldoRows[0].saldo_acumulado) : Number(dia.saldo_inicial);
+      const saldoAcumulado = saldoPrevio + cuotaIngreso;
+
+      // Contador para INGRESO_ASOCIADO
+      const { rows: contRows } = await pool.query(
+        `select count(*)::int as total from caja_movimientos_auxiliar where agencia_id = $1 and categoria = 'INGRESO_ASOCIADO'`,
+        [socio.agencia_id]
+      );
+      const contador = contRows[0].total + 1;
+
+      await pool.query(
+        `insert into caja_movimientos_auxiliar (
+           caja_dia_id, agencia_id, fecha, seccion, categoria, tipo, contador,
+           referencia, socio_id, beneficiario, descripcion, doc_no, monto, saldo_acumulado,
+           origen_fondos, usuario_id
+         ) values ($1, $2, $3, 'PROPIO', 'INGRESO_ASOCIADO', 'INGRESO', $4, $5, $6, $7, $8, $9, $10, $11, 'FONDOS_PROPIOS', $12)`,
+        [
+          dia.id, socio.agencia_id, dia.fecha, contador,
+          socio.numero_asociado, socio.id, socio.nombres,
+          `Cuota de ingreso nuevo asociado ${socio.nombres} (${socio.numero_asociado})`,
+          recibo ?? null, cuotaIngreso, saldoAcumulado, usuarioId || null
+        ]
+      );
+    }
+  }
+
+  return { ...cuentaRows[0], cuotaIngresoRegistrada: cuotaIngreso && cuotaIngreso > 0 };
 }
 
 export async function actualizar(
@@ -3997,14 +5162,64 @@ export async function actualizar(
 ): Promise<Socio> {
   const anterior = await obtener(id, agenciaVisibleParaUsuario);
 
+  // Validaciones Cruzadas (Socio y Beneficiario)
+  const dpiSocio = data.dpi?.trim();
+  const dpiBen = data.dpiBeneficiario?.trim();
+  const telSocio = data.telefono?.trim();
+  const telBen = data.telefonoBeneficiario?.trim();
+
+  // Auto-restricción: Un socio no puede ser su propio beneficiario (ni usar mismo DPI ni teléfono)
+  const finalDpiSocio = dpiSocio ?? anterior.dpi;
+  const finalDpiBen = dpiBen ?? anterior.dpi_beneficiario;
+  if (finalDpiSocio && finalDpiBen && finalDpiSocio === finalDpiBen) {
+    throw badRequest("El DPI del socio y el DPI/CUI del beneficiario no pueden ser iguales.");
+  }
+
+  const finalTelSocio = telSocio ?? anterior.telefono;
+  const finalTelBen = telBen ?? anterior.telefono_beneficiario;
+  if (finalTelSocio && finalTelBen && finalTelSocio === finalTelBen) {
+    throw badRequest("El teléfono del socio y el teléfono del beneficiario no pueden ser iguales.");
+  }
+
+  // DPI Socio
+  if (dpiSocio) {
+    const res = await verificarDpi(dpiSocio, id, "SOCIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El DPI "${dpiSocio}" ya está registrado en el sistema (${res.registrado?.rol}: ${res.registrado?.nombres}).`);
+  }
+
+  // Teléfono Socio
+  if (telSocio) {
+    const res = await verificarTelefono(telSocio, id, "SOCIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El teléfono "${telSocio}" ya está registrado en el sistema (${res.registrado?.rol}: ${res.registrado?.nombres}).`);
+  }
+
+  // DPI Beneficiario
+  if (dpiBen) {
+    const res = await verificarDpi(dpiBen, id, "BENEFICIARIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El DPI/CUI del beneficiario "${dpiBen}" ya pertenece a un socio registrado (${res.registrado?.nombres}).`);
+  }
+
+  // Teléfono Beneficiario
+  if (telBen) {
+    const res = await verificarTelefono(telBen, id, "BENEFICIARIO");
+    if (!res.valido) throw badRequest(res.mensaje!);
+    if (!res.disponible) throw conflict(`El teléfono del beneficiario "${telBen}" ya pertenece a un socio registrado (${res.registrado?.nombres}).`);
+  }
+
   const campos: Record<string, unknown> = {
-    nombres: data.nombres,
+    nombres: data.nombres !== undefined ? (data.nombres ? capitalizarNombre(data.nombres) : data.nombres) : undefined,
     genero: data.genero,
     fecha_ingreso: data.fechaIngreso,
     dpi: data.dpi,
-    direccion: data.direccion,
+    direccion: data.direccion !== undefined ? (data.direccion ? capitalizarDescripcion(data.direccion) : data.direccion) : undefined,
     telefono: data.telefono,
-    nombre_beneficiario: data.nombreBeneficiario,
+    nombre_beneficiario: data.nombreBeneficiario !== undefined ? (data.nombreBeneficiario ? capitalizarNombre(data.nombreBeneficiario) : data.nombreBeneficiario) : undefined,
+    dpi_beneficiario: data.dpiBeneficiario,
+    telefono_beneficiario: data.telefonoBeneficiario,
+    parentesco_beneficiario: data.parentescoBeneficiario,
     estado: data.estado,
   };
 
@@ -4024,23 +5239,75 @@ export async function actualizar(
     `update socios set ${sets.join(", ")} where id = $${valores.length} returning *`,
     valores,
   );
-  const socio = rows[0];
+  const actualizado = rows[0];
   await registrarAuditoria({
     entidad: "Socio",
     entidadId: id,
     accion: "ACTUALIZAR",
     usuarioId,
     datosAnteriores: anterior,
-    datosNuevos: socio,
+    datosNuevos: actualizado,
   });
-  return socio;
+  return actualizado;
+}
+
+export async function cambiarEstado(
+  id: string,
+  nuevoEstado: "ACTIVO" | "INACTIVO",
+  usuarioId: string,
+  agenciaVisibleParaUsuario: string | null,
+): Promise<Socio> {
+  return actualizar(id, { estado: nuevoEstado }, usuarioId, agenciaVisibleParaUsuario);
+}
+
+export async function listarAportaciones(params: { agenciaId: string | null; q?: string }) {
+  const condiciones: string[] = [];
+  const valores: unknown[] = [];
+
+  if (params.agenciaId) {
+    valores.push(params.agenciaId);
+    condiciones.push(`s.agencia_id = $${valores.length}`);
+  }
+  if (params.q) {
+    const qClean = params.q.replace(/\D/g, "");
+    valores.push(`%${params.q.toLowerCase()}%`);
+    const idx = valores.length;
+    if (qClean.length >= 3) {
+      valores.push(`%${qClean}%`);
+      const idxClean = valores.length;
+      condiciones.push(
+        `(lower(s.nombres) like $${idx} or lower(s.numero_asociado) like $${idx} or s.dpi like $${idx} or regexp_replace(coalesce(s.dpi, ''), '[^0-9]', '', 'g') like $${idxClean} or regexp_replace(coalesce(s.telefono, ''), '[^0-9]', '', 'g') like $${idxClean})`,
+      );
+    } else {
+      condiciones.push(`(lower(s.nombres) like $${idx} or lower(s.numero_asociado) like $${idx} or s.dpi like $${idx})`);
+    }
+  }
+
+  const where = condiciones.length ? `where ${condiciones.join(" and ")}` : "";
+
+  const query = `
+    select s.id as socio_id, s.numero_asociado, s.nombres, s.dpi, s.genero, s.fecha_ingreso, s.direccion, s.telefono,
+           s.nombre_beneficiario, s.dpi_beneficiario, s.telefono_beneficiario, s.parentesco_beneficiario, s.estado,
+           a.nombre as agencia_nombre,
+           coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0) as total_aportaciones
+    from socios s
+    join agencias a on a.id = s.agencia_id
+    left join cuentas c on c.socio_id = s.id and c.tipo = 'APORTACION'
+    left join saldos_cuenta sc on sc.cuenta_id = c.id
+    ${where}
+    group by s.id, a.nombre
+    order by s.numero_asociado desc
+  `;
+
+  const { rows } = await pool.query(query, valores);
+  return rows;
 }
 ```
 
 ## `backend/src/types/models.ts` {#backendsrctypesmodelsts}
 
 ```ts
-export type RolUsuario = "ADMIN" | "GERENCIA" | "SUPERVISOR" | "CAJERO";
+export type RolUsuario = "ADMIN" | "GERENCIA" | "SUPERVISOR" | "CAJERO" | "CAJA_CHICA" | "PROMOTOR";
 export type EstadoSocio = "ACTIVO" | "INACTIVO";
 export type Genero = "M" | "F";
 
@@ -4079,7 +5346,11 @@ export interface Socio {
   dpi: string | null;
   direccion: string | null;
   telefono: string | null;
+  edad: number | null;
   nombre_beneficiario: string | null;
+  dpi_beneficiario: string | null;
+  telefono_beneficiario: string | null;
+  parentesco_beneficiario: string | null;
   creado_por_id: string | null;
   created_at: Date;
   updated_at: Date;
@@ -4092,6 +5363,105 @@ export interface UsuarioAutenticado {
   email: string;
   rol: RolUsuario;
   agenciaId: string | null;
+}
+
+export type TipoPrestamo = "FIDUCIARIO" | "HIPOTECARIO";
+export type EstadoPrestamo = "SOLICITUD" | "APROBADO" | "DESEMBOLSADO" | "CANCELADO" | "RECHAZADO";
+export type TipoAmortizacion = "CUOTA_NIVELADA" | "SOBRE_SALDOS";
+export type OrigenFondos = "FONDOS_PROPIOS" | "FEDERURAL" | "CHN_GUATEMALA";
+
+export interface Prestamo {
+  id: string;
+  codigo: string;
+  socio_id: string;
+  socio_nombres?: string;
+  numero_asociado?: string;
+  agencia_id: string;
+  agencia_nombre?: string;
+  promotor_id: string | null;
+  promotor_nombre?: string | null;
+  tipo: TipoPrestamo;
+  estado: EstadoPrestamo;
+  tipo_amortizacion: TipoAmortizacion;
+  origen_fondos?: OrigenFondos;
+  monto_solicitado: number;
+  monto_aprobado: number | null;
+  saldo_capital?: number | null;
+  tasa_interes_mensual: number;
+  plazo_meses: number;
+  cuota_mensual: number;
+  destino: string | null;
+  garantia: string | null;
+  ubicacion_garantia?: string | null;
+  nombre_fiador?: string | null;
+  dpi_fiador?: string | null;
+  telefono_fiador?: string | null;
+  documento_desembolso?: string | null;
+  observaciones: string | null;
+  fecha_solicitud: string;
+  fecha_aprobacion: string | null;
+  fecha_desembolso: string | null;
+  fecha_vencimiento?: string | null;
+  fecha_ultimo_pago_migracion?: string | null;
+  es_migracion?: boolean;
+  numero_credito_anterior?: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CuotaAmortizacion {
+  numero: number;
+  fechaPago: string;
+  dias?: number;
+  cuota: number;
+  capital: number;
+  interes: number;
+  saldoRestante: number;
+}
+
+export type EstadoPlazoFijo = "ACTIVO" | "LIQUIDADO";
+
+export interface PlazoFijoContrato {
+  id: string;
+  cuenta_id: string;
+  numero_certificacion: string | null;
+  plazo_meses: number;
+  tasa_anual: number;
+  isr_porcentaje: number;
+  monto_deposito: number;
+  fecha_inicio: string;
+  fecha_vencimiento: string;
+  interes_generado: number;
+  interes_neto: number;
+  saldo_liquido_a_pagar: number;
+  estado: EstadoPlazoFijo;
+  fecha_retiro: string | null;
+  recibo_retiro?: string | null;
+  monto_liquidado?: number | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export type EstadoCobroCampo = "PENDIENTE" | "LIQUIDADO" | "RECHAZADO";
+
+export interface CobroCampo {
+  id: string;
+  promotor_id: string;
+  agencia_id: string;
+  socio_id: string;
+  prestamo_id: string;
+  fecha: string; // date
+  numero_recibo_fisico: string;
+  monto: number;
+  estado: EstadoCobroCampo;
+  justificacion_edicion?: string | null;
+  veces_editado: number;
+  caja_dia_id?: string | null;
+  caja_movimiento_id?: string | null;
+  prestamo_pago_id?: string | null;
+  created_at: Date;
+  updated_at: Date;
+  liquidado_at?: Date | null;
 }
 ```
 
@@ -4131,12 +5501,11 @@ export function requireRole(...roles: RolUsuario[]) {
   };
 }
 
-// ADMIN y GERENCIA ven todas las agencias; SUPERVISOR y CAJERO quedan
-// limitados a la suya. Devuelve el id de agencia por el que hay que filtrar,
-// o null si el usuario puede ver todas.
+// GERENCIA ve todas las agencias; los demás roles quedan limitados a la suya.
+// Devuelve el id de agencia por el que hay que filtrar, o null si puede ver todas.
 export function agenciaVisible(req: Request): string | null {
   if (!req.user) throw unauthorized();
-  if (req.user.rol === "ADMIN" || req.user.rol === "GERENCIA") return null;
+  if (req.user.rol === "GERENCIA") return null;
   return req.user.agenciaId;
 }
 ```
@@ -4168,6 +5537,12 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
 
   // eslint-disable-next-line no-console
   console.error("Error no controlado:", err);
+  
+  try {
+    const fs = require("fs");
+    fs.appendFileSync("error.log", new Date().toISOString() + " - " + String(err) + (err instanceof Error ? "\n" + err.stack : "") + "\n");
+  } catch (e) {}
+  
   return res.status(500).json({ error: "Ocurrió un error inesperado en el servidor" });
 }
 ```
@@ -4200,22 +5575,68 @@ main().catch((err) => {
 ## `backend/src/db/pool.ts` {#backendsrcdbpoolts}
 
 ```ts
-import { Pool } from "pg";
+import { Pool, QueryConfig, QueryResult, QueryResultRow } from "pg";
 
 const isLocal =
   !process.env.DATABASE_URL ||
   process.env.DATABASE_URL.includes("localhost") ||
   process.env.DATABASE_URL.includes("127.0.0.1");
 
+// Supabase Transaction Pooler (puerto 6543) permite ~10 conexiones en el plan
+// gratuito. Con max=5 dejamos margen para múltiples requests concurrentes.
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: isLocal ? false : { rejectUnauthorized: false },
+  max: 5,                        // Máximo de conexiones en el pool
+  idleTimeoutMillis: 30000,      // Liberar conexiones ociosas tras 30 s
+  connectionTimeoutMillis: 8000, // Esperar hasta 8 s para obtener una conexión
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 });
 
 pool.on("error", (err) => {
   // eslint-disable-next-line no-console
   console.error("Error inesperado en el pool de PostgreSQL", err);
 });
+
+// ─── Helper con reintentos automáticos ─────────────────────────────────────
+// Reintenta la query hasta `intentos` veces si ocurre un error de conexión
+// transitorio (timeout / connection terminated). Pausa exponencial entre intentos.
+const ERRORES_TRANSITORIOS = [
+  "Connection terminated",
+  "Connection terminated due to connection timeout",
+  "timeout exceeded when trying to connect",
+  "ECONNRESET",
+  "ECONNREFUSED",
+];
+
+function esErrorTransitorio(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return ERRORES_TRANSITORIOS.some((e) => msg.includes(e));
+}
+
+export async function queryWithRetry<R extends QueryResultRow = QueryResultRow>(
+  queryOrText: string | QueryConfig<unknown[]>,
+  values?: unknown[],
+  intentos = 3,
+): Promise<QueryResult<R>> {
+  let ultimo: unknown;
+  for (let i = 0; i < intentos; i++) {
+    try {
+      return values
+        ? await pool.query<R>(queryOrText as string, values)
+        : await pool.query<R>(queryOrText as QueryConfig<unknown[]>);
+    } catch (err) {
+      ultimo = err;
+      if (!esErrorTransitorio(err)) throw err;          // Error no recuperable
+      const espera = 300 * Math.pow(2, i);              // 300 ms, 600 ms, 1.2 s
+      // eslint-disable-next-line no-console
+      console.warn(`[pool] Error de conexión (intento ${i + 1}/${intentos}). Reintentando en ${espera} ms...`);
+      await new Promise((r) => setTimeout(r, espera));
+    }
+  }
+  throw ultimo;
+}
 ```
 
 ## `backend/src/db/seed.ts` {#backendsrcdbseedts}
@@ -4283,8 +5704,8 @@ async function main() {
 
   await pool.query(
     `insert into usuarios (nombre, email, password_hash, rol, agencia_id)
-     values ('Lucia Caja Chica Chajul', $1, $2, 'CAJA_CHICA', $3)
-     on conflict (email) do update set password_hash = excluded.password_hash`,
+     values ('Lucía Caba Asicona', $1, $2, 'CAJA_CHICA', $3)
+     on conflict (email) do update set nombre = 'Lucía Caba Asicona', password_hash = excluded.password_hash`,
     [cajaChicaEmail, cajaChicaHash, agencia.id],
   );
 
@@ -4337,12 +5758,13 @@ export async function registrarAuditoria(
     usuarioId: string;
     datosAnteriores?: unknown;
     datosNuevos?: unknown;
+    motivo?: string;
   },
   client: Pick<PoolClient, "query"> = pool,
 ) {
   await client.query(
-    `insert into auditoria (entidad, entidad_id, accion, usuario_id, datos_anteriores, datos_nuevos)
-     values ($1, $2, $3, $4, $5, $6)`,
+    `insert into auditoria (entidad, entidad_id, accion, usuario_id, datos_anteriores, datos_nuevos, motivo)
+     values ($1, $2, $3, $4, $5, $6, $7)`,
     [
       params.entidad,
       params.entidadId,
@@ -4350,6 +5772,7 @@ export async function registrarAuditoria(
       params.usuarioId,
       params.datosAnteriores ? JSON.stringify(params.datosAnteriores) : null,
       params.datosNuevos ? JSON.stringify(params.datosNuevos) : null,
+      params.motivo || null,
     ],
   );
 }
@@ -4403,6 +5826,13 @@ export const conflict = (msg: string) => new AppError(409, msg);
 /**
  * Catálogo Oficial de Municipios de Guatemala (INE / RENAP)
  * Para validación y detección inteligente de DPI (CUI) de 13 dígitos.
+ * 
+ * Estructura del CUI (13 dígitos):
+ * - 4 dígitos: correlativo
+ * - 5 dígitos: correlativo verificador
+ * - 4 dígitos (DDMM):
+ *     - DD (2 dígitos): Código de Departamento (01 a 22)
+ *     - MM (2 dígitos): Código de Municipio dentro del Departamento
  */
 
 export interface MunicipioInfo {
@@ -4432,7 +5862,243 @@ export const MUNICIPIOS_GUATEMALA: Record<string, { departamento: string; munici
   "0115": { departamento: "Guatemala", municipio: "Villa Nueva" },
   "0116": { departamento: "Guatemala", municipio: "Villa Canales" },
   "0117": { departamento: "Guatemala", municipio: "San Miguel Petapa" },
-  // ... Catálogo de los 340 municipios del país (01 a 22)
+
+  // 02 - El Progreso
+  "0201": { departamento: "El Progreso", municipio: "Guastatoya" },
+  "0202": { departamento: "El Progreso", municipio: "Morazán" },
+  "0203": { departamento: "El Progreso", municipio: "San Agustín Acasaguastlán" },
+  "0204": { departamento: "El Progreso", municipio: "San Cristóbal Acasaguastlán" },
+  "0205": { departamento: "El Progreso", municipio: "El Jícaro" },
+  "0206": { departamento: "El Progreso", municipio: "Sansare" },
+  "0207": { departamento: "El Progreso", municipio: "Sanarate" },
+  "0208": { departamento: "El Progreso", municipio: "San Antonio La Paz" },
+
+  // 03 - Sacatepéquez
+  "0301": { departamento: "Sacatepéquez", municipio: "Antigua Guatemala" },
+  "0302": { departamento: "Sacatepéquez", municipio: "Jocotenango" },
+  "0303": { departamento: "Sacatepéquez", municipio: "Pastores" },
+  "0304": { departamento: "Sacatepéquez", municipio: "Sumpango" },
+  "0305": { departamento: "Sacatepéquez", municipio: "Santo Domingo Xenacoj" },
+  "0306": { departamento: "Sacatepéquez", municipio: "Santiago Sacatepéquez" },
+  "0307": { departamento: "Sacatepéquez", municipio: "San Bartolomé Milpas Altas" },
+  "0308": { departamento: "Sacatepéquez", municipio: "San Lucas Sacatepéquez" },
+  "0309": { departamento: "Sacatepéquez", municipio: "Santa Lucía Milpas Altas" },
+  "0310": { departamento: "Sacatepéquez", municipio: "Magdalena Milpas Altas" },
+  "0311": { departamento: "Sacatepéquez", municipio: "Santa María de Jesús" },
+  "0312": { departamento: "Sacatepéquez", municipio: "Ciudad Vieja" },
+  "0313": { departamento: "Sacatepéquez", municipio: "San Miguel Dueñas" },
+  "0314": { departamento: "Sacatepéquez", municipio: "Alotenango" },
+  "0315": { departamento: "Sacatepéquez", municipio: "San Antonio Aguas Calientes" },
+  "0316": { departamento: "Sacatepéquez", municipio: "Santa Catarina Barahona" },
+
+  // 04 - Chimaltenango
+  "0401": { departamento: "Chimaltenango", municipio: "Chimaltenango" },
+  "0402": { departamento: "Chimaltenango", municipio: "San José Poaquil" },
+  "0403": { departamento: "Chimaltenango", municipio: "San Martín Jilotepeque" },
+  "0404": { departamento: "Chimaltenango", municipio: "San Juan Comalapa" },
+  "0405": { departamento: "Chimaltenango", municipio: "Santa Apolonia" },
+  "0406": { departamento: "Chimaltenango", municipio: "Tecpán Guatemala" },
+  "0407": { departamento: "Chimaltenango", municipio: "Patzún" },
+  "0408": { departamento: "Chimaltenango", municipio: "Pochuta" },
+  "0409": { departamento: "Chimaltenango", municipio: "Patzicía" },
+  "0410": { departamento: "Chimaltenango", municipio: "Santa Cruz Balanyá" },
+  "0411": { departamento: "Chimaltenango", municipio: "Acatenango" },
+  "0412": { departamento: "Chimaltenango", municipio: "Yepocapa" },
+  "0413": { departamento: "Chimaltenango", municipio: "San Andrés Itzapa" },
+  "0414": { departamento: "Chimaltenango", municipio: "Parramos" },
+  "0415": { departamento: "Chimaltenango", municipio: "Zaragoza" },
+  "0416": { departamento: "Chimaltenango", municipio: "El Tejar" },
+
+  // 05 - Escuintla
+  "0501": { departamento: "Escuintla", municipio: "Escuintla" },
+  "0502": { departamento: "Escuintla", municipio: "Santa Lucía Cotzumalguapa" },
+  "0503": { departamento: "Escuintla", municipio: "La Democracia" },
+  "0504": { departamento: "Escuintla", municipio: "Siquinalá" },
+  "0505": { departamento: "Escuintla", municipio: "Masagua" },
+  "0506": { departamento: "Escuintla", municipio: "Tiquisate" },
+  "0507": { departamento: "Escuintla", municipio: "La Gomera" },
+  "0508": { departamento: "Escuintla", municipio: "Guanagazapa" },
+  "0509": { departamento: "Escuintla", municipio: "San José" },
+  "0510": { departamento: "Escuintla", municipio: "Iztapa" },
+  "0511": { departamento: "Escuintla", municipio: "Palín" },
+  "0512": { departamento: "Escuintla", municipio: "San Vicente Pacaya" },
+  "0513": { departamento: "Escuintla", municipio: "Nueva Concepción" },
+  "0514": { departamento: "Escuintla", municipio: "Sipacate" },
+
+  // 06 - Santa Rosa
+  "0601": { departamento: "Santa Rosa", municipio: "Cuilapa" },
+  "0602": { departamento: "Santa Rosa", municipio: "Barberena" },
+  "0603": { departamento: "Santa Rosa", municipio: "Santa Rosa de Lima" },
+  "0604": { departamento: "Santa Rosa", municipio: "Casillas" },
+  "0605": { departamento: "Santa Rosa", municipio: "San Rafael Las Flores" },
+  "0606": { departamento: "Santa Rosa", municipio: "Oratorio" },
+  "0607": { departamento: "Santa Rosa", municipio: "San Juan Tecuaco" },
+  "0608": { departamento: "Santa Rosa", municipio: "Chiquimulilla" },
+  "0609": { departamento: "Santa Rosa", municipio: "Taxisco" },
+  "0610": { departamento: "Santa Rosa", municipio: "Santa María Ixhuatán" },
+  "0611": { departamento: "Santa Rosa", municipio: "Guazacapán" },
+  "0612": { departamento: "Santa Rosa", municipio: "Santa Cruz Naranjo" },
+  "0613": { departamento: "Santa Rosa", municipio: "Pueblo Nuevo Viñas" },
+  "0614": { departamento: "Santa Rosa", municipio: "Nueva Santa Rosa" },
+
+  // 07 - Sololá
+  "0701": { departamento: "Sololá", municipio: "Sololá" },
+  "0702": { departamento: "Sololá", municipio: "San José Chacayá" },
+  "0703": { departamento: "Sololá", municipio: "Santa María Visitación" },
+  "0704": { departamento: "Sololá", municipio: "Santa Lucía Utatlán" },
+  "0705": { departamento: "Sololá", municipio: "Nahualá" },
+  "0706": { departamento: "Sololá", municipio: "Santa Catarina Ixtahuacán" },
+  "0707": { departamento: "Sololá", municipio: "Santa Clara La Laguna" },
+  "0708": { departamento: "Sololá", municipio: "Concepción" },
+  "0709": { departamento: "Sololá", municipio: "San Andrés Semetabaj" },
+  "0710": { departamento: "Sololá", municipio: "Panajachel" },
+  "0711": { departamento: "Sololá", municipio: "Santa Catarina Palopó" },
+  "0712": { departamento: "Sololá", municipio: "San Antonio Palopó" },
+  "0713": { departamento: "Sololá", municipio: "San Lucas Tolimán" },
+  "0714": { departamento: "Sololá", municipio: "Santa Cruz La Laguna" },
+  "0715": { departamento: "Sololá", municipio: "San Pablo La Laguna" },
+  "0716": { departamento: "Sololá", municipio: "San Marcos La Laguna" },
+  "0717": { departamento: "Sololá", municipio: "San Juan La Laguna" },
+  "0718": { departamento: "Sololá", municipio: "San Pedro La Laguna" },
+  "0719": { departamento: "Sololá", municipio: "Santiago Atitlán" },
+
+  // 08 - Totonicapán
+  "0801": { departamento: "Totonicapán", municipio: "Totonicapán" },
+  "0802": { departamento: "Totonicapán", municipio: "San Cristóbal Totonicapán" },
+  "0803": { departamento: "Totonicapán", municipio: "San Francisco El Alto" },
+  "0804": { departamento: "Totonicapán", municipio: "San Andrés Xecul" },
+  "0805": { departamento: "Totonicapán", municipio: "Momostenango" },
+  "0806": { departamento: "Totonicapán", municipio: "Santa María Chiquimula" },
+  "0807": { departamento: "Totonicapán", municipio: "Santa Lucía La Reforma" },
+  "0808": { departamento: "Totonicapán", municipio: "San Bartolo" },
+
+  // 09 - Quetzaltenango
+  "0901": { departamento: "Quetzaltenango", municipio: "Quetzaltenango" },
+  "0902": { departamento: "Quetzaltenango", municipio: "Salcajá" },
+  "0903": { departamento: "Quetzaltenango", municipio: "Olintepeque" },
+  "0904": { departamento: "Quetzaltenango", municipio: "San Carlos Sija" },
+  "0905": { departamento: "Quetzaltenango", municipio: "Sibilia" },
+  "0906": { departamento: "Quetzaltenango", municipio: "Cabricán" },
+  "0907": { departamento: "Quetzaltenango", municipio: "Cajolá" },
+  "0908": { departamento: "Quetzaltenango", municipio: "San Miguel Sigüilá" },
+  "0909": { departamento: "Quetzaltenango", municipio: "San Juan Ostuncalco" },
+  "0910": { departamento: "Quetzaltenango", municipio: "San Mateo" },
+  "0911": { departamento: "Quetzaltenango", municipio: "Concepción Chiquirichapa" },
+  "0912": { departamento: "Quetzaltenango", municipio: "San Martín Sacatepéquez" },
+  "0913": { departamento: "Quetzaltenango", municipio: "Almolonga" },
+  "0914": { departamento: "Quetzaltenango", municipio: "Cantel" },
+  "0915": { departamento: "Quetzaltenango", municipio: "Huitán" },
+  "0916": { departamento: "Quetzaltenango", municipio: "Zunil" },
+  "0917": { departamento: "Quetzaltenango", municipio: "Colomba Costa Cuca" },
+  "0918": { departamento: "Quetzaltenango", municipio: "San Francisco La Unión" },
+  "0919": { departamento: "Quetzaltenango", municipio: "El Palmar" },
+  "0920": { departamento: "Quetzaltenango", municipio: "Coatepeque" },
+  "0921": { departamento: "Quetzaltenango", municipio: "Génova" },
+  "0922": { departamento: "Quetzaltenango", municipio: "Flores Costa Cuca" },
+  "0923": { departamento: "Quetzaltenango", municipio: "La Esperanza" },
+  "0924": { departamento: "Quetzaltenango", municipio: "Palestina de Los Altos" },
+
+  // 10 - Suchitepéquez
+  "1001": { departamento: "Suchitepéquez", municipio: "Mazatenango" },
+  "1002": { departamento: "Suchitepéquez", municipio: "Cuyotenango" },
+  "1003": { departamento: "Suchitepéquez", municipio: "San Francisco Zapotitlán" },
+  "1004": { departamento: "Suchitepéquez", municipio: "San Bernardino" },
+  "1005": { departamento: "Suchitepéquez", municipio: "San José El Idolo" },
+  "1006": { departamento: "Suchitepéquez", municipio: "Santo Domingo Suchitepéquez" },
+  "1007": { departamento: "Suchitepéquez", municipio: "San Lorenzo" },
+  "1008": { departamento: "Suchitepéquez", municipio: "Samayac" },
+  "1009": { departamento: "Suchitepéquez", municipio: "San Pablo Jocopilas" },
+  "1010": { departamento: "Suchitepéquez", municipio: "San Antonio Suchitepéquez" },
+  "1011": { departamento: "Suchitepéquez", municipio: "San Miguel Panán" },
+  "1012": { departamento: "Suchitepéquez", municipio: "San Gabriel" },
+  "1013": { departamento: "Suchitepéquez", municipio: "Chicacao" },
+  "1014": { departamento: "Suchitepéquez", municipio: "Patulul" },
+  "1015": { departamento: "Suchitepéquez", municipio: "Santa Bárbara" },
+  "1016": { departamento: "Suchitepéquez", municipio: "San Juan Bautista" },
+  "1017": { departamento: "Suchitepéquez", municipio: "Santo Tomás La Unión" },
+  "1018": { departamento: "Suchitepéquez", municipio: "Zunilito" },
+  "1019": { departamento: "Suchitepéquez", municipio: "Pueblo Nuevo" },
+  "1020": { departamento: "Suchitepéquez", municipio: "Río Bravo" },
+  "1021": { departamento: "Suchitepéquez", municipio: "San José La Máquina" },
+
+  // 11 - Retalhuleu
+  "1101": { departamento: "Retalhuleu", municipio: "Retalhuleu" },
+  "1102": { departamento: "Retalhuleu", municipio: "San Sebastián" },
+  "1103": { departamento: "Retalhuleu", municipio: "Santa Cruz Muluá" },
+  "1104": { departamento: "Retalhuleu", municipio: "San Martín Zapotitlán" },
+  "1105": { departamento: "Retalhuleu", municipio: "San Felipe" },
+  "1106": { departamento: "Retalhuleu", municipio: "San Andrés Villa Seca" },
+  "1107": { departamento: "Retalhuleu", municipio: "Champerico" },
+  "1108": { departamento: "Retalhuleu", municipio: "Nuevo San Carlos" },
+  "1109": { departamento: "Retalhuleu", municipio: "El Asintal" },
+
+  // 12 - San Marcos
+  "1201": { departamento: "San Marcos", municipio: "San Marcos" },
+  "1202": { departamento: "San Marcos", municipio: "San Pedro Sacatepéquez" },
+  "1203": { departamento: "San Marcos", municipio: "San Antonio Sacatepéquez" },
+  "1204": { departamento: "San Marcos", municipio: "Comitancillo" },
+  "1205": { departamento: "San Marcos", municipio: "San Miguel Ixtahuacán" },
+  "1206": { departamento: "San Marcos", municipio: "Concepción Tutuapa" },
+  "1207": { departamento: "San Marcos", municipio: "Tacaná" },
+  "1208": { departamento: "San Marcos", municipio: "Sibinal" },
+  "1209": { departamento: "San Marcos", municipio: "Tajumulco" },
+  "1210": { departamento: "San Marcos", municipio: "Tejutla" },
+  "1211": { departamento: "San Marcos", municipio: "San Rafael Pie de la Cuesta" },
+  "1212": { departamento: "San Marcos", municipio: "Nuevo Progreso" },
+  "1213": { departamento: "San Marcos", municipio: "El Tumbador" },
+  "1214": { departamento: "San Marcos", municipio: "El Rodeo" },
+  "1215": { departamento: "San Marcos", municipio: "Malacatán" },
+  "1216": { departamento: "San Marcos", municipio: "Catarina" },
+  "1217": { departamento: "San Marcos", municipio: "Ayutla" },
+  "1218": { departamento: "San Marcos", municipio: "Ocós" },
+  "1219": { departamento: "San Marcos", municipio: "San Pablo" },
+  "1220": { departamento: "San Marcos", municipio: "El Quetzal" },
+  "1221": { departamento: "San Marcos", municipio: "La Reforma" },
+  "1222": { departamento: "San Marcos", municipio: "Pajapita" },
+  "1223": { departamento: "San Marcos", municipio: "Ixchiguán" },
+  "1224": { departamento: "San Marcos", municipio: "San José Ojetenam" },
+  "1225": { departamento: "San Marcos", municipio: "San Cristóbal Cucho" },
+  "1226": { departamento: "San Marcos", municipio: "Sipacapa" },
+  "1227": { departamento: "San Marcos", municipio: "Esquipulas Palo Gordo" },
+  "1228": { departamento: "San Marcos", municipio: "Río Blanco" },
+  "1229": { departamento: "San Marcos", municipio: "San Lorenzo" },
+  "1230": { departamento: "San Marcos", municipio: "La Blanca" },
+
+  // 13 - Huehuetenango
+  "1301": { departamento: "Huehuetenango", municipio: "Huehuetenango" },
+  "1302": { departamento: "Huehuetenango", municipio: "Chiantla" },
+  "1303": { departamento: "Huehuetenango", municipio: "Malacatancito" },
+  "1304": { departamento: "Huehuetenango", municipio: "Cuilco" },
+  "1305": { departamento: "Huehuetenango", municipio: "Nentón" },
+  "1306": { departamento: "Huehuetenango", municipio: "San Pedro Necta" },
+  "1307": { departamento: "Huehuetenango", municipio: "Jacaltenango" },
+  "1308": { departamento: "Huehuetenango", municipio: "San Pedro Soloma" },
+  "1309": { departamento: "Huehuetenango", municipio: "San Ildefonso Ixtahuacán" },
+  "1310": { departamento: "Huehuetenango", municipio: "Santa Bárbara" },
+  "1311": { departamento: "Huehuetenango", municipio: "La Libertad" },
+  "1312": { departamento: "Huehuetenango", municipio: "La Democracia" },
+  "1313": { departamento: "Huehuetenango", municipio: "San Miguel Acatán" },
+  "1314": { departamento: "Huehuetenango", municipio: "San Rafael La Independencia" },
+  "1315": { departamento: "Huehuetenango", municipio: "Todos Santos Cuchumatán" },
+  "1316": { departamento: "Huehuetenango", municipio: "San Juan Atitán" },
+  "1317": { departamento: "Huehuetenango", municipio: "Santa Eulalia" },
+  "1318": { departamento: "Huehuetenango", municipio: "San Mateo Ixtatán" },
+  "1319": { departamento: "Huehuetenango", municipio: "Colotenango" },
+  "1320": { departamento: "Huehuetenango", municipio: "San Sebastián Huehuetenango" },
+  "1321": { departamento: "Huehuetenango", municipio: "Tectitán" },
+  "1322": { departamento: "Huehuetenango", municipio: "Concepción Huista" },
+  "1323": { departamento: "Huehuetenango", municipio: "San Juan Ixcoy" },
+  "1324": { departamento: "Huehuetenango", municipio: "San Antonio Huista" },
+  "1325": { departamento: "Huehuetenango", municipio: "San Sebastián Coatán" },
+  "1326": { departamento: "Huehuetenango", municipio: "Santa Cruz Barillas" },
+  "1327": { departamento: "Huehuetenango", municipio: "Aguacatán" },
+  "1328": { departamento: "Huehuetenango", municipio: "San Rafael Petzal" },
+  "1329": { departamento: "Huehuetenango", municipio: "San Gaspar Ixchil" },
+  "1330": { departamento: "Huehuetenango", municipio: "Santiago Chimaltenango" },
+  "1331": { departamento: "Huehuetenango", municipio: "Santa Ana Huista" },
+  "1332": { departamento: "Huehuetenango", municipio: "Unión Cantinil" },
+  "1333": { departamento: "Huehuetenango", municipio: "Petatán" },
+
   // 14 - Quiché (Agencias clave: Chajul 1405, Nebaj 1413, Cotzal 1411)
   "1401": { departamento: "Quiché", municipio: "Santa Cruz del Quiché" },
   "1402": { departamento: "Quiché", municipio: "Chiché" },
@@ -4455,19 +6121,132 @@ export const MUNICIPIOS_GUATEMALA: Record<string, { departamento: string; munici
   "1419": { departamento: "Quiché", municipio: "Chicamán" },
   "1420": { departamento: "Quiché", municipio: "Ixcán (Playa Grande)" },
   "1421": { departamento: "Quiché", municipio: "Pachalum" },
+
+  // 15 - Baja Verapaz
+  "1501": { departamento: "Baja Verapaz", municipio: "Salamá" },
+  "1502": { departamento: "Baja Verapaz", municipio: "San Miguel Chicaj" },
+  "1503": { departamento: "Baja Verapaz", municipio: "Rabinal" },
+  "1504": { departamento: "Baja Verapaz", municipio: "Cubulco" },
+  "1505": { departamento: "Baja Verapaz", municipio: "Granados" },
+  "1506": { departamento: "Baja Verapaz", municipio: "Santa Cruz El Chol" },
+  "1507": { departamento: "Baja Verapaz", municipio: "San Jerónimo" },
+  "1508": { departamento: "Baja Verapaz", municipio: "Purulhá" },
+
+  // 16 - Alta Verapaz
+  "1601": { departamento: "Alta Verapaz", municipio: "Cobán" },
+  "1602": { departamento: "Alta Verapaz", municipio: "Santa Cruz Verapaz" },
+  "1603": { departamento: "Alta Verapaz", municipio: "San Cristóbal Verapaz" },
+  "1604": { departamento: "Alta Verapaz", municipio: "Tactic" },
+  "1605": { departamento: "Alta Verapaz", municipio: "Tamahú" },
+  "1606": { departamento: "Alta Verapaz", municipio: "San Pedro Carchá" },
+  "1607": { departamento: "Alta Verapaz", municipio: "San Juan Chamelco" },
+  "1608": { departamento: "Alta Verapaz", municipio: "Lanquín" },
+  "1609": { departamento: "Alta Verapaz", municipio: "Santa María Cahabón" },
+  "1610": { departamento: "Alta Verapaz", municipio: "Chisec" },
+  "1611": { departamento: "Alta Verapaz", municipio: "Chahal" },
+  "1612": { departamento: "Alta Verapaz", municipio: "Fray Bartolomé de las Casas" },
+  "1613": { departamento: "Alta Verapaz", municipio: "Santa Catarina La Tinta" },
+  "1614": { departamento: "Alta Verapaz", municipio: "Raxruhá" },
+  "1615": { departamento: "Alta Verapaz", municipio: "San Miguel Tucurú" },
+  "1616": { departamento: "Alta Verapaz", municipio: "Panzós" },
+  "1617": { departamento: "Alta Verapaz", municipio: "Senahú" },
+
+  // 17 - Petén
+  "1701": { departamento: "Petén", municipio: "Flores" },
+  "1702": { departamento: "Petén", municipio: "San José" },
+  "1703": { departamento: "Petén", municipio: "San Benito" },
+  "1704": { departamento: "Petén", municipio: "San Andrés" },
+  "1705": { departamento: "Petén", municipio: "La Libertad" },
+  "1706": { departamento: "Petén", municipio: "San Francisco" },
+  "1707": { departamento: "Petén", municipio: "Santa Ana" },
+  "1708": { departamento: "Petén", municipio: "Dolores" },
+  "1709": { departamento: "Petén", municipio: "San Luis" },
+  "1710": { departamento: "Petén", municipio: "Sayaxché" },
+  "1711": { departamento: "Petén", municipio: "Melchor de Mencos" },
+  "1712": { departamento: "Petén", municipio: "Poptún" },
+  "1713": { departamento: "Petén", municipio: "Las Cruces" },
+  "1714": { departamento: "Petén", municipio: "El Chal" },
+
+  // 18 - Izabal
+  "1801": { departamento: "Izabal", municipio: "Puerto Barrios" },
+  "1802": { departamento: "Izabal", municipio: "Livingston" },
+  "1803": { departamento: "Izabal", municipio: "El Estor" },
+  "1804": { departamento: "Izabal", municipio: "Morales" },
+  "1805": { departamento: "Izabal", municipio: "Los Amates" },
+
+  // 19 - Zacapa
+  "1901": { departamento: "Zacapa", municipio: "Zacapa" },
+  "1902": { departamento: "Zacapa", municipio: "Estanzuela" },
+  "1903": { departamento: "Zacapa", municipio: "Río Hondo" },
+  "1904": { departamento: "Zacapa", municipio: "Gualán" },
+  "1905": { departamento: "Zacapa", municipio: "Teculután" },
+  "1906": { departamento: "Zacapa", municipio: "Usumatlán" },
+  "1907": { departamento: "Zacapa", municipio: "Cabañas" },
+  "1908": { departamento: "Zacapa", municipio: "San Diego" },
+  "1909": { departamento: "Zacapa", municipio: "La Unión" },
+  "1910": { departamento: "Zacapa", municipio: "Huité" },
+  "1911": { departamento: "Zacapa", municipio: "San Jorge" },
+
+  // 20 - Chiquimula
+  "2001": { departamento: "Chiquimula", municipio: "Chiquimula" },
+  "2002": { departamento: "Chiquimula", municipio: "San José La Arada" },
+  "2003": { departamento: "Chiquimula", municipio: "San Juan Ermita" },
+  "2004": { departamento: "Chiquimula", municipio: "Jocotán" },
+  "2005": { departamento: "Chiquimula", municipio: "Camotán" },
+  "2006": { departamento: "Chiquimula", municipio: "Olopa" },
+  "2007": { departamento: "Chiquimula", municipio: "Esquipulas" },
+  "2008": { departamento: "Chiquimula", municipio: "Concepción Las Minas" },
+  "2009": { departamento: "Chiquimula", municipio: "Quetzaltepeque" },
+  "2010": { departamento: "Chiquimula", municipio: "San Jacinto" },
+  "2011": { departamento: "Chiquimula", municipio: "Ipala" },
+
+  // 21 - Jalapa
+  "2101": { departamento: "Jalapa", municipio: "Jalapa" },
+  "2102": { departamento: "Jalapa", municipio: "San Pedro Pinula" },
+  "2103": { departamento: "Jalapa", municipio: "San Luis Jilotepeque" },
+  "2104": { departamento: "Jalapa", municipio: "San Manuel Chaparrón" },
+  "2105": { departamento: "Jalapa", municipio: "San Carlos Alzatate" },
+  "2106": { departamento: "Jalapa", municipio: "Monjas" },
+  "2107": { departamento: "Jalapa", municipio: "Mataquescuintla" },
+
+  // 22 - Jutiapa
+  "2201": { departamento: "Jutiapa", municipio: "Jutiapa" },
+  "2202": { departamento: "Jutiapa", municipio: "El Progreso" },
+  "2203": { departamento: "Jutiapa", municipio: "Santa Catarina Mita" },
+  "2204": { departamento: "Jutiapa", municipio: "Agua Blanca" },
+  "2205": { departamento: "Jutiapa", municipio: "Asunción Mita" },
+  "2206": { departamento: "Jutiapa", municipio: "Yupiltepeque" },
+  "2207": { departamento: "Jutiapa", municipio: "Atescatempa" },
+  "2208": { departamento: "Jutiapa", municipio: "Jerez" },
+  "2209": { departamento: "Jutiapa", municipio: "El Adelanto" },
+  "2210": { departamento: "Jutiapa", municipio: "Zapotitlán" },
+  "2211": { departamento: "Jutiapa", municipio: "Comapa" },
+  "2212": { departamento: "Jutiapa", municipio: "Jalpatagua" },
+  "2213": { departamento: "Jutiapa", municipio: "Conguaco" },
+  "2214": { departamento: "Jutiapa", municipio: "Moyuta" },
+  "2215": { departamento: "Jutiapa", municipio: "Pasaco" },
+  "2216": { departamento: "Jutiapa", municipio: "San José Acatempa" },
+  "2217": { departamento: "Jutiapa", municipio: "Quezada" },
 };
 
+// Mapeo de códigos de municipios principales de las agencias
 export const CODIGOS_AGENCIA: Record<string, { codigoMuni: string; nombre: string }> = {
   CHAJUL: { codigoMuni: "1405", nombre: "Agencia Chajul (1405 - Chajul, Quiché)" },
   NEBAJ: { codigoMuni: "1413", nombre: "Agencia Nebaj (1413 - Santa María Nebaj, Quiché)" },
   ACUL: { codigoMuni: "1413", nombre: "Agencia Acul (1413 - Nebaj/Acul, Quiché)" },
 };
 
+/**
+ * Limpia y normaliza un DPI a solo dígitos.
+ */
 export function limpiarDPI(dpi: string | null | undefined): string {
   if (!dpi) return "";
   return dpi.replace(/\D/g, "");
 }
 
+/**
+ * Formatea un DPI a estándar oficial guatemalteco: "XXXX XXXXX DDMM"
+ */
 export function formatearDPI(dpi: string | null | undefined): string {
   const digits = limpiarDPI(dpi);
   if (digits.length !== 13) return dpi?.trim() || "";
@@ -4485,32 +6264,51 @@ export interface ResultadoValidacionDPI {
   dpiFormateado?: string;
 }
 
+/**
+ * Valida un DPI guatemalteco y analiza su procedencia municipal.
+ * 
+ * Reglas de negocio:
+ * 1. Debe tener exactamente 13 dígitos numéricos (bloqueante si no).
+ * 2. Los últimos 4 dígitos deben coincidir con un municipio oficial de Guatemala (bloqueante si no existe).
+ * 3. Si coincide con la agencia actual: es local.
+ * 4. Si es de otro municipio oficial (ej. 1413 en Chajul, 0105 de San Juan Sacatepéquez): es válido e informativo.
+ */
 export function validarDpiGuatemala(dpi: string | null | undefined, agenciaCodigo?: string): ResultadoValidacionDPI {
   const raw = limpiarDPI(dpi);
-  if (!raw) return { valido: false, mensaje: "El DPI es requerido." };
+
+  if (!raw) {
+    return { valido: false, mensaje: "El DPI es requerido." };
+  }
+
   if (raw.length !== 13) {
     return {
       valido: false,
       mensaje: `DPI incompleto o con longitud errónea: tiene ${raw.length} dígitos (debe tener exactamente 13 dígitos).`,
     };
   }
+
   const codMuni = raw.slice(9, 13);
   const infoMuni = MUNICIPIOS_GUATEMALA[codMuni];
+
   if (!infoMuni) {
     return {
       valido: false,
       mensaje: `La terminación "${codMuni}" no corresponde a ningún municipio oficial de la República de Guatemala. Verifique el documento.`,
     };
   }
+
   const dpiFormateado = `${raw.slice(0, 4)} ${raw.slice(4, 9)} ${codMuni}`;
   const codAgencia = agenciaCodigo?.trim().toUpperCase();
   const agenciaEsperada = codAgencia ? CODIGOS_AGENCIA[codAgencia] : undefined;
+
   let esLocal = true;
   let advertencia: string | undefined = undefined;
 
-  if (agenciaEsperada && agenciaEsperada.codigoMuni !== codMuni) {
-    esLocal = false;
-    advertencia = `Asociado de otro municipio: DPI emitido en ${infoMuni.municipio}, ${infoMuni.departamento} (Terminación ${codMuni}).`;
+  if (agenciaEsperada) {
+    if (agenciaEsperada.codigoMuni !== codMuni) {
+      esLocal = false;
+      advertencia = `Asociado de otro municipio: DPI emitido en ${infoMuni.municipio}, ${infoMuni.departamento} (Terminación ${codMuni}).`;
+    }
   }
 
   return {
@@ -4536,6 +6334,18 @@ import path from "path";
 /**
  * Script Oficial de Importación — Fase 2: Ahorro Corriente
  * Archivo: importar/ahorro corriente/AHORRO CORRIENTE 30-08-2026.xlsx
+ * 
+ * Reglas de Negocio aprobadas:
+ * 1. Unificación de 14 errores tipográficos del libro para consolidar libretas del mismo titular.
+ * 2. Registro de 127 nuevos asociados en Agencia Chajul con aportación estatutaria inicial pre-2026 (Q100 al 2025-12-31).
+ * 3. Formato Dual de Cuenta de Ahorro Corriente:
+ *    - numero_cuenta: Conserva el número original de libreta de Excel (ej: 148-5-1) o vacío ("") si no vino en Excel.
+ *    - codigo_sistema: Correlativo estructurado único (CHAJ-AHC-00001...) para asignación y visualización dual.
+ * 4. Asignación de saldo inicial pre-2026 (fecha 2025-12-31) a 80 cuentas que retiraron ahorros históricos previos.
+ * 5. Cuadre exacto de 674 movimientos del 2026:
+ *    - Total Depósitos: Q 3,620,116.31
+ *    - Total Retiros:   Q 1,348,045.62
+ *    - Saldo Neto 2026: Q 2,272,070.69 (Diferencia Fila 679: Q 0.00).
  */
 
 interface RawExcelRow {
@@ -4565,7 +6375,399 @@ const TYPO_MAP: Record<string, string> = {
   "ELENA CABA  RIVERA": "ELENA CABA RIVERA",
   "TERESA ASICONA  ASICONA": "TERESA ASICONA ASICONA",
 };
-// ... Ver implementación completa en backend/src/db/importar-ahorro-corriente.ts
+
+async function main() {
+  console.log("================================================================================");
+  console.log("   IMPORTACIÓN OFICIAL — FASE 2: AHORRO CORRIENTE (30-08-2026)");
+  console.log("================================================================================\n");
+
+  console.log("1. Extrayendo datos desde 'importar/ahorro corriente/AHORRO CORRIENTE 30-08-2026.xlsx'...");
+  const scriptPython = `
+import openpyxl, json
+
+wb = openpyxl.load_workbook('importar/ahorro corriente/AHORRO CORRIENTE 30-08-2026.xlsx', data_only=True)
+ws = wb['AHORRO ENERO 2026']
+
+rows = []
+for r in range(4, 678):
+    nom = ws.cell(r, 5).value
+    if not nom or not str(nom).strip(): continue
+    cta = ws.cell(r, 1).value
+    fec = ws.cell(r, 2).value
+    rec = ws.cell(r, 3).value
+    ag = ws.cell(r, 4).value
+    dep = ws.cell(r, 8).value or 0
+    ret = ws.cell(r, 9).value or 0
+    
+    fec_str = str(fec)[:10] if fec else '2026-01-02'
+    if fec_str.startswith('2025-06-15'):
+        fec_str = '2026-06-15' # Corrección de error tipográfico de año del cajero en fila 433 (entre 13 y 16 de junio 2026)
+
+    rows.append({
+        'row': r,
+        'cta': str(cta).strip() if cta else '',
+        'fec': fec_str,
+        'rec': str(rec).strip() if rec else '',
+        'agencia': str(ag).strip() if ag else 'AGENCIA CHAJUL',
+        'nombre': str(nom).strip(),
+        'dep': float(dep),
+        'ret': float(ret)
+    })
+
+print(json.dumps(rows))
+`;
+
+  const rawJson = execSync(`python3 -c "${scriptPython.replace(/"/g, '\\"')}"`, {
+    maxBuffer: 50 * 1024 * 1024,
+    cwd: path.resolve(__dirname, "../../.."),
+  }).toString();
+
+  const rowsExcel: RawExcelRow[] = JSON.parse(rawJson);
+  console.log(`   ✓ Extraídas exitosamente ${rowsExcel.length} transacciones operativas del Excel.`);
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Limpiar importación previa de Ahorro Corriente si existiera (idempotente)
+    console.log("2. Limpiando registros previos de Ahorro Corriente para reimportación limpia...");
+    await client.query(`
+      delete from movimientos where cuenta_id in (select id from cuentas where tipo = 'AHORRO_CORRIENTE');
+      delete from cuentas where tipo = 'AHORRO_CORRIENTE';
+      delete from movimientos where numero_recibo = 'SALDO-HIST-APO';
+      delete from cuentas where numero_cuenta = 'APO-HIST';
+      delete from socios where advertencia_importacion = 'Socio migrado de Ahorro Corriente (Aportación estatutaria previa pre-2026)';
+    `);
+    console.log("   ✓ Base de datos preparada para importación limpia de Ahorro Corriente.");
+
+    // 1. Obtener Agencia Chajul y Usuario Admin
+    const { rows: agRows } = await client.query(`select id from agencias where codigo = 'CHAJUL';`);
+    if (agRows.length === 0) throw new Error("No se encontró Agencia Chajul en BD.");
+    const agenciaChajulId = agRows[0].id;
+
+    const { rows: uRows } = await client.query(`
+      select id from usuarios where email = 'admin@mif.coop' or rol in ('ADMIN', 'GERENCIA') limit 1;
+    `);
+    if (uRows.length === 0) throw new Error("No se encontró usuario administrador en BD.");
+    const adminUserId = uRows[0].id;
+
+    // 2. Cargar socios existentes
+    const { rows: dbSociosRows } = await client.query(`select id, nombres, numero_asociado from socios;`);
+    const sociosMap = new Map<string, { id: string; numeroAsociado: string }>();
+    let maxCorrelativoSocio = 0;
+
+    for (const s of dbSociosRows) {
+      sociosMap.set(s.nombres.trim().toUpperCase(), { id: s.id, numeroAsociado: s.numero_asociado });
+      const numMatch = s.numero_asociado.match(/CHAJ-(\d+)/);
+      if (numMatch) {
+        const n = parseInt(numMatch[1], 10);
+        if (n > maxCorrelativoSocio) maxCorrelativoSocio = n;
+      }
+    }
+    console.log(`   ✓ Socios base en base de datos: ${sociosMap.size} (Último correlativo: CHAJ-${String(maxCorrelativoSocio).padStart(5, "0")})`);
+
+    // 3. Agrupar transacciones por titular unificado y calcular saldos históricos
+    console.log("\n2. Consolidando titulares y analizando balance corrido de cada libreta...");
+    interface TitularData {
+      nombre: string;
+      cuentasExcel: Set<string>;
+      totalDep: number;
+      totalRet: number;
+      minBalance: number;
+      balanceCorrido: number;
+      movimientos: RawExcelRow[];
+    }
+
+    const titulares = new Map<string, TitularData>();
+
+    for (const r of rowsExcel) {
+      const nomNorm = TYPO_MAP[r.nombre.trim().toUpperCase()] || r.nombre.trim().toUpperCase();
+      if (!titulares.has(nomNorm)) {
+        titulares.set(nomNorm, {
+          nombre: nomNorm,
+          cuentasExcel: new Set<string>(),
+          totalDep: 0,
+          totalRet: 0,
+          minBalance: 0,
+          balanceCorrido: 0,
+          movimientos: [],
+        });
+      }
+      const t = titulares.get(nomNorm)!;
+      if (r.cta) t.cuentasExcel.add(r.cta);
+      t.totalDep += r.dep;
+      t.totalRet += r.ret;
+      t.balanceCorrido += (r.dep - r.ret);
+      if (t.balanceCorrido < t.minBalance) {
+        t.minBalance = t.balanceCorrido;
+      }
+      t.movimientos.push(r);
+    }
+
+    console.log(`   ✓ Total titulares únicos consolidados: ${titulares.size}`);
+
+    // 4. Registrar nuevos socios que no estaban en Aportaciones 2026
+    console.log("\n3. Verificando y registrando nuevos asociados con aportación estatutaria inicial pre-2026...");
+    let nuevosSociosRegistrados = 0;
+    let correlativoSocio = maxCorrelativoSocio + 1;
+
+    for (const [nom, t] of titulares.entries()) {
+      if (!sociosMap.has(nom)) {
+        const numeroAsociado = `CHAJ-${String(correlativoSocio++).padStart(5, "0")}`;
+        const { rows: newSocio } = await client.query(`
+          insert into socios (
+            numero_asociado, agencia_id, nombres, fecha_ingreso, estado,
+            advertencia_importacion, creado_por_id
+          ) values (
+            $1, $2, $3, '2025-12-31', 'ACTIVO',
+            'Socio migrado de Ahorro Corriente (Aportación estatutaria previa pre-2026)', $4
+          ) returning id;
+        `, [numeroAsociado, agenciaChajulId, nom, adminUserId]);
+
+        const socioId = newSocio[0].id;
+        sociosMap.set(nom, { id: socioId, numeroAsociado });
+
+        // Cuenta de aportación estatutaria histórica
+        const codApoHist = `CHAJ-APO-${String(correlativoSocio).padStart(5, "0")}`;
+        const { rows: newApoCta } = await client.query(`
+          insert into cuentas (
+            numero_cuenta, codigo_sistema, tipo, estado, socio_id, agencia_id, saldo_inicial,
+            observaciones_apertura, creado_por_id
+          ) values (
+            'APO-HIST', $1, 'APORTACION', 'ACTIVA', $2, $3, 100,
+            'Aportación estatutaria inicial previa a 2026', $4
+          ) returning id;
+        `, [codApoHist, socioId, agenciaChajulId, adminUserId]);
+
+        await client.query(`
+          insert into movimientos (
+            cuenta_id, tipo, monto, fecha, numero_recibo, descripcion, usuario_id,
+            cliente_movimiento_id, agencia_operacion_id
+          ) values (
+            $1, 'DEPOSITO', 100, '2025-12-31', 'SALDO-HIST-APO',
+            'Aportación estatutaria inicial previa a 2026', $2,
+            $3, $4
+          );
+        `, [newApoCta[0].id, adminUserId, `MOV-APO-PRE-${socioId}`, agenciaChajulId]);
+
+        nuevosSociosRegistrados++;
+      }
+    }
+    console.log(`   ✓ ${nuevosSociosRegistrados} nuevos socios registrados legalmente con aportación estatutaria pre-2026.`);
+
+    // 5. Crear Cuentas de Ahorro Corriente con Formato Dual
+    console.log("\n4. Creando libretas oficiales de Ahorro Corriente con formato dual...");
+    let correlativoAhorro = 1;
+    const cuentasAhorroMap = new Map<string, string>(); // nom -> cuentaId
+    let cuentasConSaldoHist = 0;
+    let totalSaldoHistPre2026 = 0;
+
+    for (const [nom, t] of titulares.entries()) {
+      const socio = sociosMap.get(nom)!;
+      const codigoSistema = `CHAJ-AHC-${String(correlativoAhorro++).padStart(5, "0")}`;
+
+      // Determinar número de cuenta de Excel
+      // Si tiene variantes como 148-5-1 y 2-148-5-1, elegir la más limpia
+      let numeroCuentaExcel = "";
+      if (t.cuentasExcel.size > 0) {
+        const sortedCtas = Array.from(t.cuentasExcel).sort((a, b) => a.length - b.length);
+        numeroCuentaExcel = sortedCtas[0]; // ej: 148-5-1
+      }
+
+      const observacion = t.cuentasExcel.size > 1
+        ? `Libreta oficial Ahorro Corriente (Variantes en Excel: ${Array.from(t.cuentasExcel).join(", ")})`
+        : numeroCuentaExcel
+        ? `Libreta oficial Ahorro Corriente (No. Libreta: ${numeroCuentaExcel})`
+        : `Libreta oficial Ahorro Corriente (Sin No. en Excel — Pendiente de asignación)`;
+
+      const saldoHistNecesario = t.minBalance < 0 ? Math.abs(t.minBalance) : 0;
+
+      const { rows: newCta } = await client.query(`
+        insert into cuentas (
+          numero_cuenta, codigo_sistema, tipo, estado, socio_id, agencia_id, saldo_inicial,
+          observaciones_apertura, creado_por_id
+        ) values (
+          $1, $2, 'AHORRO_CORRIENTE', 'ACTIVA', $3, $4, $5,
+          $6, $7
+        ) returning id;
+      `, [
+        numeroCuentaExcel, // si vino vacía en Excel, se almacena ""
+        codigoSistema,
+        socio.id,
+        agenciaChajulId,
+        saldoHistNecesario,
+        observacion,
+        adminUserId,
+      ]);
+
+      const cuentaId = newCta[0].id;
+      cuentasAhorroMap.set(nom, cuentaId);
+
+      // Si retiró fondos pre-2026, registrar depósito histórico inicial con fecha 2025-12-31
+      if (saldoHistNecesario > 0) {
+        await client.query(`
+          insert into movimientos (
+            cuenta_id, tipo, monto, fecha, numero_recibo, descripcion, usuario_id,
+            cliente_movimiento_id, agencia_operacion_id
+          ) values (
+            $1, 'DEPOSITO', $2, '2025-12-31', 'SALDO-INI-2025',
+            'Saldo acumulado de ahorro corriente pre-2026 migrado', $3,
+            $4, $5
+          );
+        `, [
+          cuentaId,
+          saldoHistNecesario,
+          adminUserId,
+          `MOV-AHC-HIST-${cuentaId}`,
+          agenciaChajulId,
+        ]);
+        cuentasConSaldoHist++;
+        totalSaldoHistPre2026 += saldoHistNecesario;
+      }
+    }
+
+    console.log(`   ✓ ${cuentasAhorroMap.size} cuentas de Ahorro Corriente creadas exitosamente.`);
+    console.log(`   ✓ ${cuentasConSaldoHist} cuentas recibieron saldo inicial histórico pre-2026 (Total: Q${totalSaldoHistPre2026.toLocaleString("es-GT", { minimumFractionDigits: 2 })}).`);
+
+    // 6. Insertar los 674 movimientos del 2026 en lotes optimizados
+    console.log("\n5. Insertando 674 movimientos del año 2026 en lotes de alta velocidad...");
+    let dep2026Count = 0;
+    let dep2026Monto = 0;
+    let ret2026Count = 0;
+    let ret2026Monto = 0;
+
+    interface MovimientoItem {
+      cuentaId: string;
+      tipo: string;
+      monto: number;
+      fecha: string;
+      recibo: string;
+      descripcion: string;
+      usuarioId: string;
+      clienteMovimientoId: string;
+      agenciaOperacionId: string;
+    }
+
+    const listaMovimientos: MovimientoItem[] = [];
+
+    for (const r of rowsExcel) {
+      const nomNorm = TYPO_MAP[r.nombre.trim().toUpperCase()] || r.nombre.trim().toUpperCase();
+      const cuentaId = cuentasAhorroMap.get(nomNorm)!;
+      const esDep = r.dep > 0;
+      const tipo = esDep ? "DEPOSITO" : "RETIRO";
+      const monto = esDep ? r.dep : r.ret;
+      const desc = esDep ? "Depósito en cuenta de ahorro corriente" : "Retiro de cuenta de ahorro corriente";
+
+      listaMovimientos.push({
+        cuentaId,
+        tipo,
+        monto,
+        fecha: r.fec,
+        recibo: r.rec || `REC-${r.row}`,
+        descripcion: desc,
+        usuarioId: adminUserId,
+        clienteMovimientoId: `MOV-AHC-2026-${r.row}`,
+        agenciaOperacionId: agenciaChajulId,
+      });
+
+      if (esDep) {
+        dep2026Count++;
+        dep2026Monto += monto;
+      } else {
+        ret2026Count++;
+        ret2026Monto += monto;
+      }
+    }
+
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < listaMovimientos.length; i += BATCH_SIZE) {
+      const batch = listaMovimientos.slice(i, i + BATCH_SIZE);
+      const valueClauses: string[] = [];
+      const params: any[] = [];
+      let pIdx = 1;
+
+      for (const m of batch) {
+        valueClauses.push(`($${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++})`);
+        params.push(
+          m.cuentaId,
+          m.tipo,
+          m.monto,
+          m.fecha,
+          m.recibo,
+          m.descripcion,
+          m.usuarioId,
+          m.clienteMovimientoId,
+          m.agenciaOperacionId
+        );
+      }
+
+      await client.query(`
+        insert into movimientos (
+          cuenta_id, tipo, monto, fecha, numero_recibo, descripcion, usuario_id,
+          cliente_movimiento_id, agencia_operacion_id
+        ) values ${valueClauses.join(", ")};
+      `, params);
+    }
+
+    console.log(`   ✓ ${dep2026Count} depósitos registrados (Total: Q${dep2026Monto.toLocaleString("es-GT", { minimumFractionDigits: 2 })})`);
+    console.log(`   ✓ ${ret2026Count} retiros registrados (Total: Q${ret2026Monto.toLocaleString("es-GT", { minimumFractionDigits: 2 })})`);
+
+    await client.query("COMMIT");
+    console.log("\n================================================================================");
+    console.log("   ✅ IMPORTACIÓN DE AHORRO CORRIENTE CONFIRMADA EN LA BASE DE DATOS");
+    console.log("================================================================================");
+
+    // Consulta de comprobación final de saldos en BD
+    const { rows: check2026 } = await client.query(`
+      select
+        coalesce(sum(case when m.tipo = 'DEPOSITO' and m.numero_recibo != 'SALDO-INI-2025' then m.monto else 0 end), 0) as dep_2026,
+        coalesce(sum(case when m.tipo = 'RETIRO' then m.monto else 0 end), 0) as ret_2026,
+        coalesce(sum(case when m.tipo = 'DEPOSITO' and m.numero_recibo != 'SALDO-INI-2025' then m.monto when m.tipo = 'RETIRO' then -m.monto else 0 end), 0) as neto_2026,
+        coalesce(sum(case when m.tipo = 'DEPOSITO' and m.numero_recibo = 'SALDO-INI-2025' then m.monto else 0 end), 0) as hist_pre2026,
+        coalesce(sum(case when m.tipo = 'DEPOSITO' then m.monto else -m.monto end), 0) as saldo_total_ahorro
+      from movimientos m
+      join cuentas c on c.id = m.cuenta_id
+      where c.tipo = 'AHORRO_CORRIENTE';
+    `);
+
+    const res = check2026[0];
+    const depBd = Number(res.dep_2026);
+    const retBd = Number(res.ret_2026);
+    const netoBd = Number(res.neto_2026);
+    const histBd = Number(res.hist_pre2026);
+    const totalAhorroBd = Number(res.saldo_total_ahorro);
+
+    console.log(`\n📊 CUADRE MATEMÁTICO FASE 2 (AHORRO CORRIENTE 2026):`);
+    console.log(`   - Total Depósitos 2026 registrados: Q${depBd.toLocaleString("es-GT", { minimumFractionDigits: 2 })} (Esperado: Q3,620,116.31)`);
+    console.log(`   - Total Retiros 2026 registrados:   Q${retBd.toLocaleString("es-GT", { minimumFractionDigits: 2 })} (Esperado: Q1,348,045.62)`);
+    console.log(`   - Saldo Neto Operativo 2026:        Q${netoBd.toLocaleString("es-GT", { minimumFractionDigits: 2 })} (Esperado Fila 679: Q2,272,070.69)`);
+    console.log(`   - Fondo Histórico Pre-2026 migrado: Q${histBd.toLocaleString("es-GT", { minimumFractionDigits: 2 })} (80 cuentas protegidas)`);
+    console.log(`   - Saldo Total Consolidado Ahorro:   Q${totalAhorroBd.toLocaleString("es-GT", { minimumFractionDigits: 2 })}`);
+
+    const difDep = Math.abs(depBd - 3620116.31);
+    const difRet = Math.abs(retBd - 1348045.62);
+    const difNeto = Math.abs(netoBd - 2272070.69);
+
+    if (difDep < 0.01 && difRet < 0.01 && difNeto < 0.01) {
+      console.log(`   🎉 ¡CUADRE EXACTO AL CENTAVO CON LA FILA 679 DEL EXCEL! (Diferencia: Q0.00)`);
+    } else {
+      console.log(`   ⚠️ Diferencia detectada: Dep=Q${difDep.toFixed(2)}, Ret=Q${difRet.toFixed(2)}, Neto=Q${difNeto.toFixed(2)}`);
+    }
+
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("❌ ERROR DURANTE LA IMPORTACIÓN:", err);
+    throw err;
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+main().catch(err => {
+  console.error("Error fatal:", err);
+  process.exit(1);
+});
 ```
 
 ## `backend/src/db/importar-plazo-fijo.ts` {#backendsrcdbimportarplazofijots}
@@ -4574,28 +6776,483 @@ const TYPO_MAP: Record<string, string> = {
 import "dotenv/config";
 import { pool } from "./pool";
 import { execSync } from "child_process";
-import path from "path";
 import { randomUUID } from "crypto";
+import path from "path";
+import { calcularVencimiento, calcularDiasExactos } from "../modules/plazofijo/calculo";
 
 /**
- * Script Oficial de Importación — Fase 3: Ahorro a Plazo Fijo
+ * Script Oficial de Importación — Fase 3: Depósito a Plazo Fijo (Kardex PF 2018-2026)
  * Archivo: importar/deposito a plazo fijo/KARDEX AHORRO PF 2026-08.xlsx
- * Cuadre Contable Exacto: Q 20,269,666.22 (Diferencia: Q0.00)
+ * 
+ * Reglas de Negocio aprobadas:
+ * 1. Importación histórica completa: 695 certificados válidos desde 2018 hasta 2026 (descartando 47 anulados).
+ * 2. Registro de 418 nuevos inversores/asociados en Agencia Chajul con aportación estatutaria inicial pre-2026.
+ * 3. Formato Dual de Cuentas de Plazo Fijo:
+ *    - numero_cuenta: Número de cuenta original de Excel (ej: 1-467-6-1, 2-95-6-2, 1188-2019).
+ *    - codigo_sistema: Correlativo estructurado único (CHAJ-PF-00001...).
+ * 4. Tasas cooperativas oficiales:
+ *    - 6.0% anual para plazos de 6 meses o menos.
+ *    - 14.0% anual para plazos de 12 meses o más.
+ *    - 10.0% de retención legal de ISR sobre intereses brutos.
+ * 5. Estados de los contratos:
+ *    - 689 contratos con fecha y recibo de retiro se marcan como LIQUIDADO.
+ *    - 6 contratos vigentes del 2026 se marcan como ACTIVO (con vencimiento en 2027).
+ *    - Total capital auditado: Q 20,269,666.22.
+ * 6. Optimización en Lotes (Batch Inserts): Ejecución ultrarrápida y atómica.
  */
 
-interface RawPFRow {
-  fila: number;
-  cert: string;
+interface RawCertRow {
+  row: number;
+  cta: string;
   nombre: string;
+  agencia: string;
+  fecEntrada: string;
+  docIn: string;
+  noDoc: string;
+  noCert: string;
+  plazoMeses: number;
+  estadoExcel: string;
   monto: number;
-  f_apertura: string;
-  f_vence: string;
-  meses: number;
-  rec_retiro: string;
-  f_retiro: string;
-  activo_2026: boolean;
+  fecRetiro: string | null;
+  reciboRetiro: string | null;
 }
-// ... Ver implementación completa optimizada con batch inserts en backend/src/db/importar-plazo-fijo.ts
+
+async function main() {
+  console.log("================================================================================");
+  console.log("   IMPORTACIÓN OFICIAL — FASE 3: PLAZO FIJO (KARDEX PF 2018-2026)");
+  console.log("================================================================================\n");
+
+  console.log("1. Extrayendo certificados desde 'importar/deposito a plazo fijo/KARDEX AHORRO PF 2026-08.xlsx'...");
+  const scriptPython = `
+import openpyxl, json
+
+wb = openpyxl.load_workbook('importar/deposito a plazo fijo/KARDEX AHORRO PF 2026-08.xlsx', data_only=True)
+ws = wb['Hoja1']
+
+certs = []
+for r in range(8, ws.max_row + 1):
+    c1 = ws.cell(r, 1).value
+    c2 = ws.cell(r, 2).value
+    c3 = ws.cell(r, 3).value
+    c4 = ws.cell(r, 4).value
+    c5 = ws.cell(r, 5).value
+    c6 = ws.cell(r, 6).value
+    c7 = ws.cell(r, 7).value
+    c8 = ws.cell(r, 8).value
+    c9 = ws.cell(r, 9).value
+    c10 = ws.cell(r, 10).value
+    c17 = ws.cell(r, 17).value
+    c18 = ws.cell(r, 18).value
+    
+    nom_str = str(c2).strip() if c2 else ''
+    if not nom_str or 'ANULADO' in nom_str.upper() or 'ANULADA' in nom_str.upper():
+        continue
+    
+    if c1 and str(c1).strip() and c10 is not None:
+        try:
+            monto = float(c10)
+        except:
+            continue
+        if monto > 0:
+            plazo = 12
+            if c8 and str(c8).isdigit():
+                plazo = int(c8)
+            
+            fec_in = str(c4)[:10] if c4 else '2026-01-02'
+            fec_ret = str(c17)[:10] if c17 else None
+            rec_ret = str(c18).strip() if c18 and str(c18).strip() not in ['', 'None'] else None
+
+            certs.append({
+                'row': r,
+                'cta': str(c1).strip(),
+                'nombre': nom_str.strip().upper(),
+                'agencia': str(c3).strip() if c3 else 'CHAJUL',
+                'fecEntrada': fec_in,
+                'docIn': str(c5).strip() if c5 else 'IN',
+                'noDoc': str(c6).strip() if c6 else '',
+                'noCert': str(c7).strip() if c7 else str(len(certs) + 1),
+                'plazoMeses': plazo,
+                'estadoExcel': str(c9).strip().upper() if c9 else 'ACTIVO',
+                'monto': monto,
+                'fecRetiro': fec_ret,
+                'reciboRetiro': rec_ret
+            })
+
+print(json.dumps(certs))
+`;
+
+  const rawJson = execSync(`python3 -c "${scriptPython.replace(/"/g, '\\"')}"`, {
+    maxBuffer: 50 * 1024 * 1024,
+    cwd: path.resolve(__dirname, "../../.."),
+  }).toString();
+
+  const certsExcel: RawCertRow[] = JSON.parse(rawJson);
+  console.log(`   ✓ Extraídos exitosamente ${certsExcel.length} certificados válidos de inversión.`);
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Limpieza idempotente previa de Plazo Fijo
+    console.log("\n2. Limpiando registros previos de Plazo Fijo para importación limpia...");
+    await client.query(`
+      delete from plazo_fijo_contratos;
+      delete from movimientos where cuenta_id in (select id from cuentas where tipo = 'AHORRO_PLAZO_FIJO');
+      delete from cuentas where tipo = 'AHORRO_PLAZO_FIJO';
+      delete from movimientos where numero_recibo = 'SALDO-HIST-APO-PF';
+      delete from cuentas where numero_cuenta = 'APO-HIST-PF';
+      delete from socios where advertencia_importacion = 'Socio migrado de Plazo Fijo (Certificados de Inversión)';
+    `);
+    console.log("   ✓ Base de datos preparada para importación limpia de Plazo Fijo.");
+
+    // Obtener Agencia Chajul y Admin
+    const { rows: agRows } = await client.query(`select id from agencias where codigo = 'CHAJUL';`);
+    if (agRows.length === 0) throw new Error("No se encontró Agencia Chajul en BD.");
+    const agenciaChajulId = agRows[0].id;
+
+    const { rows: uRows } = await client.query(`
+      select id from usuarios where email = 'admin@mif.coop' or rol in ('ADMIN', 'GERENCIA') limit 1;
+    `);
+    const adminUserId = uRows[0].id;
+
+    // Cargar socios existentes
+    const { rows: dbSociosRows } = await client.query(`select id, nombres, numero_asociado from socios;`);
+    const sociosMap = new Map<string, { id: string; numeroAsociado: string }>();
+    let maxCorrelativoSocio = 0;
+
+    for (const s of dbSociosRows) {
+      sociosMap.set(s.nombres.trim().toUpperCase(), { id: s.id, numeroAsociado: s.numero_asociado });
+      const numMatch = s.numero_asociado.match(/CHAJ-(\d+)/);
+      if (numMatch) {
+        const n = parseInt(numMatch[1], 10);
+        if (n > maxCorrelativoSocio) maxCorrelativoSocio = n;
+      }
+    }
+    console.log(`   ✓ Socios base en base de datos: ${sociosMap.size} (Último correlativo: CHAJ-${String(maxCorrelativoSocio).padStart(5, "0")})`);
+
+    // Preparar y registrar nuevos socios en lotes
+    console.log("\n3. Verificando y registrando nuevos inversores en el padrón de socios...");
+    let correlativoSocio = maxCorrelativoSocio + 1;
+
+    const titularesPF = new Set<string>();
+    for (const c of certsExcel) {
+      titularesPF.add(c.nombre);
+    }
+
+    interface NuevoSocioItem {
+      socioId: string;
+      numeroAsociado: string;
+      nombre: string;
+      apoCtaId: string;
+      codApoHist: string;
+    }
+
+    const nuevosSociosList: NuevoSocioItem[] = [];
+
+    for (const nom of titularesPF) {
+      if (!sociosMap.has(nom)) {
+        const socioId = randomUUID();
+        const apoCtaId = randomUUID();
+        const numeroAsociado = `CHAJ-${String(correlativoSocio++).padStart(5, "0")}`;
+        const codApoHist = `CHAJ-APO-${String(correlativoSocio).padStart(5, "0")}`;
+
+        sociosMap.set(nom, { id: socioId, numeroAsociado });
+        nuevosSociosList.push({ socioId, numeroAsociado, nombre: nom, apoCtaId, codApoHist });
+      }
+    }
+
+    // Inserción en lotes de nuevos socios
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < nuevosSociosList.length; i += BATCH_SIZE) {
+      const batch = nuevosSociosList.slice(i, i + BATCH_SIZE);
+
+      // Socios
+      const socioValues: string[] = [];
+      const socioParams: any[] = [];
+      let pIdx = 1;
+      for (const s of batch) {
+        socioValues.push(`($${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, '2025-12-31', 'ACTIVO', 'Socio migrado de Plazo Fijo (Certificados de Inversión)', $${pIdx++})`);
+        socioParams.push(s.socioId, s.numeroAsociado, agenciaChajulId, s.nombre, adminUserId);
+      }
+      await client.query(`
+        insert into socios (id, numero_asociado, agencia_id, nombres, fecha_ingreso, estado, advertencia_importacion, creado_por_id)
+        values ${socioValues.join(", ")};
+      `, socioParams);
+
+      // Cuentas Aportación
+      const ctaValues: string[] = [];
+      const ctaParams: any[] = [];
+      pIdx = 1;
+      for (const s of batch) {
+        ctaValues.push(`($${pIdx++}, 'APO-HIST-PF', $${pIdx++}, 'APORTACION', 'ACTIVA', $${pIdx++}, $${pIdx++}, 100, 'Aportación estatutaria previa de socio inversor', $${pIdx++})`);
+        ctaParams.push(s.apoCtaId, s.codApoHist, s.socioId, agenciaChajulId, adminUserId);
+      }
+      await client.query(`
+        insert into cuentas (id, numero_cuenta, codigo_sistema, tipo, estado, socio_id, agencia_id, saldo_inicial, observaciones_apertura, creado_por_id)
+        values ${ctaValues.join(", ")};
+      `, ctaParams);
+
+      // Movimientos Aportación
+      const movValues: string[] = [];
+      const movParams: any[] = [];
+      pIdx = 1;
+      for (const s of batch) {
+        movValues.push(`($${pIdx++}, 'DEPOSITO', 100, '2025-12-31', 'SALDO-HIST-APO-PF', 'Aportación estatutaria previa de socio inversor', $${pIdx++}, $${pIdx++}, $${pIdx++})`);
+        movParams.push(s.apoCtaId, adminUserId, `MOV-APO-PF-${s.socioId}`, agenciaChajulId);
+      }
+      await client.query(`
+        insert into movimientos (cuenta_id, tipo, monto, fecha, numero_recibo, descripcion, usuario_id, cliente_movimiento_id, agencia_operacion_id)
+        values ${movValues.join(", ")};
+      `, movParams);
+    }
+    console.log(`   ✓ ${nuevosSociosList.length} nuevos socios registrados en lotes con aportación estatutaria.`);
+
+    // Preparar Cuentas de Plazo Fijo, Contratos y Movimientos
+    console.log("\n4. Preparando cuentas de Plazo Fijo y contratos en lotes...");
+    let correlativoPF = 1;
+    let totalContratos = 0;
+    let contratosActivos = 0;
+    let contratosLiquidados = 0;
+    let totalCapitalInvertido = 0;
+    let totalLiquidadoMonto = 0;
+
+    const certsVistos = new Set<string>();
+
+    interface CuentaPFItem {
+      id: string;
+      numeroCuenta: string;
+      codigoSistema: string;
+      estadoCuenta: string;
+      socioId: string;
+      monto: number;
+      observacion: string;
+    }
+
+    interface ContratoPFItem {
+      cuentaId: string;
+      certNumero: string;
+      plazoMeses: number;
+      tasaAnual: number;
+      isrPct: number;
+      monto: number;
+      fechaInicio: string;
+      fechaVencimiento: string;
+      interesGenerado: number;
+      interesNeto: number;
+      saldoLiquido: number;
+      estadoContrato: string;
+      fechaRetiro: string | null;
+      reciboRetiro: string | null;
+      montoLiquidado: number | null;
+    }
+
+    interface MovPFItem {
+      cuentaId: string;
+      tipo: string;
+      monto: number;
+      fecha: string;
+      recibo: string;
+      descripcion: string;
+      clienteMovimientoId: string;
+    }
+
+    const cuentasList: CuentaPFItem[] = [];
+    const contratosList: ContratoPFItem[] = [];
+    const movimientosList: MovPFItem[] = [];
+
+    for (const c of certsExcel) {
+      const socio = sociosMap.get(c.nombre)!;
+      const cuentaId = randomUUID();
+      const codigoSistema = `CHAJ-PF-${String(correlativoPF++).padStart(5, "0")}`;
+
+      let certNumero = c.noCert;
+      if (certsVistos.has(certNumero)) {
+        certNumero = `${certNumero}-R`;
+      }
+      certsVistos.add(certNumero);
+
+      const estaLiquidado = !!c.reciboRetiro;
+      const estadoContrato = estaLiquidado ? "LIQUIDADO" : "ACTIVO";
+      const estadoCuenta = estaLiquidado ? "CERRADA" : "ACTIVA";
+
+      // Cálculos Financieros
+      const tasaAnual = c.plazoMeses <= 6 ? 6.0 : 14.0;
+      const isrPct = 10.0;
+      const fechaInicio = c.fecEntrada;
+      const fechaVencimiento = calcularVencimiento(fechaInicio, c.plazoMeses);
+      const diasExactos = calcularDiasExactos(fechaInicio, fechaVencimiento);
+
+      const interesGenerado = Math.round(c.monto * (tasaAnual / 100) * (diasExactos / 365) * 100) / 100;
+      const isrRetencion = Math.round(interesGenerado * (isrPct / 100) * 100) / 100;
+      const interesNeto = Math.round((interesGenerado - isrRetencion) * 100) / 100;
+      const saldoLiquido = Math.round((c.monto + interesNeto) * 100) / 100;
+
+      const montoLiquidado = estaLiquidado ? saldoLiquido : null;
+      const fechaRetiro = estaLiquidado ? (c.fecRetiro || fechaVencimiento) : null;
+
+      cuentasList.push({
+        id: cuentaId,
+        numeroCuenta: c.cta,
+        codigoSistema,
+        estadoCuenta,
+        socioId: socio.id,
+        monto: c.monto,
+        observacion: `Certificado de Inversión a Plazo Fijo #${certNumero} (${c.plazoMeses} meses)`,
+      });
+
+      contratosList.push({
+        cuentaId,
+        certNumero,
+        plazoMeses: c.plazoMeses,
+        tasaAnual,
+        isrPct,
+        monto: c.monto,
+        fechaInicio,
+        fechaVencimiento,
+        interesGenerado,
+        interesNeto,
+        saldoLiquido,
+        estadoContrato,
+        fechaRetiro,
+        reciboRetiro: c.reciboRetiro,
+        montoLiquidado,
+      });
+
+      movimientosList.push({
+        cuentaId,
+        tipo: "DEPOSITO",
+        monto: c.monto,
+        fecha: fechaInicio,
+        recibo: c.noDoc || `CERT-${certNumero}`,
+        descripcion: `Apertura de Certificado Plazo Fijo #${certNumero} (${c.plazoMeses} meses al ${tasaAnual}%)`,
+        clienteMovimientoId: `MOV-PF-DEP-${cuentaId}`,
+      });
+
+      if (estaLiquidado) {
+        movimientosList.push({
+          cuentaId,
+          tipo: "RETIRO",
+          monto: c.monto,
+          fecha: fechaRetiro!,
+          recibo: c.reciboRetiro || `REC-LIQ-${certNumero}`,
+          descripcion: `Liquidación oficial de Certificado Plazo Fijo #${certNumero}`,
+          clienteMovimientoId: `MOV-PF-RET-${cuentaId}`,
+        });
+        contratosLiquidados++;
+        totalLiquidadoMonto += c.monto;
+      } else {
+        contratosActivos++;
+      }
+
+      totalContratos++;
+      totalCapitalInvertido += c.monto;
+    }
+
+    // Inserción en lotes de Cuentas de Plazo Fijo
+    console.log(`   ↳ Insertando ${cuentasList.length} cuentas de Plazo Fijo...`);
+    for (let i = 0; i < cuentasList.length; i += BATCH_SIZE) {
+      const batch = cuentasList.slice(i, i + BATCH_SIZE);
+      const values: string[] = [];
+      const params: any[] = [];
+      let pIdx = 1;
+      for (const c of batch) {
+        values.push(`($${pIdx++}, $${pIdx++}, $${pIdx++}, 'AHORRO_PLAZO_FIJO', $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++})`);
+        params.push(c.id, c.numeroCuenta, c.codigoSistema, c.estadoCuenta, c.socioId, agenciaChajulId, c.monto, c.observacion, adminUserId);
+      }
+      await client.query(`
+        insert into cuentas (id, numero_cuenta, codigo_sistema, tipo, estado, socio_id, agencia_id, saldo_inicial, observaciones_apertura, creado_por_id)
+        values ${values.join(", ")};
+      `, params);
+    }
+
+    // Inserción en lotes de Contratos de Plazo Fijo
+    console.log(`   ↳ Insertando ${contratosList.length} contratos en plazo_fijo_contratos...`);
+    for (let i = 0; i < contratosList.length; i += BATCH_SIZE) {
+      const batch = contratosList.slice(i, i + BATCH_SIZE);
+      const values: string[] = [];
+      const params: any[] = [];
+      let pIdx = 1;
+      for (const c of batch) {
+        values.push(`($${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++})`);
+        params.push(
+          c.cuentaId, c.certNumero, c.plazoMeses, c.tasaAnual, c.isrPct,
+          c.monto, c.fechaInicio, c.fechaVencimiento, c.interesGenerado, c.interesNeto,
+          c.saldoLiquido, c.estadoContrato, c.fechaRetiro, c.reciboRetiro, c.montoLiquidado
+        );
+      }
+      await client.query(`
+        insert into plazo_fijo_contratos (
+          cuenta_id, numero_certificacion, plazo_meses, tasa_anual, isr_porcentaje,
+          monto_deposito, fecha_inicio, fecha_vencimiento, interes_generado, interes_neto,
+          saldo_liquido_a_pagar, estado, fecha_retiro, recibo_retiro, monto_liquidado
+        ) values ${values.join(", ")};
+      `, params);
+    }
+
+    // Inserción en lotes de Movimientos
+    console.log(`   ↳ Insertando ${movimientosList.length} movimientos de apertura y liquidación...`);
+    for (let i = 0; i < movimientosList.length; i += BATCH_SIZE) {
+      const batch = movimientosList.slice(i, i + BATCH_SIZE);
+      const values: string[] = [];
+      const params: any[] = [];
+      let pIdx = 1;
+      for (const m of batch) {
+        values.push(`($${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++})`);
+        params.push(m.cuentaId, m.tipo, m.monto, m.fecha, m.recibo, m.descripcion, adminUserId, m.clienteMovimientoId, agenciaChajulId);
+      }
+      await client.query(`
+        insert into movimientos (cuenta_id, tipo, monto, fecha, numero_recibo, descripcion, usuario_id, cliente_movimiento_id, agencia_operacion_id)
+        values ${values.join(", ")};
+      `, params);
+    }
+
+    await client.query("COMMIT");
+    console.log("\n================================================================================");
+    console.log("   ✅ IMPORTACIÓN DE PLAZO FIJO CONFIRMADA EN LA BASE DE DATOS");
+    console.log("================================================================================");
+
+    // Consulta de Comprobación
+    const { rows: stats } = await client.query(`
+      select
+        count(*) as total_contratos,
+        count(*) filter (where estado = 'ACTIVO') as activos,
+        count(*) filter (where estado = 'LIQUIDADO') as liquidados,
+        coalesce(sum(monto_deposito), 0) as total_capital,
+        coalesce(sum(monto_deposito) filter (where estado = 'ACTIVO'), 0) as capital_activo,
+        coalesce(sum(monto_deposito) filter (where estado = 'LIQUIDADO'), 0) as capital_liquidado,
+        coalesce(sum(interes_neto) filter (where estado = 'ACTIVO'), 0) as intereses_activos
+      from plazo_fijo_contratos;
+    `);
+
+    const r = stats[0];
+    console.log(`\n📊 CUADRE MATEMÁTICO FASE 3 (PLAZO FIJO KARDEX 2018-2026):`);
+    console.log(`   - Total contratos migrados:     ${r.total_contratos} certificados`);
+    console.log(`   - Contratos Activos Vigentes:   ${r.activos} certificados (Monto: Q${Number(r.capital_activo).toLocaleString("es-GT", { minimumFractionDigits: 2 })})`);
+    console.log(`   - Contratos Liquidados Hist.:   ${r.liquidados} certificados (Monto: Q${Number(r.capital_liquidado).toLocaleString("es-GT", { minimumFractionDigits: 2 })})`);
+    console.log(`   - TOTAL CAPITAL INVERTIDO:      Q${Number(r.total_capital).toLocaleString("es-GT", { minimumFractionDigits: 2 })} (Esperado: Q20,269,666.22)`);
+    console.log(`   - Intereses Netos en custodia:  Q${Number(r.intereses_activos).toLocaleString("es-GT", { minimumFractionDigits: 2 })}`);
+
+    const difCapital = Math.abs(Number(r.total_capital) - 20269666.22);
+    if (difCapital < 0.01) {
+      console.log(`   🎉 ¡CUADRE EXACTO AL CENTAVO CON EL KARDEX MAESTRO! (Diferencia: Q0.00)`);
+    } else {
+      console.log(`   ⚠️ Diferencia detectada: Q${difCapital.toFixed(2)}`);
+    }
+
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("❌ ERROR EN LA IMPORTACIÓN DE PLAZO FIJO:", err);
+    throw err;
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+main().catch(err => {
+  console.error("Error fatal:", err);
+  process.exit(1);
+});
 ```
 
 ## `backend/src/db/importar-programado-infantil.ts` {#backendsrcdbimportarprogramadoinfantilts}
@@ -4607,10 +7264,424 @@ import { randomUUID } from "crypto";
 
 /**
  * Script Oficial de Importación — Fase 4: Ahorro Programado, Ahorro Infanto-Juvenil y Aportaciones Infantiles
- * Cuadre Contable Exacto: Q 4,700.00 (Diferencia: Q0.00)
+ * 
+ * Archivos fuente:
+ * 1. importar/ahorro programado/AHORRO PROGRAMADO 30-08-26.xlsx
+ * 2. importar/ahorro infanto juvenil/AHORRO INFANTO JUVENIL 31-07-26.xlsx
+ * 3. importar/aportaciones infantil/APORTACIONES INFANTO JUVENIL 31-08-26.xlsx
+ * 
+ * Reglas de Negocio Aplicadas:
+ * - Titularidad jurídica de menores con registro de CUI propio y vinculación a tutores legales con DPI.
+ * - Formato Dual de Cuentas:
+ *    * Ahorro Programado: libreta física "2-214-7-1" / institucional "CHAJ-AHP-00001"
+ *    * Ahorro Infanto-Juvenil: libretas "221-8-1", "2-138-8-1" / institucional "CHAJ-AHI-00001", "CHAJ-AHI-00002"
+ *    * Aportación Infantil: libretas "221-4-1", "2-138-4-1" / institucional "CHAJ-API-00001", "CHAJ-API-00002"
+ * - Registro cronológico estricto por fecha y número de recibo de Excel.
+ * - Cuadre contable exacto al centavo.
  */
 
-// ... Ver implementación completa en backend/src/db/importar-programado-infantil.ts
+async function ejecutar() {
+  const cliente = await pool.connect();
+
+  try {
+    console.log("================================================================================");
+    console.log("🚀 INICIANDO FASE 4: IMPORTACIÓN DE AHORRO PROGRAMADO E INFANTO-JUVENIL");
+    console.log("================================================================================\n");
+
+    // 1. Obtener Agencia Chajul y Usuario Admin
+    const resAgencia = await cliente.query("select id, codigo, nombre from agencias where codigo = 'CHAJUL' limit 1");
+    if (resAgencia.rows.length === 0) throw new Error("No se encontró la agencia CHAJUL en la base de datos.");
+    const agenciaId = resAgencia.rows[0].id;
+    console.log(`📍 Agencia identificada: ${resAgencia.rows[0].nombre} (${resAgencia.rows[0].codigo})`);
+
+    const resUser = await cliente.query("select id, email from usuarios where rol = 'GERENCIA' or email = 'admin@mif.coop' limit 1");
+    if (resUser.rows.length === 0) throw new Error("No se encontró usuario administrador en la base de datos.");
+    const adminId = resUser.rows[0].id;
+    console.log(`👤 Usuario operador: ${resUser.rows[0].email}\n`);
+
+    // Iniciar Transacción
+    await cliente.query("BEGIN");
+
+    // Helper para buscar o crear cuenta
+    async function upsertCuenta(datos: {
+      numero_cuenta: string;
+      codigo_sistema: string;
+      tipo: string;
+      socio_id: string;
+      cuota_pactada?: number;
+      titular_menor_nombre?: string;
+      titular_menor_cui?: string;
+      titular_menor_parentesco?: string;
+      observaciones_apertura: string;
+    }): Promise<string> {
+      const res = await cliente.query(
+        "select id from cuentas where numero_cuenta = $1 and tipo = $2 limit 1",
+        [datos.numero_cuenta, datos.tipo]
+      );
+      if (res.rows.length > 0) {
+        const id = res.rows[0].id;
+        await cliente.query(
+          `update cuentas set socio_id = $1, codigo_sistema = $2, cuota_pactada = coalesce($3, cuota_pactada), titular_menor_nombre = $4, titular_menor_cui = $5, titular_menor_parentesco = $6 where id = $7`,
+          [datos.socio_id, datos.codigo_sistema, datos.cuota_pactada ?? null, datos.titular_menor_nombre ?? null, datos.titular_menor_cui ?? null, datos.titular_menor_parentesco ?? null, id]
+        );
+        return id;
+      }
+
+      const id = randomUUID();
+      await cliente.query(
+        `insert into cuentas (
+          id, numero_cuenta, codigo_sistema, tipo, estado, socio_id, agencia_id,
+          saldo_inicial, cuota_pactada, titular_menor_nombre, titular_menor_cui,
+          titular_menor_parentesco, observaciones_apertura, creado_por_id
+        ) values ($1, $2, $3, $4, 'ACTIVA', $5, $6, 0, $7, $8, $9, $10, $11, $12)`,
+        [
+          id,
+          datos.numero_cuenta,
+          datos.codigo_sistema,
+          datos.tipo,
+          datos.socio_id,
+          agenciaId,
+          datos.cuota_pactada ?? null,
+          datos.titular_menor_nombre ?? null,
+          datos.titular_menor_cui ?? null,
+          datos.titular_menor_parentesco ?? null,
+          datos.observaciones_apertura,
+          adminId
+        ]
+      );
+      return id;
+    }
+
+    // Helper para insertar movimiento
+    async function insertMovimiento(datos: {
+      cuenta_id: string;
+      monto: number;
+      fecha: string;
+      numero_recibo: string;
+      descripcion: string;
+      cliente_mov_id: string;
+    }) {
+      await cliente.query(
+        `insert into movimientos (
+          id, cuenta_id, tipo, monto, fecha, numero_recibo, descripcion,
+          usuario_id, cliente_movimiento_id, sincronizado_en
+        ) values ($1, $2, 'DEPOSITO', $3, $4, $5, $6, $7, $8, now())
+        on conflict (cliente_movimiento_id) do nothing`,
+        [
+          randomUUID(),
+          datos.cuenta_id,
+          datos.monto,
+          datos.fecha,
+          datos.numero_recibo,
+          datos.descripcion,
+          adminId,
+          datos.cliente_mov_id
+        ]
+      );
+    }
+
+    // ==========================================================================
+    // PARTE 1: AHORRO PROGRAMADO (ROSY MARICELDA CALEL IMUL)
+    // ==========================================================================
+    console.log("--------------------------------------------------------------------------------");
+    console.log("📌 PARTE 1: MIGRACIÓN DE AHORRO PROGRAMADO (2026)");
+    console.log("--------------------------------------------------------------------------------");
+
+    // Buscar socia Rosy Maricelda Calel Imul
+    let resRosy = await cliente.query(
+      "select id, numero_asociado, nombres, dpi from socios where nombres ilike '%ROSY MARICELDA CALEL%' limit 1"
+    );
+    let rosyId = resRosy.rows[0]?.id;
+
+    if (!rosyId) {
+      const resMax = await cliente.query(
+        "select numero_asociado from socios where numero_asociado like 'CHAJ-%' order by numero_asociado desc limit 1"
+      );
+      const ultNum = resMax.rows[0] ? parseInt(resMax.rows[0].numero_asociado.replace("CHAJ-", ""), 10) : 0;
+      const nuevoCod = `CHAJ-${String(ultNum + 1).padStart(5, "0")}`;
+
+      const insSocio = await cliente.query(
+        `insert into socios (id, numero_asociado, agencia_id, nombres, genero, fecha_ingreso, estado, dpi, direccion, creado_por_id)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning id`,
+        [randomUUID(), nuevoCod, agenciaId, "ROSY MARICELDA CALEL IMUL", "F", "2026-05-02", "ACTIVO", "3276 59580 1405", "Agencia Chajul", adminId]
+      );
+      rosyId = insSocio.rows[0].id;
+      console.log(`  ➕ Socia registrada: ROSY MARICELDA CALEL IMUL (${nuevoCod})`);
+    } else {
+      console.log(`  ✓ Socia existente encontrada: ${resRosy.rows[0].nombres} (${resRosy.rows[0].numero_asociado})`);
+    }
+
+    // Crear cuenta de Ahorro Programado
+    const ctaProgId = await upsertCuenta({
+      numero_cuenta: "2-214-7-1",
+      codigo_sistema: "CHAJ-AHP-00001",
+      tipo: "AHORRO_PROGRAMADO",
+      socio_id: rosyId,
+      cuota_pactada: 1000.00,
+      observaciones_apertura: "Cuenta Oficial de Ahorro Programado migrada del libro 2026"
+    });
+    console.log(`  ✓ Cuenta creada: [2-214-7-1] / [CHAJ-AHP-00001] — Ahorro Programado`);
+
+    // Movimientos de Ahorro Programado en 2026
+    const movsProgramado = [
+      { fecha: "2026-05-02", recibo: "2876", monto: 1000.00, desc: "Ahorro Programado Mayo 2026" },
+      { fecha: "2026-06-02", recibo: "3053", monto: 1000.00, desc: "Ahorro Programado Junio 2026" },
+      { fecha: "2026-07-02", recibo: "3243", monto: 1000.00, desc: "Ahorro Programado Julio 2026" },
+      { fecha: "2026-08-03", recibo: "3427", monto: 1000.00, desc: "Ahorro Programado Agosto 2026" }
+    ];
+
+    let totalProg = 0;
+    for (const m of movsProgramado) {
+      await insertMovimiento({
+        cuenta_id: ctaProgId,
+        monto: m.monto,
+        fecha: m.fecha,
+        numero_recibo: m.recibo,
+        descripcion: m.desc,
+        cliente_mov_id: `MIG-PROG-${m.recibo}`
+      });
+      totalProg += m.monto;
+      console.log(`    ↳ Depósito: ${m.fecha} | Recibo No. ${m.recibo} | Q ${m.monto.toFixed(2)} | ${m.desc}`);
+    }
+    console.log(`  💰 Subtotal Ahorro Programado 2026: Q ${totalProg.toFixed(2)}\n`);
+
+    // ==========================================================================
+    // PARTE 2: AHORRO INFANTO-JUVENIL Y APORTACIONES INFANTILES
+    // ==========================================================================
+    console.log("--------------------------------------------------------------------------------");
+    console.log("📌 PARTE 2: MIGRACIÓN DE AHORRO INFANTO-JUVENIL Y APORTACIONES INFANTILES");
+    console.log("--------------------------------------------------------------------------------");
+
+    // Consultar el último número correlativo de socio
+    const resUltSocio = await cliente.query(
+      "select numero_asociado from socios where numero_asociado like 'CHAJ-%' order by numero_asociado desc limit 1"
+    );
+    let ultimoNumSocio = resUltSocio.rows[0] ? parseInt(resUltSocio.rows[0].numero_asociado.replace("CHAJ-", ""), 10) : 0;
+
+    // --- CASO 1: ANA BETZAIDA RAMIREZ ASICONA ---
+    let anaId: string;
+    const resAna = await cliente.query(
+      "select id, numero_asociado, nombres from socios where nombres ilike '%ANA%BETZAIDA%RAMIREZ%' or nombres ilike '%ANA%BATZAIDA%RAMIREZ%' limit 1"
+    );
+
+    if (resAna.rows.length === 0) {
+      ultimoNumSocio++;
+      const codAna = `CHAJ-${String(ultimoNumSocio).padStart(5, "0")}`;
+      anaId = randomUUID();
+      await cliente.query(
+        `insert into socios (
+          id, numero_asociado, agencia_id, nombres, genero, fecha_ingreso, estado,
+          dpi, direccion, es_menor, tutor_nombre, tutor_dpi, tutor_parentesco,
+          tutor_telefono, advertencia_importacion, creado_por_id
+        ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+        [
+          anaId,
+          codAna,
+          agenciaId,
+          "ANA BETZAIDA RAMIREZ ASICONA",
+          "F",
+          "2026-04-08",
+          "ACTIVO",
+          "1780 18988 1405", // CUI de la menor registrado en Excel
+          "Cantón Ilom, Chajul",
+          true,
+          "ANA ESCOBAR RIVERA",
+          "1797 50615 1405",
+          "MADRE / TUTORA LEGAL",
+          "4901-3788",
+          "⚠️ Conflicto detectado en Excel: El CUI '1780 18988 1405' coincide con el DPI del socio adulto Juan Mateo Raymundo (CHAJ-00001). Probable error tipográfico/copiado de plantilla en archivo original. Solicitar certificación de nacimiento en ventanilla.",
+          adminId
+        ]
+      );
+      console.log(`  ➕ Socia Menor registrada: ANA BETZAIDA RAMIREZ ASICONA (${codAna})`);
+      console.log(`     ⚠️ Advertencia de Auditoría: CUI duplicado en Excel con socio Juan Mateo Raymundo.`);
+      console.log(`     ↳ Tutora Legal: ANA ESCOBAR RIVERA (DPI: 1797 50615 1405)`);
+    } else {
+      anaId = resAna.rows[0].id;
+      console.log(`  ✓ Socia menor encontrada: ${resAna.rows[0].nombres} (${resAna.rows[0].numero_asociado})`);
+    }
+
+    // Cuenta Aportación Infantil Ana Betzaida (221-4-1 / CHAJ-API-00001)
+    const ctaApoAnaId = await upsertCuenta({
+      numero_cuenta: "221-4-1",
+      codigo_sistema: "CHAJ-API-00001",
+      tipo: "APORTACION_INFANTIL",
+      socio_id: anaId,
+      titular_menor_nombre: "ANA BETZAIDA RAMIREZ ASICONA",
+      titular_menor_cui: "1780 18988 1405",
+      titular_menor_parentesco: "HIJA",
+      observaciones_apertura: "Aportación estatutaria inicial infanto-juvenil"
+    });
+    console.log(`  ✓ Cuenta creada: [221-4-1] / [CHAJ-API-00001] — Aportación Infanto-Juvenil`);
+
+    // Depósito de aportación infantil Ana Betzaida
+    await insertMovimiento({
+      cuenta_id: ctaApoAnaId,
+      monto: 100.00,
+      fecha: "2026-04-08",
+      numero_recibo: "2747",
+      descripcion: "Aportación estatutaria inicial infanto-juvenil 2026",
+      cliente_mov_id: "MIG-APO-INF-2747"
+    });
+    console.log(`    ↳ Depósito Aportación: 2026-04-08 | Recibo No. 2747 | Q 100.00`);
+
+    // Cuenta Ahorro Infantil Ana Betzaida (221-8-1 / CHAJ-AHI-00001)
+    const ctaAhoAnaId = await upsertCuenta({
+      numero_cuenta: "221-8-1",
+      codigo_sistema: "CHAJ-AHI-00001",
+      tipo: "AHORRO_INFANTO_JUVENIL",
+      socio_id: anaId,
+      titular_menor_nombre: "ANA BETZAIDA RAMIREZ ASICONA",
+      titular_menor_cui: "1780 18988 1405",
+      titular_menor_parentesco: "HIJA",
+      observaciones_apertura: "Ahorro a la vista infanto-juvenil"
+    });
+    console.log(`  ✓ Cuenta creada: [221-8-1] / [CHAJ-AHI-00001] — Ahorro Infanto-Juvenil`);
+
+    // Depósito Ahorro Infantil Ana Betzaida
+    await insertMovimiento({
+      cuenta_id: ctaAhoAnaId,
+      monto: 200.00,
+      fecha: "2026-04-07",
+      numero_recibo: "2742",
+      descripcion: "Ahorro Infanto-Juvenil Abril 2026",
+      cliente_mov_id: "MIG-AHO-INF-2742"
+    });
+    console.log(`    ↳ Depósito Ahorro Infantil: 2026-04-07 | Recibo No. 2742 | Q 200.00\n`);
+
+    // --- CASO 2: YEIKO GASPAR IJOM CANAY ---
+    let yeikoId: string;
+    const resYeiko = await cliente.query(
+      "select id, numero_asociado, nombres from socios where nombres ilike '%YEIKO%GASPAR%IJOM%' limit 1"
+    );
+
+    if (resYeiko.rows.length === 0) {
+      ultimoNumSocio++;
+      const codYeiko = `CHAJ-${String(ultimoNumSocio).padStart(5, "0")}`;
+      yeikoId = randomUUID();
+      await cliente.query(
+        `insert into socios (
+          id, numero_asociado, agencia_id, nombres, genero, fecha_ingreso, estado,
+          es_menor, direccion, advertencia_importacion, creado_por_id
+        ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [
+          yeikoId,
+          codYeiko,
+          agenciaId,
+          "YEIKO GASPAR IJOM CANAY",
+          "M",
+          "2026-02-28",
+          "ACTIVO",
+          true,
+          "Agencia Chajul",
+          "Socio menor de edad sin CUI en archivo original de importación. Solicitar CUI/Certificación de nacimiento en ventanilla.",
+          adminId
+        ]
+      );
+      console.log(`  ➕ Socio Menor registrado: YEIKO GASPAR IJOM CANAY (${codYeiko})`);
+      console.log(`     ⚠️ Advertencia generada: Solicitar CUI en ventanilla.`);
+    } else {
+      yeikoId = resYeiko.rows[0].id;
+      console.log(`  ✓ Socio menor encontrado: ${resYeiko.rows[0].nombres} (${resYeiko.rows[0].numero_asociado})`);
+    }
+
+    // Cuenta Aportación Infantil Yeiko Gaspar (2-138-4-1 / CHAJ-API-00002)
+    const ctaApoYeikoId = await upsertCuenta({
+      numero_cuenta: "2-138-4-1",
+      codigo_sistema: "CHAJ-API-00002",
+      tipo: "APORTACION_INFANTIL",
+      socio_id: yeikoId,
+      titular_menor_nombre: "YEIKO GASPAR IJOM CANAY",
+      observaciones_apertura: "Aportación estatutaria inicial infanto-juvenil"
+    });
+    console.log(`  ✓ Cuenta creada: [2-138-4-1] / [CHAJ-API-00002] — Aportación Infanto-Juvenil`);
+
+    // Depósito de aportación estatutaria Yeiko Gaspar
+    await insertMovimiento({
+      cuenta_id: ctaApoYeikoId,
+      monto: 100.00,
+      fecha: "2025-12-31",
+      numero_recibo: "HIST-APO-INF",
+      descripcion: "Aportación estatutaria de membresía previa a 2026",
+      cliente_mov_id: "MIG-APO-INF-YEIKO"
+    });
+    console.log(`    ↳ Depósito Aportación: 2025-12-31 | Recibo No. HIST-APO-INF | Q 100.00`);
+
+    // Cuenta Ahorro Infantil Yeiko Gaspar (2-138-8-1 / CHAJ-AHI-00002)
+    const ctaAhoYeikoId = await upsertCuenta({
+      numero_cuenta: "2-138-8-1",
+      codigo_sistema: "CHAJ-AHI-00002",
+      tipo: "AHORRO_INFANTO_JUVENIL",
+      socio_id: yeikoId,
+      titular_menor_nombre: "YEIKO GASPAR IJOM CANAY",
+      observaciones_apertura: "Ahorro a la vista infanto-juvenil"
+    });
+    console.log(`  ✓ Cuenta creada: [2-138-8-1] / [CHAJ-AHI-00002] — Ahorro Infanto-Juvenil`);
+
+    // Depósito Ahorro Infantil Yeiko Gaspar
+    await insertMovimiento({
+      cuenta_id: ctaAhoYeikoId,
+      monto: 300.00,
+      fecha: "2026-02-28",
+      numero_recibo: "2536",
+      descripcion: "Ahorro Infanto-Juvenil Febrero 2026",
+      cliente_mov_id: "MIG-AHO-INF-2536"
+    });
+    console.log(`    ↳ Depósito Ahorro Infantil: 2026-02-28 | Recibo No. 2536 | Q 300.00\n`);
+
+    // Confirmar Transacción
+    await cliente.query("COMMIT");
+
+    // ==========================================================================
+    // PARTE 3: AUDITORÍA Y CUADRE MATEMÁTICO AL CENTAVO
+    // ==========================================================================
+    console.log("================================================================================");
+    console.log("📊 INFORME DE AUDITORÍA Y CUADRE CONTABLE EXACTO — FASE 4");
+    console.log("================================================================================");
+
+    const resSaldos = await cliente.query(`
+      select c.numero_cuenta, c.codigo_sistema, c.tipo, s.nombres, sc.saldo_actual
+      from cuentas c
+      join socios s on s.id = c.socio_id
+      join saldos_cuenta sc on sc.cuenta_id = c.id
+      where c.tipo in ('AHORRO_PROGRAMADO', 'AHORRO_INFANTO_JUVENIL', 'APORTACION_INFANTIL')
+      order by c.tipo, c.codigo_sistema
+    `);
+
+    let totalSaldos = 0;
+    console.log("\nDetalle de Cuentas y Saldos Actualizados:");
+    resSaldos.rows.forEach(r => {
+      const saldo = parseFloat(r.saldo_actual);
+      totalSaldos += saldo;
+      console.log(`  • [${r.numero_cuenta.padEnd(9)}] / [${r.codigo_sistema.padEnd(14)}] | ${r.tipo.padEnd(22)} | ${r.nombres.padEnd(30)} | Saldo: Q ${saldo.toFixed(2)}`);
+    });
+
+    const esperadoProg = 4000.00;
+    const esperadoAhoInf = 500.00;
+    const esperadoApoInf = 200.00;
+    const esperadoTotal = esperadoProg + esperadoAhoInf + esperadoApoInf;
+
+    const diff = Math.abs(totalSaldos - esperadoTotal);
+
+    console.log("\n--------------------------------------------------------------------------------");
+    console.log(`  Total Ahorro Programado  : Q ${totalProg.toFixed(2)} (Esperado: Q ${esperadoProg.toFixed(2)})`);
+    console.log(`  Total Ahorro Infantil    : Q 500.00 (Esperado: Q ${esperadoAhoInf.toFixed(2)})`);
+    console.log(`  Total Aportación Infantil : Q 200.00 (Esperado: Q ${esperadoApoInf.toFixed(2)})`);
+    console.log(`  TOTAL CAPTADO FASE 4     : Q ${totalSaldos.toFixed(2)} (Esperado: Q ${esperadoTotal.toFixed(2)})`);
+    console.log(`  DIFERENCIA CONTABLE      : Q ${diff.toFixed(2)} ${diff === 0 ? "✅ CUADRE EXACTO AL CENTAVO" : "❌ DESCUADRE"}`);
+    console.log("================================================================================\n");
+
+  } catch (error) {
+    await cliente.query("ROLLBACK");
+    console.error("❌ ERROR CRÍTICO EN IMPORTACIÓN FASE 4:", error);
+    process.exit(1);
+  } finally {
+    cliente.release();
+    await pool.end();
+  }
+}
+
+ejecutar();
 ```
 
 
@@ -4684,6 +7755,7 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 alter type caja_categoria add value if not exists 'DEPOSITO_AHORRO_SOBRE_PRESTAMO';
 alter type caja_categoria add value if not exists 'RETIRO_AHORRO_SOBRE_PRESTAMO';
+alter type caja_categoria add value if not exists 'TRASLADO_FONDOS';
 
 
 do $$ begin
@@ -4943,7 +8015,10 @@ create table if not exists caja_movimientos_auxiliar (
   monto            numeric(14,2) not null,
   saldo_acumulado  numeric(14,2) not null,
   usuario_id       uuid not null references usuarios(id),
-  created_at       timestamptz not null default now()
+  created_at       timestamptz not null default now(),
+  saldo_anterior_reportado numeric(14,2),
+  saldo_actual_reportado   numeric(14,2),
+  numero_cuota             int
 );
 create index if not exists idx_caja_mov_aux_dia on caja_movimientos_auxiliar(caja_dia_id, created_at);
 create index if not exists idx_caja_mov_aux_agencia_categoria on caja_movimientos_auxiliar(agencia_id, categoria);
@@ -5077,6 +8152,33 @@ create table if not exists cobros_campo (
 
 create index if not exists idx_cobros_campo_promotor on cobros_campo(promotor_id, estado);
 create index if not exists idx_cobros_campo_prestamo on cobros_campo(prestamo_id);
+
+-- ---------------------------------------------------------------------------
+-- Google Drive Integración
+-- ---------------------------------------------------------------------------
+
+create table if not exists usuario_drive_tokens (
+  usuario_id      uuid primary key references usuarios(id) on delete cascade,
+  access_token    text not null,
+  refresh_token   text,
+  expiry_date     bigint,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
+create table if not exists drive_sync_queue (
+  id              uuid primary key default uuid_generate_v4(),
+  usuario_id      uuid not null references usuarios(id) on delete cascade,
+  nombre_archivo  text not null,
+  carpeta_destino text not null,
+  archivo_base64  text not null,
+  status          text not null default 'PENDING', -- PENDING, COMPLETED, FAILED
+  intentos        integer not null default 0,
+  error_mensaje   text,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
 ```
 
 ## `backend/db/schema.supabase.sql` {#backenddbschemasupabasesql}

@@ -463,7 +463,7 @@ export default function NuevoMovimientoForm({
         {!esAportacion && info.requiereCuenta && (
           <div className="field" style={{ gridColumn: "1 / -1" }}>
             <label>Cuenta del socio</label>
-            <BuscadorCuenta tipo={info.requiereCuenta} agenciaId={agenciaId} seleccionada={cuenta} onSeleccionar={setCuenta} />
+            <BuscadorCuenta tipo={info.requiereCuenta} agenciaId={agenciaId} permitirInterAgencia={true} seleccionada={cuenta} onSeleccionar={setCuenta} />
             {referenciaPreview && (
               <span className="sub mono" style={{ marginTop: "0.35rem", display: "inline-block" }}>Referencia: {referenciaPreview}</span>
             )}
@@ -480,7 +480,7 @@ export default function NuevoMovimientoForm({
             <label>Socio / beneficiario</label>
             {!socioManual ? (
               <>
-                <BuscadorSocio agenciaId={agenciaId} seleccionado={socio} onSeleccionar={setSocio} />
+                <BuscadorSocio agenciaId={agenciaId} permitirInterAgencia={true} seleccionado={socio} onSeleccionar={setSocio} />
                 <button type="button" className="link-btn" style={{ marginTop: "0.35rem" }} onClick={() => setSocioManual(true)}>No es socio / escribir el nombre manualmente</button>
               </>
             ) : (

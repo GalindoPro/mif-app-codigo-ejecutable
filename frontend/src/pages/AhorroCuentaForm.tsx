@@ -37,7 +37,8 @@ export default function AhorroCuentaForm() {
 
   const esProgramadoOInfanto =
     config?.tipo === "AHORRO_PROGRAMADO" || config?.tipo === "AHORRO_INFANTO_JUVENIL";
-  const esInfanto = config?.tipo === "AHORRO_INFANTO_JUVENIL";
+  const esInfanto =
+    config?.tipo === "AHORRO_INFANTO_JUVENIL" || config?.tipo === "APORTACION_INFANTIL";
 
   const edadMenor = useMemo(() => {
     if (!esInfanto || !titularMenorFechaNacimiento) return null;
@@ -83,7 +84,7 @@ export default function AhorroCuentaForm() {
     api
       .get<{ cuentas: Array<{ id: string; numero_cuenta: string; tipo: string; estado: string; saldo_actual?: string }> }>(`/socios/${socio.id}`)
       .then(({ data }) => {
-        const apor = data.cuentas?.find((c) => c.tipo === "APORTACION" && c.estado === "ACTIVA");
+        const apor = data.cuentas?.find((c) => (c.tipo === "APORTACION" || c.tipo === "APORTACION_INFANTIL") && c.estado === "ACTIVA");
         const saldo = apor ? Number(apor.saldo_actual ?? 0) : 0;
         setSaldoAportacion(saldo);
 
@@ -133,7 +134,12 @@ export default function AhorroCuentaForm() {
       setError(`Este socio ya tiene la cuenta ${cuentaExistente.numero_cuenta} de ${config!.titulo}.`);
       return;
     }
-    if (saldoAportacion !== null && saldoAportacion < 100) {
+    if (
+      config?.tipo !== "APORTACION" &&
+      config?.tipo !== "APORTACION_INFANTIL" &&
+      saldoAportacion !== null &&
+      saldoAportacion < 100
+    ) {
       setError(
         `Regla de la cooperativa: El socio debe tener un saldo de aportaciones de al menos Q 100.00 para poder abrir cuentas de ahorro infantil, corriente o programado (saldo actual: Q ${saldoAportacion.toFixed(2)}).`
       );
@@ -158,7 +164,7 @@ export default function AhorroCuentaForm() {
       }
       if (esMayorDeEdad) {
         setError(
-          `Titular mayor de edad (${edadMenor} años): Las cuentas de Ahorro Infanto Juvenil son exclusivas para menores de 18 años.`
+          `Titular mayor de edad (${edadMenor} años): Las cuentas Infanto Juveniles son exclusivas para menores de 18 años.`
         );
         return;
       }

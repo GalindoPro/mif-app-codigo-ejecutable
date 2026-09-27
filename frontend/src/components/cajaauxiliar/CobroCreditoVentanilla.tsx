@@ -17,6 +17,9 @@ import {
   ORIGEN_FONDOS_LABEL,
 } from "../../types";
 
+import { useAuth } from "../../context/AuthContext";
+import ReciboCobroCreditoModal, { type DatosReciboCobro } from "../ReciboCobroCreditoModal";
+
 export interface CobroCreditoVentanillaProps {
   agenciaId: string;
   diaId: string;
@@ -122,10 +125,12 @@ export default function CobroCreditoVentanilla({
   diaId,
   onCobrado,
 }: CobroCreditoVentanillaProps) {
+  const { usuario } = useAuth();
   const [socio, setSocio] = useState<Socio | null>(null);
   const [prestamos, setPrestamos] = useState<Prestamo[]>([]);
   const [prestamo, setPrestamo] = useState<Prestamo | null>(null);
   const [cargandoPrestamos, setCargandoPrestamos] = useState(false);
+  const [reciboCobroDatos, setReciboCobroDatos] = useState<DatosReciboCobro | null>(null);
 
   const [proximosAPagar, setProximosAPagar] = useState<ItemPendienteCobro[]>([]);
   const [enMora, setEnMora] = useState<ItemPendienteCobro[]>([]);
@@ -356,7 +361,7 @@ export default function CobroCreditoVentanilla({
     setError(null);
     setGuardando(true);
     try {
-      await api.post(`/caja-auxiliar/${diaId}/cobro-credito`, {
+      const { data: resp } = await api.post(`/caja-auxiliar/${diaId}/cobro-credito`, {
         prestamoId: prestamo.id,
         socioId: socio.id,
         abonoCapital: capNum,
@@ -371,6 +376,31 @@ export default function CobroCreditoVentanilla({
         saldoAnteriorReportado: Number(saldoAnteriorReportado) || undefined,
         saldoActualReportado: Number(saldoActualReportado) || undefined,
         descripcion: descripcion.trim() || undefined,
+      });
+
+      setReciboCobroDatos({
+        numeroRecibo: docNo || resp?.pago?.numero_recibo || resp?.cajaMovimiento?.doc_no || "REC-COBRO",
+        fecha: new Date().toLocaleDateString("es-GT"),
+        hora: new Date().toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" }),
+        socioNombre: socio.nombres,
+        socioNumero: socio.numero_asociado,
+        socioDpi: socio.dpi,
+        socioTelefono: socio.telefono,
+        creditoCodigo: prestamo.codigo,
+        creditoTipo: prestamo.tipo,
+        numeroCreditoAnterior: prestamo.numero_credito_anterior,
+        origenFondos,
+        agenciaNombre: resp?.agenciaCobro?.nombre || "Agencia",
+        agenciaOrigenNombre: resp?.esInterAgencia ? (resp?.agenciaOrigen?.nombre || prestamo.agencia_nombre) : null,
+        saldoCapitalAnterior: saldoActual,
+        abonoCapital: capNum,
+        interes: intNum,
+        mora: morNum,
+        ahorroSobrePrestamo: aspNum,
+        totalPagado: totalCobro,
+        saldoCapitalRestante: resp?.saldoCapitalRestante ?? saldoNuevo,
+        cajeroNombre: usuario?.nombre || "Cajero(a)",
+        formaPago: usarDebitoAhorro ? "DÉBITO DE CUENTA" : "EFECTIVO",
       });
 
       setDocNo("");
@@ -388,7 +418,8 @@ export default function CobroCreditoVentanilla({
   }
 
   return (
-    <form className="card" onSubmit={onSubmit} style={{ maxWidth: 740, marginBottom: "1.5rem", border: "2px solid #059669" }}>
+    <>
+      <form className="card" onSubmit={onSubmit} style={{ maxWidth: 740, marginBottom: "1.5rem", border: "2px solid #059669" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
         <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#065f46" }}>💵 Cobro de Cuota de Crédito en Ventanilla</h2>
         <span className="badge" style={{ background: "#ecfdf5", color: "#065f46", fontWeight: 700 }}>
@@ -403,8 +434,8 @@ export default function CobroCreditoVentanilla({
 
       <div className="field">
         <label>Socio que realiza el pago</label>
-        <BuscadorSocio agenciaId={agenciaId} seleccionado={socio} onSeleccionar={setSocio} />
-        <span className="hint">Busca un asociado en específico por nombre o número, o elige uno de las listas de abajo.</span>
+        <BuscadorSocio agenciaId={agenciaId} permitirInterAgencia={true} seleccionado={socio} onSeleccionar={setSocio} />
+        <span className="hint">Busca un asociado por nombre, DPI o número (búsqueda inter-agencia habilitada), o elige uno de abajo.</span>
       </div>
 
       {!socio && (
@@ -468,6 +499,26 @@ export default function CobroCreditoVentanilla({
           )}
           {!prestamo.tiene_cobro_campo_pendiente && (
             <>
+          {prestamo.agencia_id && prestamo.agencia_id !== agenciaId && (
+            <div
+              style={{
+                marginBottom: "0.85rem",
+                padding: "0.6rem 0.85rem",
+                background: "rgba(147, 51, 234, 0.08)",
+                border: "1px solid rgba(147, 51, 234, 0.35)",
+                borderRadius: "8px",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.55rem",
+              }}
+            >
+              <span style={{ fontSize: "1.2rem" }}>🔄</span>
+              <div style={{ fontSize: "0.82rem", color: "#c084fc", lineHeight: 1.4 }}>
+                <strong>Operación Inter-Agencia:</strong> Este crédito pertenece a <strong>{prestamo.agencia_nombre || "otra agencia"}</strong>. El dinero ingresará a la caja actual y el comprobante legal reflejará ambas agencias.
+              </div>
+            </div>
+          )}
+
           {prestamo.numero_credito_anterior && (
             <div
               style={{
@@ -1000,5 +1051,13 @@ export default function CobroCreditoVentanilla({
         </>
       )}
     </form>
+
+    {reciboCobroDatos && (
+      <ReciboCobroCreditoModal
+        datos={reciboCobroDatos}
+        onClose={() => setReciboCobroDatos(null)}
+      />
+    )}
+    </>
   );
 }

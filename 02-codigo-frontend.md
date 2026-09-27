@@ -61,9 +61,9 @@ Código real y completo del frontend (React + TypeScript + Vite, configurado com
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1f6f5c" />
-    <meta name="description" content="Sistema Integral MIF — caja chica, ahorros, aportaciones e ingresos de la Cooperativa MIF." />
+    <meta name="description" content="Sistema Integral COMIF-R.L. — caja chica, ahorros, aportaciones e ingresos de la Cooperativa COMIF-R.L." />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
-    <title>Sistema Integral MIF</title>
+    <title>Sistema Integral COMIF-R.L.</title>
   </head>
   <body>
     <div id="root"></div>
@@ -90,7 +90,8 @@ Código real y completo del frontend (React + TypeScript + Vite, configurado com
     "axios": "^1.19.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.2"
+    "react-router-dom": "^7.18.2",
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
@@ -191,9 +192,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg"],
       manifest: {
-        name: "Sistema Integral MIF",
-        short_name: "MIF",
-        description: "Caja chica, ahorros, aportaciones e ingresos de la Cooperativa MIF",
+        name: "Sistema Integral COMIF-R.L.",
+        short_name: "COMIF-R.L.",
+        description: "Caja chica, ahorros, aportaciones e ingresos de la Cooperativa COMIF-R.L.",
         theme_color: "#1f6f5c",
         background_color: "#eef1ea",
         display: "standalone",
@@ -247,6 +248,8 @@ import LibroArqueoMensual from "./pages/LibroArqueoMensual";
 import Auditoria from "./pages/Auditoria";
 import Alertas from "./pages/Alertas";
 import Sesiones from "./pages/Sesiones";
+import TrasladosInterAgencia from "./pages/TrasladosInterAgencia";
+
 import { useAuth } from "./context/AuthContext";
 
 function InicioRedirect() {
@@ -302,6 +305,8 @@ export default function App() {
           <Route path="/auditoria" element={<Auditoria />} />
           <Route path="/alertas" element={<Alertas />} />
           <Route path="/sesiones" element={<Sesiones />} />
+          <Route path="/traslados" element={<TrasladosInterAgencia />} />
+
         </Route>
         <Route path="*" element={<InicioRedirect />} />
       </Routes>
@@ -332,7 +337,7 @@ createRoot(document.getElementById("root")!).render(
 ## `frontend/src/types.ts` {#frontendsrctypests}
 
 ```ts
-export type RolUsuario = "GERENCIA" | "SUPERVISOR" | "CAJERO" | "CAJA_CHICA" | "PROMOTOR";
+export type RolUsuario = "ADMIN" | "GERENCIA" | "SUPERVISOR" | "CAJERO" | "CAJA_CHICA" | "PROMOTOR";
 
 export interface UsuarioAutenticado {
   id: string;
@@ -348,6 +353,33 @@ export interface Agencia {
   nombre: string;
   direccion: string | null;
   activa: boolean;
+}
+
+export interface Traslado {
+  id: string;
+  socio_id: string;
+  socio_nombre: string;
+  numero_asociado: string;
+  socio_dpi: string | null;
+  agencia_origen_id: string;
+  agencia_origen_nombre: string;
+  agencia_origen_codigo: string;
+  agencia_destino_id: string;
+  agencia_destino_nombre: string;
+  agencia_destino_codigo: string;
+  solicitado_por_id: string;
+  solicitado_por_nombre: string;
+  solicitado_por_rol: string;
+  aprobado_por_id: string | null;
+  aprobado_por_nombre: string | null;
+  estado: "PENDIENTE" | "APROBADO" | "RECHAZADO";
+  motivo: string;
+  notas_admin: string | null;
+  fecha_solicitud: string;
+  fecha_resolucion: string | null;
+  tiene_credito_activo: boolean;
+  tiene_saldo_ahorro: boolean;
+  created_at: string;
 }
 
 export interface Socio {
@@ -367,6 +399,12 @@ export interface Socio {
   dpi_beneficiario?: string | null;
   telefono_beneficiario?: string | null;
   parentesco_beneficiario?: string | null;
+  advertencia_importacion?: string | null;
+  es_menor?: boolean;
+  tutor_nombre?: string | null;
+  tutor_dpi?: string | null;
+  tutor_parentesco?: string | null;
+  tutor_telefono?: string | null;
   total_cuentas?: number;
   created_at: string;
 }
@@ -422,11 +460,12 @@ export interface ListaSocios {
 }
 
 export const ROL_LABEL: Record<RolUsuario, string> = {
-  GERENCIA: "Administrador",
-  SUPERVISOR: "Jefe de Agencia",
-  CAJERO: "Cajero Auxiliar",
-  CAJA_CHICA: "Operador Caja Chica",
-  PROMOTOR: "Promotor de Crédito",
+  ADMIN: "Administrador de Sistema",
+  GERENCIA: "Gerencia General",
+  SUPERVISOR: "Supervisor de Agencias",
+  CAJERO: "Cajero de Agencia",
+  CAJA_CHICA: "Administrador de Caja Chica",
+  PROMOTOR: "Promotor de Negocios",
 };
 
 export type TipoCuentaAhorro =
@@ -435,11 +474,13 @@ export type TipoCuentaAhorro =
   | "AHORRO_INFANTO_JUVENIL"
   | "AHORRO_SOBRE_PRESTAMO"
   | "AHORRO_PLAZO_FIJO"
-  | "APORTACION";
+  | "APORTACION"
+  | "APORTACION_INFANTIL";
 
 export interface Cuenta {
   id: string;
   numero_cuenta: string;
+  codigo_sistema?: string | null;
   tipo: TipoCuentaAhorro;
   estado: "ACTIVA" | "CERRADA";
   socio_id: string;
@@ -523,6 +564,12 @@ export const TIPOS_AHORRO: AhorroTipoConfig[] = [
     slug: "aportacion",
     titulo: "Aportación Estatutaria",
     descripcion: "Capital social institucional del asociado.",
+  },
+  {
+    tipo: "APORTACION_INFANTIL",
+    slug: "aportacion-infantil",
+    titulo: "Aportación Infanto Juvenil",
+    descripcion: "Aportación estatutaria inicial para niñas, niños y jóvenes asociados.",
   },
 ];
 
@@ -632,6 +679,7 @@ export interface ResumenAgencia {
   carteraPrestamos?: { count: number; saldo: number };
   plazoFijo?: { count: number; monto: number };
   aportaciones?: { count: number; saldo: number };
+  cuotasIngreso?: { count: number; monto: number };
   totalSocios: number;
   movimientosHoy: number;
 }
@@ -645,6 +693,7 @@ export interface ResumenDashboard {
     carteraPrestamos?: { count: number; saldo: number };
     plazoFijo?: { count: number; monto: number };
     aportaciones?: { count: number; saldo: number };
+    cuotasIngreso?: { count: number; monto: number };
     totalSocios: number;
     movimientosHoy: number;
   };
@@ -680,6 +729,7 @@ export type CajaCategoria =
   | "INTERES_PRESTAMO_FIDUCIARIO"
   | "MORA_PRESTAMO_FIDUCIARIO"
   | "COLOCACION_PRESTAMO"
+  | "TRASLADO_FONDOS"
   | "EGRESO_VARIO"
   | "INGRESO_VARIO";
 
@@ -762,6 +812,7 @@ export const CATEGORIAS_AUXILIAR: Record<CajaCategoria, CategoriaAuxiliarInfo> =
   MORA_PRESTAMO_FIDUCIARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Mora sobre préstamo fiduciario", requiereSocio: true },
 
   COLOCACION_PRESTAMO: { seccion: "PROPIO", tipo: "EGRESO", descripcion: "Colocación de préstamo (desembolso)", requiereSocio: true, sinModuloReal: true },
+  TRASLADO_FONDOS: { seccion: "PROPIO", tipo: "EGRESO", descripcion: "Traslado de fondos" },
   EGRESO_VARIO: { seccion: "PROPIO", tipo: "EGRESO", descripcion: "Egreso vario" },
   INGRESO_VARIO: { seccion: "PROPIO", tipo: "INGRESO", descripcion: "Ingreso vario", requiereSocio: true },
 };
@@ -809,6 +860,8 @@ export interface CajaMovimientoAuxiliar {
   usuario_id: string;
   usuario_nombre: string;
   usuario_rol?: string;
+  agencia_nombre?: string;
+  agencia_origen_nombre?: string;
   created_at: string;
 }
 
@@ -854,7 +907,7 @@ export interface CuotaAmortizacion {
 export type OrigenFondos = "FONDOS_PROPIOS" | "FEDERURAL" | "CHN_GUATEMALA";
 
 export const ORIGEN_FONDOS_LABEL: Record<OrigenFondos, string> = {
-  FONDOS_PROPIOS: "Fondos Propios (COOP COMIF R.L.)",
+  FONDOS_PROPIOS: "Fondos Propios (COOP COMIF-R.L.)",
   FEDERURAL: "FEDERURAL",
   CHN_GUATEMALA: "CHN - Guatemala",
 };
@@ -1022,6 +1075,7 @@ export interface PlazoFijoContrato {
   id: string;
   cuenta_id: string;
   numero_cuenta: string;
+  codigo_sistema?: string | null;
   agencia_id: string;
   agencia_nombre?: string;
   socio_id: string;
@@ -1111,11 +1165,13 @@ import type { Cuenta, TipoCuentaAhorro } from "../types";
 export default function BuscadorCuenta({
   tipo,
   agenciaId,
+  permitirInterAgencia = false,
   seleccionada,
   onSeleccionar,
 }: {
   tipo: TipoCuentaAhorro;
   agenciaId?: string;
+  permitirInterAgencia?: boolean;
   seleccionada: Cuenta | null;
   onSeleccionar: (cuenta: Cuenta | null) => void;
 }) {
@@ -1131,11 +1187,23 @@ export default function BuscadorCuenta({
     }
     const timeout = setTimeout(() => {
       api
-        .get<Cuenta[]>("/cuentas", { params: { tipo, q } })
-        .then(({ data }) => setResultados(data.filter((c) => !agenciaId || c.agencia_id === agenciaId)));
+        .get<Cuenta[]>("/cuentas", {
+          params: {
+            tipo,
+            q,
+            interAgencia: permitirInterAgencia ? "true" : undefined,
+          },
+        })
+        .then(({ data }) => {
+          if (permitirInterAgencia) {
+            setResultados(data);
+          } else {
+            setResultados(data.filter((c) => !agenciaId || c.agencia_id === agenciaId));
+          }
+        });
     }, 250);
     return () => clearTimeout(timeout);
-  }, [q, tipo, agenciaId]);
+  }, [q, tipo, agenciaId, permitirInterAgencia]);
 
   useEffect(() => {
     function onClickFuera(e: MouseEvent) {
@@ -1146,12 +1214,28 @@ export default function BuscadorCuenta({
   }, []);
 
   if (seleccionada) {
+    const esInterAgencia = Boolean(agenciaId && seleccionada.agencia_id && seleccionada.agencia_id !== agenciaId);
     return (
       <div className="socio-chip">
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
           <strong>{seleccionada.socio_nombres}</strong>
           <span className="mono"> · {seleccionada.numero_cuenta}</span>
           <span> · saldo {formatoQ(seleccionada.saldo_actual)}</span>
+          {esInterAgencia && (
+            <span
+              className="badge"
+              style={{
+                background: "rgba(147, 51, 234, 0.15)",
+                color: "#c084fc",
+                border: "1px solid rgba(147, 51, 234, 0.4)",
+                fontSize: "0.72rem",
+                fontWeight: 700,
+                padding: "0.15rem 0.5rem",
+              }}
+            >
+              🔄 Inter-Agencia: {seleccionada.agencia_nombre || "Otra Agencia"}
+            </span>
+          )}
         </div>
         <button type="button" className="link-btn" onClick={() => onSeleccionar(null)}>
           Cambiar
@@ -1163,7 +1247,7 @@ export default function BuscadorCuenta({
   return (
     <div className="buscador-socio" ref={cajaRef}>
       <input
-        placeholder="Busca por socio o número de cuenta…"
+        placeholder={permitirInterAgencia ? "Escribe el nombre del socio o número de cuenta (búsqueda inter-agencia)…" : "Escribe el nombre del socio o número de cuenta…"}
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
@@ -1173,23 +1257,45 @@ export default function BuscadorCuenta({
       />
       {abierto && resultados.length > 0 && (
         <ul className="buscador-dropdown">
-          {resultados.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  onSeleccionar(c);
-                  setAbierto(false);
-                  setQ("");
-                }}
-              >
-                <span>{c.socio_nombres}</span>
-                <span className="mono">
-                  {c.numero_cuenta} · {formatoQ(c.saldo_actual)}
-                </span>
-              </button>
-            </li>
-          ))}
+          {resultados.map((c) => {
+            const esOtraAgencia = Boolean(agenciaId && c.agencia_id && c.agencia_id !== agenciaId);
+            return (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSeleccionar(c);
+                    setAbierto(false);
+                    setQ("");
+                  }}
+                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <span>{c.socio_nombres}</span>
+                    {esOtraAgencia && (
+                      <span
+                        style={{
+                          fontSize: "0.68rem",
+                          background: "rgba(147, 51, 234, 0.12)",
+                          color: "#c084fc",
+                          border: "1px solid rgba(147, 51, 234, 0.35)",
+                          padding: "0.1rem 0.4rem",
+                          borderRadius: "4px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        🔄 {c.agencia_nombre || "Inter-Agencia"}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <span className="mono" style={{ display: "block" }}>{c.numero_cuenta}</span>
+                    <span style={{ fontSize: "0.74rem", color: "var(--accent)" }}>{formatoQ(c.saldo_actual)}</span>
+                  </div>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
       {abierto && q.length >= 2 && resultados.length === 0 && (
@@ -1209,10 +1315,12 @@ import type { Socio } from "../types";
 
 export default function BuscadorSocio({
   agenciaId,
+  permitirInterAgencia = false,
   seleccionado,
   onSeleccionar,
 }: {
   agenciaId?: string;
+  permitirInterAgencia?: boolean;
   seleccionado: Socio | null;
   onSeleccionar: (socio: Socio | null) => void;
 }) {
@@ -1228,11 +1336,24 @@ export default function BuscadorSocio({
     }
     const timeout = setTimeout(() => {
       api
-        .get<{ data: Socio[] }>("/socios", { params: { q, pageSize: 8, estado: "ACTIVO" } })
-        .then(({ data }) => setResultados(data.data.filter((s) => !agenciaId || s.agencia_id === agenciaId)));
+        .get<{ data: Socio[] }>("/socios", {
+          params: {
+            q,
+            pageSize: 8,
+            estado: "ACTIVO",
+            interAgencia: permitirInterAgencia ? "true" : undefined,
+          },
+        })
+        .then(({ data }) => {
+          if (permitirInterAgencia) {
+            setResultados(data.data);
+          } else {
+            setResultados(data.data.filter((s) => !agenciaId || s.agencia_id === agenciaId));
+          }
+        });
     }, 250);
     return () => clearTimeout(timeout);
-  }, [q, agenciaId]);
+  }, [q, agenciaId, permitirInterAgencia]);
 
   useEffect(() => {
     function onClickFuera(e: MouseEvent) {
@@ -1243,11 +1364,27 @@ export default function BuscadorSocio({
   }, []);
 
   if (seleccionado) {
+    const esInterAgencia = Boolean(agenciaId && seleccionado.agencia_id && seleccionado.agencia_id !== agenciaId);
     return (
       <div className="socio-chip">
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
           <strong>{seleccionado.nombres}</strong>
           <span className="mono"> · {seleccionado.numero_asociado}</span>
+          {esInterAgencia && (
+            <span
+              className="badge"
+              style={{
+                background: "rgba(147, 51, 234, 0.15)",
+                color: "#c084fc",
+                border: "1px solid rgba(147, 51, 234, 0.4)",
+                fontSize: "0.72rem",
+                fontWeight: 700,
+                padding: "0.15rem 0.5rem",
+              }}
+            >
+              🔄 Inter-Agencia: {seleccionado.agencia_nombre || seleccionado.agencia_codigo}
+            </span>
+          )}
         </div>
         <button type="button" className="link-btn" onClick={() => onSeleccionar(null)}>
           Cambiar
@@ -1259,7 +1396,7 @@ export default function BuscadorSocio({
   return (
     <div className="buscador-socio" ref={cajaRef}>
       <input
-        placeholder="Escribe el nombre o número de asociado…"
+        placeholder={permitirInterAgencia ? "Escribe el nombre, DPI o número de asociado (búsqueda inter-agencia)…" : "Escribe el nombre o número de asociado…"}
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
@@ -1269,21 +1406,42 @@ export default function BuscadorSocio({
       />
       {abierto && resultados.length > 0 && (
         <ul className="buscador-dropdown">
-          {resultados.map((s) => (
-            <li key={s.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  onSeleccionar(s);
-                  setAbierto(false);
-                  setQ("");
-                }}
-              >
-                <span>{s.nombres}</span>
-                <span className="mono">{s.numero_asociado}</span>
-              </button>
-            </li>
-          ))}
+          {resultados.map((s) => {
+            const esOtraAgencia = Boolean(agenciaId && s.agencia_id && s.agencia_id !== agenciaId);
+            return (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSeleccionar(s);
+                    setAbierto(false);
+                    setQ("");
+                  }}
+                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <span>{s.nombres}</span>
+                    {esOtraAgencia && (
+                      <span
+                        style={{
+                          fontSize: "0.68rem",
+                          background: "rgba(147, 51, 234, 0.12)",
+                          color: "#c084fc",
+                          border: "1px solid rgba(147, 51, 234, 0.35)",
+                          padding: "0.1rem 0.4rem",
+                          borderRadius: "4px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        🔄 {s.agencia_nombre || s.agencia_codigo}
+                      </span>
+                    )}
+                  </div>
+                  <span className="mono">{s.numero_asociado}</span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
       {abierto && q.length >= 2 && resultados.length === 0 && (
@@ -2857,151 +3015,194 @@ td a {
   display: none !important;
 }
 
+/* ═══════════════════════════════════════════════════
+   ESTÁNDAR GLOBAL DE IMPRESIÓN OFICIAL DE DOCUMENTOS
+   ═══════════════════════════════════════════════════ */
 @media print {
   @page {
     size: letter portrait;
     margin: 8mm 10mm;
   }
 
-  body {
+  /* Reset global para papel limpio */
+  html, body {
     background: #ffffff !important;
     color: #000000 !important;
     font-size: 8pt !important;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
   }
 
-  /* Mostrar elementos exclusivamente para impresión */
-  .print-only {
-    display: block !important;
-  }
-
-  /* Ocultar barra lateral, botones, controles de navegación y alertas */
+  /* Elementos de interfaz y navegación que NUNCA se imprimen */
   .sidebar,
+  .mobile-header,
+  .app-header,
   .no-print,
   button,
   .btn,
   .searchbar,
   .pagination,
+  .screen-toolbar,
+  .screen-footer,
   select,
   input,
-  .link-btn {
+  .live-badge,
+  .link-btn,
+  .sidebar-backdrop {
     display: none !important;
   }
 
-  /* Expandir contenedor principal sin desbordes */
-  .shell {
-    display: block !important;
-  }
-  .content {
-    padding: 0 !important;
-    margin: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
+  /* Si se imprime desde un MODAL renderizado en document.body (createPortal),
+     ocultamos el árbol completo de la aplicación #root para evitar pantallas en blanco y solapamientos */
+  body:has(.libro-caja-modal-overlay, .libro-caja-modal-card, .contrato-modal-overlay, .contrato-modal-card, .caja-chica-modal-overlay, .caja-chica-modal-card, .arqueo-modal-overlay, .recibo-modal-overlay) #root {
+    display: none !important;
   }
 
-  /* Mostrar membretes y encabezados institucionales de impresión */
+  /* Estructura base de la aplicación cuando se imprime una pantalla estándar sin modal */
+  #root,
+  .shell,
+  .content {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  /* Modales contenedores de reportes imprimibles (directos en document.body o en root) */
+  .modal,
+  .modal-overlay,
+  .libro-caja-modal-overlay,
+  .contrato-modal-overlay,
+  .caja-chica-modal-overlay,
+  .arqueo-modal-overlay,
+  .recibo-modal-overlay,
+  .modal-backdrop {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    inset: auto !important;
+    transform: none !important;
+  }
+
+  .modal-content,
+  .modal-card,
+  .libro-caja-modal-card,
+  .contrato-modal-card,
+  .caja-chica-modal-card,
+  .arqueo-modal-card,
+  .recibo-modal-card {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    border-radius: 0 !important;
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .modal-body,
   .print-container {
     display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
 
-  /* Tablas limpias de alta legibilidad en papel */
-  .table-wrap {
+  /* Mostrar elementos marcados como print-only */
+  .print-only {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* Tablas de impresión oficiales */
+  .table-wrap,
+  .table-scroll-container {
     overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
     box-shadow: none !important;
     border: 1px solid #334155 !important;
     margin: 0 !important;
   }
+
   table {
     width: 100% !important;
     min-width: 100% !important;
     border-collapse: collapse !important;
     font-size: 7.5pt !important;
   }
+
   th, td {
     border: 1px solid #cbd5e1 !important;
-    padding: 2px 4px !important;
+    padding: 2.5px 4px !important;
     color: #000000 !important;
   }
+
   th {
     background: #f8fafc !important;
     color: #0f172a !important;
     font-weight: 700 !important;
   }
+
+  tfoot {
+    display: table-row-group !important;
+  }
+
   tfoot tr {
     border-top: 2px solid #000000 !important;
     font-weight: bold !important;
   }
 
-  /* Tarjetas y bloques de auditoría */
-  .card, .stat-card {
-    box-shadow: none !important;
-    border: 1px solid #94a3b8 !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  /* Insignias */
-  .badge {
-    border: 1px solid #64748b !important;
-    color: #000000 !important;
-    background: transparent !important;
-  }
-
-  /* Evitar saltos de página dentro de firmas o filas */
+  /* Evitar saltos de página indebidos en firmas, tarjetas y filas */
   tr,
-  .stat-grid {
+  .card,
+  .stat-card,
+  .stat-grid,
+  .firmas-block,
+  .firmas-container {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-  }
-
-  /* Ocultar modales, overlays y paneles no imprimibles al imprimir */
-  .modal,
-  .modal-overlay,
-  .no-print,
-  .sidebar,
-  .app-header {
-    display: none !important;
-  }
-
-  /* Contenedores de modales optimizados para imprimir */
-  .caja-chica-modal-overlay,
-  .arqueo-modal-overlay,
-  .libro-caja-modal-overlay {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    background: transparent !important;
-    padding: 0 !important;
-    overflow: visible !important;
-    width: 100% !important;
-  }
-
-  .caja-chica-modal-card,
-  .arqueo-modal-card,
-  .libro-caja-modal-card {
-    max-width: 100% !important;
-    width: 100% !important;
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: transparent !important;
-  }
-
-  /* Ocultar TODO el contenido de fondo (la aplicación completa) cuando se imprime un modal de Portal */
-  body:has(.arqueo-modal-overlay) #root,
-  body:has(.libro-caja-modal-overlay) #root {
-    display: none !important;
-  }
-  
-  body:has(.arqueo-modal-overlay) .arqueo-modal-overlay,
-  body:has(.libro-caja-modal-overlay) .libro-caja-modal-overlay {
-    display: block !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    opacity: 1 !important;
-    visibility: visible !important;
   }
 }
 
@@ -3161,42 +3362,27 @@ td a {
 .row-cobrado .strikethrough-text {
   text-decoration: line-through;
 }
+
 ```
 
 ## `frontend/src/styles/tokens.css` {#frontendsrcstylestokenscss}
 
 ```css
 :root {
-  --paper: #eef1ea;
-  --paper-raised: #f7f8f3;
-  --ink: #16241c;
-  --ink-soft: #3f5347;
-  --line: #c9d1c3;
-  --accent: #1f6f5c;
-  --accent-strong: #154d40;
-  --gold: #a97a2f;
-  --danger: #a6483a;
-  --danger-bg: #f7e9e6;
-  --mono-bg: #e3e8dd;
-  --shadow: 0 1px 2px rgba(22, 36, 28, 0.06), 0 8px 24px rgba(22, 36, 28, 0.05);
+  --paper: #ffffff;
+  --paper-raised: #f8fafc;
+  --ink: #0f172a;
+  --ink-soft: #475569;
+  --line: #e2e8f0;
+  --accent: #BF9903;
+  --accent-strong: #997b02;
+  --gold: #BF9903;
+  --danger: #ef4444;
+  --danger-bg: rgba(239, 68, 68, 0.1);
+  --mono-bg: #f1f5f9;
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
   --radius: 10px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #101915;
-    --paper-raised: #16211b;
-    --ink: #e9ede5;
-    --ink-soft: #a9b8ab;
-    --line: #2b3a30;
-    --accent: #4bb497;
-    --accent-strong: #7fd1b7;
-    --gold: #d9a75b;
-    --danger: #e08877;
-    --danger-bg: #2a1c1a;
-    --mono-bg: #1a251e;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 30px rgba(0, 0, 0, 0.35);
-  }
 }
 
 * {
@@ -3213,16 +3399,18 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 h1,
 h2,
-h3 {
-  font-family: "Fraunces", Georgia, serif;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+h3,
+h4 {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   margin: 0;
 }
 
@@ -3270,10 +3458,17 @@ api.interceptors.response.use(
 );
 
 export function mensajeError(err: unknown): string {
+  if (axios.isCancel(err) || (err as { code?: string })?.code === "ERR_CANCELED") {
+    return "";
+  }
   if (axios.isAxiosError(err)) {
     const data = err.response?.data as { error?: string; detalles?: { mensaje: string }[] } | undefined;
     if (data?.detalles?.length) return data.detalles.map((d) => d.mensaje).join(" · ");
     if (data?.error) return data.error;
+    if (err.message === "Network Error" || err.code === "ERR_NETWORK") {
+      return "No se pudo conectar con el servidor (Error de Red). Verifica que el servicio esté activo.";
+    }
+    if (err.message && err.message !== "canceled") return err.message;
   }
   return "Ocurrió un error inesperado. Intenta de nuevo.";
 }
@@ -3326,60 +3521,138 @@ export default function Agencias() {
   }
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <h1>Agencias</h1>
-          <p>Cada agencia captura sus propios movimientos; este consolidado une todas en un solo sistema.</p>
+    <div className="screen-container">
+      <div className="screen-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", flexWrap: "wrap" }}>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.2rem" }}>
+            <span>🏢</span> Agencias y Puntos de Atención
+          </h1>
+          <span
+            style={{
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              padding: "0.15rem 0.5rem",
+              borderRadius: "4px",
+              background: "rgba(2, 132, 199, 0.15)",
+              color: "#0284c7",
+              border: "1px solid rgba(2, 132, 199, 0.3)",
+            }}
+          >
+            Red Cooperativa
+          </span>
         </div>
-        {usuario?.rol === "ADMIN" && (
-          <button className="btn" onClick={() => setMostrarForm((v) => !v)}>
+        {usuario?.rol === "GERENCIA" && (
+          <button
+            className="btn"
+            style={{ padding: "0.3rem 0.75rem", fontSize: "0.8rem" }}
+            onClick={() => setMostrarForm((v) => !v)}
+          >
             {mostrarForm ? "Cancelar" : "+ Nueva agencia"}
           </button>
         )}
       </div>
 
-      {error && <div className="alert error">{error}</div>}
+      {error && <div className="alert error" style={{ margin: "0.25rem 0", padding: "0.4rem 0.75rem", fontSize: "0.82rem" }}>{error}</div>}
+
+      {/* KPI METRICS STRIP FINTECH */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #0284c7",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>
+              TOTAL AGENCIAS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>🏢</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#0284c7", fontFamily: "monospace" }}>
+            {agencias.length}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Puntos de atención registrados</span>
+        </div>
+
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #059669",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#059669", letterSpacing: "0.03em" }}>
+              AGENCIAS OPERATIVAS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>✅</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#059669", fontFamily: "monospace" }}>
+            {agencias.filter((a) => a.activa).length}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Activas para ventanilla y campo</span>
+        </div>
+      </div>
 
       {mostrarForm && (
-        <form className="card" onSubmit={crear} style={{ maxWidth: 480, marginBottom: "1.5rem" }}>
-          <div className="field">
-            <label>Código</label>
-            <input value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase())} required maxLength={30} />
-            <span className="hint">Corto y sin espacios, p. ej. CHAJUL.</span>
+        <form className="card" onSubmit={crear} style={{ width: "100%", maxWidth: "100%", margin: "0.5rem 0" }}>
+          <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+            <div className="field">
+              <label>Código</label>
+              <input value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase())} required maxLength={30} />
+              <span className="hint">Corto y sin espacios, p. ej. CHAJUL.</span>
+            </div>
+            <div className="field">
+              <label>Nombre</label>
+              <input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+            </div>
+            <div className="field">
+              <label>Dirección</label>
+              <input value={direccion} onChange={(e) => setDireccion(e.target.value)} />
+            </div>
           </div>
-          <div className="field">
-            <label>Nombre</label>
-            <input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <button className="btn" type="submit" disabled={guardando}>
+              {guardando ? "Guardando…" : "Guardar agencia"}
+            </button>
+            <button type="button" className="btn secondary" onClick={() => setMostrarForm(false)}>
+              Cancelar
+            </button>
           </div>
-          <div className="field">
-            <label>Dirección</label>
-            <input value={direccion} onChange={(e) => setDireccion(e.target.value)} />
-          </div>
-          <button className="btn" type="submit" disabled={guardando}>
-            {guardando ? "Guardando…" : "Guardar agencia"}
-          </button>
         </form>
       )}
 
-      <div className="table-wrap">
-        <table>
+      <div className="table-scroll-container" style={{ flex: 1, minHeight: 0, marginTop: "0.5rem" }}>
+        <table className="table-compact" style={{ width: "100%" }}>
           <thead>
             <tr>
               <th>Código</th>
-              <th>Nombre</th>
+              <th>Nombre de Agencia</th>
               <th>Dirección</th>
-              <th>Estado</th>
+              <th style={{ textAlign: "center" }}>Estado</th>
             </tr>
           </thead>
           <tbody>
             {agencias.map((a) => (
               <tr key={a.id}>
-                <td className="mono">{a.codigo}</td>
-                <td>{a.nombre}</td>
-                <td>{a.direccion ?? "—"}</td>
-                <td>
-                  <span className={`badge ${a.activa ? "activo" : "inactivo"}`}>{a.activa ? "Activa" : "Inactiva"}</span>
+                <td className="mono" style={{ fontWeight: 700, color: "var(--accent)" }}>{a.codigo}</td>
+                <td style={{ fontWeight: 600 }}>{a.nombre}</td>
+                <td style={{ fontSize: "0.8rem" }}>{a.direccion ?? "—"}</td>
+                <td style={{ textAlign: "center" }}>
+                  <span className={`badge ${a.activa ? "activo" : "inactivo"}`} style={{ fontSize: "0.7rem", padding: "0.12rem 0.4rem" }}>
+                    {a.activa ? "Activa" : "Inactiva"}
+                  </span>
                 </td>
               </tr>
             ))}
@@ -3400,6 +3673,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { formatoQ, TIPOS_AHORRO } from "../types";
 import type { CuentaConMovimientos } from "../types";
+import { calcularEdad } from "../lib/formatters";
 
 export default function AhorroCuentaDetail() {
   const { slug, id } = useParams<{ slug: string; id: string }>();
@@ -3454,7 +3728,11 @@ export default function AhorroCuentaDetail() {
     <div>
       <div className="page-head">
         <div>
-          <button className="link-btn" onClick={() => navigate(`/ahorros/${config.slug}`)} style={{ marginBottom: "0.5rem" }}>
+          <button
+            className="link-btn"
+            onClick={() => navigate(config.tipo === "APORTACION" ? "/aportaciones" : `/ahorros/${config.slug}`)}
+            style={{ marginBottom: "0.5rem" }}
+          >
             ← Volver a {config.titulo}
           </button>
           <h1>{cuenta.socio_nombres}</h1>
@@ -3468,45 +3746,127 @@ export default function AhorroCuentaDetail() {
         </div>
       </div>
 
+      {(cuenta.tipo === "AHORRO_INFANTO_JUVENIL" || cuenta.tipo === "APORTACION_INFANTIL") && (
+        <div
+          style={{
+            background: "rgba(14, 165, 233, 0.08)",
+            border: "1px solid rgba(14, 165, 233, 0.3)",
+            borderRadius: "8px",
+            padding: "0.85rem 1rem",
+            marginBottom: "1.25rem",
+            color: "#075985",
+          }}
+        >
+          <div style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span>🧒</span> Menor titular de la cuenta
+          </div>
+          {cuenta.titular_menor_nombre ? (
+            <p style={{ fontSize: "0.84rem", margin: "0.35rem 0 0", lineHeight: 1.4 }}>
+              <strong>{cuenta.titular_menor_nombre}</strong>
+              {cuenta.titular_menor_parentesco ? ` · ${cuenta.titular_menor_parentesco} de ${cuenta.socio_nombres}` : ""}
+              {cuenta.titular_menor_fecha_nacimiento ? (
+                <>
+                  {` · Nacimiento: ${new Date(
+                    cuenta.titular_menor_fecha_nacimiento + "T00:00:00"
+                  ).toLocaleDateString("es-GT")}`}
+                  {calcularEdad(cuenta.titular_menor_fecha_nacimiento) !== null && (
+                    <span style={{ marginLeft: "4px", color: "#0369a1", fontWeight: 600 }}>
+                      ({calcularEdad(cuenta.titular_menor_fecha_nacimiento)} años)
+                    </span>
+                  )}
+                </>
+              ) : ""}
+              {cuenta.titular_menor_cui ? ` · CUI: ${cuenta.titular_menor_cui}` : ""}
+            </p>
+          ) : (
+            <p style={{ fontSize: "0.84rem", margin: "0.35rem 0 0", lineHeight: 1.4 }}>
+              Esta cuenta no tiene registrados los datos del menor. {cuenta.socio_nombres} figura solo como responsable/tutor.
+            </p>
+          )}
+        </div>
+      )}
+
+      {cuenta.tipo === "AHORRO_SOBRE_PRESTAMO" && (
+        <div
+          style={{
+            background: cuenta.prestamo_estado === "CANCELADO" ? "#ecfdf5" : "rgba(245, 158, 11, 0.1)",
+            border: `1px solid ${cuenta.prestamo_estado === "CANCELADO" ? "#10b981" : "#f59e0b"}`,
+            borderRadius: "8px",
+            padding: "0.85rem 1rem",
+            marginBottom: "1.25rem",
+            color: cuenta.prestamo_estado === "CANCELADO" ? "#065f46" : "#92400e",
+          }}
+        >
+          <div style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span>🛡️</span> Cuenta de Ahorro sobre Préstamo (Fondo en Garantía)
+            {cuenta.prestamo_codigo && (
+              <span className="mono" style={{ background: "rgba(0,0,0,0.06)", padding: "0.15rem 0.4rem", borderRadius: "4px" }}>
+                Crédito: {cuenta.prestamo_codigo} ({cuenta.prestamo_estado})
+              </span>
+            )}
+          </div>
+          <p style={{ fontSize: "0.84rem", margin: "0.35rem 0 0", lineHeight: 1.4 }}>
+            {cuenta.prestamo_estado === "CANCELADO"
+              ? "✓ El crédito vinculado ha sido cancelado en su totalidad. Los retiros y liquidaciones de esta cuenta han sido habilitados."
+              : "🔒 Por política estatutaria, los fondos de esta cuenta están en garantía de crédito activo y NO se pueden retirar hasta su liquidación total. Ante mora o atraso, la cooperativa puede aplicar débitos para cubrir cuotas."}
+          </p>
+        </div>
+      )}
+
       {error && <div className="alert error">{error}</div>}
 
-      <form className="movs-form" onSubmit={registrarMovimiento}>
-        <div className="tipo-toggle">
-          <button
-            type="button"
-            className={tipoMov === "DEPOSITO" ? "on deposito" : ""}
-            onClick={() => setTipoMov("DEPOSITO")}
-          >
-            Depósito
-          </button>
-          <button type="button" className={tipoMov === "RETIRO" ? "on retiro" : ""} onClick={() => setTipoMov("RETIRO")}>
-            Retiro
-          </button>
-        </div>
-        <div className="field">
-          <label htmlFor="mov-monto">Monto</label>
-          <input
-            id="mov-monto"
-            type="number"
-            min="0.01"
-            step="0.01"
-            value={monto}
-            onChange={(e) => setMonto(e.target.value)}
-            required
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="mov-fecha">Fecha</label>
-          <input id="mov-fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
-        </div>
-        <div className="field grow">
-          <label htmlFor="mov-recibo">No. de recibo</label>
-          <input id="mov-recibo" value={numeroRecibo} onChange={(e) => setNumeroRecibo(e.target.value)} />
-        </div>
-        <button type="submit" className="btn" disabled={guardando}>
-          {guardando ? "Guardando…" : "Registrar"}
-        </button>
-      </form>
+      {(() => {
+        const retiroBloqueado = Boolean(
+          cuenta.tipo === "AHORRO_SOBRE_PRESTAMO" &&
+          cuenta.prestamo_estado &&
+          cuenta.prestamo_estado !== "CANCELADO" &&
+          cuenta.prestamo_estado !== "RECHAZADO" &&
+          tipoMov === "RETIRO"
+        );
+        return (
+          <form className="movs-form" onSubmit={registrarMovimiento}>
+            <div className="tipo-toggle">
+              <button
+                type="button"
+                className={tipoMov === "DEPOSITO" ? "on deposito" : ""}
+                onClick={() => setTipoMov("DEPOSITO")}
+              >
+                Depósito
+              </button>
+              <button
+                type="button"
+                className={tipoMov === "RETIRO" ? "on retiro" : ""}
+                onClick={() => setTipoMov("RETIRO")}
+              >
+                Retiro
+              </button>
+            </div>
+            <div className="field">
+              <label htmlFor="mov-monto">Monto</label>
+              <input
+                id="mov-monto"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={monto}
+                onChange={(e) => setMonto(e.target.value)}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="mov-fecha">Fecha</label>
+              <input id="mov-fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
+            </div>
+            <div className="field grow">
+              <label htmlFor="mov-recibo">No. de recibo</label>
+              <input id="mov-recibo" value={numeroRecibo} onChange={(e) => setNumeroRecibo(e.target.value)} />
+            </div>
+            <button type="submit" className="btn" disabled={guardando || retiroBloqueado}>
+              {guardando ? "Guardando…" : retiroBloqueado ? "Retiro bloqueado (crédito activo)" : "Registrar"}
+            </button>
+          </form>
+        );
+      })()}
 
       <div className="table-wrap">
         <table>
@@ -3547,29 +3907,69 @@ export default function AhorroCuentaDetail() {
 ## `frontend/src/pages/AhorroCuentaForm.tsx` {#frontendsrcpagesahorrocuentaformtsx}
 
 ```tsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import type { FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { TIPOS_AHORRO } from "../types";
-import type { Agencia, Socio } from "../types";
+import { TIPOS_AHORRO, PARENTESCOS_BENEFICIARIO_MENOR } from "../types";
+import type { Agencia, Socio, Prestamo } from "../types";
+import { formatearDPI, calcularEdad } from "../lib/formatters";
 import BuscadorSocio from "../components/BuscadorSocio";
+import InputNombreAutoCompletar from "../components/InputNombreAutoCompletar";
 
 export default function AhorroCuentaForm() {
   const { slug } = useParams<{ slug: string }>();
   const config = TIPOS_AHORRO.find((t) => t.slug === slug);
   const { usuario } = useAuth();
   const navigate = useNavigate();
-  const puedeElegirAgencia = usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA";
+  const puedeElegirAgencia = usuario?.rol === "GERENCIA";
 
   const [agencias, setAgencias] = useState<Agencia[]>([]);
   const [agenciaId, setAgenciaId] = useState(usuario?.agenciaId ?? "");
   const [socio, setSocio] = useState<Socio | null>(null);
   const [numeroCuenta, setNumeroCuenta] = useState("");
   const [saldoInicial, setSaldoInicial] = useState("0");
+  const [cuotaPactada, setCuotaPactada] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [cuentaExistente, setCuentaExistente] = useState<{ id: string; numero_cuenta: string } | null>(null);
+  const [saldoAportacion, setSaldoAportacion] = useState<number | null>(null);
+  const [creandoAportacionRapida, setCreandoAportacionRapida] = useState(false);
+  const [prestamosSocio, setPrestamosSocio] = useState<Prestamo[]>([]);
+  const [prestamoSeleccionadoId, setPrestamoSeleccionadoId] = useState<string>("");
+
+  const [titularMenorNombre, setTitularMenorNombre] = useState("");
+  const [titularMenorParentesco, setTitularMenorParentesco] = useState("Hijo(a)");
+  const [titularMenorCui, setTitularMenorCui] = useState("");
+  const [titularMenorFechaNacimiento, setTitularMenorFechaNacimiento] = useState("");
+
+  const esProgramadoOInfanto =
+    config?.tipo === "AHORRO_PROGRAMADO" || config?.tipo === "AHORRO_INFANTO_JUVENIL";
+  const esInfanto =
+    config?.tipo === "AHORRO_INFANTO_JUVENIL" || config?.tipo === "APORTACION_INFANTIL";
+
+  const edadMenor = useMemo(() => {
+    if (!esInfanto || !titularMenorFechaNacimiento) return null;
+    return calcularEdad(titularMenorFechaNacimiento);
+  }, [esInfanto, titularMenorFechaNacimiento]);
+
+  const esMayorDeEdad = edadMenor !== null && edadMenor >= 18;
+  const esFechaFutura = edadMenor !== null && edadMenor < 0;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sId = params.get("socioId");
+    if (sId && !socio) {
+      api
+        .get<Socio>(`/socios/${sId}`)
+        .then(({ data }) => {
+          setSocio(data);
+          if (data.agencia_id) setAgenciaId(data.agencia_id);
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     if (puedeElegirAgencia) api.get<Agencia[]>("/agencias").then(({ data }) => setAgencias(data));
@@ -3582,6 +3982,55 @@ export default function AhorroCuentaForm() {
       .then(({ data }) => setNumeroCuenta(data.numeroCuenta));
   }, [agenciaId, config]);
 
+  useEffect(() => {
+    if (!socio || !config) {
+      setCuentaExistente(null);
+      setSaldoAportacion(null);
+      setPrestamosSocio([]);
+      setPrestamoSeleccionadoId("");
+      return;
+    }
+    api
+      .get<{ cuentas: Array<{ id: string; numero_cuenta: string; tipo: string; estado: string; saldo_actual?: string }> }>(`/socios/${socio.id}`)
+      .then(({ data }) => {
+        const apor = data.cuentas?.find((c) => (c.tipo === "APORTACION" || c.tipo === "APORTACION_INFANTIL") && c.estado === "ACTIVA");
+        const saldo = apor ? Number(apor.saldo_actual ?? 0) : 0;
+        setSaldoAportacion(saldo);
+
+        const encontrada = data.cuentas?.find((c) => c.tipo === config.tipo && c.estado === "ACTIVA");
+        setCuentaExistente(encontrada ? { id: encontrada.id, numero_cuenta: encontrada.numero_cuenta } : null);
+      })
+      .catch(() => {
+        setCuentaExistente(null);
+        setSaldoAportacion(null);
+      });
+
+    if (config.tipo === "AHORRO_SOBRE_PRESTAMO") {
+      api
+        .get<Prestamo[]>("/prestamos", { params: { socioId: socio.id } })
+        .then(({ data }) => {
+          const activos = data.filter((p) => p.estado !== "CANCELADO" && p.estado !== "RECHAZADO");
+          setPrestamosSocio(activos);
+          if (activos[0]) setPrestamoSeleccionadoId(activos[0].id);
+        })
+        .catch(() => setPrestamosSocio([]));
+    }
+  }, [socio, config]);
+
+  async function handleAperturarAportacionRapida() {
+    if (!socio) return;
+    setCreandoAportacionRapida(true);
+    setError(null);
+    try {
+      await api.post(`/socios/${socio.id}/abrir-aportacion`, { monto: 100 });
+      setSaldoAportacion(100);
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setCreandoAportacionRapida(false);
+    }
+  }
+
   if (!config) return <div className="alert error">Tipo de ahorro no reconocido.</div>;
 
   async function onSubmit(e: FormEvent) {
@@ -3589,6 +4038,45 @@ export default function AhorroCuentaForm() {
     if (!socio) {
       setError("Selecciona primero el socio dueño de la cuenta.");
       return;
+    }
+    if (cuentaExistente) {
+      setError(`Este socio ya tiene la cuenta ${cuentaExistente.numero_cuenta} de ${config!.titulo}.`);
+      return;
+    }
+    if (
+      config?.tipo !== "APORTACION" &&
+      config?.tipo !== "APORTACION_INFANTIL" &&
+      saldoAportacion !== null &&
+      saldoAportacion < 100
+    ) {
+      setError(
+        `Regla de la cooperativa: El socio debe tener un saldo de aportaciones de al menos Q 100.00 para poder abrir cuentas de ahorro infantil, corriente o programado (saldo actual: Q ${saldoAportacion.toFixed(2)}).`
+      );
+      return;
+    }
+    if (esInfanto) {
+      if (!titularMenorNombre.trim()) {
+        setError("Indica el nombre completo del menor titular de la cuenta.");
+        return;
+      }
+      if (!titularMenorParentesco.trim()) {
+        setError("Indica el parentesco del menor con el socio responsable.");
+        return;
+      }
+      if (!titularMenorFechaNacimiento) {
+        setError("Indica la fecha de nacimiento del menor titular.");
+        return;
+      }
+      if (esFechaFutura) {
+        setError("La fecha de nacimiento no puede ser una fecha futura.");
+        return;
+      }
+      if (esMayorDeEdad) {
+        setError(
+          `Titular mayor de edad (${edadMenor} años): Las cuentas Infanto Juveniles son exclusivas para menores de 18 años.`
+        );
+        return;
+      }
     }
     setError(null);
     setGuardando(true);
@@ -3599,6 +4087,12 @@ export default function AhorroCuentaForm() {
         socioId: socio.id,
         numeroCuenta,
         saldoInicial: Number(saldoInicial) || 0,
+        cuotaPactada: cuotaPactada ? Number(cuotaPactada) : undefined,
+        prestamoId: prestamoSeleccionadoId || undefined,
+        titularMenorNombre: esInfanto ? titularMenorNombre.trim() : undefined,
+        titularMenorParentesco: esInfanto ? titularMenorParentesco.trim() : undefined,
+        titularMenorCui: esInfanto ? titularMenorCui.replace(/[^0-9-]/g, "") || undefined : undefined,
+        titularMenorFechaNacimiento: esInfanto ? titularMenorFechaNacimiento || undefined : undefined,
       });
       navigate(`/ahorros/${config!.slug}/${data.id}`);
     } catch (err) {
@@ -3617,6 +4111,37 @@ export default function AhorroCuentaForm() {
       </div>
 
       {error && <div className="alert error">{error}</div>}
+
+      {socio && saldoAportacion !== null && saldoAportacion < 100 && (
+        <div
+          className="alert warning"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "0.75rem",
+            marginBottom: "1rem",
+            borderLeft: "4px solid #f59e0b",
+          }}
+        >
+          <div>
+            <strong>⚠️ Este asociado no cuenta con Aportación Inicial estatutaria (Q {saldoAportacion.toFixed(2)})</strong>
+            <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--ink-soft)" }}>
+              Para habilitar la apertura de su {config.titulo}, es obligatorio registrar su Aportación Estatutaria mínima de Q 100.00.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            style={{ background: "#059669", borderColor: "#059669", fontWeight: 700, fontSize: "0.85rem" }}
+            onClick={handleAperturarAportacionRapida}
+            disabled={creandoAportacionRapida}
+          >
+            {creandoAportacionRapida ? "Aperturando…" : "➕ Aperturar Aportación (Q 100) Ahora"}
+          </button>
+        </div>
+      )}
 
       <form className="card" onSubmit={onSubmit} style={{ maxWidth: 560 }}>
         {puedeElegirAgencia && (
@@ -3638,13 +4163,247 @@ export default function AhorroCuentaForm() {
         <div className="field">
           <label>Socio</label>
           <BuscadorSocio agenciaId={agenciaId || undefined} seleccionado={socio} onSeleccionar={setSocio} />
+          {cuentaExistente && (
+            <div
+              style={{
+                marginTop: "0.5rem",
+                padding: "0.75rem",
+                borderRadius: "8px",
+                background: "#fef3c7",
+                color: "#92400e",
+                border: "1px solid #f59e0b",
+                fontSize: "0.88rem",
+              }}
+            >
+              ⚠️ <strong>{socio?.nombres}</strong> ya tiene una cuenta de {config.titulo}:{" "}
+              <strong>{cuentaExistente.numero_cuenta}</strong>. Cada socio solo puede tener una cuenta por tipo de ahorro.
+              <div style={{ marginTop: "0.5rem" }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ fontSize: "0.85rem", padding: "0.35rem 0.75rem" }}
+                  onClick={() => navigate(`/ahorros/${config.slug}/${cuentaExistente.id}`)}
+                >
+                  Ver cuenta y movimientos →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {socio && saldoAportacion !== null && (
+            saldoAportacion < 100 ? (
+              <div
+                style={{
+                  marginTop: "0.6rem",
+                  padding: "0.75rem 0.9rem",
+                  borderRadius: "8px",
+                  background: "rgba(239, 68, 68, 0.1)",
+                  color: "#ef4444",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  fontSize: "0.86rem",
+                  lineHeight: 1.45,
+                }}
+              >
+                ⚠️ <strong>Aportación estatutaria insuficiente:</strong> El socio tiene un saldo de aportaciones de{" "}
+                <strong>Q {saldoAportacion.toFixed(2)}</strong>. La regla de la cooperativa exige contar con al menos{" "}
+                <strong>Q 100.00</strong> en aportaciones para habilitar la apertura de cuentas de {config.titulo.toLowerCase()}.
+              </div>
+            ) : (
+              <div
+                style={{
+                  marginTop: "0.6rem",
+                  padding: "0.5rem 0.8rem",
+                  borderRadius: "8px",
+                  background: "rgba(16, 185, 129, 0.1)",
+                  color: "#10b981",
+                  border: "1px solid rgba(16, 185, 129, 0.25)",
+                  fontSize: "0.82rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                }}
+              >
+                <span>✓</span> Aportación estatutaria activa: <strong>Q {saldoAportacion.toFixed(2)}</strong> (Cumple con el requisito mínimo de Q 100.00)
+              </div>
+            )
+          )}
         </div>
+
+        {esInfanto && (
+          <div
+            style={{
+              background: "rgba(14, 165, 233, 0.08)",
+              border: "1px solid rgba(14, 165, 233, 0.3)",
+              borderRadius: "8px",
+              padding: "0.85rem 1rem",
+              marginBottom: "1rem",
+            }}
+          >
+            <div style={{ fontWeight: 700, color: "#0284c7", marginBottom: "0.6rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <span>🧒</span> Datos del menor titular de la cuenta
+            </div>
+            <p style={{ fontSize: "0.82rem", color: "var(--ink-soft)", margin: "0 0 0.75rem" }}>
+              {socio ? <strong>{socio.nombres}</strong> : "El socio"} figura como responsable/tutor de la cuenta, pero el ahorro pertenece al menor. Indica sus datos.
+            </p>
+
+            <div className="field" style={{ marginBottom: "0.6rem" }}>
+              <label htmlFor="menor-nombre">
+                Nombre completo del menor <span style={{ color: "var(--danger, #dc2626)" }}>*</span>
+              </label>
+              <InputNombreAutoCompletar
+                id="menor-nombre"
+                value={titularMenorNombre}
+                onChange={setTitularMenorNombre}
+                placeholder="Ej. Juanito Tomás Sánchez Pérez"
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <div className="field" style={{ marginBottom: "0.6rem" }}>
+                <label htmlFor="menor-parentesco">
+                  Parentesco con el tutor <span style={{ color: "var(--danger, #dc2626)" }}>*</span>
+                </label>
+                <select
+                  id="menor-parentesco"
+                  value={titularMenorParentesco}
+                  onChange={(e) => setTitularMenorParentesco(e.target.value)}
+                >
+                  <option value="">Selecciona el parentesco…</option>
+                  {PARENTESCOS_BENEFICIARIO_MENOR.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field" style={{ marginBottom: "0.6rem" }}>
+                <label htmlFor="menor-fecha-nac">
+                  Fecha de nacimiento <span style={{ color: "var(--danger, #dc2626)" }}>*</span>
+                </label>
+                <input
+                  id="menor-fecha-nac"
+                  type="date"
+                  value={titularMenorFechaNacimiento}
+                  onChange={(e) => setTitularMenorFechaNacimiento(e.target.value)}
+                  max={new Date().toISOString().split("T")[0]}
+                  required
+                />
+              </div>
+            </div>
+
+            {edadMenor !== null && (
+              <div
+                style={{
+                  marginTop: "0.25rem",
+                  marginBottom: "0.75rem",
+                  padding: "0.6rem 0.85rem",
+                  borderRadius: "6px",
+                  fontSize: "0.85rem",
+                  fontWeight: 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  backgroundColor:
+                    esMayorDeEdad || esFechaFutura
+                      ? "rgba(220, 38, 38, 0.1)"
+                      : "rgba(16, 185, 129, 0.12)",
+                  color: esMayorDeEdad || esFechaFutura ? "#b91c1c" : "#047857",
+                  border: `1px solid ${
+                    esMayorDeEdad || esFechaFutura ? "#fca5a5" : "#a7f3d0"
+                  }`,
+                }}
+              >
+                {esFechaFutura ? (
+                  <span>⚠️ <strong>Fecha inválida:</strong> La fecha de nacimiento no puede ser una fecha futura.</span>
+                ) : esMayorDeEdad ? (
+                  <span>
+                    🚫 <strong>Titular mayor de edad ({edadMenor} años):</strong> No es apto para crear esta cuenta. Las cuentas Infanto Juvenil son exclusivas para menores de 18 años.
+                  </span>
+                ) : (
+                  <span>
+                    🎂 <strong>Edad calculada:</strong> {edadMenor} {edadMenor === 1 ? "año" : "años"} (Menor de edad apto para Cuenta Juvenil).
+                  </span>
+                )}
+              </div>
+            )}
+
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor="menor-cui">CUI del menor (RENAP) — opcional</label>
+              <input
+                id="menor-cui"
+                inputMode="numeric"
+                value={titularMenorCui}
+                onChange={(e) => setTitularMenorCui(formatearDPI(e.target.value.replace(/[^0-9-]/g, "")))}
+                maxLength={15}
+                placeholder="xxxx-xxxxx-xxxx (CUI de partida)"
+                style={{ fontFamily: "monospace", letterSpacing: "0.5px" }}
+              />
+              <span className="hint">Si aún no tiene CUI emitido, puedes dejarlo en blanco.</span>
+            </div>
+          </div>
+        )}
 
         <div className="field">
           <label htmlFor="numero">Número de cuenta</label>
           <input id="numero" value={numeroCuenta} onChange={(e) => setNumeroCuenta(e.target.value)} required />
           <span className="hint">Sugerido automáticamente; puedes ajustarlo.</span>
         </div>
+
+        {config.tipo === "AHORRO_SOBRE_PRESTAMO" && (
+          <div
+            className="field"
+            style={{
+              background: "rgba(59, 130, 246, 0.08)",
+              border: "1px solid rgba(59, 130, 246, 0.25)",
+              borderRadius: "8px",
+              padding: "0.85rem 1rem",
+            }}
+          >
+            <label htmlFor="prestamo-vinculado" style={{ fontWeight: 700, color: "var(--accent)" }}>
+              🛡️ Préstamo vinculado en garantía
+            </label>
+            {prestamosSocio.length > 0 ? (
+              <select
+                id="prestamo-vinculado"
+                value={prestamoSeleccionadoId}
+                onChange={(e) => setPrestamoSeleccionadoId(e.target.value)}
+                style={{ width: "100%", padding: "0.5rem", marginTop: "0.4rem" }}
+              >
+                {prestamosSocio.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.codigo} — {p.tipo} ({p.estado}) · Saldo/Monto: Q{Number(p.saldo_capital || p.monto_aprobado || p.monto_solicitado).toFixed(2)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", margin: "0.4rem 0 0" }}>
+                El socio no tiene créditos activos registrados. Esta cuenta actuará como fondo de garantía de crédito general.
+              </p>
+            )}
+            <span className="hint" style={{ marginTop: "0.5rem", display: "block" }}>
+              🔒 <strong>Regla estatutaria:</strong> Esta cuenta no permite retiros en ventanilla mientras el crédito esté activo.
+              Si el asociado cae en mora o deja de pagar su cuota, la cooperativa podrá debitar de este ahorro para cubrir el saldo adeudado.
+            </span>
+          </div>
+        )}
+
+        {esProgramadoOInfanto && (
+          <div className="field">
+            <label htmlFor="cuota-pactada">Cuota mensual acordada (Q)</label>
+            <input
+              id="cuota-pactada"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Ej. 100.00"
+              value={cuotaPactada}
+              onChange={(e) => setCuotaPactada(e.target.value)}
+            />
+            <span className="hint">
+              Monto mensual comprometido por el socio (se reflejará en tiempo real en Auxiliar de Caja).
+            </span>
+          </div>
+        )}
 
         <div className="field">
           <label htmlFor="saldo">Saldo inicial (si viene de otro registro)</label>
@@ -3659,7 +4418,24 @@ export default function AhorroCuentaForm() {
         </div>
 
         <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
-          <button type="submit" className="btn" disabled={guardando || !agenciaId}>
+          <button
+            type="submit"
+            className="btn"
+            disabled={
+              guardando ||
+              !agenciaId ||
+              Boolean(cuentaExistente) ||
+              (saldoAportacion !== null && saldoAportacion < 100) ||
+              (config.tipo === "AHORRO_SOBRE_PRESTAMO" && !prestamoSeleccionadoId) ||
+              (esInfanto && (
+                !titularMenorNombre.trim() ||
+                !titularMenorParentesco.trim() ||
+                !titularMenorFechaNacimiento ||
+                esMayorDeEdad ||
+                esFechaFutura
+              ))
+            }
+          >
             {guardando ? "Guardando…" : "Abrir cuenta"}
           </button>
           <button type="button" className="btn secondary" onClick={() => navigate(-1)}>
@@ -3680,6 +4456,7 @@ import { Link, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { formatoQ, TIPOS_AHORRO } from "../types";
 import type { Cuenta, ResumenCuentas } from "../types";
+import { DualCuentaBadge } from "../components/DualCuentaBadge";
 
 export default function AhorroList() {
   const { slug } = useParams<{ slug: string }>();
@@ -3690,9 +4467,15 @@ export default function AhorroList() {
   const [resumen, setResumen] = useState<ResumenCuentas | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+
   useEffect(() => {
     if (!config) return;
     setCuentas(null);
+    setResumen(null);
+    setError(null);
+    setPage(1);
     const timeout = setTimeout(() => {
       api
         .get<Cuenta[]>("/cuentas", { params: { tipo: config.tipo, q: q || undefined } })
@@ -3713,73 +4496,397 @@ export default function AhorroList() {
   if (!config) return <div className="alert error">Tipo de ahorro no reconocido.</div>;
 
   const saldoTotal = resumen?.saldoTotal ?? cuentas?.reduce((acc, c) => acc + Number(c.saldo_actual), 0) ?? 0;
+  const totalCuentas = cuentas?.length ?? 0;
+  const totalPaginas = Math.max(1, Math.ceil(totalCuentas / pageSize));
+  const cuentasPaginadas = cuentas?.slice((page - 1) * pageSize, page * pageSize) ?? [];
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <h1>{config.titulo}</h1>
-          <p>{config.descripcion}</p>
+    <div className="screen-container">
+      {/* CABECERA COMPACTA DE 1 LÍNEA */}
+      <div className="screen-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", flexWrap: "wrap" }}>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.2rem" }}>
+            <span>🏦</span> {config.titulo}
+          </h1>
+          <span
+            style={{
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              padding: "0.15rem 0.5rem",
+              borderRadius: "4px",
+              background: "rgba(16, 185, 129, 0.15)",
+              color: "#10b981",
+              border: "1px solid rgba(16, 185, 129, 0.3)",
+            }}
+          >
+            {config.descripcion}
+          </span>
         </div>
-        <Link to={`/ahorros/${config.slug}/nueva`} className="btn">
-          + Nueva cuenta
-        </Link>
+
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <button
+            type="button"
+            className="btn secondary"
+            onClick={() => window.print()}
+            style={{ padding: "0.3rem 0.65rem", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.3rem" }}
+          >
+            <span>🖨️</span> Imprimir Padrón
+          </button>
+          <Link
+            to={`/ahorros/${config.slug}/nueva`}
+            className="btn"
+            style={{ padding: "0.3rem 0.75rem", fontSize: "0.8rem", textDecoration: "none" }}
+          >
+            + Nueva cuenta
+          </Link>
+        </div>
       </div>
 
-      {error && <div className="alert error">{error}</div>}
+      {error && (
+        <div className="alert error" style={{ margin: "0.25rem 0", padding: "0.4rem 0.75rem", fontSize: "0.82rem" }}>
+          {error}
+        </div>
+      )}
 
-      <div className="stat-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 220px))" }}>
-        <div className="stat-card accent">
-          <span className="label">Saldo total</span>
-          <span className="value">{formatoQ(saldoTotal)}</span>
-          <span className="sub">{resumen?.totalCuentas ?? cuentas?.length ?? 0} cuenta(s)</span>
+      {/* STRIP DE KPIS HORIZONTALES CON ESTILO FINTECH */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
+        {/* SALDO TOTAL */}
+        <div
+          style={{
+            background: "rgba(2, 132, 199, 0.06)",
+            border: "1px solid rgba(2, 132, 199, 0.3)",
+            borderLeft: "4px solid #0284c7",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>
+              SALDO TOTAL CAPTADO
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>🏦</span>
+          </div>
+          <span style={{ fontSize: "1.15rem", fontWeight: 800, color: "#0284c7", fontFamily: "monospace" }}>
+            {formatoQ(saldoTotal)}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>
+            {resumen?.totalCuentas ?? totalCuentas} cuentas activas
+          </span>
         </div>
-        <div className="stat-card">
-          <span className="label">Total depósitos</span>
-          <span className="value">{formatoQ(resumen?.totalDepositos ?? 0)}</span>
+
+        {/* TOTAL DEPÓSITOS */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #059669",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#059669", letterSpacing: "0.03em" }}>
+              TOTAL DEPÓSITOS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>📥</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#059669", fontFamily: "monospace" }}>
+            {formatoQ(resumen?.totalDepositos ?? 0)}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Ingresos acumulados</span>
         </div>
-        <div className="stat-card">
-          <span className="label">Total retiros</span>
-          <span className="value">{formatoQ(resumen?.totalRetiros ?? 0)}</span>
+
+        {/* TOTAL RETIROS */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #f59e0b",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#d97706", letterSpacing: "0.03em" }}>
+              TOTAL RETIROS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>📤</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#d97706", fontFamily: "monospace" }}>
+            {formatoQ(resumen?.totalRetiros ?? 0)}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Egresos acumulados</span>
+        </div>
+
+        {/* PADRÓN DE CUENTAS */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #6366f1",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", letterSpacing: "0.03em" }}>
+              PADRÓN DE CUENTAS
+            </span>
+            <span style={{ fontSize: "0.85rem" }}>👥</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#6366f1", fontFamily: "monospace" }}>
+            {totalCuentas}
+          </span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Pág {page} de {totalPaginas}</span>
         </div>
       </div>
 
-      <div className="searchbar">
-        <input placeholder="Buscar por socio o número de cuenta…" value={q} onChange={(e) => setQ(e.target.value)} />
+      {/* BARRA DE BÚSQUEDA COMPACTA */}
+      <div className="screen-toolbar">
+        <div style={{ position: "relative", flex: 1, maxWidth: 480 }}>
+          <span
+            style={{
+              position: "absolute",
+              left: "0.65rem",
+              top: "50%",
+              transform: "translateY(-50%)",
+              fontSize: "0.85rem",
+              color: "var(--ink-soft)",
+              pointerEvents: "none",
+            }}
+          >
+            🔍
+          </span>
+          <input
+            type="text"
+            placeholder="Buscar por socio o número de cuenta..."
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+            style={{
+              width: "100%",
+              padding: "0.38rem 0.65rem 0.38rem 2rem",
+              fontSize: "0.82rem",
+              borderRadius: "6px",
+              border: "1px solid var(--line)",
+              background: "var(--paper)",
+              color: "var(--ink)",
+            }}
+          />
+        </div>
       </div>
 
-      <div className="table-wrap">
-        <table>
+      {/* TABLA CON SCROLL INTERNO Y CABECERA PEGAJOSA (SÓLO PANTALLA) */}
+      <div className="table-scroll-container no-print">
+        <table className="table-compact">
           <thead>
             <tr>
-              <th>Cuenta</th>
-              <th>Socio</th>
-              <th>Saldo actual</th>
-              <th>Estado</th>
+              <th style={{ minWidth: 140 }}>NO. CUENTA</th>
+              <th style={{ minWidth: 260 }}>ASOCIADO / TITULAR</th>
+              <th style={{ minWidth: 140, textAlign: "right" }}>SALDO ACTUAL</th>
+              <th style={{ minWidth: 90, textAlign: "center" }}>ESTADO</th>
+              <th style={{ minWidth: 110, textAlign: "right" }}>ACCIONES</th>
             </tr>
           </thead>
           <tbody>
-            {cuentas?.map((c) => (
+            {cuentasPaginadas.map((c) => (
               <tr key={c.id}>
-                <td className="mono">
-                  <Link to={`/ahorros/${config.slug}/${c.id}`}>{c.numero_cuenta}</Link>
+                <td style={{ verticalAlign: "middle" }}>
+                  <Link to={`/ahorros/${config.slug}/${c.id}`} style={{ color: "inherit", textDecoration: "none" }}>
+                    <DualCuentaBadge numeroCuenta={c.numero_cuenta} codigoSistema={c.codigo_sistema} />
+                  </Link>
                 </td>
-                <td>{c.socio_nombres}</td>
-                <td className="mono">{formatoQ(c.saldo_actual)}</td>
                 <td>
-                  <span className={`badge ${c.estado === "ACTIVA" ? "activo" : "inactivo"}`}>
+                  <Link
+                    to={`/ahorros/${config.slug}/${c.id}`}
+                    style={{ color: "inherit", textDecoration: "none", fontWeight: 600 }}
+                  >
+                    {c.socio_nombres}
+                  </Link>
+                </td>
+                <td className="mono" style={{ fontWeight: 700, color: "var(--accent)", textAlign: "right" }}>
+                  {formatoQ(c.saldo_actual)}
+                </td>
+                <td style={{ textAlign: "center" }}>
+                  <span className={`badge ${c.estado === "ACTIVA" ? "activo" : "inactivo"}`} style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}>
                     {c.estado === "ACTIVA" ? "Activa" : "Cerrada"}
                   </span>
+                </td>
+                <td style={{ textAlign: "right" }}>
+                  <Link
+                    to={`/ahorros/${config.slug}/${c.id}`}
+                    className="btn secondary"
+                    style={{ padding: "0.18rem 0.5rem", fontSize: "0.74rem", textDecoration: "none" }}
+                  >
+                    Ver cuenta →
+                  </Link>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
         {cuentas && cuentas.length === 0 && (
-          <div className="empty">
+          <div className="empty" style={{ padding: "2rem", textAlign: "center", color: "var(--ink-soft)" }}>
             {q ? `No hay cuentas que coincidan con "${q}".` : "Todavía no hay cuentas de este tipo."}
           </div>
         )}
+      </div>
+
+      {/* FOOTER FIJO CON PAGINACIÓN (SÓLO PANTALLA) */}
+      <div className="screen-footer no-print">
+        <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+          Mostrando {cuentasPaginadas.length} de {totalCuentas} cuentas · Pág. {page} de {totalPaginas}
+        </span>
+        <div style={{ display: "flex", gap: "0.4rem" }}>
+          <button
+            type="button"
+            className="btn secondary"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+            style={{ padding: "0.22rem 0.6rem", fontSize: "0.78rem" }}
+          >
+            ← Anterior
+          </button>
+          <button
+            type="button"
+            className="btn secondary"
+            disabled={page >= totalPaginas}
+            onClick={() => setPage((p) => p + 1)}
+            style={{ padding: "0.22rem 0.6rem", fontSize: "0.78rem" }}
+          >
+            Siguiente →
+          </button>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          REPORTE OFICIAL DE IMPRESIÓN COMPLETO (TODAS LAS CUENTAS SIN CORTES)
+          ══════════════════════════════════════════════════════════════════════ */}
+      <div className="print-only" style={{ width: "100%", margin: "0", padding: "0" }}>
+        {/* MEMBRETE INSTITUCIONAL OFICIAL */}
+        <div style={{ borderBottom: "2px solid #0f172a", paddingBottom: "6px", marginBottom: "10px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: "11pt", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.5px", color: "#0f172a" }}>
+              COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."
+            </div>
+            <div style={{ fontSize: "9.5pt", fontWeight: 700, color: "#0284c7", marginTop: "2px" }}>
+              PADRÓN GENERAL OFICIAL DE CUENTAS — {config.titulo.toUpperCase()}
+            </div>
+            <div style={{ fontSize: "7.5pt", color: "#475569", marginTop: "2px" }}>
+              San Gaspar Chajul, El Quiché, Guatemala · Sistema Contable y Financiero COMIF-R.L.
+            </div>
+          </div>
+          <div style={{ textAlign: "right", fontSize: "7.5pt", color: "#334155" }}>
+            <div><strong>Emisión:</strong> {new Date().toLocaleDateString("es-GT", { day: "2-digit", month: "2-digit", year: "numeric" })} {new Date().toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}</div>
+            <div><strong>Total Cuentas:</strong> {totalCuentas} ({cuentas?.filter(c => c.estado === "ACTIVA").length ?? 0} activas)</div>
+            {q && <div><strong>Filtro aplicado:</strong> "{q}"</div>}
+          </div>
+        </div>
+
+        {/* RESUMEN FINANCIERO OFICIAL */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginBottom: "10px" }}>
+          <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>SALDO TOTAL CAPTADO</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#0284c7", fontFamily: "monospace" }}>{formatoQ(saldoTotal)}</div>
+          </div>
+          <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>TOTAL CUENTAS</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#1e293b", fontFamily: "monospace" }}>{totalCuentas}</div>
+          </div>
+          <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>INGRESOS / DEPÓSITOS</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#059669", fontFamily: "monospace" }}>{formatoQ(resumen?.totalDepositos ?? 0)}</div>
+          </div>
+          <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>EGRESOS / RETIROS</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#d97706", fontFamily: "monospace" }}>{formatoQ(resumen?.totalRetiros ?? 0)}</div>
+          </div>
+        </div>
+
+        {/* TABLA COMPLETA CON TODAS LAS CUENTAS REGISTRADAS */}
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "7.5pt", marginBottom: "15px" }}>
+          <thead>
+            <tr style={{ background: "#0f172a", color: "#ffffff" }}>
+              <th style={{ width: "3%", textAlign: "center", padding: "4px 2px", color: "#ffffff" }}>#</th>
+              <th style={{ width: "18%", textAlign: "left", padding: "4px 4px", color: "#ffffff" }}>NO. DE CUENTA</th>
+              <th style={{ width: "45%", textAlign: "left", padding: "4px 4px", color: "#ffffff" }}>ASOCIADO / TITULAR</th>
+              <th style={{ width: "20%", textAlign: "right", padding: "4px 4px", color: "#ffffff" }}>SALDO ACTUAL (Q)</th>
+              <th style={{ width: "14%", textAlign: "center", padding: "4px 4px", color: "#ffffff" }}>ESTADO</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(cuentas ?? []).map((c, index) => (
+              <tr key={c.id} style={{ background: index % 2 === 0 ? "#ffffff" : "#f8fafc" }}>
+                <td style={{ textAlign: "center", border: "1px solid #cbd5e1", padding: "3px 2px" }}>
+                  {index + 1}
+                </td>
+                <td style={{ border: "1px solid #cbd5e1", padding: "3px 4px", fontFamily: "monospace", fontWeight: 700 }}>
+                  {c.numero_cuenta}
+                </td>
+                <td style={{ border: "1px solid #cbd5e1", padding: "3px 4px", fontWeight: 600 }}>
+                  {c.socio_nombres}
+                </td>
+                <td style={{ textAlign: "right", border: "1px solid #cbd5e1", padding: "3px 4px", fontFamily: "monospace", fontWeight: 700, color: "#0284c7" }}>
+                  {formatoQ(c.saldo_actual)}
+                </td>
+                <td style={{ textAlign: "center", border: "1px solid #cbd5e1", padding: "3px 4px", fontWeight: 700, fontSize: "7pt" }}>
+                  {c.estado === "ACTIVA" ? "ACTIVA" : "CERRADA"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr style={{ background: "#e2e8f0", fontWeight: "bold" }}>
+              <td colSpan={3} style={{ border: "1px solid #94a3b8", padding: "5px", textAlign: "right", fontWeight: 800 }}>
+                TOTAL GENERAL CAPTADO ({totalCuentas} CUENTAS):
+              </td>
+              <td style={{ border: "1px solid #94a3b8", padding: "5px", textAlign: "right", fontFamily: "monospace", fontWeight: 800, color: "#0284c7", fontSize: "8.5pt" }}>
+                {formatoQ(saldoTotal)}
+              </td>
+              <td style={{ border: "1px solid #94a3b8", padding: "5px", textAlign: "center", color: "#475569", fontSize: "7pt" }}>
+                Verificado COMIF-R.L.
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+
+        {/* BLOQUE DE FIRMAS OFICIALES DE LEGALIZACIÓN */}
+        <div style={{ pageBreakInside: "avoid", breakInside: "avoid", marginTop: "24px", paddingTop: "8px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px", textAlign: "center" }}>
+            <div>
+              <div style={{ borderTop: "1px solid #000", margin: "0 10px", paddingTop: "4px", fontSize: "7.5pt", fontWeight: 700 }}>
+                Encargado de Captaciones / Cajero
+              </div>
+              <div style={{ fontSize: "6.5pt", color: "#475569" }}>Operaciones y Ventanilla</div>
+            </div>
+            <div>
+              <div style={{ borderTop: "1px solid #000", margin: "0 10px", paddingTop: "4px", fontSize: "7.5pt", fontWeight: 700 }}>
+                Comisión de Vigilancia
+              </div>
+              <div style={{ fontSize: "6.5pt", color: "#475569" }}>Fiscalización Interna</div>
+            </div>
+            <div>
+              <div style={{ borderTop: "1px solid #000", margin: "0 10px", paddingTop: "4px", fontSize: "7.5pt", fontWeight: 700 }}>
+                Contador General / Gerencia
+              </div>
+              <div style={{ fontSize: "6.5pt", color: "#475569" }}>Certificación Contable COMIF-R.L.</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -4291,7 +5398,7 @@ export default function CajaChica() {
 
   if (mostrarReporte) {
     return (
-      <div className="screen-container" style={{ overflowY: "auto" }}>
+      <div className="screen-container" style={{ overflowY: "auto", overflowX: "hidden", height: "auto", maxHeight: "none", width: "100%" }}>
         <CajaChicaReporteView
           agenciaId={agenciaId || agencias[0]?.id || ""}
           agencias={agencias}
@@ -4349,28 +5456,107 @@ export default function CajaChica() {
 
         {error && <div className="alert error" style={{ margin: "0.4rem 0", padding: "0.5rem 0.8rem", fontSize: "0.85rem" }}>{error}</div>}
 
-        {/* CINTILLO SUPERIOR DE KPIS COMPACTOS */}
+        {/* CINTILLO SUPERIOR DE KPIS COMPACTOS FINTECH */}
         {resultado && (
-          <div className="screen-kpis" style={{ margin: "0.4rem 0" }}>
-            <div className="kpi-tile accent" style={{ padding: "0.5rem 0.85rem" }}>
-              <span className="kpi-tile-label">Saldo Actual</span>
-              <span className="kpi-tile-value" style={{ color: "#10b981" }}>{formatoQ(resultado.saldoActual)}</span>
-              <span className="kpi-tile-sub">Fondo disponible</span>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem", margin: "0.4rem 0" }}>
+            {/* SALDO ACTUAL */}
+            <div
+              style={{
+                background: "rgba(5, 150, 105, 0.06)",
+                border: "1px solid rgba(5, 150, 105, 0.3)",
+                borderLeft: "4px solid #059669",
+                borderRadius: "8px",
+                padding: "0.45rem 0.65rem",
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#059669", letterSpacing: "0.03em" }}>
+                  SALDO DISPONIBLE
+                </span>
+                <span style={{ fontSize: "0.85rem" }}>💵</span>
+              </div>
+              <span style={{ fontSize: "1.15rem", fontWeight: 800, color: "#059669", fontFamily: "monospace" }}>
+                {formatoQ(resultado.saldoActual)}
+              </span>
+              <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Fondo disponible en caja</span>
             </div>
-            <div className="kpi-tile" style={{ padding: "0.5rem 0.85rem" }}>
-              <span className="kpi-tile-label">Total Ingresos</span>
-              <span className="kpi-tile-value">{formatoQ(resultado.totalIngresos)}</span>
-              <span className="kpi-tile-sub">Reposiciones registradas</span>
+
+            {/* TOTAL INGRESOS */}
+            <div
+              style={{
+                background: "var(--paper)",
+                border: "1px solid var(--line)",
+                borderLeft: "4px solid #0284c7",
+                borderRadius: "8px",
+                padding: "0.45rem 0.65rem",
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>
+                  TOTAL INGRESOS
+                </span>
+                <span style={{ fontSize: "0.85rem" }}>📥</span>
+              </div>
+              <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#0284c7", fontFamily: "monospace" }}>
+                {formatoQ(resultado.totalIngresos)}
+              </span>
+              <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Reposiciones registradas</span>
             </div>
-            <div className="kpi-tile" style={{ padding: "0.5rem 0.85rem" }}>
-              <span className="kpi-tile-label">Total Egresos</span>
-              <span className="kpi-tile-value" style={{ color: "#ef4444" }}>{formatoQ(resultado.totalEgresos)}</span>
-              <span className="kpi-tile-sub">Gastos comprobados</span>
+
+            {/* TOTAL EGRESOS */}
+            <div
+              style={{
+                background: "var(--paper)",
+                border: "1px solid var(--line)",
+                borderLeft: "4px solid #f59e0b",
+                borderRadius: "8px",
+                padding: "0.45rem 0.65rem",
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#d97706", letterSpacing: "0.03em" }}>
+                  TOTAL EGRESOS
+                </span>
+                <span style={{ fontSize: "0.85rem" }}>📤</span>
+              </div>
+              <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#d97706", fontFamily: "monospace" }}>
+                {formatoQ(resultado.totalEgresos)}
+              </span>
+              <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Gastos comprobados</span>
             </div>
-            <div className="kpi-tile" style={{ padding: "0.5rem 0.85rem" }}>
-              <span className="kpi-tile-label">Comprobantes</span>
-              <span className="kpi-tile-value">{resultado.data.length}</span>
-              <span className="kpi-tile-sub">Movimientos en libro</span>
+
+            {/* COMPROBANTES */}
+            <div
+              style={{
+                background: "var(--paper)",
+                border: "1px solid var(--line)",
+                borderLeft: "4px solid #6366f1",
+                borderRadius: "8px",
+                padding: "0.45rem 0.65rem",
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", letterSpacing: "0.03em" }}>
+                  COMPROBANTES
+                </span>
+                <span style={{ fontSize: "0.85rem" }}>📄</span>
+              </div>
+              <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#6366f1", fontFamily: "monospace" }}>
+                {resultado.data.length}
+              </span>
+              <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Movimientos en libro</span>
             </div>
           </div>
         )}
@@ -4899,7 +6085,7 @@ export default function Layout() {
             display: "flex", alignItems: "center", justifyContent: "center",
             fontWeight: 900, fontSize: "0.9rem",
           }}>M</div>
-          <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#ffffff", letterSpacing: "0.02em" }}>COOP COMIF R.L.</span>
+          <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#ffffff", letterSpacing: "0.02em" }}>COOP COMIF-R.L.</span>
         </div>
         <button className="hamburger-btn" onClick={() => setSidebarOpen(true)} title="Abrir Menú">☰</button>
       </div>
@@ -4920,7 +6106,7 @@ export default function Layout() {
           >
             <div className="sidebar-toggle-logo">M</div>
             <div className="sidebar-toggle-text">
-              <span className="name">COOP COMIF R.L.</span>
+              <span className="name">COOP COMIF-R.L.</span>
               <span className="sub">Maya Inversiones Futuras</span>
             </div>
             <i className="sidebar-chevron">‹</i>
@@ -4999,6 +6185,7 @@ export default function Layout() {
             <NavItem to="/alertas"   icon="🔔" label="Panel de Alertas"      onClick={closeSidebar} />
             <NavItem to="/usuarios"  icon="👤" label="Usuarios"              onClick={closeSidebar} />
             <NavItem to="/agencias"  icon="🏢" label="Agencias"              onClick={closeSidebar} />
+            <NavItem to="/traslados" icon="🔀" label="Traslados Inter-Agencia" onClick={closeSidebar} />
             <NavItem to="/auditoria" icon="🔍" label="Bitácora de Auditoría" onClick={closeSidebar} />
             <NavItem to="/sesiones"  icon="🛡️" label="Sesiones Activas"      onClick={closeSidebar} />
           </>)}
@@ -5128,8 +6315,8 @@ export default function Login() {
   return (
     <div className="login-wrap">
       <div className="card login-card">
-        <h1>Sistema Integral MIF</h1>
-        <p className="sub">COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."</p>
+        <h1>Sistema Integral COMIF-R.L.</h1>
+        <p className="sub">COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."</p>
 
         {error && <div className="alert error">{error}</div>}
 
@@ -5173,41 +6360,113 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
-import type { Socio } from "../types";
+import type { Socio, EstadoPrestamo, TipoPrestamo } from "../types";
+import {
+  PARENTESCOS_BENEFICIARIO,
+  PARENTESCOS_BENEFICIARIO_MENOR,
+  formatoQ,
+} from "../types";
+import {
+  formatearDPI,
+  formatearTelefono,
+  prepararTelefonoParaGuardar,
+  capitalizarDescripcion,
+} from "../lib/formatters";
+import InputNombreAutoCompletar from "../components/InputNombreAutoCompletar";
+import { DualCuentaBadge } from "../components/DualCuentaBadge";
 
 interface Cuenta {
   id: string;
   numero_cuenta: string;
+  codigo_sistema?: string | null;
   tipo: string;
   estado: string;
   saldo_actual: string;
 }
 
-type SocioConCuentas = Socio & { cuentas: Cuenta[] };
+interface PrestamoBrief {
+  id: string;
+  codigo: string;
+  tipo: TipoPrestamo;
+  estado: EstadoPrestamo;
+  monto_aprobado: string | number | null;
+  monto_solicitado: string | number;
+  saldo_capital: string | number | null;
+  cuota_mensual: string | number;
+  plazo_meses: number;
+  tasa_interes_mensual: string | number;
+  fecha_solicitud: string;
+  fecha_desembolso: string | null;
+  promotor_nombre: string | null;
+  ultimo_pago_fecha: string | null;
+  es_migracion: boolean;
+  numero_credito_anterior: string | null;
+}
+
+type SocioConCuentas = Socio & { cuentas: Cuenta[]; prestamos: PrestamoBrief[] };
 
 const TIPO_CUENTA_LABEL: Record<string, string> = {
-  APORTACION: "Aportación",
-  AHORRO_CORRIENTE: "Ahorro corriente",
-  AHORRO_PROGRAMADO: "Ahorro programado",
-  AHORRO_INFANTO_JUVENIL: "Ahorro infanto juvenil",
-  AHORRO_PLAZO_FIJO: "Ahorro a plazo fijo",
+  APORTACION: "Aportación Estatutaria",
+  APORTACION_INFANTIL: "Aportación Infanto Juvenil",
+  AHORRO_CORRIENTE: "Ahorro Corriente",
+  AHORRO_PROGRAMADO: "Ahorro Programado",
+  AHORRO_INFANTO_JUVENIL: "Ahorro Infanto Juvenil",
+  AHORRO_SOBRE_PRESTAMO: "Ahorro sobre Préstamo",
+  AHORRO_PLAZO_FIJO: "Ahorro a Plazo Fijo",
+};
+
+const TIPO_SLUG: Record<string, string> = {
+  APORTACION: "aportacion",
+  APORTACION_INFANTIL: "aportacion-infantil",
+  AHORRO_CORRIENTE: "corriente",
+  AHORRO_PROGRAMADO: "programado",
+  AHORRO_INFANTO_JUVENIL: "infanto-juvenil",
+  AHORRO_SOBRE_PRESTAMO: "sobre-prestamo",
+  AHORRO_PLAZO_FIJO: "plazo-fijo",
 };
 
 export default function SocioDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
   const [socio, setSocio] = useState<SocioConCuentas | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
+  // Modal de Apertura de Aportación Inicial
+  const [mostrarModalAportacion, setMostrarModalAportacion] = useState(false);
+  const [montoApor, setMontoApor] = useState("100");
+  const [reciboApor, setReciboApor] = useState("");
+  const [cuotaIngresoApor, setCuotaIngresoApor] = useState("");
+  const [abriendoApor, setAbriendoApor] = useState(false);
+
   const [form, setForm] = useState({
     nombres: "",
+    genero: "" as "M" | "F" | "",
     dpi: "",
     direccion: "",
     telefono: "",
     nombreBeneficiario: "",
+    parentescoBeneficiario: "",
+    dpiBeneficiario: "",
+    telefonoBeneficiario: "",
   });
+
+  const [dpiDuplicado, setDpiDuplicado] = useState<{ nombres: string; numeroAsociado: string; rol?: string } | null>(null);
+  const [verificandoDpi, setVerificandoDpi] = useState(false);
+
+  const [telefonoDuplicado, setTelefonoDuplicado] = useState<{ nombres: string; numeroAsociado: string; rol?: string } | null>(null);
+  const [verificandoTelefono, setVerificandoTelefono] = useState(false);
+
+  const [dpiDuplicadoBen, setDpiDuplicadoBen] = useState<{ nombres: string; numeroAsociado: string; rol?: string } | null>(null);
+  const [verificandoDpiBen, setVerificandoDpiBen] = useState(false);
+
+  const [telefonoDuplicadoBen, setTelefonoDuplicadoBen] = useState<{ nombres: string; numeroAsociado: string; rol?: string } | null>(null);
+  const [verificandoTelefonoBen, setVerificandoTelefonoBen] = useState(false);
+
+  const esMenorBeneficiario = form.parentescoBeneficiario && PARENTESCOS_BENEFICIARIO_MENOR.includes(form.parentescoBeneficiario as any);
 
   function cargar() {
     if (!id) return;
@@ -5217,10 +6476,14 @@ export default function SocioDetail() {
         setSocio(data);
         setForm({
           nombres: data.nombres,
-          dpi: data.dpi ?? "",
+          genero: (data.genero as "M" | "F" | "") ?? "",
+          dpi: data.dpi ? formatearDPI(data.dpi) : "",
           direccion: data.direccion ?? "",
-          telefono: data.telefono ?? "",
+          telefono: data.telefono ? formatearTelefono(data.telefono) : "",
           nombreBeneficiario: data.nombre_beneficiario ?? "",
+          parentescoBeneficiario: data.parentesco_beneficiario ?? "",
+          dpiBeneficiario: data.dpi_beneficiario ? formatearDPI(data.dpi_beneficiario) : "",
+          telefonoBeneficiario: data.telefono_beneficiario ? formatearTelefono(data.telefono_beneficiario) : "",
         });
       })
       .catch((err) => setError(mensajeError(err)));
@@ -5228,20 +6491,208 @@ export default function SocioDetail() {
 
   useEffect(cargar, [id]);
 
+  // Verificación en vivo de DPI duplicado en edición (excluyendo este socio)
+  useEffect(() => {
+    if (!editando) {
+      setDpiDuplicado(null);
+      setVerificandoDpi(false);
+      return;
+    }
+    const rawDpi = form.dpi.replace(/\D/g, "");
+    if (rawDpi.length === 13) {
+      setVerificandoDpi(true);
+      const timer = setTimeout(() => {
+        api
+          .get<{
+            valido: boolean;
+            disponible?: boolean;
+            registrado?: { nombres: string; numeroAsociado: string; rol?: string };
+            socio?: { nombres: string; numeroAsociado: string };
+          }>("/socios/verificar-dpi", { params: { dpi: rawDpi, socioId: id } })
+          .then(({ data }) => {
+            if (data.disponible === false && data.registrado) {
+              setDpiDuplicado(data.registrado);
+            } else if (data.disponible === false && data.socio) {
+              setDpiDuplicado(data.socio);
+            } else {
+              setDpiDuplicado(null);
+            }
+          })
+          .catch(() => setDpiDuplicado(null))
+          .finally(() => setVerificandoDpi(false));
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      setDpiDuplicado(null);
+      setVerificandoDpi(false);
+    }
+  }, [form.dpi, editando, id]);
+
+  // Verificación Teléfono Socio
+  useEffect(() => {
+    if (!editando) {
+      setTelefonoDuplicado(null);
+      setVerificandoTelefono(false);
+      return;
+    }
+    const rawTel = form.telefono.replace(/\D/g, "");
+    const localTel = rawTel.startsWith("502") && rawTel.length > 8 ? rawTel.slice(3) : rawTel.slice(-8);
+    if (localTel.length === 8) {
+      setVerificandoTelefono(true);
+      const timer = setTimeout(() => {
+        api
+          .get<{
+            valido: boolean;
+            disponible?: boolean;
+            registrado?: { nombres: string; numeroAsociado: string; rol: string };
+          }>("/socios/verificar-telefono", { params: { telefono: localTel, socioId: id, tipo: "SOCIO" } })
+          .then(({ data }) => {
+            if (data.disponible === false && data.registrado) {
+              setTelefonoDuplicado(data.registrado);
+            } else {
+              setTelefonoDuplicado(null);
+            }
+          })
+          .catch(() => setTelefonoDuplicado(null))
+          .finally(() => setVerificandoTelefono(false));
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      setTelefonoDuplicado(null);
+      setVerificandoTelefono(false);
+    }
+  }, [form.telefono, editando, id]);
+
+  // Verificación DPI Beneficiario
+  useEffect(() => {
+    if (!editando || esMenorBeneficiario) {
+      setDpiDuplicadoBen(null);
+      setVerificandoDpiBen(false);
+      return;
+    }
+    const rawDpi = form.dpiBeneficiario.replace(/\D/g, "");
+    if (rawDpi.length === 13) {
+      setVerificandoDpiBen(true);
+      const timer = setTimeout(() => {
+        api
+          .get<{
+            valido: boolean;
+            disponible?: boolean;
+            registrado?: { nombres: string; numeroAsociado: string; rol: string };
+            socio?: { nombres: string; numeroAsociado: string };
+          }>("/socios/verificar-dpi", { params: { dpi: rawDpi, socioId: id, tipo: "BENEFICIARIO" } })
+          .then(({ data }) => {
+            if (data.disponible === false && data.registrado) {
+              setDpiDuplicadoBen(data.registrado);
+            } else if (data.disponible === false && data.socio) {
+              setDpiDuplicadoBen({ ...data.socio, rol: "Socio registrado" });
+            } else {
+              setDpiDuplicadoBen(null);
+            }
+          })
+          .catch(() => setDpiDuplicadoBen(null))
+          .finally(() => setVerificandoDpiBen(false));
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      setDpiDuplicadoBen(null);
+      setVerificandoDpiBen(false);
+    }
+  }, [form.dpiBeneficiario, editando, id, esMenorBeneficiario]);
+
+  // Verificación Teléfono Beneficiario
+  useEffect(() => {
+    if (!editando || esMenorBeneficiario) {
+      setTelefonoDuplicadoBen(null);
+      setVerificandoTelefonoBen(false);
+      return;
+    }
+    const rawTel = form.telefonoBeneficiario.replace(/\D/g, "");
+    const localTel = rawTel.startsWith("502") && rawTel.length > 8 ? rawTel.slice(3) : rawTel.slice(-8);
+    if (localTel.length === 8) {
+      setVerificandoTelefonoBen(true);
+      const timer = setTimeout(() => {
+        api
+          .get<{
+            valido: boolean;
+            disponible?: boolean;
+            registrado?: { nombres: string; numeroAsociado: string; rol: string };
+          }>("/socios/verificar-telefono", { params: { telefono: localTel, socioId: id, tipo: "BENEFICIARIO" } })
+          .then(({ data }) => {
+            if (data.disponible === false && data.registrado) {
+              setTelefonoDuplicadoBen(data.registrado);
+            } else {
+              setTelefonoDuplicadoBen(null);
+            }
+          })
+          .catch(() => setTelefonoDuplicadoBen(null))
+          .finally(() => setVerificandoTelefonoBen(false));
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      setTelefonoDuplicadoBen(null);
+      setVerificandoTelefonoBen(false);
+    }
+  }, [form.telefonoBeneficiario, editando, id, esMenorBeneficiario]);
+
   async function guardar(e: FormEvent) {
     e.preventDefault();
     if (!id) return;
+    if (dpiDuplicado) {
+      setError(
+        `El DPI ya está registrado (${dpiDuplicado.rol || "Socio"}: ${dpiDuplicado.nombres}, Asociado: ${dpiDuplicado.numeroAsociado}). Modifícalo antes de guardar.`
+      );
+      return;
+    }
+    if (telefonoDuplicado) {
+      setError(
+        `El teléfono ya está registrado (${telefonoDuplicado.rol || "Socio"}: ${telefonoDuplicado.nombres}, Asociado: ${telefonoDuplicado.numeroAsociado}). Modifícalo antes de guardar.`
+      );
+      return;
+    }
+    if (!esMenorBeneficiario && dpiDuplicadoBen) {
+      setError(
+        `El DPI/CUI del beneficiario ya pertenece a un registro (${dpiDuplicadoBen.rol || "Socio"}: ${dpiDuplicadoBen.nombres}, Asociado: ${dpiDuplicadoBen.numeroAsociado}). Modifícalo antes de guardar.`
+      );
+      return;
+    }
+    if (!esMenorBeneficiario && telefonoDuplicadoBen) {
+      setError(
+        `El teléfono del beneficiario ya pertenece a un registro (${telefonoDuplicadoBen.rol || "Socio"}: ${telefonoDuplicadoBen.nombres}, Asociado: ${telefonoDuplicadoBen.numeroAsociado}). Modifícalo antes de guardar.`
+      );
+      return;
+    }
+
+    const cleanDpi = form.dpi ? form.dpi.replace(/\D/g, "") : "";
+    const cleanDpiBen = form.dpiBeneficiario ? form.dpiBeneficiario.replace(/\D/g, "") : "";
+    if (cleanDpi && cleanDpiBen && cleanDpi === cleanDpiBen) {
+      setError("El DPI del socio y el DPI/CUI del beneficiario no pueden ser iguales.");
+      return;
+    }
+
+    const cleanTel = form.telefono ? form.telefono.replace(/\D/g, "") : "";
+    const cleanTelBen = form.telefonoBeneficiario ? form.telefonoBeneficiario.replace(/\D/g, "") : "";
+    if (cleanTel && cleanTelBen && cleanTel === cleanTelBen) {
+      setError("El teléfono del socio y el teléfono del beneficiario no pueden ser iguales.");
+      return;
+    }
     setGuardando(true);
     setError(null);
     try {
       await api.patch(`/socios/${id}`, {
         nombres: form.nombres,
-        dpi: form.dpi || undefined,
+        genero: form.genero || undefined,
+        dpi: form.dpi ? form.dpi.trim() : undefined,
         direccion: form.direccion || undefined,
-        telefono: form.telefono || undefined,
+        telefono: prepararTelefonoParaGuardar(form.telefono),
         nombreBeneficiario: form.nombreBeneficiario || undefined,
+        parentescoBeneficiario: form.parentescoBeneficiario || undefined,
+        dpiBeneficiario: form.dpiBeneficiario ? form.dpiBeneficiario.trim() : undefined,
+        telefonoBeneficiario: prepararTelefonoParaGuardar(form.telefonoBeneficiario),
       });
       setEditando(false);
+      setMensajeExito("Datos del socio actualizados correctamente.");
+      setTimeout(() => setMensajeExito(null), 4000);
       cargar();
     } catch (err) {
       setError(mensajeError(err));
@@ -5260,46 +6711,461 @@ export default function SocioDetail() {
     }
   }
 
+  async function handleAbrirAportacion(e: FormEvent) {
+    e.preventDefault();
+    if (!id) return;
+    const monto = Number(montoApor);
+    if (isNaN(monto) || monto < 100) {
+      setError("La aportación estatutaria mínima es de Q 100.00.");
+      return;
+    }
+    const cuotaIngreso = cuotaIngresoApor.trim() ? Number(cuotaIngresoApor) : undefined;
+    if (cuotaIngreso !== undefined && (isNaN(cuotaIngreso) || cuotaIngreso < 0)) {
+      setError("La cuota de ingreso debe ser mayor a 0.");
+      return;
+    }
+    setAbriendoApor(true);
+    setError(null);
+    try {
+      const { data } = await api.post(`/socios/${id}/abrir-aportacion`, {
+        monto,
+        recibo: reciboApor.trim() || undefined,
+        cuotaIngreso: cuotaIngreso,
+      });
+      setMostrarModalAportacion(false);
+      setCuotaIngresoApor("");
+      setReciboApor("");
+      const msgCuota = data.cuotaIngresoRegistrada
+        ? ` La cuota de ingreso de Q ${cuotaIngreso?.toFixed(2)} fue registrada en la caja del día.`
+        : cuotaIngreso && cuotaIngreso > 0 ? " (No hay caja abierta hoy: la cuota de ingreso no pudo registrarse en caja)" : "";
+      setMensajeExito(`¡Cuenta de Aportación ${data.numero_cuenta} creada con éxito con saldo de ${formatoQ(monto)}!${msgCuota} El socio ya puede aperturar cuentas de ahorro y créditos.`);
+      setTimeout(() => setMensajeExito(null), 6000);
+      cargar();
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setAbriendoApor(false);
+    }
+  }
+
   if (error && !socio) return <div className="alert error">{error}</div>;
   if (!socio) return <p>Cargando…</p>;
 
+  const cuentaAportacion = socio.cuentas.find((c) => c.tipo === "APORTACION" || c.tipo === "APORTACION_INFANTIL");
+  const tieneAportacion = Boolean(cuentaAportacion);
+  const saldoAportacion = cuentaAportacion ? Number(cuentaAportacion.saldo_actual) : 0;
+  const tieneAportacionMinima = saldoAportacion >= 100;
+
+  // Cálculos de portafolio financiero del socio
+  const totalAhorroLiquido = socio.cuentas
+    .filter((c) => ["AHORRO_CORRIENTE", "AHORRO_PROGRAMADO", "AHORRO_INFANTO_JUVENIL", "AHORRO_SOBRE_PRESTAMO"].includes(c.tipo))
+    .reduce((acc, c) => acc + Number(c.saldo_actual || 0), 0);
+
+  const totalPlazoFijo = socio.cuentas
+    .filter((c) => c.tipo === "AHORRO_PLAZO_FIJO")
+    .reduce((acc, c) => acc + Number(c.saldo_actual || 0), 0);
+
+  const totalCreditosActivos = (socio.prestamos || [])
+    .filter((p) => ["APROBADO", "DESEMBOLSADO", "MIGRADO_ACTIVO"].includes(p.estado))
+    .reduce((acc, p) => acc + Number(p.saldo_capital ?? p.monto_aprobado ?? p.monto_solicitado ?? 0), 0);
+
+  const iniciales = socio.nombres
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <button className="link-btn" onClick={() => navigate("/socios")} style={{ marginBottom: "0.5rem" }}>
-            ← Volver a socios
-          </button>
-          <h1>{socio.nombres}</h1>
-          <p>
-            <span className="mono">{socio.numero_asociado}</span> · {socio.agencia_nombre}
-          </p>
+    <div style={{ maxWidth: "1200px", margin: "0 auto", paddingBottom: "2rem" }}>
+      {/* NAVEGACIÓN Y ENLACE DE RETORNO */}
+      <div style={{ marginBottom: "0.75rem" }}>
+        <button
+          className="link-btn"
+          onClick={() => navigate("/socios")}
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", fontSize: "0.82rem", fontWeight: 700 }}
+        >
+          ← Volver a listado de asociados
+        </button>
+      </div>
+
+      {/* TARJETA DE PERFIL HERO / CABECERA EJECUTIVA */}
+      <div
+        className="card"
+        style={{
+          background: "linear-gradient(135deg, var(--paper) 0%, var(--paper-raised) 100%)",
+          border: "1px solid var(--line)",
+          borderRadius: "12px",
+          padding: "1.2rem 1.4rem",
+          marginBottom: "1rem",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "1rem",
+        }}
+      >
+        {/* Lado Izquierdo: Avatar + Nombres + Badges */}
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", minWidth: 0 }}>
+          <div
+            style={{
+              width: "56px",
+              height: "56px",
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+              color: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: 800,
+              fontSize: "1.35rem",
+              letterSpacing: "1px",
+              boxShadow: "0 4px 12px rgba(5, 150, 105, 0.35)",
+              flexShrink: 0,
+            }}
+          >
+            {iniciales || "S"}
+          </div>
+
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <h1 style={{ margin: 0, fontSize: "1.35rem", fontWeight: 800, letterSpacing: "-0.02em" }}>
+                {socio.nombres}
+              </h1>
+              <span
+                className={`badge ${socio.estado === "ACTIVO" ? "activo" : "inactivo"}`}
+                style={{ fontSize: "0.75rem", padding: "0.15rem 0.5rem", fontWeight: 700 }}
+              >
+                {socio.estado === "ACTIVO" ? "● Activo" : "○ Inactivo"}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.35rem", flexWrap: "wrap", fontSize: "0.82rem", color: "var(--ink-soft)" }}>
+              <span className="mono" style={{ background: "rgba(0,0,0,0.05)", padding: "0.1rem 0.45rem", borderRadius: "4px", fontWeight: 700, color: "var(--ink)" }}>
+                💳 No. {socio.numero_asociado}
+              </span>
+              <span>·</span>
+              <span>🏢 {socio.agencia_nombre}</span>
+              <span>·</span>
+              <span>📁 {socio.cuentas.length} cuenta(s)</span>
+              {socio.genero && (
+                <>
+                  <span>·</span>
+                  <span>{socio.genero === "F" ? "👩 Femenino" : "👨 Masculino"}</span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: "0.6rem" }}>
-          <span className={`badge ${socio.estado === "ACTIVO" ? "activo" : "inactivo"}`}>
-            {socio.estado === "ACTIVO" ? "Activo" : "Inactivo"}
-          </span>
+
+        {/* Lado Derecho: Acciones Principales */}
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+          {!tieneAportacion && (
+            <button
+              type="button"
+              className="btn"
+              style={{ background: "#059669", borderColor: "#059669", fontWeight: 700, fontSize: "0.84rem" }}
+              onClick={() => setMostrarModalAportacion(true)}
+            >
+              ➕ Aperturar Aportación (Q 100)
+            </button>
+          )}
+
+          {!editando && (
+            <button
+              type="button"
+              className="btn secondary"
+              style={{ fontSize: "0.84rem", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.3rem" }}
+              onClick={() => setEditando(true)}
+            >
+              ✏️ Editar Expediente
+            </button>
+          )}
+
           {socio.estado === "ACTIVO" ? (
-            <button className="btn secondary" onClick={() => cambiarEstado("INACTIVO")}>
-              Marcar inactivo
+            <button className="btn secondary" style={{ fontSize: "0.84rem" }} onClick={() => cambiarEstado("INACTIVO")}>
+              Marcar Inactivo
             </button>
           ) : (
-            <button className="btn secondary" onClick={() => cambiarEstado("ACTIVO")}>
-              Reactivar
+            <button className="btn secondary" style={{ fontSize: "0.84rem" }} onClick={() => cambiarEstado("ACTIVO")}>
+              Reactivar Socio
             </button>
           )}
         </div>
       </div>
 
-      {error && <div className="alert error">{error}</div>}
+      {mensajeExito && <div className="alert success" style={{ marginBottom: "1rem" }}>{mensajeExito}</div>}
+      {error && <div className="alert error" style={{ marginBottom: "1rem" }}>{error}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem", alignItems: "start" }}>
-        <div className="card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-            <h3 style={{ fontFamily: "inherit", fontSize: "1rem" }}>Datos generales</h3>
+      {socio.advertencia_importacion && (
+        <div
+          style={{
+            marginBottom: "1rem",
+            padding: "0.75rem 1rem",
+            background: "rgba(245, 158, 11, 0.12)",
+            border: "1px solid rgba(245, 158, 11, 0.4)",
+            borderRadius: "8px",
+            color: "var(--ink)",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "0.6rem",
+          }}
+        >
+          <span style={{ fontSize: "1.1rem" }}>⚠️</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "#b45309" }}>
+              Observación detectada en la importación oficial:
+            </div>
+            <div style={{ fontSize: "0.82rem", marginTop: "0.2rem" }}>
+              {socio.advertencia_importacion}
+            </div>
+            <div style={{ fontSize: "0.76rem", color: "var(--ink-soft)", marginTop: "0.25rem" }}>
+              Puede actualizar o corregir el expediente del asociado haciendo clic en <strong>✏️ Editar Expediente</strong> arriba.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CINTILLO EJECUTIVO DE KPIS FINANCIEROS DEL SOCIO */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: "0.75rem",
+          marginBottom: "1rem",
+        }}
+      >
+        {/* KPI 1: Aportaciones */}
+        <div
+          className="card"
+          style={{
+            padding: "0.85rem 1rem",
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "10px",
+            borderLeft: "4px solid #059669",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.2rem" }}>
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--ink-soft)", letterSpacing: "0.03em" }}>
+              Aportación Estatutaria
+            </span>
+            <span style={{ fontSize: "1rem" }}>🏛️</span>
+          </div>
+          <strong className="mono" style={{ fontSize: "1.25rem", color: tieneAportacionMinima ? "#059669" : "#d97706", display: "block" }}>
+            {formatoQ(saldoAportacion)}
+          </strong>
+          <span style={{ fontSize: "0.72rem", color: tieneAportacionMinima ? "var(--ink-soft)" : "#d97706", fontWeight: 600 }}>
+            {tieneAportacionMinima ? "✓ Al día con estatutos" : "⚠️ Mínimo Q 100.00 requerido"}
+          </span>
+        </div>
+
+        {/* KPI 2: Ahorros Líquidos */}
+        <div
+          className="card"
+          style={{
+            padding: "0.85rem 1rem",
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "10px",
+            borderLeft: "4px solid #0284c7",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.2rem" }}>
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--ink-soft)", letterSpacing: "0.03em" }}>
+              Ahorro Disponible
+            </span>
+            <span style={{ fontSize: "1rem" }}>💰</span>
+          </div>
+          <strong className="mono" style={{ fontSize: "1.25rem", color: "var(--ink)", display: "block" }}>
+            {formatoQ(totalAhorroLiquido)}
+          </strong>
+          <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
+            Corriente · Programado · Infanto
+          </span>
+        </div>
+
+        {/* KPI 3: Plazo Fijo */}
+        <div
+          className="card"
+          style={{
+            padding: "0.85rem 1rem",
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "10px",
+            borderLeft: "4px solid #7c3aed",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.2rem" }}>
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--ink-soft)", letterSpacing: "0.03em" }}>
+              Inversiones a Plazo
+            </span>
+            <span style={{ fontSize: "1rem" }}>📈</span>
+          </div>
+          <strong className="mono" style={{ fontSize: "1.25rem", color: "#7c3aed", display: "block" }}>
+            {formatoQ(totalPlazoFijo)}
+          </strong>
+          <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
+            Certificados a término fijo
+          </span>
+        </div>
+
+        {/* KPI 4: Créditos / Saldo Deudor */}
+        <div
+          className="card"
+          style={{
+            padding: "0.85rem 1rem",
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "10px",
+            borderLeft: "4px solid #dc2626",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.2rem" }}>
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", color: "var(--ink-soft)", letterSpacing: "0.03em" }}>
+              Cartera de Créditos
+            </span>
+            <span style={{ fontSize: "1rem" }}>📋</span>
+          </div>
+          <strong className="mono" style={{ fontSize: "1.25rem", color: totalCreditosActivos > 0 ? "#dc2626" : "var(--ink)", display: "block" }}>
+            {formatoQ(totalCreditosActivos)}
+          </strong>
+          <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
+            {totalCreditosActivos > 0 ? "Saldo deudor vigente" : "Sin créditos pendientes"}
+          </span>
+        </div>
+      </div>
+
+      {/* ALERTA ESTATUTARIA SI NO TIENE APORTACIÓN */}
+      {!tieneAportacionMinima && (
+        <div
+          className="alert warning"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "1rem",
+            marginBottom: "1rem",
+            borderLeft: "4px solid #f59e0b",
+            borderRadius: "8px",
+          }}
+        >
+          <div>
+            <strong style={{ fontSize: "0.92rem" }}>
+              ⚠️ Asociado sin Cuenta de Aportaciones Estatutaria ({socio.cuentas.length} cuentas registradas)
+            </strong>
+            <p style={{ margin: "0.25rem 0 0", fontSize: "0.82rem", color: "var(--ink-soft)" }}>
+              Por estatuto cooperativo de COMIF-R.L., todo asociado debe contar con su <strong>Cuenta de Aportación Inicial (Mínimo Q 100.00)</strong> para aperturar cuentas de ahorro o solicitar créditos.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            style={{ background: "#059669", borderColor: "#059669", fontWeight: 700, fontSize: "0.84rem" }}
+            onClick={() => setMostrarModalAportacion(true)}
+          >
+            ➕ Aperturar Aportación Inicial (Q 100)
+          </button>
+        </div>
+      )}
+
+      {/* PANEL DE ACCIONES RÁPIDAS MODERNO */}
+      <div
+        className="card"
+        style={{
+          marginBottom: "1.25rem",
+          background: "var(--paper-raised)",
+          border: "1px solid var(--line)",
+          borderRadius: "10px",
+          padding: "0.75rem 1rem",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.6rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <span style={{ fontSize: "1rem" }}>⚡</span>
+            <strong style={{ fontSize: "0.86rem" }}>Operaciones Rápidas:</strong>
+            <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+              Aperturar productos vinculados automáticamente a este asociado
+            </span>
+          </div>
+
+          <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+            {!tieneAportacion && (
+              <button
+                type="button"
+                className="btn"
+                style={{ background: "#059669", borderColor: "#059669", fontSize: "0.76rem", padding: "0.25rem 0.6rem", fontWeight: 700 }}
+                onClick={() => setMostrarModalAportacion(true)}
+              >
+                + Aportación
+              </button>
+            )}
+            <Link
+              to={`/ahorros/corriente/nueva?socioId=${socio.id}`}
+              className="btn secondary"
+              style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem", fontWeight: 600 }}
+            >
+              + Ahorro Corriente
+            </Link>
+            <Link
+              to={`/ahorros/programado/nueva?socioId=${socio.id}`}
+              className="btn secondary"
+              style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem", fontWeight: 600 }}
+            >
+              + Ahorro Programado
+            </Link>
+            <Link
+              to={`/ahorros/infanto-juvenil/nueva?socioId=${socio.id}`}
+              className="btn secondary"
+              style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem", fontWeight: 600 }}
+            >
+              + Infanto Juvenil
+            </Link>
+            <Link
+              to={`/ahorros/plazo-fijo/nuevo?socioId=${socio.id}`}
+              className="btn secondary"
+              style={{ fontSize: "0.76rem", padding: "0.25rem 0.6rem", fontWeight: 600 }}
+            >
+              + Plazo Fijo
+            </Link>
+            <Link
+              to={`/creditos/nuevo?socioId=${socio.id}`}
+              className="btn"
+              style={{ fontSize: "0.76rem", padding: "0.25rem 0.65rem", fontWeight: 700 }}
+            >
+              + Solicitar Crédito
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* CUADRÍCULA PRINCIPAL: EXPEDIENTE (IZQUIERDA) Y PORTAFOLIO DE CUENTAS (DERECHA) */}
+      <div style={{ display: "grid", gridTemplateColumns: "1.05fr 1.15fr", gap: "1.25rem", alignItems: "start" }}>
+        {/* EXPEDIENTE Y DATOS GENERALES DEL ASOCIADO */}
+        <div
+          className="card"
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "10px",
+            padding: "1rem 1.15rem",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", borderBottom: "1px solid var(--line)", paddingBottom: "0.45rem" }}>
+            <h3 style={{ fontFamily: "inherit", fontSize: "0.95rem", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <span>📋</span> Expediente del Asociado
+            </h3>
             {!editando && (
-              <button className="btn secondary" onClick={() => setEditando(true)}>
-                Editar
+              <button
+                type="button"
+                className="btn secondary"
+                style={{ padding: "0.2rem 0.5rem", fontSize: "0.76rem", fontWeight: 600 }}
+                onClick={() => setEditando(true)}
+              >
+                ✏️ Modificar
               </button>
             )}
           </div>
@@ -5308,102 +7174,595 @@ export default function SocioDetail() {
             <form onSubmit={guardar}>
               <div className="field">
                 <label htmlFor="edit-nombres">Nombres completos</label>
-                <input
+                <InputNombreAutoCompletar
                   id="edit-nombres"
                   value={form.nombres}
-                  onChange={(e) => setForm({ ...form, nombres: e.target.value })}
+                  onChange={(val) => setForm({ ...form, nombres: val })}
                   required
                 />
               </div>
               <div className="field">
-                <label htmlFor="edit-dpi">DPI</label>
+                <label htmlFor="edit-genero">Género</label>
+                <select
+                  id="edit-genero"
+                  value={form.genero}
+                  onChange={(e) => setForm({ ...form, genero: e.target.value as "M" | "F" | "" })}
+                >
+                  <option value="">Sin especificar</option>
+                  <option value="F">Femenino</option>
+                  <option value="M">Masculino</option>
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="edit-dpi">DPI (13 dígitos)</label>
                 <input
                   id="edit-dpi"
                   value={form.dpi}
-                  onChange={(e) => setForm({ ...form, dpi: e.target.value })}
-                  maxLength={13}
+                  onChange={(e) => setForm({ ...form, dpi: formatearDPI(e.target.value) })}
+                  maxLength={15}
+                  placeholder="xxxx-xxxxx-xxxx"
+                  style={{
+                    fontFamily: "monospace",
+                    letterSpacing: "0.5px",
+                    borderColor: dpiDuplicado ? "var(--danger)" : undefined,
+                  }}
                 />
+                <div style={{ minHeight: "1.1rem", marginTop: "0.15rem" }}>
+                  {verificandoDpi && <span className="hint">🔍 Verificando disponibilidad...</span>}
+                  {dpiDuplicado && (
+                    <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                      🔴 Registrado ({dpiDuplicado.rol || "Socio"}: {dpiDuplicado.nombres})
+                    </span>
+                  )}
+                  {!verificandoDpi && !dpiDuplicado && form.dpi.replace(/\D/g, "").length === 13 && (
+                    <span style={{ color: "#10b981", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                      ✓ DPI válido y disponible (13 dígitos)
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="field">
-                <label htmlFor="edit-telefono">Teléfono</label>
-                <input
-                  id="edit-telefono"
-                  value={form.telefono}
-                  onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-                />
+                <label htmlFor="edit-telefono">Teléfono (WhatsApp)</label>
+                <div style={{ display: "flex", alignItems: "stretch" }}>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.25rem",
+                      padding: "0 0.65rem",
+                      background: "var(--mono-bg, #1e293b)",
+                      border: "1px solid var(--line)",
+                      borderRight: "none",
+                      borderTopLeftRadius: "8px",
+                      borderBottomLeftRadius: "8px",
+                      fontSize: "0.85rem",
+                      fontWeight: 600,
+                      color: "var(--ink)",
+                      userSelect: "none",
+                    }}
+                  >
+                    🇬🇹 +502
+                  </span>
+                  <input
+                    id="edit-telefono"
+                    value={form.telefono}
+                    onChange={(e) => setForm({ ...form, telefono: formatearTelefono(e.target.value) })}
+                    placeholder="xxxx-xxxx"
+                    maxLength={9}
+                    style={{
+                      borderTopLeftRadius: 0,
+                      borderBottomLeftRadius: 0,
+                      fontFamily: "monospace",
+                      letterSpacing: "0.5px",
+                    }}
+                  />
+                </div>
+                <div style={{ minHeight: "1.1rem", marginTop: "0.15rem" }}>
+                  {verificandoTelefono && <span className="hint">🔍 Verificando teléfono...</span>}
+                  {telefonoDuplicado && (
+                    <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                      🔴 Registrado ({telefonoDuplicado.rol || "Socio"}: {telefonoDuplicado.nombres})
+                    </span>
+                  )}
+                  {!verificandoTelefono && !telefonoDuplicado && form.telefono.replace(/\D/g, "").length === 8 && (
+                    <span style={{ color: "#10b981", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                      ✓ Teléfono válido
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="field">
-                <label htmlFor="edit-direccion">Dirección</label>
+                <label htmlFor="edit-direccion">Dirección / Comunidad</label>
                 <input
                   id="edit-direccion"
                   value={form.direccion}
-                  onChange={(e) => setForm({ ...form, direccion: e.target.value })}
+                  onChange={(e) => setForm({ ...form, direccion: capitalizarDescripcion(e.target.value) })}
                 />
               </div>
               <div className="field">
                 <label htmlFor="edit-beneficiario">Persona beneficiaria</label>
-                <input
+                <InputNombreAutoCompletar
                   id="edit-beneficiario"
                   value={form.nombreBeneficiario}
-                  onChange={(e) => setForm({ ...form, nombreBeneficiario: e.target.value })}
+                  onChange={(val) => setForm({ ...form, nombreBeneficiario: val })}
                 />
               </div>
-              <div style={{ display: "flex", gap: "0.6rem" }}>
-                <button className="btn" type="submit" disabled={guardando}>
+              <div className="field">
+                <label htmlFor="edit-parentesco-ben">Parentesco con el asociado</label>
+                <select
+                  id="edit-parentesco-ben"
+                  value={form.parentescoBeneficiario}
+                  onChange={(e) => setForm({ ...form, parentescoBeneficiario: e.target.value })}
+                >
+                  <option value="">Selecciona el parentesco…</option>
+                  {PARENTESCOS_BENEFICIARIO.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+                <span className="hint">Vínculo familiar del beneficiario</span>
+              </div>
+              <div className="field">
+                <label htmlFor="edit-dpi-ben">DPI Beneficiario</label>
+                <input
+                  id="edit-dpi-ben"
+                  value={form.dpiBeneficiario}
+                  onChange={(e) => setForm({ ...form, dpiBeneficiario: formatearDPI(e.target.value) })}
+                  maxLength={15}
+                  placeholder="xxxx-xxxxx-xxxx"
+                  style={{ borderColor: dpiDuplicadoBen && !esMenorBeneficiario ? "var(--danger)" : undefined }}
+                />
+                <div style={{ minHeight: "1.1rem", marginTop: "0.15rem" }}>
+                  {verificandoDpiBen && !esMenorBeneficiario && <span className="hint">🔍 Verificando...</span>}
+                  {dpiDuplicadoBen && !esMenorBeneficiario && (
+                    <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                      🔴 Registrado ({dpiDuplicadoBen.rol || "Socio"}: {dpiDuplicadoBen.nombres})
+                    </span>
+                  )}
+                  {!verificandoDpiBen && !dpiDuplicadoBen && !esMenorBeneficiario && form.dpiBeneficiario.replace(/\D/g, "").length === 13 && (
+                    <span style={{ color: "#10b981", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                      ✓ DPI válido
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="edit-tel-ben">Teléfono Beneficiario</label>
+                <div style={{ display: "flex", alignItems: "stretch" }}>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.25rem",
+                      padding: "0 0.65rem",
+                      background: "var(--mono-bg, #1e293b)",
+                      border: "1px solid var(--line)",
+                      borderRight: "none",
+                      borderTopLeftRadius: "8px",
+                      borderBottomLeftRadius: "8px",
+                      fontSize: "0.85rem",
+                      fontWeight: 600,
+                      color: "var(--ink)",
+                      userSelect: "none",
+                    }}
+                  >
+                    🇬🇹 +502
+                  </span>
+                  <input
+                    id="edit-tel-ben"
+                    value={form.telefonoBeneficiario}
+                    onChange={(e) => setForm({ ...form, telefonoBeneficiario: formatearTelefono(e.target.value) })}
+                    placeholder="xxxx-xxxx"
+                    maxLength={9}
+                    style={{
+                      borderTopLeftRadius: 0,
+                      borderBottomLeftRadius: 0,
+                      fontFamily: "monospace",
+                      letterSpacing: "0.5px",
+                    }}
+                  />
+                </div>
+                <div style={{ minHeight: "1.1rem", marginTop: "0.15rem" }}>
+                  {verificandoTelefonoBen && !esMenorBeneficiario && <span className="hint">🔍 Verificando...</span>}
+                  {telefonoDuplicadoBen && !esMenorBeneficiario && (
+                    <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                      🔴 Registrado ({telefonoDuplicadoBen.rol || "Socio"}: {telefonoDuplicadoBen.nombres})
+                    </span>
+                  )}
+                  {!verificandoTelefonoBen && !telefonoDuplicadoBen && !esMenorBeneficiario && form.telefonoBeneficiario.replace(/\D/g, "").length === 8 && (
+                    <span style={{ color: "#10b981", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                      ✓ Teléfono válido
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
+                <button type="submit" className="btn" disabled={guardando}>
                   {guardando ? "Guardando…" : "Guardar cambios"}
                 </button>
-                <button className="btn secondary" type="button" onClick={() => setEditando(false)}>
+                <button type="button" className="btn secondary" onClick={() => setEditando(false)}>
                   Cancelar
                 </button>
               </div>
             </form>
           ) : (
-            <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "auto 1fr", rowGap: "0.6rem", columnGap: "1rem" }}>
-              <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Fecha de ingreso</dt>
-              <dd className="mono" style={{ margin: 0 }}>{new Date(socio.fecha_ingreso).toLocaleDateString("es-GT")}</dd>
-              <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Género</dt>
-              <dd style={{ margin: 0 }}>{socio.genero === "F" ? "Femenino" : socio.genero === "M" ? "Masculino" : "—"}</dd>
-              <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>DPI</dt>
-              <dd className="mono" style={{ margin: 0 }}>{socio.dpi ?? "—"}</dd>
-              <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Teléfono</dt>
-              <dd style={{ margin: 0 }}>{socio.telefono ?? "—"}</dd>
-              <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Dirección</dt>
-              <dd style={{ margin: 0 }}>{socio.direccion ?? "—"}</dd>
-              <dt style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>Beneficiario</dt>
-              <dd style={{ margin: 0 }}>{socio.nombre_beneficiario ?? "—"}</dd>
-            </dl>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {/* Fila 1: Fecha Ingreso y Género */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                <div style={{ background: "var(--paper-raised)", padding: "0.55rem 0.75rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                  <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)", fontWeight: 600, display: "block" }}>Fecha de Ingreso</span>
+                  <strong className="mono" style={{ fontSize: "0.85rem", color: "var(--ink)", display: "block", marginTop: "2px" }}>
+                    {new Date(socio.fecha_ingreso).toLocaleDateString("es-GT")}
+                  </strong>
+                </div>
+
+                <div style={{ background: "var(--paper-raised)", padding: "0.55rem 0.75rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                  <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)", fontWeight: 600, display: "block" }}>Género</span>
+                  <strong style={{ fontSize: "0.85rem", color: "var(--ink)", display: "block", marginTop: "2px" }}>
+                    {socio.genero === "F" ? "👩 Femenino" : socio.genero === "M" ? "👨 Masculino" : "—"}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Fila 2: DPI */}
+              <div style={{ background: "var(--paper-raised)", padding: "0.55rem 0.75rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)", fontWeight: 600, display: "block" }}>Documento Personal de Identificación (DPI)</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "2px" }}>
+                  <strong className="mono" style={{ fontSize: "0.95rem", letterSpacing: "0.5px", color: "var(--ink)" }}>
+                    {socio.dpi ? formatearDPI(socio.dpi) : "—"}
+                  </strong>
+                  {socio.dpi && (
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      style={{ padding: "0.15rem 0.45rem", fontSize: "0.72rem" }}
+                      onClick={() => navigator.clipboard.writeText((socio.dpi || "").replace(/\D/g, ""))}
+                      title="Copiar DPI"
+                    >
+                      Copiar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Fila 3: Teléfono con WhatsApp */}
+              <div style={{ background: "var(--paper-raised)", padding: "0.55rem 0.75rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)", fontWeight: 600, display: "block" }}>Teléfono Principal</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "2px", flexWrap: "wrap", gap: "0.4rem" }}>
+                  <strong className="mono" style={{ fontSize: "0.95rem", color: "var(--ink)" }}>
+                    {socio.telefono ? socio.telefono : "—"}
+                  </strong>
+                  {socio.telefono && (
+                    <a
+                      href={`https://wa.me/${socio.telefono.replace(/\D/g, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn"
+                      style={{
+                        padding: "0.2rem 0.6rem",
+                        fontSize: "0.75rem",
+                        borderRadius: "20px",
+                        background: "#25D366",
+                        color: "#ffffff",
+                        borderColor: "#25D366",
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.25rem",
+                      }}
+                      title="Contactar vía WhatsApp"
+                    >
+                      💬 WhatsApp
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Fila 4: Dirección */}
+              <div style={{ background: "var(--paper-raised)", padding: "0.55rem 0.75rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)", fontWeight: 600, display: "block" }}>Dirección y Residencia</span>
+                <strong style={{ fontSize: "0.85rem", color: "var(--ink)", display: "block", marginTop: "2px" }}>
+                  {socio.direccion ?? "—"}
+                </strong>
+              </div>
+
+              {/* Fila 5: Beneficiario Registrado */}
+              <div style={{ background: "rgba(2, 132, 199, 0.05)", padding: "0.65rem 0.8rem", borderRadius: "8px", border: "1px solid rgba(2, 132, 199, 0.2)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "0.72rem", color: "#0284c7", fontWeight: 700, textTransform: "uppercase" }}>
+                    Persona Beneficiaria
+                  </span>
+                  {socio.parentesco_beneficiario && (
+                    <span style={{ fontSize: "0.72rem", fontWeight: 700, padding: "0.1rem 0.45rem", borderRadius: "4px", background: "rgba(2, 132, 199, 0.15)", color: "#0284c7" }}>
+                      {socio.parentesco_beneficiario}
+                    </span>
+                  )}
+                </div>
+                <strong style={{ fontSize: "0.9rem", color: "var(--ink)", display: "block", marginTop: "3px" }}>
+                  {socio.nombre_beneficiario ?? "Sin beneficiario asignado"}
+                </strong>
+                {(socio.dpi_beneficiario || socio.telefono_beneficiario) && (
+                  <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", marginTop: "0.25rem" }}>
+                    {socio.dpi_beneficiario ? `DPI: ${formatearDPI(socio.dpi_beneficiario)} ` : ""}
+                    {socio.telefono_beneficiario ? `· Tel: ${socio.telefono_beneficiario}` : ""}
+                  </div>
+                )}
+              </div>
+
+              {/* Fila 6: Tutor(a) Legal si el asociado es menor de edad */}
+              {socio.es_menor && (
+                <div style={{ background: "rgba(124, 58, 237, 0.05)", padding: "0.65rem 0.8rem", borderRadius: "8px", border: "1px solid rgba(124, 58, 237, 0.25)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "0.72rem", color: "#7c3aed", fontWeight: 700, textTransform: "uppercase" }}>
+                      🧒 Tutor(a) Legal / Representante
+                    </span>
+                    {socio.tutor_parentesco && (
+                      <span style={{ fontSize: "0.72rem", fontWeight: 700, padding: "0.1rem 0.45rem", borderRadius: "4px", background: "rgba(124, 58, 237, 0.15)", color: "#7c3aed" }}>
+                        {socio.tutor_parentesco}
+                      </span>
+                    )}
+                  </div>
+                  <strong style={{ fontSize: "0.9rem", color: "var(--ink)", display: "block", marginTop: "3px" }}>
+                    {socio.tutor_nombre ?? "Pendiente de asignar tutor en ventanilla"}
+                  </strong>
+                  {(socio.tutor_dpi || socio.tutor_telefono) && (
+                    <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", marginTop: "0.25rem" }}>
+                      {socio.tutor_dpi ? `DPI: ${formatearDPI(socio.tutor_dpi)} ` : ""}
+                      {socio.tutor_telefono ? `· Tel: ${socio.tutor_telefono}` : ""}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
 
-        <div className="card">
-          <h3 style={{ fontFamily: "inherit", fontSize: "1rem", marginBottom: "0.75rem" }}>Cuentas</h3>
+        {/* PORTAFOLIO DE CUENTAS DEL ASOCIADO */}
+        <div
+          className="card"
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderRadius: "10px",
+            padding: "1rem 1.15rem",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", borderBottom: "1px solid var(--line)", paddingBottom: "0.45rem" }}>
+            <h3 style={{ fontFamily: "inherit", fontSize: "0.95rem", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <span>🏦</span> Cuentas y Portafolio ({socio.cuentas.length})
+            </h3>
+            {!tieneAportacion && (
+              <button
+                type="button"
+                className="btn"
+                style={{ fontSize: "0.75rem", padding: "0.2rem 0.55rem", background: "#059669", borderColor: "#059669", fontWeight: 700 }}
+                onClick={() => setMostrarModalAportacion(true)}
+              >
+                + Aportación
+              </button>
+            )}
+          </div>
+
           {socio.cuentas.length === 0 ? (
-            <p style={{ color: "var(--ink-soft)", fontSize: "0.9rem" }}>
-              Este socio todavía no tiene cuentas registradas. La apertura de cuentas de ahorro y plazo fijo se
-              habilita en la fase 2.
-            </p>
+            <div style={{ textAlign: "center", padding: "2rem 1rem", color: "var(--ink-soft)" }}>
+              <div style={{ fontSize: "2.5rem", marginBottom: "0.5rem" }}>📂</div>
+              <p style={{ margin: "0 0 0.75rem", fontSize: "0.9rem", fontWeight: 600 }}>
+                Este asociado todavía no tiene cuentas activas en el sistema.
+              </p>
+              <button
+                type="button"
+                className="btn"
+                style={{ background: "#059669", borderColor: "#059669", fontWeight: 700, fontSize: "0.84rem" }}
+                onClick={() => setMostrarModalAportacion(true)}
+              >
+                ➕ Aperturar Cuenta de Aportaciones (Q 100)
+              </button>
+            </div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Cuenta</th>
-                  <th>Tipo</th>
-                  <th>Saldo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {socio.cuentas.map((c) => (
-                  <tr key={c.id}>
-                    <td className="mono">{c.numero_cuenta}</td>
-                    <td>{TIPO_CUENTA_LABEL[c.tipo] ?? c.tipo}</td>
-                    <td className="mono">Q {Number(c.saldo_actual).toLocaleString("es-GT", { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+              {socio.cuentas.map((c) => {
+                const slug = TIPO_SLUG[c.tipo];
+                const esApor = c.tipo === "APORTACION";
+                const esPF = c.tipo === "AHORRO_PLAZO_FIJO";
+                const esASP = c.tipo === "AHORRO_SOBRE_PRESTAMO";
+                const saldoNum = Number(c.saldo_actual || 0);
+
+                return (
+                  <div
+                    key={c.id}
+                    style={{
+                      background: esApor ? "rgba(5, 150, 105, 0.04)" : "var(--paper-raised)",
+                      border: `1px solid ${esApor ? "rgba(5, 150, 105, 0.25)" : "var(--line)"}`,
+                      borderRadius: "8px",
+                      padding: "0.65rem 0.85rem",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "0.6rem",
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        <span
+                          className="badge"
+                          style={{
+                            background: esApor ? "rgba(5, 150, 105, 0.15)" : esPF ? "rgba(124, 58, 237, 0.15)" : esASP ? "rgba(217, 119, 6, 0.15)" : "rgba(2, 132, 199, 0.15)",
+                            color: esApor ? "#059669" : esPF ? "#7c3aed" : esASP ? "#d97706" : "#0284c7",
+                            fontWeight: 700,
+                            fontSize: "0.72rem",
+                            padding: "0.1rem 0.45rem",
+                          }}
+                        >
+                          {TIPO_CUENTA_LABEL[c.tipo] ?? c.tipo}
+                        </span>
+                      </div>
+                      <div style={{ marginTop: "3px" }}>
+                        <DualCuentaBadge numeroCuenta={c.numero_cuenta} codigoSistema={c.codigo_sistema} />
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)", display: "block", textTransform: "uppercase", fontWeight: 600 }}>
+                        Saldo Actual
+                      </span>
+                      <strong className="mono" style={{ fontSize: "1.05rem", color: esApor ? "#059669" : "var(--ink)", display: "block" }}>
+                        {formatoQ(saldoNum)}
+                      </strong>
+                      <div style={{ marginTop: "2px" }}>
+                        {slug ? (
+                          <Link to={`/ahorros/${slug}/${c.id}`} style={{ fontSize: "0.74rem", fontWeight: 700, textDecoration: "none" }}>
+                            Ver Cuenta →
+                          </Link>
+                        ) : (
+                          <Link to="/aportaciones" style={{ fontSize: "0.74rem", fontWeight: 700, textDecoration: "none" }}>
+                            Ver Aportación →
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
+
+      {/* MODAL RÁPIDO DE APERTURA DE CUENTA DE APORTACIÓN */}
+      {mostrarModalAportacion && (
+        <div
+          className="caja-chica-modal-overlay"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.75)",
+            zIndex: 9999,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: "1rem",
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              width: "100%",
+              maxWidth: "500px",
+              background: "var(--paper)",
+              borderRadius: "10px",
+              boxShadow: "0 20px 40px -10px rgba(0, 0, 0, 0.5)",
+              border: "1px solid var(--line)",
+              padding: "1.25rem",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", borderBottom: "1px solid var(--line)", paddingBottom: "0.5rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <span style={{ fontSize: "1.25rem" }}>🏛️</span>
+                <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Aperturar Cuenta de Aportaciones</h3>
+              </div>
+              <button
+                type="button"
+                className="btn secondary"
+                style={{ padding: "0.2rem 0.5rem", fontSize: "0.85rem" }}
+                onClick={() => setMostrarModalAportacion(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)", margin: "0 0 1rem" }}>
+              Asociado: <strong>{socio.nombres}</strong> (<span className="mono">{socio.numero_asociado}</span>) · Agencia: {socio.agencia_nombre}
+            </p>
+
+            <form onSubmit={handleAbrirAportacion}>
+              <div className="field">
+                <label htmlFor="modal-monto-apor">
+                  Monto de Aportación Inicial (Q) <span style={{ color: "#059669", fontWeight: 700 }}>* Mínimo Q 100.00</span>
+                </label>
+                <input
+                  id="modal-monto-apor"
+                  type="number"
+                  min="100"
+                  step="0.01"
+                  value={montoApor}
+                  onChange={(e) => setMontoApor(e.target.value)}
+                  required
+                  style={{ fontSize: "1rem", fontWeight: 700 }}
+                />
+                <span className="hint">Monto estatutario obligatorio para operar en la cooperativa.</span>
+              </div>
+
+              <div className="field">
+                <label htmlFor="modal-recibo-apor">No. de Recibo o Comprobante (Opcional)</label>
+                <input
+                  id="modal-recibo-apor"
+                  type="text"
+                  value={reciboApor}
+                  onChange={(e) => setReciboApor(e.target.value)}
+                  placeholder="Ej. REC-009842"
+                />
+              </div>
+
+              {/* CUOTA DE INGRESO */}
+              <div
+                style={{
+                  background: "rgba(191, 153, 3, 0.07)",
+                  border: "1px solid rgba(191, 153, 3, 0.3)",
+                  borderRadius: "8px",
+                  padding: "0.85rem",
+                  marginTop: "0.25rem",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginBottom: "0.5rem" }}>
+                  <span style={{ fontSize: "1rem" }}>🎫</span>
+                  <strong style={{ fontSize: "0.88rem", color: "var(--ink)" }}>Cuota de Ingreso (Opcional)</strong>
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label htmlFor="modal-cuota-ingreso" style={{ fontSize: "0.82rem" }}>
+                    Monto de la cuota de membresía (Q)
+                  </label>
+                  <input
+                    id="modal-cuota-ingreso"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={cuotaIngresoApor}
+                    onChange={(e) => setCuotaIngresoApor(e.target.value)}
+                    placeholder="Ej. 25.00 ó 50.00"
+                    style={{ fontSize: "1rem", fontWeight: 600 }}
+                  />
+                  <span className="hint" style={{ color: "var(--ink-soft)" }}>
+                    Pago único por inscripción al ingresar como socio. Se registrará automáticamente en la caja del día si hay turno abierto.
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1.25rem" }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => setMostrarModalAportacion(false)}
+                  disabled={abriendoApor}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn"
+                  style={{ background: "#059669", borderColor: "#059669", fontWeight: 700 }}
+                  disabled={abriendoApor}
+                >
+                  {abriendoApor ? "Creando cuenta…" : "✓ Confirmar y Crear Aportación"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <p style={{ marginTop: "1.5rem" }}>
         <Link to="/socios">← Volver al listado</Link>
@@ -5418,26 +7777,80 @@ export default function SocioDetail() {
 ```tsx
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import type { Agencia } from "../types";
+import {
+  formatearDPI,
+  formatearTelefono,
+  limpiarDPI,
+  prepararTelefonoParaGuardar,
+  capitalizarDescripcion,
+} from "../lib/formatters";
+import { PARENTESCOS_BENEFICIARIO, PARENTESCOS_BENEFICIARIO_MENOR } from "../types";
+import InputNombreAutoCompletar from "../components/InputNombreAutoCompletar";
 
 export default function SocioForm() {
   const { usuario } = useAuth();
   const navigate = useNavigate();
-  const puedeElegirAgencia = usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA";
+  const [searchParams] = useSearchParams();
+  const puedeElegirAgencia = usuario?.rol === "GERENCIA";
 
   const [agencias, setAgencias] = useState<Agencia[]>([]);
-  const [agenciaId, setAgenciaId] = useState(usuario?.agenciaId ?? "");
+  const [agenciaId, setAgenciaId] = useState(() => searchParams.get("agenciaId") || usuario?.agenciaId || "");
   const [numeroAsociado, setNumeroAsociado] = useState("");
-  const [nombres, setNombres] = useState("");
+  const [nombres, setNombres] = useState(() => searchParams.get("nombres") || "");
   const [genero, setGenero] = useState<"M" | "F" | "">("");
+  const [dpi, setDpi] = useState(() => (searchParams.get("dpi") ? formatearDPI(searchParams.get("dpi")!) : ""));
   const [fechaIngreso, setFechaIngreso] = useState(() => new Date().toISOString().slice(0, 10));
-  const [dpi, setDpi] = useState("");
-  const [direccion, setDireccion] = useState("");
-  const [telefono, setTelefono] = useState("");
+  const [telefono, setTelefono] = useState(() => (searchParams.get("telefono") ? formatearTelefono(searchParams.get("telefono")!) : ""));
+  const [direccion, setDireccion] = useState(() => searchParams.get("direccion") || "");
+
+  // Beneficiario
+  const [esMenorBeneficiario, setEsMenorBeneficiario] = useState(false);
   const [nombreBeneficiario, setNombreBeneficiario] = useState("");
+  const [parentescoBeneficiario, setParentescoBeneficiario] = useState("");
+  const [dpiBeneficiario, setDpiBeneficiario] = useState("");
+  const [telefonoBeneficiario, setTelefonoBeneficiario] = useState("");
+
+  // Aportación inicial
+  const [montoAportacion, setMontoAportacion] = useState("100");
+  const [reciboAportacion, setReciboAportacion] = useState("");
+
+  // Validaciones en tiempo real
+  const [dpiDuplicado, setDpiDuplicado] = useState<{ nombres: string; numeroAsociado: string } | null>(null);
+  const [dpiMuniInfo, setDpiMuniInfo] = useState<{
+    valido: boolean;
+    mensaje?: string;
+    codigoMunicipio?: string;
+    municipio?: string;
+    departamento?: string;
+    esLocal?: boolean;
+    advertencia?: string;
+  } | null>(null);
+  const [verificandoDpi, setVerificandoDpi] = useState(false);
+
+  const [telefonoDuplicado, setTelefonoDuplicado] = useState<{
+    nombres: string;
+    numeroAsociado: string;
+    rol?: string;
+  } | null>(null);
+  const [verificandoTelefono, setVerificandoTelefono] = useState(false);
+
+  const [telefonoDuplicadoBen, setTelefonoDuplicadoBen] = useState<{
+    nombres: string;
+    numeroAsociado: string;
+    rol?: string;
+  } | null>(null);
+  const [verificandoTelefonoBen, setVerificandoTelefonoBen] = useState(false);
+
+  const [dpiDuplicadoBen, setDpiDuplicadoBen] = useState<{
+    nombres: string;
+    numeroAsociado: string;
+    rol?: string;
+  } | null>(null);
+  const [verificandoDpiBen, setVerificandoDpiBen] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -5455,8 +7868,204 @@ export default function SocioForm() {
       .then(({ data }) => setNumeroAsociado(data.numeroAsociado));
   }, [agenciaId]);
 
+  // Verificación en tiempo real de DPI duplicado y municipio al completar 13 dígitos
+  useEffect(() => {
+    const rawDpi = limpiarDPI(dpi);
+    if (rawDpi.length === 13) {
+      setVerificandoDpi(true);
+      const timer = setTimeout(() => {
+        const agSel = agencias?.find((a) => a.id === agenciaId);
+        api
+          .get<{
+            valido: boolean;
+            mensaje?: string;
+            disponible?: boolean;
+            codigoMunicipio?: string;
+            municipio?: string;
+            departamento?: string;
+            esLocal?: boolean;
+            advertencia?: string;
+            registrado?: { nombres: string; numeroAsociado: string; rol?: string };
+            socio?: { nombres: string; numeroAsociado: string };
+          }>("/socios/verificar-dpi", { params: { dpi: rawDpi, agenciaCodigo: agSel?.codigo } })
+          .then(({ data }) => {
+            setDpiMuniInfo(data);
+            if (data.disponible === false && data.registrado) {
+              setDpiDuplicado(data.registrado);
+            } else if (data.disponible === false && data.socio) {
+              setDpiDuplicado(data.socio);
+            } else {
+              setDpiDuplicado(null);
+            }
+          })
+          .catch(() => {
+            setDpiDuplicado(null);
+            setDpiMuniInfo(null);
+          })
+          .finally(() => setVerificandoDpi(false));
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      setDpiDuplicado(null);
+      setDpiMuniInfo(null);
+      setVerificandoDpi(false);
+    }
+  }, [dpi, agenciaId, agencias]);
+
+  // Verificación en tiempo real de Teléfono del socio (8 dígitos)
+  useEffect(() => {
+    const rawTel = telefono.replace(/\D/g, "");
+    const localTel = rawTel.startsWith("502") && rawTel.length > 8 ? rawTel.slice(3) : rawTel.slice(-8);
+    if (localTel.length === 8) {
+      setVerificandoTelefono(true);
+      const timer = setTimeout(() => {
+        api
+          .get<{
+            valido: boolean;
+            disponible?: boolean;
+            registrado?: { nombres: string; numeroAsociado: string; rol: string };
+          }>("/socios/verificar-telefono", { params: { telefono: localTel, tipo: "SOCIO" } })
+          .then(({ data }) => {
+            if (data.disponible === false && data.registrado) {
+              setTelefonoDuplicado(data.registrado);
+            } else {
+              setTelefonoDuplicado(null);
+            }
+          })
+          .catch(() => setTelefonoDuplicado(null))
+          .finally(() => setVerificandoTelefono(false));
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      setTelefonoDuplicado(null);
+      setVerificandoTelefono(false);
+    }
+  }, [telefono]);
+
+  // Verificación en tiempo real de Teléfono del beneficiario (si NO es menor)
+  useEffect(() => {
+    if (esMenorBeneficiario) {
+      setTelefonoDuplicadoBen(null);
+      setVerificandoTelefonoBen(false);
+      return;
+    }
+    const rawTel = telefonoBeneficiario.replace(/\D/g, "");
+    const localTel = rawTel.startsWith("502") && rawTel.length > 8 ? rawTel.slice(3) : rawTel.slice(-8);
+    if (localTel.length === 8) {
+      setVerificandoTelefonoBen(true);
+      const timer = setTimeout(() => {
+        api
+          .get<{
+            valido: boolean;
+            disponible?: boolean;
+            registrado?: { nombres: string; numeroAsociado: string; rol: string };
+          }>("/socios/verificar-telefono", { params: { telefono: localTel, tipo: "BENEFICIARIO" } })
+          .then(({ data }) => {
+            if (data.disponible === false && data.registrado) {
+              setTelefonoDuplicadoBen(data.registrado);
+            } else {
+              setTelefonoDuplicadoBen(null);
+            }
+          })
+          .catch(() => setTelefonoDuplicadoBen(null))
+          .finally(() => setVerificandoTelefonoBen(false));
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      setTelefonoDuplicadoBen(null);
+      setVerificandoTelefonoBen(false);
+    }
+  }, [telefonoBeneficiario, esMenorBeneficiario]);
+
+  // Verificación en tiempo real de DPI del beneficiario (si NO es menor)
+  useEffect(() => {
+    if (esMenorBeneficiario) {
+      setDpiDuplicadoBen(null);
+      setVerificandoDpiBen(false);
+      return;
+    }
+    const rawDpi = limpiarDPI(dpiBeneficiario);
+    if (rawDpi.length === 13) {
+      setVerificandoDpiBen(true);
+      const timer = setTimeout(() => {
+        api
+          .get<{
+            valido: boolean;
+            disponible?: boolean;
+            registrado?: { nombres: string; numeroAsociado: string; rol: string };
+            socio?: { nombres: string; numeroAsociado: string };
+          }>("/socios/verificar-dpi", { params: { dpi: rawDpi, tipo: "BENEFICIARIO" } })
+          .then(({ data }) => {
+            if (data.disponible === false && data.registrado) {
+              setDpiDuplicadoBen(data.registrado);
+            } else if (data.disponible === false && data.socio) {
+              setDpiDuplicadoBen({ ...data.socio, rol: "Socio registrado" });
+            } else {
+              setDpiDuplicadoBen(null);
+            }
+          })
+          .catch(() => setDpiDuplicadoBen(null))
+          .finally(() => setVerificandoDpiBen(false));
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      setDpiDuplicadoBen(null);
+      setVerificandoDpiBen(false);
+    }
+  }, [dpiBeneficiario, esMenorBeneficiario]);
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (dpiMuniInfo && !dpiMuniInfo.valido) {
+      setError(dpiMuniInfo.mensaje || "El DPI ingresado no es válido.");
+      return;
+    }
+    if (dpiDuplicado) {
+      setError(
+        `El DPI ya está registrado para el socio ${dpiDuplicado.nombres} (${dpiDuplicado.numeroAsociado}). Modifícalo antes de guardar.`
+      );
+      return;
+    }
+    if (telefonoDuplicado) {
+      setError(
+        `El teléfono ya está registrado para el socio ${telefonoDuplicado.nombres} (${telefonoDuplicado.numeroAsociado}). No se permiten números duplicados.`
+      );
+      return;
+    }
+    if (!esMenorBeneficiario && telefonoDuplicadoBen) {
+      setError(
+        `El teléfono del beneficiario ya pertenece a un registro (${telefonoDuplicadoBen.rol || "Socio"}: ${telefonoDuplicadoBen.nombres}, Asociado: ${telefonoDuplicadoBen.numeroAsociado}). Modifícalo antes de guardar.`
+      );
+      return;
+    }
+    if (!esMenorBeneficiario && dpiDuplicadoBen) {
+      setError(
+        `El DPI/CUI del beneficiario ya pertenece a un registro (${dpiDuplicadoBen.rol || "Socio"}: ${dpiDuplicadoBen.nombres}, Asociado: ${dpiDuplicadoBen.numeroAsociado}). Modifícalo antes de guardar.`
+      );
+      return;
+    }
+    const cleanDpi = dpi ? dpi.replace(/\D/g, "") : "";
+    const cleanDpiBen = dpiBeneficiario ? dpiBeneficiario.replace(/\D/g, "") : "";
+    if (cleanDpi && cleanDpiBen && cleanDpi === cleanDpiBen) {
+      setError("El DPI del socio y el DPI/CUI del beneficiario no pueden ser iguales.");
+      return;
+    }
+    const cleanTel = telefono ? telefono.replace(/\D/g, "") : "";
+    const cleanTelBen = telefonoBeneficiario ? telefonoBeneficiario.replace(/\D/g, "") : "";
+    if (cleanTel && cleanTelBen && cleanTel === cleanTelBen) {
+      setError("El teléfono del socio y el teléfono del beneficiario no pueden ser iguales.");
+      return;
+    }
+    if (!reciboAportacion.trim()) {
+      setError("El número de boleta o recibo de pago es obligatorio para respaldar la aportación estatutaria inicial.");
+      return;
+    }
+    const montoAporNum = Number(montoAportacion);
+    if (isNaN(montoAporNum) || montoAporNum < 100) {
+      setError("La regla de la cooperativa exige una aportación inicial mínima de Q 100.00.");
+      return;
+    }
+
     setError(null);
     setGuardando(true);
     try {
@@ -5465,11 +8074,16 @@ export default function SocioForm() {
         agenciaId,
         nombres,
         genero: genero || undefined,
+        dpi: dpi ? dpi.trim() : undefined,
         fechaIngreso,
-        dpi: dpi || undefined,
+        telefono: prepararTelefonoParaGuardar(telefono),
         direccion: direccion || undefined,
-        telefono: telefono || undefined,
         nombreBeneficiario: nombreBeneficiario || undefined,
+        parentescoBeneficiario: parentescoBeneficiario || undefined,
+        dpiBeneficiario: dpiBeneficiario ? dpiBeneficiario.trim() : undefined,
+        telefonoBeneficiario: prepararTelefonoParaGuardar(telefonoBeneficiario),
+        montoAportacionInicial: montoAporNum,
+        reciboAportacionInicial: reciboAportacion.trim(),
       });
       navigate(`/socios/${data.id}`);
     } catch (err) {
@@ -5477,6 +8091,11 @@ export default function SocioForm() {
       setGuardando(false);
     }
   }
+
+  const rawDpiLength = limpiarDPI(dpi).length;
+  const rawTelLength = telefono.replace(/\D/g, "").length;
+  const rawDpiBenLength = limpiarDPI(dpiBeneficiario).length;
+  const rawTelBenLength = telefonoBeneficiario.replace(/\D/g, "").length;
 
   return (
     <div>
@@ -5489,7 +8108,7 @@ export default function SocioForm() {
 
       {error && <div className="alert error">{error}</div>}
 
-      <form className="card" onSubmit={onSubmit} style={{ maxWidth: 640 }}>
+      <form className="card" onSubmit={onSubmit} style={{ maxWidth: 680 }}>
         <div className="form-grid">
           {puedeElegirAgencia && (
             <div className="field">
@@ -5515,9 +8134,17 @@ export default function SocioForm() {
 
           <div className="field" style={{ gridColumn: "1 / -1" }}>
             <label htmlFor="nombres">Nombres completos</label>
-            <input id="nombres" value={nombres} onChange={(e) => setNombres(e.target.value)} required />
+            <InputNombreAutoCompletar
+              id="nombres"
+              value={nombres}
+              onChange={setNombres}
+              placeholder="Ej. Tomás Sánchez Pérez"
+              required
+            />
+            <span className="hint">Sugerencias inteligentes con tildes. Toca la sugerencia o presiona Tab para autocompletar.</span>
           </div>
 
+          {/* Fila: Género a la izquierda, DPI del asociado a la derecha */}
           <div className="field">
             <label htmlFor="genero">Género</label>
             <select id="genero" value={genero} onChange={(e) => setGenero(e.target.value as "M" | "F" | "")}>
@@ -5527,6 +8154,54 @@ export default function SocioForm() {
             </select>
           </div>
 
+          <div className="field">
+            <label htmlFor="dpi">DPI del asociado</label>
+            <input
+              id="dpi"
+              inputMode="numeric"
+              value={dpi}
+              onChange={(e) => setDpi(formatearDPI(e.target.value.replace(/[^0-9-]/g, "")))}
+              maxLength={15}
+              placeholder="xxxx-xxxxx-xxxx"
+              style={{
+                fontFamily: "monospace",
+                letterSpacing: "0.5px",
+                borderColor: dpiDuplicado ? "var(--danger)" : undefined,
+              }}
+            />
+            <div style={{ minHeight: "1.1rem", marginTop: "0.15rem" }}>
+              {verificandoDpi && <span className="hint">🔍 Verificando DPI y procedencia municipal...</span>}
+              {dpiMuniInfo && !dpiMuniInfo.valido && (
+                <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                  ⛔ {dpiMuniInfo.mensaje}
+                </span>
+              )}
+              {dpiDuplicado && (
+                <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                  ⚠️ Ya registrado para: {dpiDuplicado.nombres} ({dpiDuplicado.numeroAsociado})
+                </span>
+              )}
+              {!verificandoDpi && !dpiDuplicado && dpiMuniInfo?.valido && (
+                <span
+                  style={{
+                    color: dpiMuniInfo.esLocal ? "#10b981" : "#0284c7",
+                    fontSize: "0.78rem",
+                    fontWeight: 600,
+                    display: "block",
+                  }}
+                >
+                  {dpiMuniInfo.esLocal
+                    ? `✓ ${dpiMuniInfo.codigoMunicipio} — ${dpiMuniInfo.municipio}, ${dpiMuniInfo.departamento} (Agencia Local)`
+                    : `🔵 ${dpiMuniInfo.codigoMunicipio} — ${dpiMuniInfo.municipio}, ${dpiMuniInfo.departamento} (Válido: Asociado procedente de otro municipio)`}
+                </span>
+              )}
+              {rawDpiLength > 0 && rawDpiLength < 13 && (
+                <span className="hint">{rawDpiLength}/13 dígitos (solo números)</span>
+              )}
+            </div>
+          </div>
+
+          {/* Fila abajo: Fecha de ingreso y Teléfono */}
           <div className="field">
             <label htmlFor="fecha">Fecha de ingreso</label>
             <input
@@ -5538,33 +8213,427 @@ export default function SocioForm() {
             />
           </div>
 
+          {/* Fila: Teléfono con prefijo +502 */}
           <div className="field">
-            <label htmlFor="dpi">DPI</label>
-            <input id="dpi" value={dpi} onChange={(e) => setDpi(e.target.value)} maxLength={13} placeholder="13 dígitos" />
+            <label htmlFor="telefono">Teléfono (WhatsApp)</label>
+            <div style={{ display: "flex", alignItems: "stretch" }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.3rem",
+                  padding: "0 0.75rem",
+                  background: "var(--mono-bg, #1e293b)",
+                  border: "1px solid var(--line)",
+                  borderRight: "none",
+                  borderTopLeftRadius: "8px",
+                  borderBottomLeftRadius: "8px",
+                  fontSize: "0.88rem",
+                  fontWeight: 600,
+                  color: "var(--ink)",
+                  userSelect: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                🇬🇹 +502
+              </span>
+              <input
+                id="telefono"
+                inputMode="numeric"
+                value={telefono}
+                onChange={(e) => setTelefono(formatearTelefono(e.target.value.replace(/[^0-9-]/g, "")))}
+                placeholder="xxxx-xxxx"
+                maxLength={9}
+                style={{
+                  borderTopLeftRadius: 0,
+                  borderBottomLeftRadius: 0,
+                  fontFamily: "monospace",
+                  letterSpacing: "0.5px",
+                  borderColor: telefonoDuplicado ? "var(--danger)" : undefined,
+                }}
+              />
+            </div>
+            <div style={{ minHeight: "1.1rem", marginTop: "0.15rem" }}>
+              {verificandoTelefono && <span className="hint">🔍 Verificando número...</span>}
+              {telefonoDuplicado && (
+                <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                  ⚠️ Teléfono ya registrado para: {telefonoDuplicado.nombres} ({telefonoDuplicado.numeroAsociado})
+                </span>
+              )}
+              {!verificandoTelefono && !telefonoDuplicado && rawTelLength === 8 && (
+                <span style={{ color: "#10b981", fontSize: "0.78rem", fontWeight: 500 }}>
+                  ✓ Disponible para WhatsApp (+502 {telefono})
+                </span>
+              )}
+              {rawTelLength > 0 && rawTelLength < 8 && (
+                <span className="hint">{rawTelLength}/8 dígitos locales (solo números)</span>
+              )}
+              {rawTelLength === 0 && (
+                <span className="hint">8 dígitos numéricos (número único por socio)</span>
+              )}
+            </div>
           </div>
 
           <div className="field">
-            <label htmlFor="telefono">Teléfono</label>
-            <input id="telefono" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-          </div>
-
-          <div className="field" style={{ gridColumn: "1 / -1" }}>
-            <label htmlFor="direccion">Dirección</label>
-            <input id="direccion" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
-          </div>
-
-          <div className="field" style={{ gridColumn: "1 / -1" }}>
-            <label htmlFor="beneficiario">Nombre de la persona beneficiaria</label>
+            <label htmlFor="direccion">Dirección / Comunidad</label>
             <input
+              id="direccion"
+              value={direccion}
+              onChange={(e) => setDireccion(capitalizarDescripcion(e.target.value))}
+              placeholder="Ej. Cantón Ilom, Chajul"
+            />
+          </div>
+
+          {/* Sección Beneficiario */}
+          <div style={{ gridColumn: "1 / -1", marginTop: "0.75rem", borderTop: "1px solid var(--line)", paddingTop: "1.25rem" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem", marginBottom: "0.75rem" }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "1.05rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <span>👥</span> Datos de la Persona Beneficiaria
+                </h3>
+                <p style={{ margin: "0.25rem 0 0", fontSize: "0.82rem", color: "var(--ink-soft)" }}>
+                  Designada por el asociado según el libro oficial de aportaciones.
+                </p>
+              </div>
+
+              {/* Selector segmentado: Adulto vs Menor de Edad */}
+              <div
+                style={{
+                  display: "inline-flex",
+                  background: "var(--mono-bg, #0f172a)",
+                  padding: "0.25rem",
+                  borderRadius: "8px",
+                  border: "1px solid var(--line)",
+                  gap: "0.25rem",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEsMenorBeneficiario(false);
+                  }}
+                  style={{
+                    padding: "0.35rem 0.75rem",
+                    borderRadius: "6px",
+                    border: "none",
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    background: !esMenorBeneficiario ? "var(--primary, #0284c7)" : "transparent",
+                    color: !esMenorBeneficiario ? "#ffffff" : "var(--ink-soft)",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  👤 Adulto (DPI)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEsMenorBeneficiario(true);
+                    setParentescoBeneficiario("Hijo(a)");
+                    setTelefonoDuplicadoBen(null);
+                  }}
+                  style={{
+                    padding: "0.35rem 0.75rem",
+                    borderRadius: "6px",
+                    border: "none",
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    background: esMenorBeneficiario ? "#0ea5e9" : "transparent",
+                    color: esMenorBeneficiario ? "#ffffff" : "var(--ink-soft)",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  🧒 Menor de edad (CUI)
+                </button>
+              </div>
+            </div>
+
+            {esMenorBeneficiario && (
+              <div
+                style={{
+                  padding: "0.6rem 0.85rem",
+                  borderRadius: "8px",
+                  background: "rgba(14, 165, 233, 0.12)",
+                  border: "1px solid rgba(14, 165, 233, 0.35)",
+                  color: "#38bdf8",
+                  fontSize: "0.82rem",
+                  marginBottom: "1rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                <span>ℹ️</span>
+                <span>
+                  <strong>Beneficiario menor de edad:</strong> Ingrese el <strong>CUI de 13 dígitos</strong> que aparece en su partida de nacimiento de RENAP. El parentesco se ajusta a menores de edad y el teléfono es opcional.
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="field">
+            <label htmlFor="beneficiario">Nombre completo del beneficiario</label>
+            <InputNombreAutoCompletar
               id="beneficiario"
               value={nombreBeneficiario}
-              onChange={(e) => setNombreBeneficiario(e.target.value)}
+              onChange={setNombreBeneficiario}
+              placeholder={esMenorBeneficiario ? "Ej. Juanito Tomás Sánchez Pérez" : "Ej. María Elena Pérez Gómez"}
             />
+          </div>
+
+          <div className="field">
+            <label htmlFor="parentesco-ben">Parentesco con el asociado</label>
+            <select
+              id="parentesco-ben"
+              value={parentescoBeneficiario}
+              onChange={(e) => setParentescoBeneficiario(e.target.value)}
+            >
+              <option value="">Selecciona el parentesco…</option>
+              {(esMenorBeneficiario ? PARENTESCOS_BENEFICIARIO_MENOR : PARENTESCOS_BENEFICIARIO).map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+            <span className="hint">
+              {esMenorBeneficiario ? "Opciones válidas para menores (sugerido Hijo/a)" : "Vínculo familiar del beneficiario"}
+            </span>
+          </div>
+
+          <div className="field">
+            <label htmlFor="dpi-ben" style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <span>{esMenorBeneficiario ? "CUI del menor (RENAP)" : "DPI del beneficiario"}</span>
+              {esMenorBeneficiario && (
+                <span
+                  style={{
+                    fontSize: "0.7rem",
+                    padding: "0.1rem 0.4rem",
+                    borderRadius: "4px",
+                    background: "#0ea5e9",
+                    color: "#fff",
+                    fontWeight: 700,
+                  }}
+                >
+                  CUI RENAP
+                </span>
+              )}
+            </label>
+            <input
+              id="dpi-ben"
+              inputMode="numeric"
+              value={dpiBeneficiario}
+              onChange={(e) => setDpiBeneficiario(formatearDPI(e.target.value.replace(/[^0-9-]/g, "")))}
+              maxLength={15}
+              placeholder={esMenorBeneficiario ? "xxxx-xxxxx-xxxx (CUI de partida)" : "xxxx-xxxxx-xxxx (DPI adulto)"}
+              style={{
+                fontFamily: "monospace",
+                letterSpacing: "0.5px",
+                borderColor: esMenorBeneficiario ? "#38bdf8" : undefined,
+              }}
+            />
+            <div style={{ minHeight: "1.1rem", marginTop: "0.15rem" }}>
+              {verificandoDpiBen && !esMenorBeneficiario ? (
+                <span className="hint">🔍 Verificando...</span>
+              ) : dpiDuplicadoBen && !esMenorBeneficiario ? (
+                <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                  🔴 DPI/CUI registrado ({dpiDuplicadoBen.nombres})
+                </span>
+              ) : esMenorBeneficiario ? (
+                <span className="hint" style={{ color: "#38bdf8" }}>
+                  {rawDpiBenLength === 13 ? "✓ CUI válido (13 dígitos de partida)" : `${rawDpiBenLength}/13 dígitos numéricos del CUI`}
+                </span>
+              ) : rawDpiBenLength === 13 ? (
+                <span style={{ color: "#10b981", fontSize: "0.78rem", fontWeight: 500 }}>
+                  ✓ DPI válido (13 dígitos)
+                </span>
+              ) : (
+                <span className="hint">13 dígitos numéricos (opcional)</span>
+              )}
+            </div>
+          </div>
+
+          <div className="field">
+            <label htmlFor="tel-ben">
+              Teléfono del beneficiario {esMenorBeneficiario ? "(Opcional)" : ""}
+            </label>
+            <div style={{ display: "flex", alignItems: "stretch" }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.3rem",
+                  padding: "0 0.75rem",
+                  background: "var(--mono-bg, #1e293b)",
+                  border: "1px solid var(--line)",
+                  borderRight: "none",
+                  borderTopLeftRadius: "8px",
+                  borderBottomLeftRadius: "8px",
+                  fontSize: "0.88rem",
+                  fontWeight: 600,
+                  color: "var(--ink)",
+                  userSelect: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                🇬🇹 +502
+              </span>
+              <input
+                id="tel-ben"
+                inputMode="numeric"
+                value={telefonoBeneficiario}
+                onChange={(e) => setTelefonoBeneficiario(formatearTelefono(e.target.value.replace(/[^0-9-]/g, "")))}
+                placeholder="xxxx-xxxx"
+                maxLength={9}
+                style={{
+                  borderTopLeftRadius: 0,
+                  borderBottomLeftRadius: 0,
+                  fontFamily: "monospace",
+                  letterSpacing: "0.5px",
+                  borderColor: !esMenorBeneficiario && telefonoDuplicadoBen ? "var(--danger)" : undefined,
+                }}
+              />
+            </div>
+            <div style={{ minHeight: "1.1rem", marginTop: "0.15rem" }}>
+              {!esMenorBeneficiario && verificandoTelefonoBen && (
+                <span className="hint">🔍 Verificando teléfono...</span>
+              )}
+              {!esMenorBeneficiario && telefonoDuplicadoBen && (
+                <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                  🔴 Teléfono ya registrado ({telefonoDuplicadoBen.rol || "Socio"}: {telefonoDuplicadoBen.nombres})
+                </span>
+              )}
+              {esMenorBeneficiario && (
+                <span className="hint">
+                  Opcional (al ser menor de edad, puede usar el del padre o tutor sin validación de duplicado)
+                </span>
+              )}
+              {!esMenorBeneficiario && !telefonoDuplicadoBen && !verificandoTelefonoBen && rawTelBenLength === 8 && (
+                <span style={{ color: "#10b981", fontSize: "0.78rem", fontWeight: 500 }}>
+                  ✓ Teléfono válido (+502 {telefonoBeneficiario})
+                </span>
+              )}
+              {!esMenorBeneficiario && !telefonoDuplicadoBen && rawTelBenLength > 0 && rawTelBenLength < 8 && (
+                <span className="hint">{rawTelBenLength}/8 dígitos numéricos</span>
+              )}
+              {!esMenorBeneficiario && rawTelBenLength === 0 && (
+                <span className="hint">8 dígitos numéricos (opcional, no repetible)</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Aportación Inicial Estatutaria */}
+        <div className="card" style={{ marginTop: "1rem" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.4rem", flexWrap: "wrap", gap: "0.5rem" }}>
+            <h2 style={{ fontSize: "1.05rem", margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span>💰</span> Aportación Inicial Estatutaria
+            </h2>
+            <span
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                padding: "0.2rem 0.55rem",
+                borderRadius: "6px",
+                background: "rgba(16, 185, 129, 0.12)",
+                color: "#10b981",
+                border: "1px solid rgba(16, 185, 129, 0.3)",
+              }}
+            >
+              Requisito Obligatorio: Mínimo Q 100.00
+            </span>
+          </div>
+
+          <p style={{ margin: "0 0 1rem", fontSize: "0.82rem", color: "var(--ink-soft)", lineHeight: 1.45 }}>
+            <strong>Regla de la cooperativa:</strong> Todo asociado debe aportar como mínimo <strong>Q 100.00</strong> para habilitar su afiliación oficial y tener derecho a abrir cuentas de ahorro infantil, corriente, programado, plazo fijo o solicitar créditos.
+          </p>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem" }}>
+            <div className="field">
+              <label htmlFor="monto-aportacion">Monto de aportación inicial (Q) *</label>
+              <div style={{ display: "flex", alignItems: "stretch" }}>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    padding: "0 0.85rem",
+                    background: "var(--mono-bg, #1e293b)",
+                    border: "1px solid var(--line)",
+                    borderRight: "none",
+                    borderTopLeftRadius: "8px",
+                    borderBottomLeftRadius: "8px",
+                    fontSize: "0.95rem",
+                    fontWeight: 700,
+                    color: "var(--accent, #38bdf8)",
+                    userSelect: "none",
+                  }}
+                >
+                  Q
+                </span>
+                <input
+                  id="monto-aportacion"
+                  type="number"
+                  min="100"
+                  step="any"
+                  value={montoAportacion}
+                  onChange={(e) => setMontoAportacion(e.target.value)}
+                  required
+                  placeholder="100.00"
+                  style={{
+                    borderTopLeftRadius: 0,
+                    borderBottomLeftRadius: 0,
+                    fontWeight: 700,
+                    fontSize: "1.05rem",
+                    color: Number(montoAportacion) < 100 ? "var(--danger, #ef4444)" : undefined,
+                  }}
+                />
+              </div>
+              {Number(montoAportacion) < 100 ? (
+                <span style={{ fontSize: "0.8rem", color: "var(--danger, #ef4444)", marginTop: "0.3rem", display: "block", fontWeight: 600 }}>
+                  ⚠️ El estatuto cooperativo exige un mínimo de Q 100.00
+                </span>
+              ) : (
+                <span className="hint">Mínimo Q 100.00 (el socio puede aportar un monto mayor)</span>
+              )}
+            </div>
+
+            <div className="field">
+              <label htmlFor="recibo-aportacion">No. de boleta o recibo de pago *</label>
+              <input
+                id="recibo-aportacion"
+                value={reciboAportacion}
+                onChange={(e) => setReciboAportacion(e.target.value)}
+                placeholder="Ej. BOL-2026-00412 / REC-1029"
+                required
+                style={{
+                  borderColor: !reciboAportacion.trim() ? "var(--accent, #38bdf8)" : undefined,
+                }}
+              />
+              <span className="hint">
+                Comprobante oficial de ingreso en caja o boleta bancaria (Requerido para respaldo de la aportación).
+              </span>
+            </div>
           </div>
         </div>
 
         <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
-          <button type="submit" className="btn" disabled={guardando || !agenciaId}>
+          <button
+            type="submit"
+            className="btn"
+            disabled={
+              guardando ||
+              !agenciaId ||
+              Boolean(dpiDuplicado) ||
+              verificandoDpi ||
+              Boolean(telefonoDuplicado) ||
+              verificandoTelefono ||
+              (!esMenorBeneficiario && Boolean(telefonoDuplicadoBen)) ||
+              verificandoTelefonoBen ||
+              !reciboAportacion.trim() ||
+              Number(montoAportacion) < 100
+            }
+          >
             {guardando ? "Guardando…" : "Guardar socio"}
           </button>
           <button type="button" className="btn secondary" onClick={() => navigate(-1)}>
@@ -5580,27 +8649,46 @@ export default function SocioForm() {
 ## `frontend/src/pages/SociosList.tsx` {#frontendsrcpagessocioslisttsx}
 
 ```tsx
+import axios from "axios";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
-import type { ListaSocios } from "../types";
+import type { ListaSocios, FiadorItem } from "../types";
+import { formatearDPI, formatearQuetzales } from "../lib/formatters";
 
 export default function SociosList() {
+  const [tab, setTab] = useState<"socios" | "prospectos">("socios");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [resultado, setResultado] = useState<ListaSocios | null>(null);
+  const [fiadores, setFiadores] = useState<FiadorItem[]>([]);
+  const [cargandoFiadores, setCargandoFiadores] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
 
+  const [recargar, setRecargar] = useState(0);
+
+  // Cargar lista de socios
   useEffect(() => {
+    if (tab !== "socios") return;
     const controller = new AbortController();
     setCargando(true);
+    setError(null);
     const timeout = setTimeout(() => {
       api
-        .get<ListaSocios>("/socios", { params: { q: q || undefined, page }, signal: controller.signal })
-        .then(({ data }) => setResultado(data))
+        .get<ListaSocios>("/socios", {
+          params: { q: q || undefined, page, pageSize: 10 },
+          signal: controller.signal,
+        })
+        .then(({ data }) => {
+          setResultado(data);
+          setError(null);
+        })
         .catch((err) => {
-          if (err.name !== "CanceledError") setError(mensajeError(err));
+          if (!axios.isCancel(err) && err?.name !== "CanceledError" && (err as { code?: string })?.code !== "ERR_CANCELED") {
+            const msg = mensajeError(err);
+            if (msg) setError(msg);
+          }
         })
         .finally(() => setCargando(false));
     }, 250);
@@ -5608,84 +8696,378 @@ export default function SociosList() {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [q, page]);
+  }, [q, page, tab, recargar]);
+
+  // Cargar lista de fiadores / prospectos
+  useEffect(() => {
+    if (tab !== "prospectos") return;
+    setCargandoFiadores(true);
+    setError(null);
+    api
+      .get<FiadorItem[]>("/prestamos/fiadores", {
+        params: { q: q || undefined, tipoFiltro: "EXTERNOS" },
+      })
+      .then(({ data }) => {
+        setFiadores(data);
+        setError(null);
+      })
+      .catch((err) => setError(mensajeError(err)))
+      .finally(() => setCargandoFiadores(false));
+  }, [q, tab, recargar]);
 
   const totalPaginas = resultado ? Math.max(1, Math.ceil(resultado.total / resultado.pageSize)) : 1;
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <h1>Socios</h1>
-          <p>Registro único de asociados — reemplaza el listado de Aportaciones.</p>
+    <div className="screen-container">
+      {/* CABECERA COMPACTA DE 1 LÍNEA CON TABS INTEGRADAS */}
+      <div className="screen-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.2rem" }}>
+            <span>👥</span> Socios y Asociados
+          </h1>
+          <div style={{ display: "flex", gap: "0.25rem", background: "var(--paper-raised)", padding: "0.18rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+            <button
+              type="button"
+              onClick={() => {
+                setTab("socios");
+                setQ("");
+                setPage(1);
+              }}
+              style={{
+                padding: "0.22rem 0.65rem",
+                borderRadius: "6px",
+                border: "none",
+                fontSize: "0.8rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                background: tab === "socios" ? "var(--primary, #0284c7)" : "transparent",
+                color: tab === "socios" ? "#fff" : "var(--ink-soft)",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.35rem",
+              }}
+            >
+              <span>Padrón</span>
+              <span style={{ fontSize: "0.72rem", opacity: 0.9 }}>({resultado?.total ?? "—"})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTab("prospectos");
+                setQ("");
+              }}
+              style={{
+                padding: "0.22rem 0.65rem",
+                borderRadius: "6px",
+                border: "none",
+                fontSize: "0.8rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                background: tab === "prospectos" ? "#d97706" : "transparent",
+                color: tab === "prospectos" ? "#fff" : "var(--ink-soft)",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.35rem",
+              }}
+            >
+              <span>🎯 Prospectos</span>
+              <span style={{ fontSize: "0.72rem", opacity: 0.9 }}>({fiadores.length})</span>
+            </button>
+          </div>
         </div>
-        <Link to="/socios/nuevo" className="btn">
+
+        <Link to="/socios/nuevo" className="btn" style={{ fontSize: "0.78rem", padding: "0.3rem 0.75rem", fontWeight: 700 }}>
           + Nuevo socio
         </Link>
       </div>
 
-      {error && <div className="alert error">{error}</div>}
-
-      <div className="searchbar">
-        <input
-          placeholder="Buscar por nombre, DPI o número de asociado…"
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setPage(1);
+      {error && (
+        <div
+          className="alert error"
+          style={{
+            padding: "0.35rem 0.75rem",
+            fontSize: "0.82rem",
+            margin: 0,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
           }}
-        />
-      </div>
+        >
+          <span>{error}</span>
+          <button
+            type="button"
+            className="btn secondary"
+            style={{
+              padding: "0.15rem 0.5rem",
+              fontSize: "0.75rem",
+              fontWeight: 700,
+            }}
+            onClick={() => setRecargar((v) => v + 1)}
+          >
+            🔄 Reintentar
+          </button>
+        </div>
+      )}
 
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>No. asociado</th>
-              <th>Nombre</th>
-              <th>Agencia</th>
-              <th>Fecha de ingreso</th>
-              <th>Cuentas</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {resultado?.data.map((s) => (
-              <tr key={s.id}>
-                <td className="mono">{s.numero_asociado}</td>
-                <td>
-                  <Link to={`/socios/${s.id}`}>{s.nombres}</Link>
-                </td>
-                <td>{s.agencia_nombre}</td>
-                <td className="mono">{new Date(s.fecha_ingreso).toLocaleDateString("es-GT")}</td>
-                <td className="mono">{s.total_cuentas ?? 0}</td>
-                <td>
-                  <span className={`badge ${s.estado === "ACTIVO" ? "activo" : "inactivo"}`}>
-                    {s.estado === "ACTIVO" ? "Activo" : "Inactivo"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!cargando && resultado?.data.length === 0 && (
-          <div className="empty">
-            {q ? `No hay socios que coincidan con "${q}".` : "Todavía no hay socios registrados."}
+      {/* FRANJA DE KPIS COMPACTA FINTECH */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
+        {/* TOTAL ASOCIADOS */}
+        <div
+          style={{
+            background: tab === "socios" ? "rgba(99, 102, 241, 0.06)" : "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #6366f1",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            cursor: "pointer",
+            boxShadow: tab === "socios" ? "0 0 0 2px #6366f1" : "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+          onClick={() => {
+            setTab("socios");
+            setQ("");
+          }}
+        >
+          <div>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", display: "block", letterSpacing: "0.02em" }}>
+              TOTAL ASOCIADOS
+            </span>
+            <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
+              {resultado?.total ?? "—"}
+            </span>
           </div>
-        )}
+          <span style={{ fontSize: "1.2rem" }}>👥</span>
+        </div>
+
+        {/* PROSPECTOS / FIADORES */}
+        <div
+          style={{
+            background: tab === "prospectos" ? "rgba(245, 158, 11, 0.06)" : "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #f59e0b",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            cursor: "pointer",
+            boxShadow: tab === "prospectos" ? "0 0 0 2px #f59e0b" : "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+          onClick={() => {
+            setTab("prospectos");
+            setQ("");
+          }}
+        >
+          <div>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#d97706", display: "block", letterSpacing: "0.02em" }}>
+              PROSPECTOS / FIADORES
+            </span>
+            <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#d97706", fontFamily: "monospace" }}>
+              {fiadores.length}
+            </span>
+          </div>
+          <span style={{ fontSize: "1.2rem" }}>🎯</span>
+        </div>
+
+        {/* BLOQUE DE PADRÓN */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #0284c7",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", display: "block", letterSpacing: "0.02em" }}>
+              VISTA ACTUAL
+            </span>
+            <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
+              Pág {page} de {totalPaginas}
+            </span>
+          </div>
+          <span style={{ fontSize: "1.2rem" }}>📄</span>
+        </div>
       </div>
 
-      {resultado && resultado.total > resultado.pageSize && (
-        <div className="pagination">
-          <button className="btn secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-            Anterior
-          </button>
-          <span>
-            Página {page} de {totalPaginas} · {resultado.total} socios
-          </span>
-          <button className="btn secondary" disabled={page >= totalPaginas} onClick={() => setPage((p) => p + 1)}>
-            Siguiente
-          </button>
+      {/* BARRA DE BÚSQUEDA COMPACTA */}
+      <div className="screen-toolbar">
+        <div style={{ flex: 1, minWidth: 260 }}>
+          <input
+            placeholder={tab === "socios" ? "🔍 Buscar por nombre, DPI o número de asociado…" : "🔍 Buscar fiador por nombre, DPI o crédito…"}
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+            style={{ width: "100%", padding: "0.32rem 0.65rem", fontSize: "0.82rem", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--paper-raised)", color: "var(--ink)" }}
+          />
+        </div>
+      </div>
+
+      {/* TABLA DE PADRÓN CON SCROLL INTERNO Y CABECERA STICKY */}
+      {tab === "socios" ? (
+        <>
+          <div className="table-scroll-container">
+            <table className="table-compact" style={{ width: "100%" }}>
+              <thead>
+                <tr>
+                  <th style={{ width: "14%" }}>No. asociado</th>
+                  <th style={{ width: "32%" }}>Nombre y Contacto</th>
+                  <th style={{ width: "18%" }}>Agencia</th>
+                  <th style={{ width: "14%" }}>Fecha Ingreso</th>
+                  <th style={{ width: "10%", textAlign: "center" }}>Cuentas</th>
+                  <th style={{ width: "12%", textAlign: "center" }}>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resultado?.data.map((s) => (
+                  <tr key={s.id}>
+                    <td className="mono" style={{ fontWeight: 700 }}>
+                      <Link to={`/socios/${s.id}`}>{s.numero_asociado}</Link>
+                    </td>
+                    <td>
+                      <Link to={`/socios/${s.id}`} style={{ fontWeight: 600, color: "inherit", textDecoration: "none" }}>
+                        {s.nombres}
+                      </Link>
+                      {(s.dpi || s.telefono) && (
+                        <div style={{ fontSize: "0.72rem", color: "var(--ink-soft)", marginTop: "0.1rem" }}>
+                          {s.dpi && <span>DPI: <span className="mono">{formatearDPI(s.dpi)}</span></span>}
+                          {s.dpi && s.telefono && <span> · </span>}
+                          {s.telefono && <span>Tel: <span className="mono">{s.telefono}</span></span>}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ fontSize: "0.8rem" }}>{s.agencia_nombre}</td>
+                    <td className="mono" style={{ fontSize: "0.78rem" }}>{new Date(s.fecha_ingreso).toLocaleDateString("es-GT")}</td>
+                    <td className="mono" style={{ textAlign: "center", fontWeight: 700 }}>{s.total_cuentas ?? 0}</td>
+                    <td style={{ textAlign: "center" }}>
+                      <span className={`badge ${s.estado === "ACTIVO" ? "activo" : "inactivo"}`} style={{ fontSize: "0.7rem", padding: "0.12rem 0.4rem" }}>
+                        {s.estado === "ACTIVO" ? "Activo" : "Inactivo"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!cargando && resultado?.data.length === 0 && (
+              <div className="empty" style={{ padding: "1.5rem" }}>
+                {q ? `No hay socios que coincidan con "${q}".` : "Todavía no hay socios registrados."}
+              </div>
+            )}
+          </div>
+
+          {/* PAGINACIÓN FIJA EN PIE */}
+          {resultado && resultado.total > resultado.pageSize && (
+            <div className="screen-footer">
+              <span style={{ color: "var(--ink-soft)" }}>
+                Mostrando {resultado.data.length} de {resultado.total} socios · Pág. {page} de {totalPaginas}
+              </span>
+              <div style={{ display: "flex", gap: "0.4rem" }}>
+                <button
+                  className="btn secondary"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                  style={{ fontSize: "0.75rem", padding: "0.22rem 0.6rem" }}
+                >
+                  ← Anterior
+                </button>
+                <button
+                  className="btn secondary"
+                  disabled={page >= totalPaginas}
+                  onClick={() => setPage((p) => p + 1)}
+                  style={{ fontSize: "0.75rem", padding: "0.22rem 0.6rem" }}
+                >
+                  Siguiente →
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="table-scroll-container">
+          <table className="table-compact" style={{ width: "100%" }}>
+            <thead>
+              <tr>
+                <th>Fiador (Prospecto)</th>
+                <th>DPI / Teléfono</th>
+                <th>Dirección / Lugar</th>
+                <th>Crédito que Respalda</th>
+                <th>Socio Titular</th>
+                <th style={{ textAlign: "center" }}>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fiadores.map((f, idx) => (
+                <tr key={`${f.prestamo_id}-${idx}`}>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{f.nombre_fiador}</div>
+                    <span className="badge" style={{ background: "#fef3c7", color: "#92400e", fontSize: "0.68rem", padding: "0.1rem 0.35rem" }}>
+                      👤 Prospecto
+                    </span>
+                  </td>
+                  <td>
+                    <div className="mono" style={{ fontSize: "0.8rem" }}>
+                      {formatearDPI(f.dpi_fiador || "")}
+                    </div>
+                    {f.telefono_fiador && (
+                      <div style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
+                        📞 {f.telefono_fiador}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+                    {f.lugar_fiador || "—"}
+                  </td>
+                  <td>
+                    <Link to={`/creditos/${f.prestamo_id}`} style={{ fontWeight: 600, fontSize: "0.8rem" }} className="mono">
+                      {f.prestamo_codigo}
+                    </Link>
+                    <div style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
+                      {formatearQuetzales(f.monto_aprobado || f.monto_solicitado)}
+                    </div>
+                  </td>
+                  <td>
+                    <Link to={`/socios/${f.socio_id}`} style={{ fontWeight: 500, fontSize: "0.8rem" }}>
+                      {f.socio_nombre}
+                    </Link>
+                    <div style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
+                      Asoc. <span className="mono">{f.socio_numero}</span>
+                    </div>
+                  </td>
+                  <td style={{ textAlign: "center" }}>
+                    <Link
+                      to={`/socios/nuevo?nombres=${encodeURIComponent(f.nombre_fiador)}&dpi=${encodeURIComponent(f.dpi_fiador || "")}&telefono=${encodeURIComponent(f.telefono_fiador || "")}&direccion=${encodeURIComponent(f.lugar_fiador || "")}`}
+                      className="btn secondary"
+                      style={{
+                        padding: "0.2rem 0.5rem",
+                        fontSize: "0.72rem",
+                        background: "#10b981",
+                        color: "#fff",
+                        borderColor: "#059669",
+                        textDecoration: "none",
+                        fontWeight: 700,
+                      }}
+                    >
+                      + Afiliar
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!cargandoFiadores && fiadores.length === 0 && (
+            <div className="empty" style={{ padding: "1.5rem" }}>
+              {q ? `No hay fiadores externos que coincidan con "${q}".` : "No hay fiadores externos registrados en créditos fiduciarios."}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -5730,22 +9112,20 @@ export default function Tablero() {
 
   const [driveConnected, setDriveConnected] = useState(false);
 
-  const [periodoAnalitica] = useState<"dia" | "mes">("dia");
+  const cargandoRef = useRef(false);
 
   function cargarResumen(silencioso = false) {
+    if (cargandoRef.current) return;
+    cargandoRef.current = true;
     api
       .get<ResumenDashboard>("/dashboard/resumen")
       .then(({ data }) => setResumen(data))
       .catch((err) => {
         if (!silencioso) setError(mensajeError(err));
+      })
+      .finally(() => {
+        cargandoRef.current = false;
       });
-  }
-
-  function cargarAnalitica() {
-    api
-      .get("/caja-auxiliar/analitica-servicios", { params: { periodo: periodoAnalitica } })
-      .then(() => {})
-      .catch(console.error);
   }
 
   async function verificarDrive() {
@@ -5778,15 +9158,13 @@ export default function Tablero() {
     }
   }, []);
 
-  // Actualización automática en tiempo real cada 10s y al recuperar foco
+  // Actualización automática en tiempo real cada 30s y al recuperar foco
   useEffect(() => {
     cargarResumen();
-    cargarAnalitica();
     verificarDrive();
     const interval = setInterval(() => {
       cargarResumen(true);
-      cargarAnalitica();
-    }, 10000);
+    }, 30000);
 
     const onFocus = () => {
       if (!document.hidden) {
@@ -5801,7 +9179,7 @@ export default function Tablero() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
     };
-  }, [periodoAnalitica]);
+  }, []);
 
   // Cerrar menú de opciones al hacer clic afuera
   useEffect(() => {
@@ -5888,7 +9266,7 @@ export default function Tablero() {
             </span>
           </div>
           <p style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-            <span>COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."{varias ? " · Todas las Agencias" : ""}</span>
+            <span>COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."{varias ? " · Todas las Agencias" : ""}</span>
             {driveConnected ? (
               <span style={{ fontSize: "0.75rem", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", padding: "0.2rem 0.6rem", borderRadius: "20px", display: "flex", alignItems: "center", gap: "0.3rem" }}>
                 ✅ Google Drive Conectado
@@ -6674,6 +10052,7 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
     </div>
   );
 }
+
 ```
 
 ## `frontend/src/pages/LibroArqueoMensual.tsx` {#frontendsrcpageslibroarqueomensualtsx}
@@ -6691,6 +10070,8 @@ interface DiaArqueo {
   estado: string;
   saldo_inicial: number;
   saldo_final: number | null;
+  saldo_esperado?: number;
+  flujo_neto?: number;
   total_ingresos: number;
   total_egresos: number;
   total_contado: number | null;
@@ -6711,13 +10092,14 @@ interface ArqueoMensualResponse {
     totalMovimientosMes: number;
     totalIngresosMes: number;
     totalEgresosMes: number;
+    totalFlujoNetoMes?: number;
   };
   dias: DiaArqueo[];
 }
 
 export default function LibroArqueoMensual() {
   const { usuario } = useAuth();
-  const puedeElegirAgencia = usuario?.rol === "ADMIN" || usuario?.rol === "GERENCIA";
+  const puedeElegirAgencia = usuario?.rol === "GERENCIA";
 
   const [agencias, setAgencias] = useState<Agencia[]>([]);
   const [agenciaId, setAgenciaId] = useState(usuario?.agenciaId ?? "");
@@ -6746,8 +10128,13 @@ export default function LibroArqueoMensual() {
   }, [mes, mesNum, añoStr]);
 
   useEffect(() => {
-    api.get<Agencia[]>("/agencias").then(({ data }) => setAgencias(data));
-  }, []);
+    api.get<Agencia[]>("/agencias").then(({ data }) => {
+      setAgencias(data);
+      if (!agenciaId && data.length > 0) {
+        setAgenciaId(data[0].id);
+      }
+    });
+  }, [agenciaId]);
 
   function cargar() {
     if (!agenciaId) return;
@@ -6782,35 +10169,43 @@ export default function LibroArqueoMensual() {
   const ultimoDiaMes = new Date(Number(añoStr), Number(mesNum), 0).getDate();
 
   function exportarCSV() {
-    if (!datos || datos.dias.length === 0) return;
     const lineas: string[] = [];
     lineas.push(`LIBRO DE ACTAS DE ARQUEO MENSUAL DE CAJA - COMISION DE VIGILANCIA`);
-    lineas.push(`COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF R.L."`);
+    lineas.push(`COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."`);
     lineas.push(`Acta No.: ${numeroActa}`);
     lineas.push(`Agencia: ${agenciaNombre}`);
     lineas.push(`Periodo: ${mesNombreLargo}`);
     lineas.push("");
     lineas.push("RESUMEN GENERAL DEL MES");
-    lineas.push(`Dias Operados,${datos.resumen.totalDiasOperados}`);
-    lineas.push(`Dias Cuadrados Exactos,${datos.resumen.diasCuadrados}`);
-    lineas.push(`Dias con Diferencia,${datos.resumen.diasConDiferencia}`);
-    lineas.push(`Total Ingresos del Mes (Q),${datos.resumen.totalIngresosMes.toFixed(2)}`);
-    lineas.push(`Total Egresos del Mes (Q),${datos.resumen.totalEgresosMes.toFixed(2)}`);
-    lineas.push(`Diferencia Neta (Q),${(datos.resumen.totalSobrante - datos.resumen.totalFaltante).toFixed(2)}`);
+    lineas.push(`Dias Operados,${datos?.resumen?.totalDiasOperados ?? 0}`);
+    lineas.push(`Dias Cuadrados Exactos,${datos?.resumen?.diasCuadrados ?? 0}`);
+    lineas.push(`Dias con Diferencia,${datos?.resumen?.diasConDiferencia ?? 0}`);
+    lineas.push(`Total Ingresos del Mes (Q),${(datos?.resumen?.totalIngresosMes ?? 0).toFixed(2)}`);
+    lineas.push(`Total Egresos del Mes (Q),${(datos?.resumen?.totalEgresosMes ?? 0).toFixed(2)}`);
+    lineas.push(`Flujo Neto del Mes (Q),${((datos?.resumen?.totalIngresosMes ?? 0) - (datos?.resumen?.totalEgresosMes ?? 0)).toFixed(2)}`);
+    lineas.push(`Diferencia Neta (Q),${((datos?.resumen?.totalSobrante ?? 0) - (datos?.resumen?.totalFaltante ?? 0)).toFixed(2)}`);
     lineas.push("");
     lineas.push("SABANA DE CIERRES DIARIOS");
-    lineas.push("Fecha,Cajero / Operador,Saldo Inicial (Q),Ingresos (Q),Egresos (Q),Saldo Libro (Q),Efectivo Contado (Q),Diferencia (Q),Resultado");
-    datos.dias.forEach((d) => {
-      const fechaStr = new Date(d.fecha).toLocaleDateString("es-GT");
-      const cajero = `"${(d.cerrado_por_nombre || d.abierto_por_nombre || "").replace(/"/g, '""')}"`;
-      const esperado = Number(d.saldo_final ?? d.saldo_inicial);
-      const contado = Number(d.total_contado || esperado);
-      const dif = Number(d.diferencia || 0);
-      const res = dif === 0 ? "CUADRADO" : dif > 0 ? "SOBRANTE" : "FALTANTE";
-      lineas.push(
-        `${fechaStr},${cajero},${d.saldo_inicial.toFixed(2)},${d.total_ingresos.toFixed(2)},${d.total_egresos.toFixed(2)},${esperado.toFixed(2)},${contado.toFixed(2)},${dif.toFixed(2)},${res}`,
-      );
-    });
+    lineas.push("Fecha,Cajero / Operador,Saldo Inicial (Q),Ingresos (Q),Egresos (Q),Flujo Neto (Q),Saldo Libro (Q),Efectivo Contado (Q),Diferencia (Q),Resultado");
+    if (datos && datos.dias.length > 0) {
+      datos.dias.forEach((d) => {
+        const fechaStr = new Date(d.fecha).toLocaleDateString("es-GT");
+        const cajero = `"${(d.cerrado_por_nombre || d.abierto_por_nombre || "").replace(/"/g, '""')}"`;
+        const sIni = Number(d.saldo_inicial || 0);
+        const ing = Number(d.total_ingresos || 0);
+        const egr = Number(d.total_egresos || 0);
+        const flujo = Number(d.flujo_neto ?? (ing - egr));
+        const esperado = Number(d.saldo_esperado ?? (sIni + ing - egr));
+        const contado = Number(d.total_contado ?? (d.estado === "CERRADO" ? (d.saldo_final ?? esperado) : esperado));
+        const dif = Number(d.diferencia ?? (d.estado === "CERRADO" ? contado - esperado : 0));
+        const res = d.estado === "ABIERTO" ? "EN TURNO ACTIVO" : dif === 0 ? "CUADRADO" : dif > 0 ? "SOBRANTE" : "FALTANTE";
+        lineas.push(
+          `${fechaStr},${cajero},${sIni.toFixed(2)},${ing.toFixed(2)},${egr.toFixed(2)},${flujo.toFixed(2)},${esperado.toFixed(2)},${contado.toFixed(2)},${dif.toFixed(2)},${res}`,
+        );
+      });
+    } else {
+      lineas.push(`"Sin operaciones registradas en el mes de ${mesNombreLargo}",,,,,,,,,`);
+    }
     lineas.push("");
     lineas.push(`Observaciones: "${observaciones.replace(/"/g, '""')}"`);
 
@@ -6871,7 +10266,7 @@ export default function LibroArqueoMensual() {
               type="button"
               className="btn secondary"
               onClick={exportarCSV}
-              disabled={!datos || datos.dias.length === 0}
+              disabled={cargando}
               style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem" }}
             >
               📥 Excel (CSV)
@@ -6880,7 +10275,7 @@ export default function LibroArqueoMensual() {
               type="button"
               className="btn"
               onClick={() => window.print()}
-              disabled={!datos || datos.dias.length === 0}
+              disabled={cargando}
               style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem" }}
             >
               🖨️ Imprimir Acta Oficial
@@ -7050,7 +10445,7 @@ export default function LibroArqueoMensual() {
           }}
         >
           <div style={{ fontSize: "1rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-            COOPERATIVA MAYA INVERSIONES FUTURAS R.L. &quot;COMIF R.L.&quot;
+            COOPERATIVA MAYA INVERSIONES FUTURAS R.L. &quot;COMIF-R.L.&quot;
           </div>
           <div style={{ fontSize: "1.15rem", color: "#047857", fontWeight: 800, margin: "0.15rem 0" }}>
             COMISIÓN DE VIGILANCIA · LIBRO DE ACTAS DE ARQUEO MENSUAL
@@ -7067,222 +10462,255 @@ export default function LibroArqueoMensual() {
         {cargando && <p style={{ textAlign: "center", padding: "1rem" }}>Cargando arqueos del mes…</p>}
 
         {!cargando && (!datos || datos.dias.length === 0) && (
-          <div className="alert info">
-            No se encontraron cajas registradas para el mes de {mesNombreLargo} en {agenciaNombre}.
+          <div className="alert info no-print" style={{ margin: "0.5rem 0" }}>
+            ℹ️ No se encontraron cajas operadas para el mes de {mesNombreLargo} en {agenciaNombre}. Se muestra el formato notarial oficial con saldo Q 0.00 para efectos de acta y dictamen.
           </div>
         )}
 
-        {datos && (
-          <div style={{ fontSize: "0.82rem", lineHeight: 1.5, color: "var(--ink)" }}>
-            {/* PUNTO PRIMERO */}
-            <div style={{ marginBottom: "0.75rem", textAlign: "justify" }}>
-              <strong style={{ textDecoration: "underline" }}>PUNTO PRIMERO (APERTURA Y QUÓRUM):</strong> En el municipio
-              de {lugarMunicipio}, departamento de Quiché, siendo las {horaInicio} horas del día {ultimoDiaMes} del mes
-              de {mesNombreLargo}, reunidos en las oficinas de la Agencia <strong>{agenciaNombre}</strong> de la{" "}
-              <strong>COOPERATIVA MAYA INVERSIONES FUTURAS R.L. &quot;COMIF R.L.&quot;</strong>, se
-              constituyen los miembros de la Comisión de Vigilancia: <strong>{nombrePresidente}</strong> (Presidente),{" "}
-              <strong>{nombreSecretaria}</strong> (Secretaria) y <strong>{nombreVocal}</strong> (Vocal I), en presencia del
-              Receptor Pagador <strong>{nombreCajero}</strong>, con el propósito de celebrar la sesión ordinaria de
-              verificación, cotejo y cierre mensual del libro auxiliar de caja.
+        <div style={{ fontSize: "0.82rem", lineHeight: 1.5, color: "var(--ink)" }}>
+          {/* PUNTO PRIMERO */}
+          <div style={{ marginBottom: "0.75rem", textAlign: "justify" }}>
+            <strong style={{ textDecoration: "underline" }}>PUNTO PRIMERO (APERTURA Y QUÓRUM):</strong> En el municipio
+            de {lugarMunicipio}, departamento de Quiché, siendo las {horaInicio} horas del día {ultimoDiaMes} del mes
+            de {mesNombreLargo}, reunidos en las oficinas de la Agencia <strong>{agenciaNombre}</strong> de la{" "}
+            <strong>COOPERATIVA MAYA INVERSIONES FUTURAS R.L. &quot;COMIF-R.L.&quot;</strong>, se
+            constituyen los miembros de la Comisión de Vigilancia: <strong>{nombrePresidente}</strong> (Presidente),{" "}
+            <strong>{nombreSecretaria}</strong> (Secretaria) y <strong>{nombreVocal}</strong> (Vocal I), en presencia del
+            Receptor Pagador <strong>{nombreCajero}</strong>, con el propósito de celebrar la sesión ordinaria de
+            verificación, cotejo y cierre mensual del libro auxiliar de caja.
+          </div>
+
+          {/* PUNTO SEGUNDO */}
+          <div style={{ marginBottom: "0.5rem" }}>
+            <div style={{ textAlign: "justify", marginBottom: "0.4rem" }}>
+              <strong style={{ textDecoration: "underline" }}>PUNTO SEGUNDO (REVISIÓN DE OPERACIONES Y SÁBANA DE CIERRES):</strong>{" "}
+              La Comisión de Vigilancia procedió a la revisión minuciosa y cotejo diario de los comprobantes de ingreso y egreso
+              generados durante el mes, arrojando el siguiente resumen consolidado:
             </div>
 
-            {/* PUNTO SEGUNDO */}
-            <div style={{ marginBottom: "0.5rem" }}>
-              <div style={{ textAlign: "justify", marginBottom: "0.4rem" }}>
-                <strong style={{ textDecoration: "underline" }}>PUNTO SEGUNDO (REVISIÓN DE OPERACIONES Y SÁBANA DE CIERRES):</strong>{" "}
-                La Comisión de Vigilancia procedió a la revisión minuciosa y cotejo diario de los comprobantes de ingreso y egreso
-                generados durante el mes, arrojando el siguiente resumen consolidado:
+            {/* Cintillo de Cifras Clave */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                gap: "0.45rem",
+                marginBottom: "0.5rem",
+                background: "var(--paper-raised)",
+                padding: "0.4rem 0.6rem",
+                borderRadius: "6px",
+                border: "1px solid var(--line)",
+                fontSize: "0.72rem",
+              }}
+            >
+              <div>
+                <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                  Días Operados
+                </span>
+                <strong className="mono" style={{ fontSize: "0.9rem" }}>
+                  {datos?.resumen?.totalDiasOperados ?? 0} días
+                </strong>
               </div>
 
-              {/* Cintillo de Cifras Clave */}
+              <div>
+                <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                  Efectividad de Cuadre
+                </span>
+                <strong className="mono" style={{ fontSize: "0.9rem", color: "#16a34a" }}>
+                  {datos?.resumen ? `${datos.resumen.diasCuadrados} / ${datos.resumen.totalDiasOperados}` : "0 / 0"} (
+                  {datos?.resumen && datos.resumen.totalDiasOperados > 0
+                    ? Math.round((datos.resumen.diasCuadrados / datos.resumen.totalDiasOperados) * 100)
+                    : 100}
+                  %)
+                </strong>
+              </div>
+
+              <div>
+                <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                  Total Ingresos del Mes
+                </span>
+                <strong className="mono" style={{ fontSize: "0.9rem", color: "#16a34a" }}>
+                  + {formatoQ(datos?.resumen?.totalIngresosMes ?? 0)}
+                </strong>
+              </div>
+
+              <div>
+                <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                  Total Egresos del Mes
+                </span>
+                <strong className="mono" style={{ fontSize: "0.9rem", color: "#dc2626" }}>
+                  − {formatoQ(datos?.resumen?.totalEgresosMes ?? 0)}
+                </strong>
+              </div>
+
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-                  gap: "0.45rem",
-                  marginBottom: "0.5rem",
-                  background: "var(--paper-raised)",
-                  padding: "0.4rem 0.6rem",
-                  borderRadius: "6px",
-                  border: "1px solid var(--line)",
-                  fontSize: "0.72rem",
+                  background: (datos?.resumen?.diasConDiferencia ?? 0) === 0 ? "rgba(22, 163, 74, 0.1)" : "rgba(220, 38, 38, 0.1)",
+                  padding: "2px 4px",
+                  borderRadius: "4px",
                 }}
               >
-                <div>
-                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
-                    Días Operados
-                  </span>
-                  <strong className="mono" style={{ fontSize: "0.9rem" }}>
-                    {datos.resumen.totalDiasOperados} días
-                  </strong>
-                </div>
-
-                <div>
-                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
-                    Efectividad de Cuadre
-                  </span>
-                  <strong className="mono" style={{ fontSize: "0.9rem", color: "#16a34a" }}>
-                    {datos.resumen.diasCuadrados} / {datos.resumen.totalDiasOperados} (
-                    {datos.resumen.totalDiasOperados > 0
-                      ? Math.round((datos.resumen.diasCuadrados / datos.resumen.totalDiasOperados) * 100)
-                      : 100}
-                    %)
-                  </strong>
-                </div>
-
-                <div>
-                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
-                    Total Ingresos del Mes
-                  </span>
-                  <strong className="mono" style={{ fontSize: "0.9rem", color: "#16a34a" }}>
-                    + {formatoQ(datos.resumen.totalIngresosMes)}
-                  </strong>
-                </div>
-
-                <div>
-                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
-                    Total Egresos del Mes
-                  </span>
-                  <strong className="mono" style={{ fontSize: "0.9rem", color: "#dc2626" }}>
-                    − {formatoQ(datos.resumen.totalEgresosMes)}
-                  </strong>
-                </div>
-
-                <div
+                <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
+                  Diferencia de Caja
+                </span>
+                <strong
+                  className="mono"
                   style={{
-                    background: datos.resumen.diasConDiferencia === 0 ? "rgba(22, 163, 74, 0.1)" : "rgba(220, 38, 38, 0.1)",
-                    padding: "2px 4px",
-                    borderRadius: "4px",
+                    fontSize: "0.9rem",
+                    color: (datos?.resumen?.diasConDiferencia ?? 0) === 0 ? "#16a34a" : "#dc2626",
                   }}
                 >
-                  <span style={{ color: "var(--ink-soft)", display: "block", fontSize: "0.65rem", textTransform: "uppercase" }}>
-                    Diferencia de Caja
-                  </span>
-                  <strong
-                    className="mono"
-                    style={{
-                      fontSize: "0.9rem",
-                      color: datos.resumen.diasConDiferencia === 0 ? "#16a34a" : "#dc2626",
-                    }}
-                  >
-                    {datos.resumen.diasConDiferencia === 0
-                      ? "Cuadrado (Q 0.00)"
-                      : `${datos.resumen.diasConDiferencia} día(s)`}
-                  </strong>
-                </div>
+                  {(datos?.resumen?.diasConDiferencia ?? 0) === 0
+                    ? "Cuadrado (Q 0.00)"
+                    : `${datos?.resumen?.diasConDiferencia} día(s)`}
+                </strong>
               </div>
+            </div>
 
-              {/* Sábana de Cierres Diarios */}
-              {datos.dias.length > 0 && (
-                <div className="table-wrap" style={{ border: "1px solid var(--line)" }}>
-                  <table style={{ fontSize: "0.75rem", width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr style={{ background: "var(--paper-raised)" }}>
-                        <th style={{ width: "70px", padding: "2px 4px" }}>Fecha</th>
-                        <th style={{ padding: "2px 4px" }}>Cajero / Operador</th>
-                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Saldo Inicial</th>
-                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Ingresos (+)</th>
-                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Egresos (−)</th>
-                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Saldo Libro</th>
-                        <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Contado</th>
-                        <th style={{ width: "75px", textAlign: "right", padding: "2px 4px" }}>Diferencia</th>
-                        <th style={{ width: "75px", textAlign: "center", padding: "2px 4px" }}>Resultado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {datos.dias.map((d) => {
-                        const dif = Number(d.diferencia || 0);
-                        const esperado = Number(d.saldo_final ?? d.saldo_inicial);
-                        const contado = Number(d.total_contado || esperado);
-                        return (
-                          <tr key={d.id}>
-                            <td className="mono" style={{ fontWeight: 600, padding: "2px 4px" }}>
-                              {new Date(d.fecha).toLocaleDateString("es-GT", {
-                                weekday: "short",
-                                day: "2-digit",
-                                month: "2-digit",
-                              })}
-                            </td>
-                            <td style={{ padding: "2px 4px" }}>
-                              {d.cerrado_por_nombre || d.abierto_por_nombre || nombreCajero}
-                            </td>
-                            <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
-                              {formatoQ(d.saldo_inicial)}
-                            </td>
-                            <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "2px 4px" }}>
-                              {formatoQ(d.total_ingresos)}
-                            </td>
-                            <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "2px 4px" }}>
-                              {formatoQ(d.total_egresos)}
-                            </td>
-                            <td className="mono" style={{ textAlign: "right", fontWeight: 700, padding: "2px 4px" }}>
-                              {formatoQ(esperado)}
-                            </td>
-                            <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
-                              {formatoQ(contado)}
-                            </td>
-                            <td
-                              className="mono"
+            {/* Sábana de Cierres Diarios */}
+            <div className="table-wrap" style={{ border: "1px solid var(--line)" }}>
+              <table style={{ fontSize: "0.74rem", width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "var(--paper-raised)" }}>
+                    <th style={{ width: "65px", padding: "2px 4px" }}>Fecha</th>
+                    <th style={{ padding: "2px 4px" }}>Cajero / Operador</th>
+                    <th style={{ width: "80px", textAlign: "right", padding: "2px 4px" }}>Saldo Inicial</th>
+                    <th style={{ width: "80px", textAlign: "right", padding: "2px 4px" }}>Ingresos (+)</th>
+                    <th style={{ width: "80px", textAlign: "right", padding: "2px 4px" }}>Egresos (−)</th>
+                    <th style={{ width: "80px", textAlign: "right", padding: "2px 4px" }}>Flujo Neto (±)</th>
+                    <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Saldo Libro</th>
+                    <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Contado</th>
+                    <th style={{ width: "70px", textAlign: "right", padding: "2px 4px" }}>Diferencia</th>
+                    <th style={{ width: "85px", textAlign: "center", padding: "2px 4px" }}>Resultado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {datos && datos.dias.length > 0 ? (
+                    datos.dias.map((d) => {
+                      const sIni = Number(d.saldo_inicial || 0);
+                      const ing = Number(d.total_ingresos || 0);
+                      const egr = Number(d.total_egresos || 0);
+                      const flujo = Number(d.flujo_neto ?? (ing - egr));
+                      const esperado = Number(d.saldo_esperado ?? (sIni + ing - egr));
+                      const contado = Number(d.total_contado ?? (d.estado === "CERRADO" ? (d.saldo_final ?? esperado) : esperado));
+                      const dif = Number(d.diferencia ?? (d.estado === "CERRADO" ? contado - esperado : 0));
+                      return (
+                        <tr key={d.id}>
+                          <td className="mono" style={{ fontWeight: 600, padding: "2px 4px" }}>
+                            {new Date(d.fecha).toLocaleDateString("es-GT", {
+                              weekday: "short",
+                              day: "2-digit",
+                              month: "2-digit",
+                            })}
+                          </td>
+                          <td style={{ padding: "2px 4px" }}>
+                            {d.cerrado_por_nombre || d.abierto_por_nombre || nombreCajero}
+                          </td>
+                          <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
+                            {formatoQ(sIni)}
+                          </td>
+                          <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "2px 4px" }}>
+                            {formatoQ(ing)}
+                          </td>
+                          <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "2px 4px" }}>
+                            {formatoQ(egr)}
+                          </td>
+                          <td
+                            className="mono"
+                            style={{
+                              textAlign: "right",
+                              fontWeight: 700,
+                              color: flujo >= 0 ? "#16a34a" : "#dc2626",
+                              padding: "2px 4px",
+                            }}
+                          >
+                            {flujo >= 0 ? `+${formatoQ(flujo)}` : `-${formatoQ(Math.abs(flujo))}`}
+                          </td>
+                          <td className="mono" style={{ textAlign: "right", fontWeight: 800, color: "var(--ink)", padding: "2px 4px" }}>
+                            {formatoQ(esperado)}
+                          </td>
+                          <td className="mono" style={{ textAlign: "right", padding: "2px 4px" }}>
+                            {formatoQ(contado)}
+                          </td>
+                          <td
+                            className="mono"
+                            style={{
+                              textAlign: "right",
+                              fontWeight: 700,
+                              color: dif === 0 ? "#16a34a" : dif > 0 ? "#2563eb" : "#dc2626",
+                              padding: "2px 4px",
+                            }}
+                          >
+                            {dif === 0 ? "Q 0.00" : dif > 0 ? `+${formatoQ(dif)}` : `-${formatoQ(Math.abs(dif))}`}
+                          </td>
+                          <td style={{ textAlign: "center", padding: "2px 4px" }}>
+                            <span
                               style={{
-                                textAlign: "right",
+                                color: d.estado === "ABIERTO" ? "#2563eb" : dif === 0 ? "#16a34a" : "#dc2626",
                                 fontWeight: 700,
-                                color: dif === 0 ? "#16a34a" : dif > 0 ? "#2563eb" : "#dc2626",
-                                padding: "2px 4px",
+                                fontSize: "0.72rem",
                               }}
                             >
-                              {dif === 0 ? "Q 0.00" : dif > 0 ? `+${formatoQ(dif)}` : `-${formatoQ(Math.abs(dif))}`}
-                            </td>
-                            <td style={{ textAlign: "center", padding: "2px 4px" }}>
-                              <span
-                                style={{
-                                  color: dif === 0 ? "#16a34a" : "#dc2626",
-                                  fontWeight: 700,
-                                  fontSize: "0.72rem",
-                                }}
-                              >
-                                {dif === 0 ? "✓ Cuadrado" : dif > 0 ? "Sobrante" : "Faltante"}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr style={{ background: "rgba(0,0,0,0.04)", fontWeight: 800, borderTop: "2px solid #0f172a" }}>
-                        <td colSpan={2} style={{ padding: "3px 4px" }}>
-                          TOTALES DEL MES:
-                        </td>
-                        <td style={{ padding: "3px 4px" }}>—</td>
-                        <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "3px 4px" }}>
-                          {formatoQ(datos.resumen.totalIngresosMes)}
-                        </td>
-                        <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "3px 4px" }}>
-                          {formatoQ(datos.resumen.totalEgresosMes)}
-                        </td>
-                        <td colSpan={2} style={{ padding: "3px 4px" }}></td>
-                        <td
-                          className="mono"
-                          style={{
-                            textAlign: "right",
-                            color: datos.resumen.diasConDiferencia === 0 ? "#16a34a" : "#dc2626",
-                            padding: "3px 4px",
-                          }}
-                        >
-                          {datos.resumen.diasConDiferencia === 0
-                            ? "Q 0.00"
-                            : datos.resumen.totalSobrante > 0
-                            ? `+${formatoQ(datos.resumen.totalSobrante)}`
-                            : `-${formatoQ(datos.resumen.totalFaltante)}`}
-                        </td>
-                        <td style={{ textAlign: "center", padding: "3px 4px" }}>
-                          {datos.resumen.diasConDiferencia === 0 ? "✓ CONFORME" : "REVISADO"}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              )}
+                              {d.estado === "ABIERTO" ? "⏳ En Turno" : dif === 0 ? "✓ Cuadrado" : dif > 0 ? "Sobrante" : "Faltante"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={10} style={{ textAlign: "center", padding: "14px 8px", color: "var(--ink-soft)", fontStyle: "italic" }}>
+                        Sin movimientos de caja registrados en este período mensual (0 operaciones registradas)
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: "rgba(0,0,0,0.04)", fontWeight: 800, borderTop: "2px solid #0f172a" }}>
+                    <td colSpan={2} style={{ padding: "3px 4px" }}>
+                      TOTALES DEL MES:
+                    </td>
+                    <td style={{ padding: "3px 4px" }}>—</td>
+                    <td className="mono" style={{ textAlign: "right", color: "#16a34a", padding: "3px 4px" }}>
+                      {formatoQ(datos?.resumen?.totalIngresosMes ?? 0)}
+                    </td>
+                    <td className="mono" style={{ textAlign: "right", color: "#dc2626", padding: "3px 4px" }}>
+                      {formatoQ(datos?.resumen?.totalEgresosMes ?? 0)}
+                    </td>
+                    <td
+                      className="mono"
+                      style={{
+                        textAlign: "right",
+                        color: (datos?.resumen ? (datos.resumen.totalIngresosMes - datos.resumen.totalEgresosMes) : 0) >= 0 ? "#16a34a" : "#dc2626",
+                        padding: "3px 4px",
+                      }}
+                    >
+                      {datos?.resumen && (datos.resumen.totalIngresosMes - datos.resumen.totalEgresosMes) >= 0
+                        ? `+${formatoQ(datos.resumen.totalIngresosMes - datos.resumen.totalEgresosMes)}`
+                        : `-${formatoQ(Math.abs((datos?.resumen?.totalIngresosMes ?? 0) - (datos?.resumen?.totalEgresosMes ?? 0)))}`}
+                    </td>
+                    <td colSpan={2} style={{ padding: "3px 4px" }}></td>
+                    <td
+                      className="mono"
+                      style={{
+                        textAlign: "right",
+                        color: (datos?.resumen?.diasConDiferencia ?? 0) === 0 ? "#16a34a" : "#dc2626",
+                        padding: "3px 4px",
+                      }}
+                    >
+                      {(datos?.resumen?.diasConDiferencia ?? 0) === 0
+                        ? "Q 0.00"
+                        : (datos?.resumen?.totalSobrante ?? 0) > 0
+                        ? `+${formatoQ(datos?.resumen?.totalSobrante ?? 0)}`
+                        : `-${formatoQ(datos?.resumen?.totalFaltante ?? 0)}`}
+                    </td>
+                    <td style={{ textAlign: "center", padding: "3px 4px" }}>
+                      {(datos?.resumen?.diasConDiferencia ?? 0) === 0 ? "✓ CONFORME" : "REVISADO"}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
+          </div>
 
             {/* PUNTO TERCERO */}
             <div style={{ marginTop: "0.6rem", marginBottom: "0.6rem", textAlign: "justify" }}>
@@ -7340,7 +10768,6 @@ export default function LibroArqueoMensual() {
               </div>
             </div>
           </div>
-        )}
       </div>
     </div>
   );

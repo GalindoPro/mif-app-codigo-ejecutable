@@ -205,12 +205,22 @@ async function ejecutar() {
     const socioPrestamoIdMap = new Map<string, { prestamoId: string; saldoCapital: number }>();
     let correlativoCredito = 1;
 
+    // Preparar batch de prestamos
+    const bPrestamoIds: string[] = [];
+    const bPrestamoCodigos: string[] = [];
+    const bPrestamoSocioIds: string[] = [];
+    const bPrestamoAgenciaIds: string[] = [];
+    const bPrestamoPromotorIds: string[] = [];
+    const bPrestamoMontos: number[] = [];
+    const bPrestamoCuotas: number[] = [];
+    const bPrestamoSaldos: number[] = [];
+
     for (const [nombre, datos] of sociosPrestamos.entries()) {
       let socioInfo = buscarSocio(nombre);
       let socioId: string;
 
       if (!socioInfo) {
-        // Crear socio si no existiera
+        // Crear socio si no existiera (casos raros — query individual necesario)
         const resMax = await cliente.query(
           "select numero_asociado from socios where numero_asociado like 'CHAJ-%' order by numero_asociado desc limit 1"
         );
@@ -241,110 +251,163 @@ async function ejecutar() {
       const codigoCredito = `CHAJ-CR-${String(correlativoCredito++).padStart(4, "0")}`;
       const cuotaMensual = Math.round((datos.totalAbonos + datos.totalInteres) / Math.max(1, datos.cuotasCount));
 
-      await cliente.query(
-        `insert into prestamos (
-          id, codigo, socio_id, agencia_id, promotor_id, tipo, estado,
-          tipo_amortizacion, monto_solicitado, monto_aprobado, tasa_interes_mensual,
-          plazo_meses, cuota_mensual, destino, observaciones, fecha_solicitud,
-          fecha_aprobacion, fecha_desembolso, saldo_capital, es_migracion, origen_fondos
-        ) values ($1, $2, $3, $4, $5, 'FIDUCIARIO', 'DESEMBOLSADO',
-          'CUOTA_NIVELADA', $6, $6, 2.00, 12, $7, 'Capital de Trabajo y Comercio',
-          'Crédito oficial migrado del libro de Ingresos COMIF 2026', '2026-01-15',
-          '2026-01-20', '2026-01-25', $8, true, 'FONDOS_PROPIOS')`,
-        [
-          prestamoId,
-          codigoCredito,
-          socioId,
-          agenciaId,
-          adminId,
-          montoAprobado,
-          cuotaMensual,
-          saldoInicial
-        ]
-      );
+      bPrestamoIds.push(prestamoId);
+      bPrestamoCodigos.push(codigoCredito);
+      bPrestamoSocioIds.push(socioId);
+      bPrestamoAgenciaIds.push(agenciaId);
+      bPrestamoPromotorIds.push(adminId);
+      bPrestamoMontos.push(montoAprobado);
+      bPrestamoCuotas.push(cuotaMensual);
+      bPrestamoSaldos.push(saldoInicial);
 
       socioPrestamoIdMap.set(nombre, { prestamoId, saldoCapital: saldoInicial });
     }
-    console.log(`   ✓ ${correlativoCredito - 1} créditos registrados en cartera.`);
 
-    // 5. Registrar Historial de Pagos de Créditos en prestamo_pagos
-    console.log("\n4. Registrando cobros de cartera en historial de pagos (prestamo_pagos)...");
-    // Ordenar cronológicamente
+    // Batch insert de prestamos
+    await cliente.query(
+      `insert into prestamos (
+        id, codigo, socio_id, agencia_id, promotor_id, tipo, estado,
+        tipo_amortizacion, monto_solicitado, monto_aprobado, tasa_interes_mensual,
+        plazo_meses, cuota_mensual, destino, observaciones, fecha_solicitud,
+        fecha_aprobacion, fecha_desembolso, saldo_capital, es_migracion
+      )
+      select
+        unnest($1::uuid[]), unnest($2::text[]), unnest($3::uuid[]),
+        unnest($4::uuid[]), unnest($5::uuid[]),
+        'FIDUCIARIO'::tipo_prestamo, 'DESEMBOLSADO'::estado_prestamo,
+        'CUOTA_NIVELADA'::tipo_amortizacion,
+        unnest($6::numeric[]), unnest($6::numeric[]), 2.00, 12,
+        unnest($7::numeric[]),
+        'Capital de Trabajo y Comercio',
+        'Crédito oficial migrado del libro de Ingresos COMIF 2026',
+        '2026-01-15'::date, '2026-01-20'::date, '2026-01-25'::date,
+        unnest($8::numeric[]), true`,
+      [bPrestamoIds, bPrestamoCodigos, bPrestamoSocioIds, bPrestamoAgenciaIds, bPrestamoPromotorIds, bPrestamoMontos, bPrestamoCuotas, bPrestamoSaldos]
+    );
+    console.log(`   ✓ ${correlativoCredito - 1} créditos registrados en cartera (batch).`);
+
+
+    // 5. Registrar Historial de Pagos de Créditos en prestamo_pagos — Batch
+    console.log("\n4. Registrando cobros de cartera en historial de pagos (prestamo_pagos) — batch...");
     const pagosOrdenados = Array.from(pagosCreditoMap.values()).sort((a, b) => a.fecha.localeCompare(b.fecha));
     let totalAbonoCap = 0;
     let totalInteresCob = 0;
     let totalMoraCob = 0;
 
+    // Calcular saldos progresivos primero
+    const bPagoIds: string[] = [];
+    const bPagoPrestamoIds: string[] = [];
+    const bPagoSocioIds: string[] = [];
+    const bPagoAgenciaIds: string[] = [];
+    const bPagoFechas: string[] = [];
+    const bPagoRecibos: string[] = [];
+    const bPagoAbonosCap: number[] = [];
+    const bPagoIntereses: number[] = [];
+    const bPagoMoras: number[] = [];
+    const bPagoTotales: number[] = [];
+    const bPagoSaldosRes: number[] = [];
+    const bPagoUsuarioIds: string[] = [];
+
+    // Track final saldo per prestamo for the update
+    const finalSaldoMap = new Map<string, number>();
+
     for (const p of pagosOrdenados) {
       const prestamoInfo = socioPrestamoIdMap.get(p.nombreNorm);
       if (!prestamoInfo) continue;
+      const socioInfo = buscarSocio(p.nombreNorm);
+      if (!socioInfo) continue;
 
-      const socioInfo = buscarSocio(p.nombreNorm)!;
       prestamoInfo.saldoCapital = Math.max(0, prestamoInfo.saldoCapital - p.abonoCapital);
       const totalPagado = p.abonoCapital + p.interes + p.mora;
 
-      await cliente.query(
-        `insert into prestamo_pagos (
-          id, prestamo_id, socio_id, agencia_id, fecha, numero_recibo,
-          abono_capital, interes, mora, total_pagado, saldo_capital_restante,
-          origen_fondos, usuario_id
-        ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'FONDOS_PROPIOS', $12)`,
-        [
-          randomUUID(),
-          prestamoInfo.prestamoId,
-          socioInfo.id,
-          agenciaId,
-          p.fecha,
-          p.docNo,
-          p.abonoCapital,
-          p.interes,
-          p.mora,
-          totalPagado,
-          prestamoInfo.saldoCapital,
-          adminId
-        ]
-      );
+      bPagoIds.push(randomUUID());
+      bPagoPrestamoIds.push(prestamoInfo.prestamoId);
+      bPagoSocioIds.push(socioInfo.id);
+      bPagoAgenciaIds.push(agenciaId);
+      bPagoFechas.push(p.fecha);
+      bPagoRecibos.push(p.docNo);
+      bPagoAbonosCap.push(p.abonoCapital);
+      bPagoIntereses.push(p.interes);
+      bPagoMoras.push(p.mora);
+      bPagoTotales.push(totalPagado);
+      bPagoSaldosRes.push(prestamoInfo.saldoCapital);
+      bPagoUsuarioIds.push(adminId);
 
-      // Actualizar saldo capital actual en la tabla prestamos
-      await cliente.query(
-        `update prestamos set saldo_capital = $1 where id = $2`,
-        [prestamoInfo.saldoCapital, prestamoInfo.prestamoId]
-      );
+      finalSaldoMap.set(prestamoInfo.prestamoId, prestamoInfo.saldoCapital);
 
       totalAbonoCap += p.abonoCapital;
       totalInteresCob += p.interes;
       totalMoraCob += p.mora;
     }
-    console.log(`   ✓ ${pagosOrdenados.length} recibos de pago registrados en prestamo_pagos.`);
+
+    // Batch insert prestamo_pagos
+    if (bPagoIds.length > 0) {
+      await cliente.query(
+        `insert into prestamo_pagos (
+          id, prestamo_id, socio_id, agencia_id, fecha, numero_recibo,
+          abono_capital, interes, mora, total_pagado, saldo_capital_restante, usuario_id
+        )
+        select
+          unnest($1::uuid[]), unnest($2::uuid[]), unnest($3::uuid[]),
+          unnest($4::uuid[]), unnest($5::date[]), unnest($6::text[]),
+          unnest($7::numeric[]), unnest($8::numeric[]), unnest($9::numeric[]),
+          unnest($10::numeric[]), unnest($11::numeric[]), unnest($12::uuid[])`,
+        [bPagoIds, bPagoPrestamoIds, bPagoSocioIds, bPagoAgenciaIds, bPagoFechas,
+         bPagoRecibos, bPagoAbonosCap, bPagoIntereses, bPagoMoras,
+         bPagoTotales, bPagoSaldosRes, bPagoUsuarioIds]
+      );
+    }
+
+    // Batch update saldo_capital en prestamos (una query por cada préstamo con saldo final)
+    for (const [prestamoId, saldoFinal] of finalSaldoMap.entries()) {
+      await cliente.query(`update prestamos set saldo_capital = $1 where id = $2`, [saldoFinal, prestamoId]);
+    }
+
+    console.log(`   ✓ ${pagosOrdenados.length} recibos de pago registrados en prestamo_pagos (batch).`);
     console.log(`     ↳ Abono Capital : Q ${totalAbonoCap.toFixed(2)}`);
     console.log(`     ↳ Intereses     : Q ${totalInteresCob.toFixed(2)}`);
     console.log(`     ↳ Mora          : Q ${totalMoraCob.toFixed(2)}`);
 
-    // 6. Registrar las 514 Partidas en ingresos_comif
-    console.log("\n5. Insertando partidas oficiales en el libro diario ingresos_comif...");
-    for (const part of todasPartidas) {
-      const socioInfo = buscarSocio(part.nombreNorm);
-      const socioId = socioInfo ? socioInfo.id : null;
+    // 6. Registrar las 514 Partidas en ingresos_comif — Batch Insert con unnest
+    console.log("\n5. Insertando partidas oficiales en el libro diario ingresos_comif (batch)...");
+    {
+      const ids: string[] = [];
+      const agenciaIds: string[] = [];
+      const fechas: string[] = [];
+      const docs: string[] = [];
+      const nombres: string[] = [];
+      const categorias: string[] = [];
+      const montos: number[] = [];
+      const socioIds: (string | null)[] = [];
+      const usuarioIds: string[] = [];
+
+      for (const part of todasPartidas) {
+        const socioInfo = buscarSocio(part.nombreNorm);
+        ids.push(randomUUID());
+        agenciaIds.push(agenciaId);
+        fechas.push(part.fecha);
+        docs.push(part.docNo);
+        nombres.push(part.nombreNorm);
+        categorias.push(part.categoria);
+        montos.push(part.monto);
+        socioIds.push(socioInfo ? socioInfo.id : null);
+        usuarioIds.push(adminId);
+      }
 
       await cliente.query(
         `insert into ingresos_comif (
           id, agencia_id, fecha, numero_documento, nombre_socio,
-          categoria, monto, socio_id, usuario_id, origen_fondos
-        ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'FONDOS_PROPIOS')`,
-        [
-          randomUUID(),
-          agenciaId,
-          part.fecha,
-          part.docNo,
-          part.nombreNorm,
-          part.categoria,
-          part.monto,
-          socioId,
-          adminId
-        ]
+          categoria, monto, socio_id, usuario_id
+        )
+        select
+          unnest($1::uuid[]), unnest($2::uuid[]), unnest($3::date[]),
+          unnest($4::text[]), unnest($5::text[]),
+          unnest($6::categoria_ingreso_comif[]), unnest($7::numeric[]),
+          unnest($8::text[])::uuid, unnest($9::uuid[])`,
+        [ids, agenciaIds, fechas, docs, nombres, categorias, montos, socioIds, usuarioIds]
       );
+      console.log(`   ✓ ${todasPartidas.length} partidas contables insertadas exitosamente (batch).`);
     }
-    console.log(`   ✓ ${todasPartidas.length} partidas contables insertadas exitosamente.`);
 
     // Confirmar Transacción
     await cliente.query("COMMIT");

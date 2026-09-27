@@ -49,6 +49,7 @@ type SocioConCuentas = Socio & { cuentas: Cuenta[]; prestamos: PrestamoBrief[] }
 
 const TIPO_CUENTA_LABEL: Record<string, string> = {
   APORTACION: "Aportación Estatutaria",
+  APORTACION_INFANTIL: "Aportación Infanto Juvenil",
   AHORRO_CORRIENTE: "Ahorro Corriente",
   AHORRO_PROGRAMADO: "Ahorro Programado",
   AHORRO_INFANTO_JUVENIL: "Ahorro Infanto Juvenil",
@@ -58,6 +59,7 @@ const TIPO_CUENTA_LABEL: Record<string, string> = {
 
 const TIPO_SLUG: Record<string, string> = {
   APORTACION: "aportacion",
+  APORTACION_INFANTIL: "aportacion-infantil",
   AHORRO_CORRIENTE: "corriente",
   AHORRO_PROGRAMADO: "programado",
   AHORRO_INFANTO_JUVENIL: "infanto-juvenil",
@@ -391,7 +393,7 @@ export default function SocioDetail() {
   if (error && !socio) return <div className="alert error">{error}</div>;
   if (!socio) return <p>Cargando…</p>;
 
-  const cuentaAportacion = socio.cuentas.find((c) => c.tipo === "APORTACION");
+  const cuentaAportacion = socio.cuentas.find((c) => c.tipo === "APORTACION" || c.tipo === "APORTACION_INFANTIL");
   const tieneAportacion = Boolean(cuentaAportacion);
   const saldoAportacion = cuentaAportacion ? Number(cuentaAportacion.saldo_actual) : 0;
   const tieneAportacionMinima = saldoAportacion >= 100;

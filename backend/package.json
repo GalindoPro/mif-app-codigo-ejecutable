@@ -16,6 +16,7 @@
     "db:importar:plazo-fijo": "tsx src/db/importar-plazo-fijo.ts",
     "db:importar:programado-infantil": "tsx src/db/importar-programado-infantil.ts",
     "db:importar:ingresos-creditos": "tsx src/db/importar-ingresos-creditos.ts",
+    "db:importar:caja-chica": "tsx src/db/importar-caja-chica.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

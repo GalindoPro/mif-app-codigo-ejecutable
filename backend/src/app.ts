@@ -17,6 +17,9 @@ import { auditoriaRouter } from "./modules/auditoria/routes";
 import { alertasRouter } from "./modules/alertas/routes";
 import { sesionesRouter } from "./modules/sesiones/routes";
 import { cobrosCampoRouter } from "./modules/cobroscampo/routes";
+import trasladosRouter from "./modules/traslados/routes";
+import consolidadoFinancieroRouter from "./modules/consolidadofinanciero/routes";
+
 
 export const app = express();
 
@@ -60,6 +63,9 @@ app.use("/api/auditoria", auditoriaRouter);
 app.use("/api/alertas", alertasRouter);
 app.use("/api/sesiones", sesionesRouter);
 app.use("/api/cobros-campo", cobrosCampoRouter);
+app.use("/api/traslados", trasladosRouter);
+app.use("/api/consolidado-financiero", consolidadoFinancieroRouter);
+
 
 app.use((_req, res) => res.status(404).json({ error: "Ruta no encontrada" }));
 app.use(errorHandler);

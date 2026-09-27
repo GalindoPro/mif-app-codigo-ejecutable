@@ -261,6 +261,7 @@ export default function Layout() {
             <NavItem to="/alertas"   icon="🔔" label="Panel de Alertas"      onClick={closeSidebar} />
             <NavItem to="/usuarios"  icon="👤" label="Usuarios"              onClick={closeSidebar} />
             <NavItem to="/agencias"  icon="🏢" label="Agencias"              onClick={closeSidebar} />
+            <NavItem to="/traslados" icon="🔀" label="Traslados Inter-Agencia" onClick={closeSidebar} />
             <NavItem to="/auditoria" icon="🔍" label="Bitácora de Auditoría" onClick={closeSidebar} />
             <NavItem to="/sesiones"  icon="🛡️" label="Sesiones Activas"      onClick={closeSidebar} />
           </>)}
