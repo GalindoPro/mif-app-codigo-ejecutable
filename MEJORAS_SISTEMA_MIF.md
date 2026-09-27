@@ -4,6 +4,44 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
 
 ---
 
+## 80. Fase 4: Importación Oficial de Ahorro Programado, Ahorro Infanto-Juvenil y Aportaciones Infantiles, Cuadre al Centavo (Q 4,700.00), Detección de Conflicto de CUI Duplicado y Registro de Tutores Legales
+
+**Objetivo y Reglas de Negocio:**
+1. **Migración Completa de Productos de Captación Especial:**
+   - **Ahorro Programado:** Extracción de movimientos de `importar/ahorro programado/AHORRO PROGRAMADO 30-08-26.xlsx`. Socia titular Rosy Maricelda Calel Imul (`CHAJ-00054`), libreta física `2-214-7-1`, código estructurado `CHAJ-AHP-00001`, cuota pactada Q1,000.00. 4 depósitos cronológicos registrados con número de recibo oficial (Mayo: Rec. 2876, Junio: Rec. 3053, Julio: Rec. 3243, Agosto: Rec. 3427). Saldo: **Q 4,000.00**.
+   - **Ahorro Infanto-Juvenil:** Extracción de `importar/ahorro infanto juvenil/AHORRO INFANTO JUVENIL 31-07-26.xlsx`. Cuentas creadas con código estructurado `CHAJ-AHI-00001` y `CHAJ-AHI-00002`:
+     * Ana Betzaida Ramírez Asicona: libreta `221-8-1`, depósito Q 200.00 (Rec. 2742, 2026-04-07).
+     * Yeiko Gaspar Ijom Canay: libreta `2-138-8-1`, depósito Q 300.00 (Rec. 2536, 2026-02-28).
+     * Total Ahorro Infanto-Juvenil: **Q 500.00**.
+   - **Aportaciones Infantiles:** Extracción de `importar/aportaciones infantil/APORTACIONES INFANTO JUVENIL 31-08-26.xlsx`.
+     * Ana Betzaida Ramírez Asicona: libreta `221-4-1`, código `CHAJ-API-00001`, aportación inicial Q 100.00 (Rec. 2747, 2026-04-08).
+     * Yeiko Gaspar Ijom Canay: libreta `2-138-4-1`, código `CHAJ-API-00002`, aportación inicial histórica Q 100.00 (fecha 2025-12-31 para membresía estatutaria).
+     * Total Aportaciones Infantiles: **Q 200.00**.
+2. **Detección Inteligente de Conflicto de CUI Duplicado en Excel:**
+   - Detección de error de plantilla en el archivo original: la fila de la menor Ana Betzaida Ramírez Asicona traía duplicado el CUI/DPI `1780 18988 1405`, perteneciente al socio fundador adulto Juan Mateo Raymundo (`CHAJ-00001`).
+   - El sistema evitó la fusión indebida de identidades, registrando a la menor con su expediente legal independiente (`CHAJ-00692`) y emitiendo una alerta de auditoría visible en su ficha: `"⚠️ Conflicto detectado en Excel: El CUI '1780 18988 1405' coincide con el DPI del socio adulto Juan Mateo Raymundo (CHAJ-00001). Probable error tipográfico/copiado de plantilla en archivo original. Solicitar certificación de nacimiento en ventanilla."`
+3. **Gestión Jurídica de Menores y Tutores Legales:**
+   - Registro de madre y tutora legal de la menor: Ana Escobar Rivera (DPI: `1797 50615 1405`, Teléfono: `4901-3788`).
+   - En Yeiko Gaspar Ijom Canay (`CHAJ-00691`), registro con advertencia operativa para solicitar CUI/certificación de nacimiento en ventanilla en su siguiente visita.
+   - Nuevo panel visual interactivo en `SocioDetail.tsx` desplegando la tarjeta morada institucional: `🧒 Tutor(a) Legal / Representante` con parentesco, DPI formateado y enlace directo a WhatsApp.
+4. **Formato Dual y Tipología Extendida de Cuentas:**
+   - Adición del tipo de cuenta `APORTACION_INFANTIL` en base de datos PostgreSQL, backend (`TipoCuentaAhorro`) y catálogo de productos (`TIPOS_AHORRO`) con slug `/ahorros/aportacion-infantil`.
+   - Visualización unificada arriba con libreta física y abajo con código institucional mediante `DualCuentaBadge`.
+5. **Cuadre Contable Exacto al Centavo:**
+   - Ahorro Programado: Q 4,000.00
+   - Ahorro Infanto-Juvenil: Q 500.00
+   - Aportaciones Infantiles: Q 200.00
+   - **Total Captado en Fase 4:** **Q 4,700.00** (Esperado: Q 4,700.00, Diferencia: **Q 0.00** exacta).
+
+**Archivos modificados/creados:**
+- `backend/src/db/importar-programado-infantil.ts`
+- `backend/src/modules/cuentas/service.ts`
+- `frontend/src/types.ts`
+- `frontend/src/pages/SocioDetail.tsx`
+- `backend/package.json`
+
+---
+
 ## 79. Fase 3: Importación Oficial de Depósito a Plazo Fijo (2018-2026), Cuadre al Centavo (Q 20,269,666.22), Formato Dual y 418 Nuevos Socios Inversores
 
 **Objetivo y Reglas de Negocio:**

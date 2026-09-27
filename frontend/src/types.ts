@@ -34,6 +34,11 @@ export interface Socio {
   telefono_beneficiario?: string | null;
   parentesco_beneficiario?: string | null;
   advertencia_importacion?: string | null;
+  es_menor?: boolean;
+  tutor_nombre?: string | null;
+  tutor_dpi?: string | null;
+  tutor_parentesco?: string | null;
+  tutor_telefono?: string | null;
   total_cuentas?: number;
   created_at: string;
 }
@@ -103,7 +108,8 @@ export type TipoCuentaAhorro =
   | "AHORRO_INFANTO_JUVENIL"
   | "AHORRO_SOBRE_PRESTAMO"
   | "AHORRO_PLAZO_FIJO"
-  | "APORTACION";
+  | "APORTACION"
+  | "APORTACION_INFANTIL";
 
 export interface Cuenta {
   id: string;
@@ -192,6 +198,12 @@ export const TIPOS_AHORRO: AhorroTipoConfig[] = [
     slug: "aportacion",
     titulo: "Aportación Estatutaria",
     descripcion: "Capital social institucional del asociado.",
+  },
+  {
+    tipo: "APORTACION_INFANTIL",
+    slug: "aportacion-infantil",
+    titulo: "Aportación Infanto Juvenil",
+    descripcion: "Aportación estatutaria inicial para niñas, niños y jóvenes asociados.",
   },
 ];
 

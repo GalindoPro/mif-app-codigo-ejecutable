@@ -55,7 +55,17 @@ Este documento registra el **avance real y completo** del sistema de la COOPERAT
        * **Saldo Neto Operativo 2026:** **Q 2,272,070.69** (Diferencia: **Q 0.00**).
        * **Saldo Total Consolidado en Sistema:** Q 2,680,939.53.
 
-5. **Ahorro a Plazo Fijo — Kardex PF (`/ahorros/plazo-fijo`):**
+5. **Ahorro Programado, Ahorro Infanto-Juvenil y Aportaciones Infantiles (`/ahorros/programado`, `/ahorros/infanto-juvenil`, `/ahorros/aportacion-infantil`):**
+   - **Importación Oficial y Cuadre Matemático Exacto (Fase 4):**
+     - Basado en los libros oficiales de `importar/ahorro programado/`, `importar/ahorro infanto juvenil/` y `importar/aportaciones infantil/`.
+     - **Ahorro Programado:** Socia Rosy Maricelda Calel Imul (`CHAJ-00054`), libreta física `2-214-7-1` (`CHAJ-AHP-00001`), cuota pactada Q1,000.00. 4 depósitos cronológicos (Mayo a Agosto 2026). Saldo exacto: **Q 4,000.00**.
+     - **Ahorro Infanto-Juvenil:** Cuentas oficiales para Ana Betzaida Ramírez Asicona (libreta `221-8-1` / `CHAJ-AHI-00001`, Q200.00) y Yeiko Gaspar Ijom Canay (libreta `2-138-8-1` / `CHAJ-AHI-00002`, Q300.00). Saldo exacto: **Q 500.00**.
+     - **Aportaciones Infantiles:** Cuentas estatutarias para Ana Betzaida Ramírez Asicona (libreta `221-4-1` / `CHAJ-API-00001`, Q100.00) y Yeiko Gaspar Ijom Canay (libreta `2-138-4-1` / `CHAJ-API-00002`, Q100.00 histórico pre-2026). Saldo exacto: **Q 200.00**.
+     - **Detección de Error de Plantilla en Excel:** Identificación de CUI duplicado en Excel para Ana Betzaida (copiado del DPI del socio Juan Mateo Raymundo `CHAJ-00001`), separando a la menor como socia independiente (`CHAJ-00692`) y emitiendo alerta de auditoría.
+     - **Gestión de Tutores Legales:** Vinculación de Ana Escobar Rivera (DPI: `1797 50615 1405`, Tel: `4901-3788`) como representante legal de la menor con tarjeta morada en expediente.
+     - **Total Captado Fase 4:** **Q 4,700.00** (Diferencia: **Q 0.00** exacta al centavo).
+
+6. **Ahorro a Plazo Fijo — Kardex PF (`/ahorros/plazo-fijo`):**
    - **Importación Oficial y Cuadre Matemático Exacto (Fase 3):**
      - Basado en el libro oficial `importar/deposito a plazo fijo/KARDEX AHORRO PF 2026-08.xlsx` (histórico integral 2018 a 2026).
      - 695 certificados válidos importados (47 filas de `ANULADO` descartadas y resolución de duplicado No. 213 como `213-R`).

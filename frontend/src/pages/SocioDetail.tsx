@@ -1129,6 +1129,31 @@ export default function SocioDetail() {
                   </div>
                 )}
               </div>
+
+              {/* Fila 6: Tutor(a) Legal si el asociado es menor de edad */}
+              {socio.es_menor && (
+                <div style={{ background: "rgba(124, 58, 237, 0.05)", padding: "0.65rem 0.8rem", borderRadius: "8px", border: "1px solid rgba(124, 58, 237, 0.25)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "0.72rem", color: "#7c3aed", fontWeight: 700, textTransform: "uppercase" }}>
+                      🧒 Tutor(a) Legal / Representante
+                    </span>
+                    {socio.tutor_parentesco && (
+                      <span style={{ fontSize: "0.72rem", fontWeight: 700, padding: "0.1rem 0.45rem", borderRadius: "4px", background: "rgba(124, 58, 237, 0.15)", color: "#7c3aed" }}>
+                        {socio.tutor_parentesco}
+                      </span>
+                    )}
+                  </div>
+                  <strong style={{ fontSize: "0.9rem", color: "var(--ink)", display: "block", marginTop: "3px" }}>
+                    {socio.tutor_nombre ?? "Pendiente de asignar tutor en ventanilla"}
+                  </strong>
+                  {(socio.tutor_dpi || socio.tutor_telefono) && (
+                    <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", marginTop: "0.25rem" }}>
+                      {socio.tutor_dpi ? `DPI: ${formatearDPI(socio.tutor_dpi)} ` : ""}
+                      {socio.tutor_telefono ? `· Tel: ${socio.tutor_telefono}` : ""}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

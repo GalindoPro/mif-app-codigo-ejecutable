@@ -38,6 +38,7 @@ Código real y completo del backend (API en Node.js + TypeScript + PostgreSQL), 
 - [`backend/src/utils/dpiGuatemala.ts`](#backendsrcutilsdpiguatemalats)
 - [`backend/src/db/importar-ahorro-corriente.ts`](#backendsrcdbimportarahorrocorrientets)
 - [`backend/src/db/importar-plazo-fijo.ts`](#backendsrcdbimportarplazofijots)
+- [`backend/src/db/importar-programado-infantil.ts`](#backendsrcdbimportarprogramadoinfantilts)
 - [`backend/db/schema.sql`](#backenddbschemasql)
 - [`backend/db/schema.supabase.sql`](#backenddbschemasupabasesql)
 
@@ -4596,6 +4597,22 @@ interface RawPFRow {
 }
 // ... Ver implementación completa optimizada con batch inserts en backend/src/db/importar-plazo-fijo.ts
 ```
+
+## `backend/src/db/importar-programado-infantil.ts` {#backendsrcdbimportarprogramadoinfantilts}
+
+```ts
+import "dotenv/config";
+import { pool } from "./pool";
+import { randomUUID } from "crypto";
+
+/**
+ * Script Oficial de Importación — Fase 4: Ahorro Programado, Ahorro Infanto-Juvenil y Aportaciones Infantiles
+ * Cuadre Contable Exacto: Q 4,700.00 (Diferencia: Q0.00)
+ */
+
+// ... Ver implementación completa en backend/src/db/importar-programado-infantil.ts
+```
+
 
 
 ## `backend/db/schema.sql` {#backenddbschemasql}

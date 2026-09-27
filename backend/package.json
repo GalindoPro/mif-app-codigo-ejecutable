@@ -14,6 +14,8 @@
     "db:importar:aportaciones": "tsx src/db/importar-aportaciones.ts",
     "db:importar:ahorro-corriente": "tsx src/db/importar-ahorro-corriente.ts",
     "db:importar:plazo-fijo": "tsx src/db/importar-plazo-fijo.ts",
+    "db:importar:programado-infantil": "tsx src/db/importar-programado-infantil.ts",
+    "db:importar:ingresos-creditos": "tsx src/db/importar-ingresos-creditos.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -13,6 +13,7 @@ const PREFIJO_TIPO: Record<string, string> = {
   AHORRO_SOBRE_PRESTAMO: "ASP",
   AHORRO_PLAZO_FIJO: "PF",
   APORTACION: "APORT",
+  APORTACION_INFANTIL: "API",
 };
 
 export type TipoCuentaAhorro =
@@ -21,7 +22,8 @@ export type TipoCuentaAhorro =
   | "AHORRO_INFANTO_JUVENIL"
   | "AHORRO_SOBRE_PRESTAMO"
   | "AHORRO_PLAZO_FIJO"
-  | "APORTACION";
+  | "APORTACION"
+  | "APORTACION_INFANTIL";
 
 export async function listar(params: {
   tipo: TipoCuentaAhorro;
