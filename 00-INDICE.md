@@ -15,15 +15,17 @@ Este documento registra el **avance real y completo** del sistema de la COOPERAT
    - Base de datos conectada localmente a PostgreSQL 18 (`mif_dev`, usuario `galindo`).
 
 2. **Módulo de Socios y Padrón de Aportaciones (`/socios` y `/aportaciones`):**
-   - Basado en el libro oficial `caja/APORTACIONES 31-08-26.xlsx`.
-   - **Campos del asociado:** Nombres, DPI, Género (`M`/`F`), Dirección y Teléfono (el campo Edad fue eliminado globalmente a favor de utilizar la fecha de nacimiento extraída del DPI en el futuro).
-   - **Datos de la persona beneficiaria:** Nombre completo, Parentesco, DPI/CUI y Teléfono.
-   - **Reglas Globales de Unicidad:** Bloqueo cruzado estricto donde el DPI/CUI o teléfono de un asociado no puede repetirse en ningún otro asociado ni beneficiario, con auto-restricción para evitar que el asociado sea su propio beneficiario.
-   - **Apertura automática de Aportaciones:** Creación de cuenta `CHAJUL-APOR-XXXX` para cada socio.
-   - **Padrón de Aportaciones de Capital (`/aportaciones`):**
-     - Métricas clave: Capital Social Total Aportado, Total de Asociados Inscritos, Aportación Promedio por Socio.
-     - Tabla del padrón con filtro en tiempo real y vista imprimible (`🖨️ Imprimir`).
-   - Permiso habilitado para que los **Promotores de crédito (`PROMOTOR`)** registren y actualicen asociados directamente en campo.
+   - **Importación Oficial y Cuadre Matemático Exacto (Q 29,400.00):**
+     - Migración limpia de los 146 registros del libro oficial `importar/APORTACIONES 31-09-26.xlsx`.
+     - Fondo histórico consolidado anterior a 2026: **Q 15,400.00** a fecha 2025-12-31.
+     - 143 depósitos de aportación estatutaria inicial del 2026: **Q 14,300.00** con fechas reales y recibos oficiales.
+     - 3 devoluciones/retiros de aportación: **-Q 300.00** (Francisco Laynez Rivera, María Hu Méndez de Caba y Salvador Genry Pacheco Ramírez) con estado `INACTIVO`.
+     - Cuadre exacto al centavo con el Excel de origen: **Q 29,400.00** (Diferencia: Q 0.00).
+   - **Formato Dual de Cuentas:** Visualización simultánea del número de cuenta original de Excel arriba (ej: `165-1-1`) y del código correlativo estructurado del sistema abajo (ej: `CHAJ-APO-00001`) en una misma casilla/badge mediante `DualCuentaBadge.tsx`.
+   - **Recibos y Comprobantes Multi-Agencia:** Muestran tanto la **Agencia de Operación / Pago** como la **Agencia de Origen del Asociado**.
+   - **Validador de DPI con Catálogo de 340 Municipios de Guatemala:** Detección de municipio por últimos 4 dígitos (`DDMM`), validación estricta de 13 dígitos y distintivo para asociados de otras localidades.
+   - **Campos del asociado:** Nombres, DPI, Género (`M`/`F`), Dirección, Teléfono, y Datos de la persona beneficiaria (Nombre, Parentesco, DPI/CUI, Teléfono).
+   - **Padrón de Aportaciones de Capital (`/aportaciones`):** Métricas clave, filtro en tiempo real y vista imprimible (`🖨️ Imprimir`).
 
 3. **Caja Chica (`/caja-chica`):**
    - Basado en `caja/Caja Chica 30-07-2026.xlsx`.

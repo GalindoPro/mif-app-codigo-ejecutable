@@ -43,10 +43,11 @@ sociosRouter.get(
     const dpi = typeof req.query.dpi === "string" ? req.query.dpi : "";
     const socioId = typeof req.query.socioId === "string" ? req.query.socioId : undefined;
     const tipo = (req.query.tipo as "SOCIO" | "BENEFICIARIO") || "SOCIO";
+    const agenciaCodigo = typeof req.query.agenciaCodigo === "string" ? req.query.agenciaCodigo : undefined;
     if (!dpi) {
       return res.json({ valido: false, mensaje: "Se requiere el número de DPI" });
     }
-    res.json(await service.verificarDpi(dpi, socioId, tipo));
+    res.json(await service.verificarDpi(dpi, socioId, tipo, agenciaCodigo));
   }),
 );
 

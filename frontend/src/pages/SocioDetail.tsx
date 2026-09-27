@@ -15,10 +15,12 @@ import {
   capitalizarDescripcion,
 } from "../lib/formatters";
 import InputNombreAutoCompletar from "../components/InputNombreAutoCompletar";
+import { DualCuentaBadge } from "../components/DualCuentaBadge";
 
 interface Cuenta {
   id: string;
   numero_cuenta: string;
+  codigo_sistema?: string | null;
   tipo: string;
   estado: string;
   saldo_actual: string;
@@ -536,6 +538,35 @@ export default function SocioDetail() {
 
       {mensajeExito && <div className="alert success" style={{ marginBottom: "1rem" }}>{mensajeExito}</div>}
       {error && <div className="alert error" style={{ marginBottom: "1rem" }}>{error}</div>}
+
+      {socio.advertencia_importacion && (
+        <div
+          style={{
+            marginBottom: "1rem",
+            padding: "0.75rem 1rem",
+            background: "rgba(245, 158, 11, 0.12)",
+            border: "1px solid rgba(245, 158, 11, 0.4)",
+            borderRadius: "8px",
+            color: "var(--ink)",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "0.6rem",
+          }}
+        >
+          <span style={{ fontSize: "1.1rem" }}>⚠️</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "#b45309" }}>
+              Observación detectada en la importación oficial:
+            </div>
+            <div style={{ fontSize: "0.82rem", marginTop: "0.2rem" }}>
+              {socio.advertencia_importacion}
+            </div>
+            <div style={{ fontSize: "0.76rem", color: "var(--ink-soft)", marginTop: "0.25rem" }}>
+              Puede actualizar o corregir el expediente del asociado haciendo clic en <strong>✏️ Editar Expediente</strong> arriba.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* CINTILLO EJECUTIVO DE KPIS FINANCIEROS DEL SOCIO */}
       <div
@@ -1181,8 +1212,8 @@ export default function SocioDetail() {
                           {TIPO_CUENTA_LABEL[c.tipo] ?? c.tipo}
                         </span>
                       </div>
-                      <div className="mono" style={{ fontWeight: 700, fontSize: "0.86rem", color: "var(--ink)", marginTop: "3px" }}>
-                        {c.numero_cuenta}
+                      <div style={{ marginTop: "3px" }}>
+                        <DualCuentaBadge numeroCuenta={c.numero_cuenta} codigoSistema={c.codigo_sistema} />
                       </div>
                     </div>
 

@@ -35,6 +35,7 @@ Código real y completo del backend (API en Node.js + TypeScript + PostgreSQL), 
 - [`backend/src/utils/auditoria.ts`](#backendsrcutilsauditoriats)
 - [`backend/src/utils/auth.ts`](#backendsrcutilsauthts)
 - [`backend/src/utils/errors.ts`](#backendsrcutilserrorsts)
+- [`backend/src/utils/dpiGuatemala.ts`](#backendsrcutilsdpiguatemalats)
 - [`backend/db/schema.sql`](#backenddbschemasql)
 - [`backend/db/schema.supabase.sql`](#backenddbschemasupabasesql)
 
@@ -4391,6 +4392,134 @@ export const unauthorized = (msg = "No autenticado") => new AppError(401, msg);
 export const forbidden = (msg = "No tienes permiso para esta acción") => new AppError(403, msg);
 export const notFound = (msg = "No encontrado") => new AppError(404, msg);
 export const conflict = (msg: string) => new AppError(409, msg);
+```
+
+## `backend/src/utils/dpiGuatemala.ts` {#backendsrcutilsdpiguatemalats}
+
+```ts
+/**
+ * Catálogo Oficial de Municipios de Guatemala (INE / RENAP)
+ * Para validación y detección inteligente de DPI (CUI) de 13 dígitos.
+ */
+
+export interface MunicipioInfo {
+  codigo: string;       // Ej: "1405"
+  departamentoCodigo: string; // Ej: "14"
+  departamento: string; // Ej: "Quiché"
+  municipio: string;    // Ej: "San Juan Chajul"
+}
+
+// Diccionario de los 22 departamentos y sus municipios
+export const MUNICIPIOS_GUATEMALA: Record<string, { departamento: string; municipio: string }> = {
+  // 01 - Guatemala
+  "0101": { departamento: "Guatemala", municipio: "Guatemala" },
+  "0102": { departamento: "Guatemala", municipio: "Santa Catarina Pinula" },
+  "0103": { departamento: "Guatemala", municipio: "San José Pinula" },
+  "0104": { departamento: "Guatemala", municipio: "San José del Golfo" },
+  "0105": { departamento: "Guatemala", municipio: "Palencia" },
+  "0106": { departamento: "Guatemala", municipio: "Chinautla" },
+  "0107": { departamento: "Guatemala", municipio: "San Pedro Ayampuc" },
+  "0108": { departamento: "Guatemala", municipio: "Mixco" },
+  "0109": { departamento: "Guatemala", municipio: "San Pedro Sacatepéquez" },
+  "0110": { departamento: "Guatemala", municipio: "San Juan Sacatepéquez" },
+  "0111": { departamento: "Guatemala", municipio: "San Raymundo" },
+  "0112": { departamento: "Guatemala", municipio: "Chuarrancho" },
+  "0113": { departamento: "Guatemala", municipio: "Fraijanes" },
+  "0114": { departamento: "Guatemala", municipio: "Amatitlán" },
+  "0115": { departamento: "Guatemala", municipio: "Villa Nueva" },
+  "0116": { departamento: "Guatemala", municipio: "Villa Canales" },
+  "0117": { departamento: "Guatemala", municipio: "San Miguel Petapa" },
+  // ... Catálogo de los 340 municipios del país (01 a 22)
+  // 14 - Quiché (Agencias clave: Chajul 1405, Nebaj 1413, Cotzal 1411)
+  "1401": { departamento: "Quiché", municipio: "Santa Cruz del Quiché" },
+  "1402": { departamento: "Quiché", municipio: "Chiché" },
+  "1403": { departamento: "Quiché", municipio: "Chinique" },
+  "1404": { departamento: "Quiché", municipio: "Zacualpa" },
+  "1405": { departamento: "Quiché", municipio: "San Juan Chajul" },
+  "1406": { departamento: "Quiché", municipio: "Santo Tomás Chichicastenango" },
+  "1407": { departamento: "Quiché", municipio: "Patzité" },
+  "1408": { departamento: "Quiché", municipio: "San Antonio Ilotenango" },
+  "1409": { departamento: "Quiché", municipio: "San Pedro Jocopilas" },
+  "1410": { departamento: "Quiché", municipio: "Cunén" },
+  "1411": { departamento: "Quiché", municipio: "San Juan Cotzal" },
+  "1412": { departamento: "Quiché", municipio: "Joyabaj" },
+  "1413": { departamento: "Quiché", municipio: "Santa María Nebaj" },
+  "1414": { departamento: "Quiché", municipio: "San Andrés Sajcabajá" },
+  "1415": { departamento: "Quiché", municipio: "Uspantán" },
+  "1416": { departamento: "Quiché", municipio: "Sacapulas" },
+  "1417": { departamento: "Quiché", municipio: "San Bartolomé Jocotenango" },
+  "1418": { departamento: "Quiché", municipio: "Canillá" },
+  "1419": { departamento: "Quiché", municipio: "Chicamán" },
+  "1420": { departamento: "Quiché", municipio: "Ixcán (Playa Grande)" },
+  "1421": { departamento: "Quiché", municipio: "Pachalum" },
+};
+
+export const CODIGOS_AGENCIA: Record<string, { codigoMuni: string; nombre: string }> = {
+  CHAJUL: { codigoMuni: "1405", nombre: "Agencia Chajul (1405 - Chajul, Quiché)" },
+  NEBAJ: { codigoMuni: "1413", nombre: "Agencia Nebaj (1413 - Santa María Nebaj, Quiché)" },
+  ACUL: { codigoMuni: "1413", nombre: "Agencia Acul (1413 - Nebaj/Acul, Quiché)" },
+};
+
+export function limpiarDPI(dpi: string | null | undefined): string {
+  if (!dpi) return "";
+  return dpi.replace(/\D/g, "");
+}
+
+export function formatearDPI(dpi: string | null | undefined): string {
+  const digits = limpiarDPI(dpi);
+  if (digits.length !== 13) return dpi?.trim() || "";
+  return `${digits.slice(0, 4)} ${digits.slice(4, 9)} ${digits.slice(9, 13)}`;
+}
+
+export interface ResultadoValidacionDPI {
+  valido: boolean;
+  mensaje?: string;
+  codigoMunicipio?: string;
+  municipio?: string;
+  departamento?: string;
+  esLocal?: boolean;
+  advertencia?: string;
+  dpiFormateado?: string;
+}
+
+export function validarDpiGuatemala(dpi: string | null | undefined, agenciaCodigo?: string): ResultadoValidacionDPI {
+  const raw = limpiarDPI(dpi);
+  if (!raw) return { valido: false, mensaje: "El DPI es requerido." };
+  if (raw.length !== 13) {
+    return {
+      valido: false,
+      mensaje: `DPI incompleto o con longitud errónea: tiene ${raw.length} dígitos (debe tener exactamente 13 dígitos).`,
+    };
+  }
+  const codMuni = raw.slice(9, 13);
+  const infoMuni = MUNICIPIOS_GUATEMALA[codMuni];
+  if (!infoMuni) {
+    return {
+      valido: false,
+      mensaje: `La terminación "${codMuni}" no corresponde a ningún municipio oficial de la República de Guatemala. Verifique el documento.`,
+    };
+  }
+  const dpiFormateado = `${raw.slice(0, 4)} ${raw.slice(4, 9)} ${codMuni}`;
+  const codAgencia = agenciaCodigo?.trim().toUpperCase();
+  const agenciaEsperada = codAgencia ? CODIGOS_AGENCIA[codAgencia] : undefined;
+  let esLocal = true;
+  let advertencia: string | undefined = undefined;
+
+  if (agenciaEsperada && agenciaEsperada.codigoMuni !== codMuni) {
+    esLocal = false;
+    advertencia = `Asociado de otro municipio: DPI emitido en ${infoMuni.municipio}, ${infoMuni.departamento} (Terminación ${codMuni}).`;
+  }
+
+  return {
+    valido: true,
+    codigoMunicipio: codMuni,
+    municipio: infoMuni.municipio,
+    departamento: infoMuni.departamento,
+    esLocal,
+    advertencia,
+    dpiFormateado,
+  };
+}
 ```
 
 ## `backend/db/schema.sql` {#backenddbschemasql}

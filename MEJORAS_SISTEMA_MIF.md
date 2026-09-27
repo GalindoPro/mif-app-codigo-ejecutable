@@ -4,6 +4,43 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
 
 ---
 
+## 77. Importación Oficial Limpia desde Excel (Aportaciones 31-09-26), Cuadre Matemático Exacto (Q29,400.00), Recibos Multi-Agencia Duales y Validador Municipal de DPI de Guatemala (340 Municipios)
+
+**Objetivo y Reglas de Negocio:**
+1. **Limpieza e Importación Oficial:** Limpieza total de tablas operativas preservando usuarios y agencias. Extracción y migración de los 146 registros del libro oficial `importar/APORTACIONES 31-09-26.xlsx`.
+2. **Cuadre Contable Exacto al Centavo (Q29,400.00):**
+   - Saldo histórico inicial consolidado previo a 2026: **Q 15,400.00** registrado con fecha 2025-12-31 en fondo de aportaciones.
+   - 143 depósitos de aportación estatutaria inicial del 2026: **Q 14,300.00** con fechas reales (de enero a septiembre de 2026) y números de boleta/recibo oficiales.
+   - 3 devoluciones/retiros de aportación: **-Q 300.00** (Francisco Laynez Rivera, María Hu Méndez de Caba y Salvador Genry Pacheco Ramírez), marcando sus cuentas y estados en `INACTIVO`.
+   - Saldo final neto consolidado: **Q 29,400.00** (Diferencia: Q 0.00 con la fila 154 de Excel).
+3. **Formato Dual de Cuentas:**
+   - Visualización simultánea del número de cuenta original de Excel arriba (ej: `165-1-1`) y del código correlativo estructurado del sistema abajo (ej: `CHAJ-APO-00001`) en una misma casilla/badge unificada mediante el nuevo componente `DualCuentaBadge.tsx`.
+4. **Recibos y Comprobantes Multi-Agencia:**
+   - Los comprobantes de ventanilla y recibos de cobro reflejan explícitamente tanto la **Agencia de Operación / Cobro** (donde se atendió) como la **Agencia de Origen del Asociado** (donde pertenece la cuenta).
+5. **Validador Inteligente de DPI con Catálogo de 340 Municipios de Guatemala:**
+   - Algoritmo que analiza los últimos 4 dígitos del CUI/DPI (`DDMM`).
+   - Identifica el departamento (01 al 22) y el municipio oficial.
+   - Detecta si es un asociado local de la agencia (ej. 1405 para Chajul, 1413 para Nebaj/Acul) o si es un asociado procedente de otro municipio (informativo azul).
+   - Bloquea números de DPI con longitud diferente a 13 dígitos o con códigos de municipio inexistentes en Guatemala.
+   - Detección de duplicados con advertencias visuales y notificaciones para corrección en expediente.
+
+**Archivos modificados/creados:**
+- `backend/src/db/importar-aportaciones.ts`
+- `backend/src/utils/dpiGuatemala.ts`
+- `frontend/src/utils/dpiGuatemala.ts`
+- `frontend/src/components/DualCuentaBadge.tsx`
+- `frontend/src/types.ts`
+- `backend/src/modules/socios/service.ts`
+- `backend/src/modules/socios/routes.ts`
+- `backend/src/modules/cajaauxiliar/service.ts`
+- `frontend/src/pages/SocioForm.tsx`
+- `frontend/src/pages/SocioDetail.tsx`
+- `frontend/src/pages/AhorroList.tsx`
+- `frontend/src/components/ReciboCobroCreditoModal.tsx`
+- `frontend/src/components/cajaauxiliar/ReciboMovimientoModal.tsx`
+
+---
+
 ## 76. Estabilidad de Conexión: Pool Resiliente con Reintentos Automáticos
 
 **Problema:** El backend lanzaba `Connection terminated due to connection timeout` repetidamente al usar el Transaction Pooler de Supabase (plan gratuito, ~10 conexiones simultáneas). Las 9 queries del dashboard en `Promise.all` saturaban el pool.

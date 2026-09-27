@@ -2,6 +2,7 @@ import { pool } from "../../db/pool";
 import { Socio } from "../../types/models";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
+import { validarDpiGuatemala, formatearDPI, type ResultadoValidacionDPI } from "../../utils/dpiGuatemala";
 
 export interface FiltrosSocios {
   agenciaId: string | null; // null = todas (ADMIN/GERENCIA)
@@ -258,11 +259,36 @@ export async function crear(data: DatosSocio, usuarioId: string): Promise<Socio>
   return socio;
 }
 
-export async function verificarDpi(dpi: string, socioIdActual?: string, tipo: "SOCIO" | "BENEFICIARIO" = "SOCIO") {
-  const rawDpi = dpi.replace(/\D/g, "");
-  if (rawDpi.length !== 13) {
-    return { valido: false, mensaje: "El DPI debe contener 13 dígitos numéricos" };
+export interface ResultadoVerificarDpi extends Partial<ResultadoValidacionDPI> {
+  valido: boolean;
+  disponible: boolean;
+  mensaje?: string;
+  registrado?: {
+    id: string;
+    nombres: string;
+    numeroAsociado: string;
+    rol: string;
+  };
+}
+
+export async function verificarDpi(
+  dpi: string,
+  socioIdActual?: string,
+  tipo: "SOCIO" | "BENEFICIARIO" = "SOCIO",
+  agenciaCodigo?: string,
+): Promise<ResultadoVerificarDpi> {
+  // Validación de estructura y municipio oficial de Guatemala
+  const valGuatemala = validarDpiGuatemala(dpi, agenciaCodigo);
+  if (!valGuatemala.valido) {
+    return {
+      ...valGuatemala,
+      valido: false,
+      disponible: false,
+      mensaje: valGuatemala.mensaje,
+    };
   }
+
+  const rawDpi = valGuatemala.dpiFormateado ? valGuatemala.dpiFormateado.replace(/\D/g, "") : dpi.replace(/\D/g, "");
   const params: unknown[] = [rawDpi];
   
   // 1. Verificar si coincide con DPI de algún SOCIO
@@ -276,6 +302,7 @@ export async function verificarDpi(dpi: string, socioIdActual?: string, tipo: "S
   const { rows: socioRows } = await pool.query(querySocio, params);
   if (socioRows[0]) {
     return {
+      ...valGuatemala,
       valido: true,
       disponible: false,
       registrado: {
@@ -298,6 +325,7 @@ export async function verificarDpi(dpi: string, socioIdActual?: string, tipo: "S
     const { rows: benRows } = await pool.query(queryBen, params);
     if (benRows[0]) {
       return {
+        ...valGuatemala,
         valido: true,
         disponible: false,
         registrado: {
@@ -310,7 +338,11 @@ export async function verificarDpi(dpi: string, socioIdActual?: string, tipo: "S
     }
   }
 
-  return { valido: true, disponible: true };
+  return {
+    ...valGuatemala,
+    valido: true,
+    disponible: true,
+  };
 }
 
 export async function verificarTelefono(

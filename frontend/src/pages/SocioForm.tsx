@@ -43,6 +43,15 @@ export default function SocioForm() {
 
   // Validaciones en tiempo real
   const [dpiDuplicado, setDpiDuplicado] = useState<{ nombres: string; numeroAsociado: string } | null>(null);
+  const [dpiMuniInfo, setDpiMuniInfo] = useState<{
+    valido: boolean;
+    mensaje?: string;
+    codigoMunicipio?: string;
+    municipio?: string;
+    departamento?: string;
+    esLocal?: boolean;
+    advertencia?: string;
+  } | null>(null);
   const [verificandoDpi, setVerificandoDpi] = useState(false);
 
   const [telefonoDuplicado, setTelefonoDuplicado] = useState<{
@@ -82,20 +91,28 @@ export default function SocioForm() {
       .then(({ data }) => setNumeroAsociado(data.numeroAsociado));
   }, [agenciaId]);
 
-  // Verificación en tiempo real de DPI duplicado al completar 13 dígitos
+  // Verificación en tiempo real de DPI duplicado y municipio al completar 13 dígitos
   useEffect(() => {
     const rawDpi = limpiarDPI(dpi);
     if (rawDpi.length === 13) {
       setVerificandoDpi(true);
       const timer = setTimeout(() => {
+        const agSel = agencias?.find((a) => a.id === agenciaId);
         api
           .get<{
             valido: boolean;
+            mensaje?: string;
             disponible?: boolean;
+            codigoMunicipio?: string;
+            municipio?: string;
+            departamento?: string;
+            esLocal?: boolean;
+            advertencia?: string;
             registrado?: { nombres: string; numeroAsociado: string; rol?: string };
             socio?: { nombres: string; numeroAsociado: string };
-          }>("/socios/verificar-dpi", { params: { dpi: rawDpi } })
+          }>("/socios/verificar-dpi", { params: { dpi: rawDpi, agenciaCodigo: agSel?.codigo } })
           .then(({ data }) => {
+            setDpiMuniInfo(data);
             if (data.disponible === false && data.registrado) {
               setDpiDuplicado(data.registrado);
             } else if (data.disponible === false && data.socio) {
@@ -104,15 +121,19 @@ export default function SocioForm() {
               setDpiDuplicado(null);
             }
           })
-          .catch(() => setDpiDuplicado(null))
+          .catch(() => {
+            setDpiDuplicado(null);
+            setDpiMuniInfo(null);
+          })
           .finally(() => setVerificandoDpi(false));
       }, 250);
       return () => clearTimeout(timer);
     } else {
       setDpiDuplicado(null);
+      setDpiMuniInfo(null);
       setVerificandoDpi(false);
     }
-  }, [dpi]);
+  }, [dpi, agenciaId, agencias]);
 
   // Verificación en tiempo real de Teléfono del socio (8 dígitos)
   useEffect(() => {
@@ -218,6 +239,10 @@ export default function SocioForm() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (dpiMuniInfo && !dpiMuniInfo.valido) {
+      setError(dpiMuniInfo.mensaje || "El DPI ingresado no es válido.");
+      return;
+    }
     if (dpiDuplicado) {
       setError(
         `El DPI ya está registrado para el socio ${dpiDuplicado.nombres} (${dpiDuplicado.numeroAsociado}). Modifícalo antes de guardar.`
@@ -368,15 +393,29 @@ export default function SocioForm() {
               }}
             />
             <div style={{ minHeight: "1.1rem", marginTop: "0.15rem" }}>
-              {verificandoDpi && <span className="hint">🔍 Verificando disponibilidad...</span>}
+              {verificandoDpi && <span className="hint">🔍 Verificando DPI y procedencia municipal...</span>}
+              {dpiMuniInfo && !dpiMuniInfo.valido && (
+                <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
+                  ⛔ {dpiMuniInfo.mensaje}
+                </span>
+              )}
               {dpiDuplicado && (
                 <span style={{ color: "#ef4444", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
                   ⚠️ Ya registrado para: {dpiDuplicado.nombres} ({dpiDuplicado.numeroAsociado})
                 </span>
               )}
-              {!verificandoDpi && !dpiDuplicado && rawDpiLength === 13 && (
-                <span style={{ color: "#10b981", fontSize: "0.78rem", fontWeight: 600, display: "block" }}>
-                  ✓ DPI válido y disponible (13 dígitos)
+              {!verificandoDpi && !dpiDuplicado && dpiMuniInfo?.valido && (
+                <span
+                  style={{
+                    color: dpiMuniInfo.esLocal ? "#10b981" : "#0284c7",
+                    fontSize: "0.78rem",
+                    fontWeight: 600,
+                    display: "block",
+                  }}
+                >
+                  {dpiMuniInfo.esLocal
+                    ? `✓ ${dpiMuniInfo.codigoMunicipio} — ${dpiMuniInfo.municipio}, ${dpiMuniInfo.departamento} (Agencia Local)`
+                    : `🔵 ${dpiMuniInfo.codigoMunicipio} — ${dpiMuniInfo.municipio}, ${dpiMuniInfo.departamento} (Válido: Asociado procedente de otro municipio)`}
                 </span>
               )}
               {rawDpiLength > 0 && rawDpiLength < 13 && (

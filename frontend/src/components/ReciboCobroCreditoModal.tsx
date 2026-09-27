@@ -15,6 +15,7 @@ export interface DatosReciboCobro {
   numeroCreditoAnterior?: string | null;
   origenFondos?: OrigenFondos;
   agenciaNombre: string;
+  agenciaOrigenNombre?: string | null;
   saldoCapitalAnterior: number;
   abonoCapital: number;
   interes: number;
@@ -211,6 +212,14 @@ export default function ReciboCobroCreditoModal({ datos, onClose }: Props) {
                 </div>
               )}
             </div>
+            <div>
+              <span style={{ color: "#64748b" }}>Agencia de Cobro:</span> <strong>{datos.agenciaNombre}</strong>
+            </div>
+            {datos.agenciaOrigenNombre ? (
+              <div style={{ textAlign: "right" }}>
+                <span style={{ color: "#64748b" }}>Agencia de Origen:</span> <strong style={{ color: "#0369a1" }}>{datos.agenciaOrigenNombre}</strong>
+              </div>
+            ) : <div />}
             {datos.socioDpi && (
               <div style={{ gridColumn: "1 / -1", fontSize: "0.76rem", color: "#64748b" }}>
                 DPI: <span className="mono">{formatearDPI(datos.socioDpi)}</span>

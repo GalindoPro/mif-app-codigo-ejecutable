@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { formatoQ, TIPOS_AHORRO } from "../types";
 import type { Cuenta, ResumenCuentas } from "../types";
+import { DualCuentaBadge } from "../components/DualCuentaBadge";
 
 export default function AhorroList() {
   const { slug } = useParams<{ slug: string }>();
@@ -249,9 +250,9 @@ export default function AhorroList() {
           <tbody>
             {cuentasPaginadas.map((c) => (
               <tr key={c.id}>
-                <td className="mono" style={{ fontWeight: 700, color: "var(--accent)" }}>
+                <td style={{ verticalAlign: "middle" }}>
                   <Link to={`/ahorros/${config.slug}/${c.id}`} style={{ color: "inherit", textDecoration: "none" }}>
-                    {c.numero_cuenta}
+                    <DualCuentaBadge numeroCuenta={c.numero_cuenta} codigoSistema={c.codigo_sistema} />
                   </Link>
                 </td>
                 <td>

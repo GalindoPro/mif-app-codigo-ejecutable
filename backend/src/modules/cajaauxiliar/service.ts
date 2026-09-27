@@ -135,8 +135,15 @@ export async function detalle(id: string, agenciaVisible: string | null) {
   const dia = await obtenerDiaCrudo(id, agenciaVisible);
 
   const { rows: movimientos } = await pool.query(
-    `select m.*, u.nombre as usuario_nombre, u.rol as usuario_rol
-     from caja_movimientos_auxiliar m join usuarios u on u.id = m.usuario_id
+    `select m.*, u.nombre as usuario_nombre, u.rol as usuario_rol,
+            ag_op.nombre as agencia_nombre,
+            coalesce(ag_orig.nombre, ag_op.nombre) as agencia_origen_nombre
+     from caja_movimientos_auxiliar m
+     join caja_dias d on d.id = m.caja_dia_id
+     join agencias ag_op on ag_op.id = d.agencia_id
+     join usuarios u on u.id = m.usuario_id
+     left join socios s on s.id = m.socio_id
+     left join agencias ag_orig on ag_orig.id = s.agencia_id
      where m.caja_dia_id = $1
      order by m.created_at desc`,
     [id],
@@ -1957,10 +1964,15 @@ export async function reporteMovimientos(
   const agencia = agenciaRows[0];
 
   const { rows: movimientos } = await pool.query(
-    `select m.*, u.nombre as usuario_nombre, u.rol as usuario_rol, d.fecha as dia_fecha, d.saldo_inicial as dia_saldo_inicial
+    `select m.*, u.nombre as usuario_nombre, u.rol as usuario_rol, d.fecha as dia_fecha, d.saldo_inicial as dia_saldo_inicial,
+            ag_op.nombre as agencia_nombre,
+            coalesce(ag_orig.nombre, ag_op.nombre) as agencia_origen_nombre
      from caja_movimientos_auxiliar m
      join caja_dias d on d.id = m.caja_dia_id
+     join agencias ag_op on ag_op.id = d.agencia_id
      join usuarios u on u.id = m.usuario_id
+     left join socios s on s.id = m.socio_id
+     left join agencias ag_orig on ag_orig.id = s.agencia_id
      where m.agencia_id = $1 and d.fecha >= $2 and d.fecha <= $3
      order by d.fecha asc, m.created_at asc`,
     [agenciaId, fInicio, fFin],

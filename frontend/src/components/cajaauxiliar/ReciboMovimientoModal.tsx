@@ -109,6 +109,16 @@ export default function ReciboMovimientoModal({ movimiento, onClose }: Props) {
               <span>Atendió:</span>
               <span>{movimiento.usuario_nombre}</span>
             </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span>Agencia de Operación:</span>
+              <span>{movimiento.agencia_nombre || "Agencia Chajul"}</span>
+            </div>
+            {movimiento.agencia_origen_nombre && (
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>Agencia de Origen:</span>
+                <span style={{ fontWeight: 600 }}>{movimiento.agencia_origen_nombre}</span>
+              </div>
+            )}
           </div>
 
           <div style={{ borderBottom: "1px dashed #ccc", paddingBottom: "0.5rem", marginBottom: "0.5rem" }}>

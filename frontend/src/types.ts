@@ -33,6 +33,7 @@ export interface Socio {
   dpi_beneficiario?: string | null;
   telefono_beneficiario?: string | null;
   parentesco_beneficiario?: string | null;
+  advertencia_importacion?: string | null;
   total_cuentas?: number;
   created_at: string;
 }
@@ -107,6 +108,7 @@ export type TipoCuentaAhorro =
 export interface Cuenta {
   id: string;
   numero_cuenta: string;
+  codigo_sistema?: string | null;
   tipo: TipoCuentaAhorro;
   estado: "ACTIVA" | "CERRADA";
   socio_id: string;
@@ -480,6 +482,8 @@ export interface CajaMovimientoAuxiliar {
   usuario_id: string;
   usuario_nombre: string;
   usuario_rol?: string;
+  agencia_nombre?: string;
+  agencia_origen_nombre?: string;
   created_at: string;
 }
 
