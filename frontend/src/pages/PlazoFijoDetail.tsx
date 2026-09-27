@@ -8,6 +8,7 @@ import {
 } from "../types";
 import type { PlazoFijoContrato } from "../types";
 import { formatearDPI } from "../lib/formatters";
+import { DualCuentaBadge } from "../components/DualCuentaBadge";
 
 export default function PlazoFijoDetail() {
   const { id } = useParams<{ id: string }>();
@@ -82,9 +83,11 @@ export default function PlazoFijoDetail() {
           <h1>
             Certificado #{contrato.numero_certificacion ?? "—"} · {contrato.socio_nombres}
           </h1>
-          <p>
-            Cuenta <span className="mono">{contrato.numero_cuenta}</span> · {contrato.agencia_nombre}
-          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
+            <span style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>Cuenta:</span>
+            <DualCuentaBadge numeroCuenta={contrato.numero_cuenta} codigoSistema={contrato.codigo_sistema} />
+            <span style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>· {contrato.agencia_nombre}</span>
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>

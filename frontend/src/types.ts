@@ -697,6 +697,7 @@ export interface PlazoFijoContrato {
   id: string;
   cuenta_id: string;
   numero_cuenta: string;
+  codigo_sistema?: string | null;
   agencia_id: string;
   agencia_nombre?: string;
   socio_id: string;

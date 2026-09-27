@@ -56,15 +56,22 @@ Este documento registra el **avance real y completo** del sistema de la COOPERAT
        * **Saldo Total Consolidado en Sistema:** Q 2,680,939.53.
 
 5. **Ahorro a Plazo Fijo — Kardex PF (`/ahorros/plazo-fijo`):**
-   - Basado en `caja/KARDEX AHORRO PF 2026-08.xlsx` y `caja/EJEMPLO 2.xlsx`.
-   - Emisión de Certificados de Inversión a Plazo Fijo con correlativo (`CHAJUL-PF-XXXX`).
+   - **Importación Oficial y Cuadre Matemático Exacto (Fase 3):**
+     - Basado en el libro oficial `importar/deposito a plazo fijo/KARDEX AHORRO PF 2026-08.xlsx` (histórico integral 2018 a 2026).
+     - 695 certificados válidos importados (47 filas de `ANULADO` descartadas y resolución de duplicado No. 213 como `213-R`).
+     - 418 nuevos socios inversionistas registrados jurídicamente con código correlativo institucional y aportación estatutaria inicial.
+     - 695 cuentas de Plazo Fijo con formato dual (`numero_cuenta` físico original y `CHAJ-PF-XXXXX` estructurado con `DualCuentaBadge`).
+     - **6 Contratos Activos Vigentes (2026):** Capital activo de **Q 322,826.38** con intereses netos de **Q 40,676.12** listos para devengarse y vencer en 2027.
+     - **689 Contratos Históricos Liquidados:** Capital devuelto de **Q 19,946,839.84** con fechas y números de recibos de liquidación registrados.
+     - **Total Capital Invertido:** **Q 20,269,666.22** (Cuadre exacto al centavo, Diferencia: **Q 0.00**).
+   - Emisión de Certificados de Inversión a Plazo Fijo con correlativo institucional.
    - Motor financiero oficial:
-     - Interés generado al plazo pactado: $P \times (r / 100) \times (n / 12)$.
+     - Interés generado al plazo pactado: $P \times (r / 100) \times (n / 12)$ (6% a 6 meses, 14% a 12 meses).
      - Retención legal de ISR del 10% sobre intereses brutos.
      - Interés neto y saldo líquido a pagar.
      - Cálculo exacto de fecha de vencimiento.
    - Alertas visuales para certificados vencidos listos para cobro.
-   - Liquidación y pago del certificado al vencimiento (`LIQUIDADO`) con generación de recibo contable.
+   - Liquidación y pago del certificado al vencimiento (`LIQUIDADO`) con generación de recibo contable y afectación en Auxiliar de Caja.
 
 6. **Créditos y Promotor (`/creditos`):**
    - **Diseño de Pantalla Única (100vh Sin Scroll):** Cabecera compacta de 1 sola línea con tabs integradas (`Cartera` y `Fiadores`), franja horizontal de KPIs ultra compacta con filtrado con un clic, buscador y chips rápidos en 1 línea, tabla compacta con scroll interno suave y paginación fija al fondo.

@@ -37,6 +37,7 @@ Código real y completo del backend (API en Node.js + TypeScript + PostgreSQL), 
 - [`backend/src/utils/errors.ts`](#backendsrcutilserrorsts)
 - [`backend/src/utils/dpiGuatemala.ts`](#backendsrcutilsdpiguatemalats)
 - [`backend/src/db/importar-ahorro-corriente.ts`](#backendsrcdbimportarahorrocorrientets)
+- [`backend/src/db/importar-plazo-fijo.ts`](#backendsrcdbimportarplazofijots)
 - [`backend/db/schema.sql`](#backenddbschemasql)
 - [`backend/db/schema.supabase.sql`](#backenddbschemasupabasesql)
 
@@ -4565,6 +4566,37 @@ const TYPO_MAP: Record<string, string> = {
 };
 // ... Ver implementación completa en backend/src/db/importar-ahorro-corriente.ts
 ```
+
+## `backend/src/db/importar-plazo-fijo.ts` {#backendsrcdbimportarplazofijots}
+
+```ts
+import "dotenv/config";
+import { pool } from "./pool";
+import { execSync } from "child_process";
+import path from "path";
+import { randomUUID } from "crypto";
+
+/**
+ * Script Oficial de Importación — Fase 3: Ahorro a Plazo Fijo
+ * Archivo: importar/deposito a plazo fijo/KARDEX AHORRO PF 2026-08.xlsx
+ * Cuadre Contable Exacto: Q 20,269,666.22 (Diferencia: Q0.00)
+ */
+
+interface RawPFRow {
+  fila: number;
+  cert: string;
+  nombre: string;
+  monto: number;
+  f_apertura: string;
+  f_vence: string;
+  meses: number;
+  rec_retiro: string;
+  f_retiro: string;
+  activo_2026: boolean;
+}
+// ... Ver implementación completa optimizada con batch inserts en backend/src/db/importar-plazo-fijo.ts
+```
+
 
 ## `backend/db/schema.sql` {#backenddbschemasql}
 

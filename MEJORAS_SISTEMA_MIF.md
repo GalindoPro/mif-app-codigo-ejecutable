@@ -4,6 +4,40 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
 
 ---
 
+## 79. Fase 3: Importación Oficial de Depósito a Plazo Fijo (2018-2026), Cuadre al Centavo (Q 20,269,666.22), Formato Dual y 418 Nuevos Socios Inversores
+
+**Objetivo y Reglas de Negocio:**
+1. **Extracción y Migración Completa de Histórico:** Extracción de los 695 certificados válidos del kardex oficial `importar/deposito a plazo fijo/KARDEX AHORRO PF 2026-08.xlsx` que abarca desde 2018 hasta 2026.
+2. **Depuración de Certificados Anulados y Duplicados:**
+   - 47 filas descartadas que correspondían a registros con etiqueta `ANULADO`.
+   - Resolución del único número de certificación duplicado en el libro físico (Certificado No. 213 de Felipe Laynez del Barrio, renovado entre 2018 y 2019), diferenciado en el sistema como `213-R`.
+3. **Registro Jurídico de 418 Nuevos Asociados Inversores:**
+   - Inversionistas de plazo fijo que no figuraban en el padrón de aportaciones inicial. Se les dio de alta en la Agencia Chajul con código correlativo legal (`CHAJ-00272` en adelante) y su aportación estatutaria inicial con fecha histórica de apertura de su primer certificado, garantizando legitimidad cooperativa sin alterar el libro de aportaciones 2026.
+4. **Formato Dual de Cuentas de Plazo Fijo:**
+   - 695 cuentas creadas bajo la tipología `PLAZO_FIJO`.
+   - `numero_cuenta`: Conserva el número correlativo del certificado físico emitido en libreta/título (ej: `1`, `480`, `660`).
+   - `codigo_sistema`: Código correlativo estructurado institucional único (`CHAJ-PF-00001` a `CHAJ-PF-00695`), desplegado con el componente visual unificado `DualCuentaBadge`.
+5. **Separación de Contratos Activos y Liquidados:**
+   - **6 Contratos Activos Vigentes (2026):**
+     * Capital activo en custodia: **Q 322,826.38** (vencimientos en 2027).
+     * Intereses netos acumulados por devengar: **Q 40,676.12**.
+     * Desglose: Juan Sánchez Caba (Q70,000.00), Cipriano Bop Rivera (Q40,000.00), Pedro Luis Tomás Lux (Q100,000.00), Jacinto Caba Caba (Q52,826.38), Domingo Marcos Asicona (Q10,000.00) y Pedro Rivera Raymundo (Q50,000.00).
+   - **689 Contratos Históricos Liquidados:**
+     * Capital cancelado a sus titulares: **Q 19,946,839.84**, con fecha de liquidación y número de recibo de retiro físico registrados en base de datos.
+6. **Cuadre Contable Exacto al Centavo:**
+   - **Total Capital Invertido:** **Q 20,269,666.22** (Esperado: Q 20,269,666.22, Diferencia: **Q 0.00** exacta).
+   - Optimización de carga por lotes de 50 registros (`batch inserts`) reduciendo el tiempo de migración en Supabase a tan solo 12 segundos.
+
+**Archivos modificados/creados:**
+- `backend/src/db/importar-plazo-fijo.ts`
+- `backend/src/modules/plazofijo/service.ts`
+- `frontend/src/types.ts`
+- `frontend/src/pages/PlazoFijoList.tsx`
+- `frontend/src/pages/PlazoFijoDetail.tsx`
+- `backend/package.json`
+
+---
+
 ## 78. Fase 2: Importación Oficial de Ahorro Corriente (30-08-2026), Cuadre al Centavo (Q 2,272,070.69), Unificación Tipográfica y Saldos Históricos Pre-2026
 
 **Objetivo y Reglas de Negocio:**

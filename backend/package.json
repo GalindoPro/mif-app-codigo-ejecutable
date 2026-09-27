@@ -13,6 +13,7 @@
     "db:reset": "tsx src/db/reset.ts",
     "db:importar:aportaciones": "tsx src/db/importar-aportaciones.ts",
     "db:importar:ahorro-corriente": "tsx src/db/importar-ahorro-corriente.ts",
+    "db:importar:plazo-fijo": "tsx src/db/importar-plazo-fijo.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

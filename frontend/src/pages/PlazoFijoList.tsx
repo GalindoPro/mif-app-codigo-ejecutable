@@ -7,6 +7,7 @@ import {
 } from "../types";
 import type { PlazoFijoContrato } from "../types";
 import { formatearDPI } from "../lib/formatters";
+import { DualCuentaBadge } from "../components/DualCuentaBadge";
 
 export default function PlazoFijoList() {
   const [contratos, setContratos] = useState<PlazoFijoContrato[] | null>(null);
@@ -312,7 +313,9 @@ export default function PlazoFijoList() {
                       Cert. #{c.numero_certificacion ?? "—"}
                     </Link>
                   </td>
-                  <td className="mono" style={{ fontSize: "0.8rem" }}>{c.numero_cuenta}</td>
+                  <td>
+                    <DualCuentaBadge numeroCuenta={c.numero_cuenta} codigoSistema={c.codigo_sistema} />
+                  </td>
                   <td>
                     <Link
                       to={`/ahorros/plazo-fijo/${c.id}`}
