@@ -71,10 +71,14 @@ for r in range(4, 678):
     dep = ws.cell(r, 8).value or 0
     ret = ws.cell(r, 9).value or 0
     
+    fec_str = str(fec)[:10] if fec else '2026-01-02'
+    if fec_str.startswith('2025-06-15'):
+        fec_str = '2026-06-15' # Corrección de error tipográfico de año del cajero en fila 433 (entre 13 y 16 de junio 2026)
+
     rows.append({
         'row': r,
         'cta': str(cta).strip() if cta else '',
-        'fec': str(fec)[:10] if fec else '2026-01-02',
+        'fec': fec_str,
         'rec': str(rec).strip() if rec else '',
         'agencia': str(ag).strip() if ag else 'AGENCIA CHAJUL',
         'nombre': str(nom).strip(),
@@ -96,6 +100,17 @@ print(json.dumps(rows))
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+
+    // Limpiar importación previa de Ahorro Corriente si existiera (idempotente)
+    console.log("2. Limpiando registros previos de Ahorro Corriente para reimportación limpia...");
+    await client.query(`
+      delete from movimientos where cuenta_id in (select id from cuentas where tipo = 'AHORRO_CORRIENTE');
+      delete from cuentas where tipo = 'AHORRO_CORRIENTE';
+      delete from movimientos where numero_recibo = 'SALDO-HIST-APO';
+      delete from cuentas where numero_cuenta = 'APO-HIST';
+      delete from socios where advertencia_importacion = 'Socio migrado de Ahorro Corriente (Aportación estatutaria previa pre-2026)';
+    `);
+    console.log("   ✓ Base de datos preparada para importación limpia de Ahorro Corriente.");
 
     // 1. Obtener Agencia Chajul y Usuario Admin
     const { rows: agRows } = await client.query(`select id from agencias where codigo = 'CHAJUL';`);
@@ -121,7 +136,7 @@ print(json.dumps(rows))
         if (n > maxCorrelativoSocio) maxCorrelativoSocio = n;
       }
     }
-    console.log(`   ✓ Socios existentes en base de datos: ${sociosMap.size} (Último correlativo: CHAJ-${String(maxCorrelativoSocio).padStart(5, "0")})`);
+    console.log(`   ✓ Socios base en base de datos: ${sociosMap.size} (Último correlativo: CHAJ-${String(maxCorrelativoSocio).padStart(5, "0")})`);
 
     // 3. Agrupar transacciones por titular unificado y calcular saldos históricos
     console.log("\n2. Consolidando titulares y analizando balance corrido de cada libreta...");
@@ -377,9 +392,11 @@ print(json.dumps(rows))
     // Consulta de comprobación final de saldos en BD
     const { rows: check2026 } = await client.query(`
       select
-        coalesce(sum(case when m.tipo = 'DEPOSITO' and m.fecha >= '2026-01-01' then m.monto else 0 end), 0) as dep_2026,
-        coalesce(sum(case when m.tipo = 'RETIRO' and m.fecha >= '2026-01-01' then m.monto else 0 end), 0) as ret_2026,
-        coalesce(sum(case when m.tipo = 'DEPOSITO' and m.fecha >= '2026-01-01' then m.monto else -m.monto end), 0) as neto_2026
+        coalesce(sum(case when m.tipo = 'DEPOSITO' and m.numero_recibo != 'SALDO-INI-2025' then m.monto else 0 end), 0) as dep_2026,
+        coalesce(sum(case when m.tipo = 'RETIRO' then m.monto else 0 end), 0) as ret_2026,
+        coalesce(sum(case when m.tipo = 'DEPOSITO' and m.numero_recibo != 'SALDO-INI-2025' then m.monto when m.tipo = 'RETIRO' then -m.monto else 0 end), 0) as neto_2026,
+        coalesce(sum(case when m.tipo = 'DEPOSITO' and m.numero_recibo = 'SALDO-INI-2025' then m.monto else 0 end), 0) as hist_pre2026,
+        coalesce(sum(case when m.tipo = 'DEPOSITO' then m.monto else -m.monto end), 0) as saldo_total_ahorro
       from movimientos m
       join cuentas c on c.id = m.cuenta_id
       where c.tipo = 'AHORRO_CORRIENTE';
@@ -389,11 +406,15 @@ print(json.dumps(rows))
     const depBd = Number(res.dep_2026);
     const retBd = Number(res.ret_2026);
     const netoBd = Number(res.neto_2026);
+    const histBd = Number(res.hist_pre2026);
+    const totalAhorroBd = Number(res.saldo_total_ahorro);
 
     console.log(`\n📊 CUADRE MATEMÁTICO FASE 2 (AHORRO CORRIENTE 2026):`);
-    console.log(`   - Depósitos 2026 registrados: Q${depBd.toLocaleString("es-GT", { minimumFractionDigits: 2 })} (Esperado: Q3,620,116.31)`);
-    console.log(`   - Retiros 2026 registrados:   Q${retBd.toLocaleString("es-GT", { minimumFractionDigits: 2 })} (Esperado: Q1,348,045.62)`);
-    console.log(`   - Saldo Neto 2026 en sistema: Q${netoBd.toLocaleString("es-GT", { minimumFractionDigits: 2 })} (Esperado Fila 679: Q2,272,070.69)`);
+    console.log(`   - Total Depósitos 2026 registrados: Q${depBd.toLocaleString("es-GT", { minimumFractionDigits: 2 })} (Esperado: Q3,620,116.31)`);
+    console.log(`   - Total Retiros 2026 registrados:   Q${retBd.toLocaleString("es-GT", { minimumFractionDigits: 2 })} (Esperado: Q1,348,045.62)`);
+    console.log(`   - Saldo Neto Operativo 2026:        Q${netoBd.toLocaleString("es-GT", { minimumFractionDigits: 2 })} (Esperado Fila 679: Q2,272,070.69)`);
+    console.log(`   - Fondo Histórico Pre-2026 migrado: Q${histBd.toLocaleString("es-GT", { minimumFractionDigits: 2 })} (80 cuentas protegidas)`);
+    console.log(`   - Saldo Total Consolidado Ahorro:   Q${totalAhorroBd.toLocaleString("es-GT", { minimumFractionDigits: 2 })}`);
 
     const difDep = Math.abs(depBd - 3620116.31);
     const difRet = Math.abs(retBd - 1348045.62);

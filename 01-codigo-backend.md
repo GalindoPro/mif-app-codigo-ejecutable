@@ -36,6 +36,7 @@ Código real y completo del backend (API en Node.js + TypeScript + PostgreSQL), 
 - [`backend/src/utils/auth.ts`](#backendsrcutilsauthts)
 - [`backend/src/utils/errors.ts`](#backendsrcutilserrorsts)
 - [`backend/src/utils/dpiGuatemala.ts`](#backendsrcutilsdpiguatemalats)
+- [`backend/src/db/importar-ahorro-corriente.ts`](#backendsrcdbimportarahorrocorrientets)
 - [`backend/db/schema.sql`](#backenddbschemasql)
 - [`backend/db/schema.supabase.sql`](#backenddbschemasupabasesql)
 
@@ -4520,6 +4521,49 @@ export function validarDpiGuatemala(dpi: string | null | undefined, agenciaCodig
     dpiFormateado,
   };
 }
+```
+
+## `backend/src/db/importar-ahorro-corriente.ts` {#backendsrcdbimportarahorrocorrientets}
+
+```ts
+import "dotenv/config";
+import { pool } from "./pool";
+import { execSync } from "child_process";
+import path from "path";
+
+/**
+ * Script Oficial de Importación — Fase 2: Ahorro Corriente
+ * Archivo: importar/ahorro corriente/AHORRO CORRIENTE 30-08-2026.xlsx
+ */
+
+interface RawExcelRow {
+  row: number;
+  cta: string;
+  fec: string;
+  rec: string;
+  agencia: string;
+  nombre: string;
+  dep: number;
+  ret: number;
+}
+
+const TYPO_MAP: Record<string, string> = {
+  "IGLESIA EVANGALICA MISION JESUS FUENTE DE VISA JUIL": "IGLESIA EVANGELICA MISION JESUS FUENTE DE VIDA JUIL",
+  "IGLESIA EVANGELICA 1 MISION JESUS FUENTE DE VIDA JUIL": "IGLESIA EVANGELICA MISION JESUS FUENTE DE VIDA JUIL",
+  "ROSA LAYNEZ RAMISREZ DE LAYNEZ": "ROSA LAYNEZ RAMIREZ DE LAYNEZ",
+  "MATEO CANAY AISCONA Y JUANA CLARITA LAYNEZ DEL BARRIO": "MATEO CANAY ASICONA Y JUANA CLARITA LAYNEZ DEL BARRIO",
+  "MATEO CANAY ASICOANA": "MATEO CANAY ASICONA",
+  "JUA SANCHEZ LAYNEZ": "JUAN SANCHEZ LAYNEZ",
+  "MARIA RIVER NUNAL": "MARIA RIVERA NUNAL",
+  "JUANA HU GLINDO": "JUANA HU GALINDO",
+  "MANUELA YESSICA  SANCHZ CABA": "MANUELA YESSICA SANCHEZ CABA",
+  "MADGALENA MENDOZA RIVERA": "MAGDALENA MENDOZA RIVERA",
+  "MANUEL PACHECO ASOCONA": "MANUEL PACHECO ASICONA",
+  "PEDRO LUIS TOMA LUX": "PEDRO LUIS TOMAS LUX",
+  "ELENA CABA  RIVERA": "ELENA CABA RIVERA",
+  "TERESA ASICONA  ASICONA": "TERESA ASICONA ASICONA",
+};
+// ... Ver implementación completa en backend/src/db/importar-ahorro-corriente.ts
 ```
 
 ## `backend/db/schema.sql` {#backenddbschemasql}

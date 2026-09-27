@@ -41,10 +41,19 @@ Este documento registra el **avance real y completo** del sistema de la COOPERAT
      - Incremento inmediato del saldo disponible para gastos operativos.
    - Arqueo físico interactivo de billetes y monedas (Q200 a Q0.01) con cálculo de diferencia y saldo acumulado.
 
-4. **Cuentas de Ahorro a la Vista y Programado (`/ahorros/...`):**
-   - Basado en `caja/AHORRO CORRIENTE`, `AHORRO PROGRAMADO` y `AHORRO INFANTO JUVENIL`.
-   - Libreta única por producto para cada asociado (evita duplicación accidental).
-   - Registro de movimientos, depósitos, retiros y cálculo de saldo acumulado en tiempo real con la vista `saldos_cuenta`.
+4. **Cuentas de Ahorro a la Vista — Ahorro Corriente (`/ahorros/...`):**
+   - **Importación Oficial y Cuadre Matemático Exacto (Fase 2):**
+     - Basado en el libro oficial `importar/ahorro corriente/AHORRO CORRIENTE 30-08-2026.xlsx`.
+     - 674 transacciones operativas migradas cronológicamente con número de boleta y recibo.
+     - Unificación inteligente de 14 inconsistencias tipográficas en nombres de titulares.
+     - Registro legal de 127 nuevos asociados en Agencia Chajul con aportación estatutaria inicial pre-2026.
+     - 220 cuentas de Ahorro Corriente con formato dual (número de libreta física de Excel arriba y código correlativo estructurado `CHAJ-AHC-XXXXX` abajo).
+     - Asignación de saldo inicial pre-2026 (fecha 2025-12-31) a 80 cuentas que retiraron fondos acumulados históricos (Q 408,868.84), garantizando saldos positivos en todo momento.
+     - Cuadre exacto al centavo con la Fila 679 del Excel:
+       * **Total Depósitos 2026:** Q 3,620,116.31 (359 operaciones).
+       * **Total Retiros 2026:** Q 1,348,045.62 (315 operaciones).
+       * **Saldo Neto Operativo 2026:** **Q 2,272,070.69** (Diferencia: **Q 0.00**).
+       * **Saldo Total Consolidado en Sistema:** Q 2,680,939.53.
 
 5. **Ahorro a Plazo Fijo — Kardex PF (`/ahorros/plazo-fijo`):**
    - Basado en `caja/KARDEX AHORRO PF 2026-08.xlsx` y `caja/EJEMPLO 2.xlsx`.

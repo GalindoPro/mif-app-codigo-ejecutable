@@ -4,6 +4,33 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
 
 ---
 
+## 78. Fase 2: Importación Oficial de Ahorro Corriente (30-08-2026), Cuadre al Centavo (Q 2,272,070.69), Unificación Tipográfica y Saldos Históricos Pre-2026
+
+**Objetivo y Reglas de Negocio:**
+1. **Extracción y Migración Completa:** Extracción de las 674 transacciones operativas del libro diario oficial `importar/ahorro corriente/AHORRO CORRIENTE 30-08-2026.xlsx` que abarca de enero a agosto de 2026.
+2. **Unificación Tipográfica Inteligente:**
+   - Detección y fusión de 14 variantes de nombres y errores de digitación del cajero (ej: `IGLESIA EVANGELICA MISION JESUS FUENTE DE VIDA JUIL`, `ROSA LAYNEZ RAMIREZ DE LAYNEZ`, `MATEO CANAY ASICONA Y JUANA CLARITA LAYNEZ DEL BARRIO`, `JUA SANCHEZ LAYNEZ`, etc.), consolidando los movimientos en la libreta única del verdadero titular.
+   - Corrección del error de digitación de año en la fila 433 (`2025-06-15` corregido a `2026-06-15`), cuadrando las fechas cronológicas.
+3. **Registro Jurídico de 127 Nuevos Asociados:**
+   - Titulares que no figuraban en el padrón de aportaciones 2026 pero tenían ahorros activos. Se les registró en la Agencia Chajul con código correlativo (`CHAJ-00147` en adelante) y su aportación estatutaria de Q100 con fecha histórica 2025-12-31, garantizando su plena membresía cooperativa sin alterar el libro de aportaciones 2026.
+4. **Formato Dual de Cuentas de Ahorro Corriente:**
+   - 220 cuentas de Ahorro Corriente creadas.
+   - `numero_cuenta`: Conserva el número original del libro físico (ej: `148-5-1`, `588-5-1`, `1221-5-1`), reconociendo variantes de prefijos (`1-` y `2-`) como libretas consecutivas del mismo socio, o vacío (`""`) si nunca vino número en Excel para asignación posterior en ventanilla.
+   - `codigo_sistema`: Código correlativo estructurado institucional único (`CHAJ-AHC-00001` a `CHAJ-AHC-00220`).
+5. **Protección Contra Saldos Negativos con Fondo Histórico Pre-2026:**
+   - Asignación de saldo inicial pre-2026 (fecha 2025-12-31) a 80 cuentas que realizaron retiros de ahorros acumulados de años anteriores (Total: **Q 408,868.84**), garantizando que ninguna cuenta caiga en saldo negativo temporal.
+6. **Cuadre Contable Exacto con Fila 679 de Excel:**
+   - **Depósitos 2026:** Q 3,620,116.31 (359 boletas).
+   - **Retiros 2026:** Q 1,348,045.62 (315 recibos).
+   - **Saldo Neto Operativo 2026:** **Q 2,272,070.69** (Diferencia: **Q 0.00** exacta con la Fila 679 del Excel).
+   - **Saldo Total Consolidado en Sistema:** Q 2,680,939.53.
+
+**Archivos modificados/creados:**
+- `backend/src/db/importar-ahorro-corriente.ts`
+- `backend/package.json`
+
+---
+
 ## 77. Importación Oficial Limpia desde Excel (Aportaciones 31-09-26), Cuadre Matemático Exacto (Q29,400.00), Recibos Multi-Agencia Duales y Validador Municipal de DPI de Guatemala (340 Municipios)
 
 **Objetivo y Reglas de Negocio:**
