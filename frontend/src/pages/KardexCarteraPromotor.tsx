@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { formatoQ } from "../types";
-import type { KardexCarteraRespuesta, TipoPrestamo } from "../types";
+import type { KardexCarteraRespuesta, KardexCarteraItem, TipoPrestamo } from "../types";
 import { useAuth } from "../context/AuthContext";
 
 export default function KardexCarteraPromotor() {
@@ -51,9 +51,82 @@ export default function KardexCarteraPromotor() {
     );
   });
 
+  function obtenerFechaVencimiento(p: KardexCarteraItem): string {
+    if (p.fecha_vencimiento) {
+      return new Date(p.fecha_vencimiento).toLocaleDateString("es-GT");
+    }
+    if (p.fecha_desembolso && p.plazo_meses) {
+      const d = new Date(p.fecha_desembolso);
+      d.setMonth(d.getMonth() + Number(p.plazo_meses));
+      return d.toLocaleDateString("es-GT");
+    }
+    return "A término";
+  }
+
+  function exportarExcel() {
+    if (!itemsFiltrados || itemsFiltrados.length === 0) return;
+    const encabezados = [
+      "Código",
+      "No. Asociado",
+      "Socio",
+      "Comunidad / Ubicación",
+      "Tipo Crédito",
+      "Garantía / Fiador",
+      "Plazo Meses",
+      "Fecha Vencimiento",
+      "Valor Crédito Original",
+      "Saldo Vivo Capital",
+      "Cuota Mensual",
+      "Estado Mes",
+      "Total Pagado Mes",
+    ];
+    const filas = itemsFiltrados.map((p) => {
+      const montoOriginal = Number(p.monto_aprobado || p.monto_solicitado);
+      const saldoActual = Number(p.saldo_capital ?? montoOriginal);
+      const vencimiento = obtenerFechaVencimiento(p);
+      const estadoLabel = p.estadoCuotaMes === "CANCELADO" ? "Liquidado" : p.estadoCuotaMes === "AL_DIA" ? "Al Día" : "Pendiente";
+      return [
+        `"${p.codigo}"`,
+        `"${p.numero_asociado || ""}"`,
+        `"${(p.socio_nombres || "").replace(/"/g, '""')}"`,
+        `"${p.ubicacion_garantia || "Chajul"}"`,
+        `"${p.tipo}"`,
+        `"${(p.nombre_fiador || p.garantia || "Fiador solidario").replace(/"/g, '""')}"`,
+        p.plazo_meses,
+        `"${vencimiento}"`,
+        montoOriginal.toFixed(2),
+        saldoActual.toFixed(2),
+        Number(p.cuota_mensual).toFixed(2),
+        `"${estadoLabel}"`,
+        Number(p.totalPagadoMes || 0).toFixed(2),
+      ];
+    });
+    const csvContent = "\uFEFF" + [encabezados.join(";"), ...filas.map((f) => f.join(";"))].join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Kardex_Cartera_COMIF_${mes}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   const totalItems = itemsFiltrados.length;
   const totalPaginas = Math.max(1, Math.ceil(totalItems / pageSize));
   const itemsPaginados = itemsFiltrados.slice((page - 1) * pageSize, page * pageSize);
+
+  const sumaValorOriginal = itemsFiltrados.reduce(
+    (acc, x) => acc + Number(x.monto_aprobado || x.monto_solicitado || 0),
+    0
+  );
+  const sumaSaldoVivo = itemsFiltrados.reduce(
+    (acc, x) => acc + Number(x.saldo_capital ?? (x.monto_aprobado || x.monto_solicitado) ?? 0),
+    0
+  );
+  const sumaCuotas = itemsFiltrados.reduce(
+    (acc, x) => acc + Number(x.cuota_mensual || 0),
+    0
+  );
 
   const [reseteando, setReseteando] = useState(false);
   const [recargando, setRecargando] = useState(false);
@@ -139,8 +212,17 @@ export default function KardexCarteraPromotor() {
               style={{ padding: "0.4rem 0.6rem", borderRadius: "6px", fontSize: "0.88rem" }}
             />
           </div>
-          <button type="button" className="btn secondary" onClick={() => window.print()}>
+          <button type="button" className="btn secondary" onClick={() => window.print()} title="Imprimir libro oficial del Kardex">
             🖨️ Imprimir Kardex
+          </button>
+          <button
+            type="button"
+            className="btn secondary"
+            onClick={exportarExcel}
+            title="Descargar libro de cartera en Excel (CSV)"
+            style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
+          >
+            📥 Exportar a Excel
           </button>
           <Link to="/creditos/nuevo" className="btn">
             + Nueva Solicitud en Campo
@@ -192,22 +274,28 @@ export default function KardexCarteraPromotor() {
         >
           <div className="stat-card accent">
             <span className="label">💼 Cartera Activa Viva</span>
-            <span className="value">{formatoQ(kardex.resumen.totalCarteraViva)}</span>
+            <span className="value" style={{ fontSize: "clamp(0.95rem, 1.15vw, 1.22rem)", whiteSpace: "nowrap" }}>
+              {formatoQ(kardex.resumen.totalCarteraViva)}
+            </span>
             <span className="hint">{kardex.resumen.totalCreditos} préstamos registrados</span>
           </div>
           <div className="stat-card">
             <span className="label">🏡 Hipotecarios</span>
-            <span className="value">{formatoQ(kardex.resumen.totalColocadoHipotecario)}</span>
+            <span className="value" style={{ fontSize: "clamp(0.95rem, 1.15vw, 1.22rem)", whiteSpace: "nowrap" }}>
+              {formatoQ(kardex.resumen.totalColocadoHipotecario)}
+            </span>
             <span className="hint">{kardex.resumen.countHipotecarios} créditos colocados</span>
           </div>
           <div className="stat-card">
             <span className="label">🤝 Fiduciarios</span>
-            <span className="value">{formatoQ(kardex.resumen.totalColocadoFiduciario)}</span>
+            <span className="value" style={{ fontSize: "clamp(0.95rem, 1.15vw, 1.22rem)", whiteSpace: "nowrap" }}>
+              {formatoQ(kardex.resumen.totalColocadoFiduciario)}
+            </span>
             <span className="hint">{kardex.resumen.countFiduciarios} créditos colocados</span>
           </div>
           <div className="stat-card">
             <span className="label">💵 Cobrado en {mes}</span>
-            <span className="value" style={{ color: "#16a34a" }}>
+            <span className="value" style={{ color: "#16a34a", fontSize: "clamp(0.95rem, 1.15vw, 1.22rem)", whiteSpace: "nowrap" }}>
               {formatoQ(kardex.resumen.totalCobradoMes)}
             </span>
             <span className="hint">Ingresos recibidos en caja</span>
@@ -331,7 +419,25 @@ export default function KardexCarteraPromotor() {
                                 {p.tipo}
                               </span>
                             </div>
-                            <div style={{ display: "flex", gap: "0.5rem" }}>
+                            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                              {p.estadoCuotaMes !== "CANCELADO" && (
+                                <Link
+                                  to={`/auxiliar-caja?socioId=${p.socio_id}&prestamoId=${p.id}&accion=COBRO_CUOTA`}
+                                  className="btn"
+                                  style={{
+                                    fontSize: "0.78rem",
+                                    padding: "0.25rem 0.6rem",
+                                    background: "#059669",
+                                    borderColor: "#059669",
+                                    color: "#fff",
+                                    textDecoration: "none",
+                                    fontWeight: 700,
+                                  }}
+                                  title="Cobrar cuota de este préstamo en Ventanilla"
+                                >
+                                  💰 Cobrar en Ventanilla
+                                </Link>
+                              )}
                               <Link
                                 to={`/creditos/${p.id}`}
                                 className="btn secondary"
@@ -378,7 +484,7 @@ export default function KardexCarteraPromotor() {
                             </div>
                             <div>
                               <span style={{ color: "var(--ink-soft)" }}>Vencimiento:</span>{" "}
-                              <strong>{p.fecha_vencimiento ? p.fecha_vencimiento.slice(0, 10) : "Calculado"}</strong>
+                              <strong>{obtenerFechaVencimiento(p)}</strong>
                             </div>
                             <div>
                               <span style={{ color: "var(--ink-soft)" }}>Monto inicial:</span>{" "}
@@ -457,7 +563,7 @@ export default function KardexCarteraPromotor() {
                             </div>
                           </td>
                           <td>
-                            <div>{p.nombre_fiador || p.garantia || "—"}</div>
+                            <div>{p.nombre_fiador || p.garantia || "Garantía fiduciaria"}</div>
                             <div style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
                               {p.tipo === "FIDUCIARIO" ? "Fiador solidario" : "Garantía hipotecaria"}
                             </div>
@@ -465,7 +571,7 @@ export default function KardexCarteraPromotor() {
                           <td>
                             <div>{p.plazo_meses} meses</div>
                             <div style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>
-                              Vence: {p.fecha_vencimiento ? p.fecha_vencimiento.slice(0, 10) : "—"}
+                              Vence: {obtenerFechaVencimiento(p)}
                             </div>
                           </td>
                           <td className="mono" style={{ textAlign: "right", fontWeight: 600 }}>
@@ -476,7 +582,7 @@ export default function KardexCarteraPromotor() {
                             style={{
                               textAlign: "right",
                               fontWeight: 700,
-                              color: saldoActual > 0 ? "#b45309" : "#15803d",
+                              color: saldoActual > 0 ? "#BF9903" : "#15803d",
                             }}
                           >
                             {formatoQ(saldoActual)}
@@ -500,14 +606,34 @@ export default function KardexCarteraPromotor() {
                             )}
                           </td>
                           <td style={{ textAlign: "center" }}>
-                            <button
-                              type="button"
-                              className="btn secondary"
-                              style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-                              onClick={() => setExpandidoId(p.id)}
-                            >
-                              👁️ Ver pagos ({p.pagos.length})
-                            </button>
+                            <div style={{ display: "flex", gap: "0.25rem", justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
+                              <button
+                                type="button"
+                                className="btn secondary"
+                                style={{ fontSize: "0.72rem", padding: "0.2rem 0.4rem" }}
+                                onClick={() => setExpandidoId(p.id)}
+                                title="Ver historial de pagos de este crédito"
+                              >
+                                👁️ Pagos ({p.pagos.length})
+                              </button>
+                              {p.estadoCuotaMes !== "CANCELADO" && (
+                                <Link
+                                  to={`/auxiliar-caja?socioId=${p.socio_id}&prestamoId=${p.id}&accion=COBRO_CUOTA`}
+                                  className="btn secondary"
+                                  style={{
+                                    fontSize: "0.72rem",
+                                    padding: "0.2rem 0.4rem",
+                                    borderColor: "#10b981",
+                                    color: "#10b981",
+                                    textDecoration: "none",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                  title="Cobrar cuota en ventanilla"
+                                >
+                                  💰 Cobrar
+                                </Link>
+                              )}
+                            </div>
                           </td>
                         </>
                       )}
@@ -515,6 +641,25 @@ export default function KardexCarteraPromotor() {
                 );
               })}
             </tbody>
+            <tfoot>
+              <tr style={{ background: "var(--paper-raised)", borderTop: "2px solid var(--line)", fontWeight: 800 }}>
+                <td colSpan={4} style={{ textAlign: "right", color: "var(--ink)", padding: "0.65rem 0.75rem", fontSize: "0.85rem" }}>
+                  TOTAL CONSOLIDADO ({totalItems} créditos):
+                </td>
+                <td className="mono" style={{ textAlign: "right", color: "var(--ink)", padding: "0.65rem 0.75rem", fontSize: "0.88rem", fontWeight: 800 }}>
+                  {formatoQ(sumaValorOriginal)}
+                </td>
+                <td className="mono" style={{ textAlign: "right", color: "#BF9903", padding: "0.65rem 0.75rem", fontSize: "0.88rem", fontWeight: 800 }}>
+                  {formatoQ(sumaSaldoVivo)}
+                </td>
+                <td className="mono" style={{ textAlign: "right", color: "var(--accent)", padding: "0.65rem 0.75rem", fontSize: "0.88rem", fontWeight: 800 }}>
+                  {formatoQ(sumaCuotas)}
+                </td>
+                <td colSpan={2} style={{ textAlign: "center", fontSize: "0.76rem", color: "var(--ink-soft)", padding: "0.65rem 0.75rem" }}>
+                  {kardex?.resumen.sociosAlDia ?? 0} al día · {kardex?.resumen.sociosPendientes ?? 0} pendientes
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}

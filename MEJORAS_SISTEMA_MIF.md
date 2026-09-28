@@ -2120,6 +2120,99 @@ Elevar el módulo de Créditos (`/creditos`) a estándar financiero bancario y c
 **Resultado:**
 - Ciclo de cobro y supervisión de créditos 100% integrado entre el módulo de cartera y la ventanilla operativa de caja.
 
+---
+
+### MEJORA #91 (28/09/2026) - Optimizaciones de Kardex de Cartera de Préstamos: Cifras Completas sin Truncamiento, Exportación Excel, Vencimientos Dinámicos y Cobro Directo en Ventanilla
+
+**Objetivo:**
+Elevar el módulo del Kardex de Cartera (`/promotor/cartera`) al estándar de auditoría y gestión de campo bancaria y cooperativa, eliminando el corte con puntos suspensivos en las cifras monetarias grandes de los KPIs, incorporando exportación directa a Excel (CSV), calculando automáticamente las fechas de vencimiento de cada crédito y facilitando el cobro en ventanilla en 1 clic.
+
+**Detalles de la Implementación:**
+1. **Ajuste Tipográfico de KPIs contra Truncamiento (`KardexCarteraPromotor.tsx`):**
+   - Se aplicó tipografía adaptable con `fontSize: "clamp(0.95rem, 1.15vw, 1.22rem)"` y `whiteSpace: "nowrap"` en los valores de las tarjetas superiores.
+   - Las cifras monetarias millonarias (`Q 29,066,388.80` y `Q 30,168,300.80`) ahora se leen completas, nítidas y sin puntos suspensivos (`....`).
+2. **Exportación Inmediata del Kardex a Excel (`exportarExcel`):**
+   - Se incorporó el botón `📥 Exportar a Excel` en la cabecera junto a `🖨️ Imprimir Kardex`.
+   - Genera una sábana completa de los 121 créditos con código, número de asociado, nombres completos, comunidad, tipo de crédito, fiador/garantía, plazo, vencimiento, valor original, saldo vivo, cuota mensual, estado del mes y total pagado.
+3. **Cálculo Dinámico de Fechas de Vencimiento:**
+   - Si `p.fecha_vencimiento` no viene registrada de origen, el sistema calcula de forma automática la fecha proyectada sumando el plazo en meses a la fecha de desembolso (`p.fecha_desembolso + p.plazo_meses`), eliminando el texto vacío `Vence: —`.
+4. **Acceso Directo `💰 Cobrar` a Ventanilla:**
+   - En la columna de acciones de la tabla y en la tarjeta expandida de cada crédito, se habilitó el botón `💰 Cobrar` para préstamos activos.
+   - Navega directamente a `/auxiliar-caja` precargando al socio y la cuota respectiva para registrar el pago al instante.
+
+**Archivos Modificados:**
+- `frontend/src/pages/KardexCarteraPromotor.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+- `00-INDICE.md`
+
+**Resultado:**
+- Kardex de cartera 100% visible, exportable a Excel y vinculado con la ventanilla operativa.
+
+---
+
+### MEJORA #92 (28/09/2026) - Reclasificación Contable de Cartera: Separación Fiel de Hipotecarios (Garantía Real) y Fiduciarios según Libros Excel del Promotor
+
+**Objetivo:**
+Subsanar la asignación homogénea que etiquetaba los 121 créditos como Fiduciarios, reclasificando con exactitud los 53 préstamos que poseen Garantía Real Hipotecaria (terrenos e inmuebles en Cantón Chajul, Ilom, Juil, etc.) según las hojas originales `HIPOTECARIO` y `FIDUCIARIO` del archivo `promotor/KARDEX PRESTAMOS 01-07-26 AL 31-07-26 promotor 2.xlsx`.
+
+**Detalles de la Implementación:**
+1. **Cruce Contable Automatizado con el Libro Excel Oficial:**
+   - Se ejecutó el script de sincronización `sincronizar-tipos-prestamos.ts` cruzando los registros de la base de datos contra las hojas oficiales del Promotor.
+   - 53 créditos fueron reclasificados como `HIPOTECARIO` con su ubicación de garantía (`Inmueble / Terreno`) y 68 como `FIDUCIARIO` (con fiador solidario).
+2. **Balance y Distribución de Cartera Actualizada:**
+   - **Créditos Hipotecarios (Garantía Real):** 53 créditos por un valor de **Q 14,525,023.86** (Saldo Vivo: **Q 13,945,292.67**).
+   - **Créditos Fiduciarios:** 68 créditos por un valor de **Q 15,643,276.94** (Saldo Vivo: **Q 15,121,096.30**).
+   - **Total Cartera:** 121 créditos por un monto total de **Q 30,168,300.80** (Saldo Vivo: **Q 29,066,388.97**).
+3. **Impacto en Pantallas y Estados Financieros:**
+   - En el **Kardex de Cartera** (`/promotor/cartera`): La tarjeta `🏡 Hipotecarios` muestra de inmediato `Q 14,525,023.86 (53 créditos)`, la tarjeta `🤝 Fiduciarios` muestra `Q 15,643,276.94 (68 créditos)`, y los filtros de pestañas segmentan con un clic.
+   - En el **Balance General** (`/consolidado-financiero`): Se desglosa fielmente el rubro `103-01 Créditos Hipotecarios` y `103-02 Créditos Fiduciarios`.
+
+**Archivos Modificados:**
+- `backend/src/db/sincronizar-tipos-prestamos.ts`
+- `MEJORAS_SISTEMA_MIF.md`
+- `00-INDICE.md`
+
+---
+
+### MEJORA #93 (28/09/2026) - Incorporación de Pie de Tabla de Totales Consolidados (`<tfoot>`) en Kardex de Cartera y Cartera General de Créditos
+
+**Objetivo:**
+Hacer visible de forma permanente e inequívoca la fila de suma total acumulada (`<tfoot>`) al pie de las tablas interactivas de la cartera de préstamos, permitiendo a la Gerencia, Promotoría y Auditoría visualizar al instante la suma total colocada, el saldo vivo insoluto y la cuota mensual proyectada sin necesidad de recurrir únicamente a la vista de impresión.
+
+**Detalles de la Implementación:**
+1. **Pie de Tabla en Kardex de Cartera (`frontend/src/pages/KardexCarteraPromotor.tsx`):**
+   - Se calcularon las sumatorias dinámicas sobre la cartera filtrada:
+     * `sumaValorOriginal`: Sumatoria total del capital colocado original (Q 30,168,300.80 al ver todos los 121 créditos).
+     * `sumaSaldoVivo`: Sumatoria del capital insoluto pendiente de cobro (Q 29,066,388.97 al ver la cartera completa) resaltado en Oro Maya `#BF9903`.
+     * `sumaCuotas`: Sumatoria de las cuotas mensuales devengadas a recaudar en el mes.
+   - Se incorporó la fila `<tfoot>` en la tabla interactiva de pantalla (`table.table`), alineando las 9 columnas con precisión:
+     * Columnas 1-4 (`colSpan={4}`): Etiqueta `TOTAL CONSOLIDADO (X créditos):`
+     * Columna 5: `formatoQ(sumaValorOriginal)`
+     * Columna 6: `formatoQ(sumaSaldoVivo)` en tono `#BF9903`
+     * Columna 7: `formatoQ(sumaCuotas)` en tono `var(--accent)`
+     * Columnas 8-9 (`colSpan={2}`): Indicador de socios al día vs socios pendientes en el mes.
+2. **Pie de Tabla en Cartera de Créditos (`frontend/src/pages/CreditosList.tsx`):**
+   - Se incorporó el cálculo de `totalCuotas` para sumar las cuotas mensuales de préstamos en cobro.
+   - Se añadió la fila `<tfoot>` alineada con las 10 columnas de la tabla:
+     * Columnas 1-3 (`colSpan={3}`): `TOTAL CARTERA (X créditos):`
+     * Columna 4: `totalDesembolsado` (Q 30,168,300.80)
+     * Columna 5: `totalSaldoVivo` (Q 29,066,388.97) en `#BF9903`
+     * Columna 6: Indicador de plazo medio
+     * Columna 7: `totalCuotas`
+     * Columnas 8-10 (`colSpan={3}`): Resumen de créditos en cobro activo vs aprobados.
+
+**Archivos Modificados:**
+- `frontend/src/pages/KardexCarteraPromotor.tsx`
+- `frontend/src/pages/CreditosList.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+- `00-INDICE.md`
+
+**Resultado:**
+- Ambas tablas de cartera presentan ahora una fila de cierre financiero formal y de alto contraste con el 100% de los totales consolidados.
+
+
+
+
 
 
 

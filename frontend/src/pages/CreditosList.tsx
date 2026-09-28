@@ -120,6 +120,11 @@ export default function CreditosList() {
       ?.filter((p) => p.estado === "DESEMBOLSADO")
       .reduce((acc, p) => acc + Number(p.saldo_capital != null ? p.saldo_capital : (p.monto_aprobado ?? p.monto_solicitado)), 0) ?? 0;
 
+  const totalCuotas =
+    prestamos
+      ?.filter((p) => p.estado === "DESEMBOLSADO")
+      .reduce((acc, p) => acc + Number(p.cuota_mensual || 0), 0) ?? 0;
+
   function exportarExcel() {
     if (!prestamos || prestamos.length === 0) return;
     const encabezados = [
@@ -730,6 +735,26 @@ export default function CreditosList() {
                   );
                 })}
               </tbody>
+              <tfoot>
+                <tr style={{ background: "var(--paper-raised)", borderTop: "2px solid var(--line)", fontWeight: 800 }}>
+                  <td colSpan={3} style={{ textAlign: "right", color: "var(--ink)", padding: "0.65rem 0.75rem", fontSize: "0.85rem" }}>
+                    TOTAL CARTERA ({totalCreditos} créditos):
+                  </td>
+                  <td className="mono" style={{ textAlign: "right", color: "var(--ink)", padding: "0.65rem 0.75rem", fontSize: "0.88rem", fontWeight: 800 }}>
+                    {formatoQ(totalDesembolsado)}
+                  </td>
+                  <td className="mono" style={{ textAlign: "right", color: "#BF9903", padding: "0.65rem 0.75rem", fontSize: "0.88rem", fontWeight: 800 }}>
+                    {formatoQ(totalSaldoVivo)}
+                  </td>
+                  <td style={{ textAlign: "center", fontSize: "0.75rem", color: "var(--ink-soft)" }}>—</td>
+                  <td className="mono" style={{ textAlign: "right", color: "var(--accent)", padding: "0.65rem 0.75rem", fontSize: "0.88rem", fontWeight: 800 }}>
+                    {formatoQ(totalCuotas)}
+                  </td>
+                  <td colSpan={3} style={{ textAlign: "center", fontSize: "0.75rem", color: "var(--ink-soft)", padding: "0.65rem 0.75rem" }}>
+                    {desembolsados} en cobro activo · {aprobados} por desembolsar
+                  </td>
+                </tr>
+              </tfoot>
             </table>
 
             {prestamos && prestamos.length === 0 && (

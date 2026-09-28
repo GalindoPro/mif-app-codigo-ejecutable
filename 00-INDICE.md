@@ -388,5 +388,20 @@ Todas las especificaciones operativas y estatutarias acordadas se encuentran doc
     - **Exportación Inmediata a Excel (CSV):** Botón `📥 Excel` en la barra de filtros para descargar la cartera activa con todos sus metadatos contables.
     - **Protección de Liquidación:** Advertencia gerencial reforzada en el botón `Finalizar ⚠️` si el crédito posee saldo activo > Q 0.00.
 
+65. **Fase 17: Optimizaciones del Kardex de Cartera de Préstamos (`/promotor/cartera`):**
+    - **Cifras Monetarias sin Truncamiento:** Aplicación de tipografía adaptable con `clamp()` en tarjetas KPI que despliega de forma completa y nítida montos millonarios (Q 29M y Q 30M) sin cortes con puntos suspensivos.
+    - **Exportación Inmediata a Excel (CSV):** Botón `📥 Exportar a Excel` en la cabecera que descarga la sábana completa de los 121 créditos activos con historial mensual.
+    - **Cálculo Automático de Vencimientos:** Proyección dinámica sumando el plazo a la fecha de desembolso para créditos sin fecha fija de vencimiento.
+    - **Acceso Rápido `💰 Cobrar`:** Enlace en cada fila y ficha expandida que abre la ventanilla de caja auxiliar con el socio y crédito precargados.
+
+66. **Fase 18: Reclasificación Contable de Cartera (Hipotecarios vs. Fiduciarios):** Sincronización automatizada con las hojas `HIPOTECARIO` y `FIDUCIARIO` del archivo Excel oficial del Promotor. 53 créditos fueron reclasificados como `HIPOTECARIO` (Q 14.5M, garantía real en Chajul/Ilom/Juil) y 68 como `FIDUCIARIO` (Q 15.6M, fiador solidario), corrigiendo los contadores a 0 en el Kardex y reflejando la composición real en el Balance General (`103-01` y `103-02`).
+
+67. **Fase 19: Fila de Totales Consolidados (`<tfoot>`) en Pantalla para Kardex y Cartera de Préstamos:**
+    - **Visualización Permanente de Totales en Kardex (`/promotor/cartera`):** Fila de pie de tabla con sumatoria dinámica de Valor Crédito (Q 30,168,300.80), Saldo Vivo Insoluto (Q 29,066,388.97) en tono `#BF9903`, Cuotas Mensuales devengadas y contadores de socios al día vs pendientes.
+    - **Visualización Permanente de Totales en Cartera (`/creditos`):** Fila de pie de tabla con sumatoria de Monto Desembolsado, Saldo Vivo de Capital, Cuotas Mensuales a recaudar y contadores de créditos activos y aprobados.
+
+
+
+
 
 
