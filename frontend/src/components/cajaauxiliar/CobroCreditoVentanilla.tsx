@@ -23,6 +23,8 @@ import ReciboCobroCreditoModal, { type DatosReciboCobro } from "../ReciboCobroCr
 export interface CobroCreditoVentanillaProps {
   agenciaId: string;
   diaId: string;
+  socioInicialId?: string | null;
+  prestamoInicialId?: string | null;
   onCobrado: () => void;
 }
 
@@ -123,6 +125,8 @@ function ListaPendientesCobro({
 export default function CobroCreditoVentanilla({
   agenciaId,
   diaId,
+  socioInicialId,
+  prestamoInicialId,
   onCobrado,
 }: CobroCreditoVentanillaProps) {
   const { usuario } = useAuth();
@@ -255,6 +259,15 @@ export default function CobroCreditoVentanilla({
     }
   }
 
+  // Si se provee socioInicialId desde la navegación de Créditos, precargar el socio automáticamente
+  useEffect(() => {
+    if (socioInicialId && !socio) {
+      api.get<Socio>(`/socios/${socioInicialId}`)
+        .then(({ data }) => setSocio(data))
+        .catch(err => console.error("Error precargando socio para cobro:", err));
+    }
+  }, [socioInicialId]);
+
   useEffect(() => {
     if (!socio) {
       setPrestamos([]);
@@ -271,7 +284,10 @@ export default function CobroCreditoVentanilla({
       .then(({ data }) => {
         const activos = data.filter((p) => p.estado === "DESEMBOLSADO" || p.estado === "APROBADO");
         setPrestamos(activos);
-        if (activos[0]) {
+        const match = prestamoInicialId ? activos.find((p) => p.id === prestamoInicialId) : null;
+        if (match) {
+          cargarLiquidacion(match);
+        } else if (activos[0]) {
           cargarLiquidacion(activos[0]);
         } else {
           setPrestamo(null);

@@ -2087,5 +2087,39 @@ Elevar la pantalla operativa y de control de Caja Chica (`/caja-chica`) al está
 **Resultado:**
 - Cuadre y auditoría de Caja Chica 100% transparente para administradores, contabilidad y comisión de vigilancia.
 
+---
+
+### MEJORA #90 (28/09/2026) - Optimizaciones de Cartera de Créditos: Saldo Vivo en Línea, Enlace Directo a Ventanilla, Exportación Excel y Protección de Liquidación
+
+**Objetivo:**
+Elevar el módulo de Créditos (`/creditos`) a estándar financiero bancario y cooperativo, visualizando en línea el saldo vivo pendiente de cada préstamo, conectando el cobro en ventanilla con precarga automática del asociado y crédito, incorporando exportación inmediata a Excel y blindando el botón de liquidación para prevenir anulaciones accidentales de deuda.
+
+**Detalles de la Implementación:**
+1. **Columna "Saldo Vivo" en Tabla de Créditos (`CreditosList.tsx`):**
+   - Incorporación de la columna `Saldo Vivo` en color Oro Maya `#BF9903` con tipografía monoespaciada `IBM Plex Mono`.
+   - Permite a la gerencia, auditoría y promotores conocer de forma inmediata el capital insoluto real adeudado a la fecha, diferenciándolo del monto original otorgado.
+2. **Cálculo de Saldo Vivo en KPI de Cartera Activa:**
+   - La tarjeta superior `CARTERA ACTIVA` ahora refleja el total del saldo vivo pendiente de cobro y preserva el desglose del monto total desembolsado.
+3. **Flujo de Cobro Directo en Ventanilla en 1 Clic (`AuxiliarCaja.tsx`, `CajaAbierta.tsx`, `CobroCreditoVentanilla.tsx`):**
+   - El botón `💰 Cobrar` de la tabla navega hacia `/caja-auxiliar?socioId=...&prestamoId=...&accion=COBRO_CUOTA`.
+   - La ventanilla de caja auxiliar detecta los parámetros, abre automáticamente el formulario de cobro de préstamos y precarga al socio con su préstamo específico seleccionado para procesar la cuota al instante.
+4. **Exportación Inmediata de Cartera a Excel (CSV):**
+   - Se añadió el botón `📥 Excel` en la barra de herramientas de filtros, permitiendo descargar la nómina de créditos filtrados con código, no. anterior, socio, DPI, teléfono, tipo, fondo, monto original, saldo vivo, plazo, cuota, promotor, estado y fecha de desembolso.
+5. **Protección y Alerta Gerencial en el Botón "Finalizar":**
+   - Si un crédito aún posee saldo vivo activo (`> Q 0.00`), el botón alerta con distintivo `Finalizar ⚠️` y abre un diálogo modal de confirmación con advertencia de que la deuda saldrá de cartera sin ingreso de efectivo a caja, requiriendo autorización explícita de Gerencia / Consejo.
+   - Si el crédito tiene saldo `Q 0.00`, el botón se presenta limpiamente como `Liquidar`.
+
+**Archivos Modificados:**
+- `frontend/src/pages/CreditosList.tsx`
+- `frontend/src/pages/AuxiliarCaja.tsx`
+- `frontend/src/components/cajaauxiliar/CajaAbierta.tsx`
+- `frontend/src/components/cajaauxiliar/CobroCreditoVentanilla.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+- `00-INDICE.md`
+
+**Resultado:**
+- Ciclo de cobro y supervisión de créditos 100% integrado entre el módulo de cartera y la ventanilla operativa de caja.
+
+
 
 

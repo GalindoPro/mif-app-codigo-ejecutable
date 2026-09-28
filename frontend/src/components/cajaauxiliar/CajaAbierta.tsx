@@ -66,6 +66,9 @@ function renderRolBadge(rol?: string) {
 export interface CajaAbiertaProps {
   agenciaId: string;
   detalle: DetalleCajaAuxiliar;
+  socioInicialId?: string | null;
+  prestamoInicialId?: string | null;
+  accionInicial?: string | null;
   onRecargar: () => void;
   onCerrada: () => void;
 }
@@ -73,11 +76,16 @@ export interface CajaAbiertaProps {
 export default function CajaAbierta({
   agenciaId,
   detalle,
+  socioInicialId,
+  prestamoInicialId,
+  accionInicial,
   onRecargar,
   onCerrada,
 }: CajaAbiertaProps) {
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [mostrarCobroCredito, setMostrarCobroCredito] = useState(false);
+  const [mostrarCobroCredito, setMostrarCobroCredito] = useState(
+    Boolean(prestamoInicialId || (accionInicial === "COBRO_CUOTA" && socioInicialId))
+  );
   const [mostrarDesembolso, setMostrarDesembolso] = useState(false);
   const [mostrarLiquidarPF, setMostrarLiquidarPF] = useState(false);
   const [mostrarCierre, setMostrarCierre] = useState(false);
@@ -491,6 +499,8 @@ export default function CajaAbierta({
               <CobroCreditoVentanilla
                 agenciaId={agenciaId}
                 diaId={detalle.dia.id}
+                socioInicialId={socioInicialId}
+                prestamoInicialId={prestamoInicialId}
                 onCobrado={() => {
                   cerrarTodosFormularios();
                   onRecargar();

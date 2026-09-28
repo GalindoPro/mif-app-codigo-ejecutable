@@ -115,6 +115,55 @@ export default function CreditosList() {
       ?.filter((p) => p.estado === "DESEMBOLSADO")
       .reduce((acc, p) => acc + Number(p.monto_aprobado ?? p.monto_solicitado), 0) ?? 0;
 
+  const totalSaldoVivo =
+    prestamos
+      ?.filter((p) => p.estado === "DESEMBOLSADO")
+      .reduce((acc, p) => acc + Number(p.saldo_capital != null ? p.saldo_capital : (p.monto_aprobado ?? p.monto_solicitado)), 0) ?? 0;
+
+  function exportarExcel() {
+    if (!prestamos || prestamos.length === 0) return;
+    const encabezados = [
+      "Código",
+      "No. Crédito Anterior",
+      "Socio Solicitante",
+      "DPI",
+      "Teléfono",
+      "Tipo Crédito",
+      "Fondo",
+      "Monto Original",
+      "Saldo Capital Vivo",
+      "Plazo Meses",
+      "Cuota Mensual",
+      "Promotor",
+      "Estado",
+      "Fecha Desembolso",
+    ];
+    const filas = prestamos.map((p) => [
+      `"${p.codigo}"`,
+      `"${p.numero_credito_anterior || ""}"`,
+      `"${(p.socio_nombres || "").replace(/"/g, '""')}"`,
+      `"${p.socio_dpi || ""}"`,
+      `"${p.socio_telefono || ""}"`,
+      `"${TIPO_PRESTAMO_LABEL[p.tipo] || p.tipo}"`,
+      `"${p.origen_fondos ? ORIGEN_FONDOS_SHORT_LABEL[p.origen_fondos] : ""}"`,
+      Number(p.monto_aprobado ?? p.monto_solicitado).toFixed(2),
+      Number(p.saldo_capital != null ? p.saldo_capital : (p.monto_aprobado ?? p.monto_solicitado)).toFixed(2),
+      p.plazo_meses,
+      Number(p.cuota_mensual).toFixed(2),
+      `"${(p.promotor_nombre || "").replace(/"/g, '""')}"`,
+      `"${ESTADO_PRESTAMO_LABEL[p.estado] || p.estado}"`,
+      `"${p.fecha_desembolso ? new Date(p.fecha_desembolso).toLocaleDateString("es-GT") : ""}"`,
+    ]);
+    const csvContent = "\uFEFF" + [encabezados.join(";"), ...filas.map((f) => f.join(";"))].join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Cartera_Creditos_COMIF_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   const pendientes = prestamos?.filter((p) => p.estado === "SOLICITUD").length ?? 0;
   const aprobados = prestamos?.filter((p) => p.estado === "APROBADO").length ?? 0;
   const desembolsados = prestamos?.filter((p) => p.estado === "DESEMBOLSADO").length ?? 0;
@@ -215,8 +264,13 @@ export default function CreditosList() {
                   CARTERA ACTIVA ({desembolsados})
                 </span>
                 <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
-                  {formatoQ(totalDesembolsado)}
+                  {formatoQ(totalSaldoVivo)}
                 </span>
+                {totalDesembolsado > totalSaldoVivo && (
+                  <span style={{ fontSize: "0.62rem", color: "var(--ink-soft)", display: "block" }}>
+                    Desembolsado: {formatoQ(totalDesembolsado)}
+                  </span>
+                )}
               </div>
               <span style={{ fontSize: "1.2rem" }}>💼</span>
             </div>
@@ -384,6 +438,23 @@ export default function CreditosList() {
               >
                 Pagados ({cancelados})
               </button>
+
+              {/* BOTÓN EXPORTAR EXCEL */}
+              <button
+                type="button"
+                onClick={exportarExcel}
+                className="btn secondary"
+                title="Descargar listado de créditos filtrados en formato CSV/Excel"
+                style={{
+                  fontSize: "0.75rem",
+                  padding: "0.25rem 0.6rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                }}
+              >
+                📥 Excel
+              </button>
             </div>
           </div>
 
@@ -396,6 +467,7 @@ export default function CreditosList() {
                   <th>Socio solicitante</th>
                   <th>Tipo / Fondo</th>
                   <th style={{ textAlign: "right" }}>Monto</th>
+                  <th style={{ textAlign: "right", color: "#BF9903" }}>Saldo Vivo</th>
                   <th>Plazo</th>
                   <th style={{ textAlign: "right" }}>Cuota</th>
                   <th>Promotor</th>
@@ -454,6 +526,11 @@ export default function CreditosList() {
                       <td className="mono" style={{ textAlign: "right", fontWeight: 700 }}>
                         <span className={(cobrosPendientes.find(c => c.prestamo_id === p.id) || p.tiene_cobro_campo_pendiente) ? "strikethrough-text" : ""}>
                           {formatoQ(p.monto_aprobado ?? p.monto_solicitado)}
+                        </span>
+                      </td>
+                      <td className="mono" style={{ textAlign: "right", fontWeight: 700, color: "#BF9903", whiteSpace: "nowrap" }}>
+                        <span className={(cobrosPendientes.find(c => c.prestamo_id === p.id) || p.tiene_cobro_campo_pendiente) ? "strikethrough-text" : ""}>
+                          {formatoQ(p.saldo_capital != null ? Number(p.saldo_capital) : Number(p.monto_aprobado ?? p.monto_solicitado))}
                         </span>
                       </td>
                       <td className="mono">{p.plazo_meses}m</td>
@@ -582,33 +659,48 @@ export default function CreditosList() {
                                 })()
                               ) : (
                                 <Link
-                                  to="/caja-auxiliar"
+                                  to={`/auxiliar-caja?socioId=${p.socio_id}&prestamoId=${p.id}&accion=COBRO_CUOTA`}
                                   className="btn secondary"
-                                  style={{ fontSize: "0.72rem", padding: "0.18rem 0.45rem", borderColor: "#10b981", color: "#10b981" }}
-                                  title="Ir a Caja Auxiliar a registrar cobro de cuota"
+                                  style={{ fontSize: "0.72rem", padding: "0.18rem 0.45rem", borderColor: "#10b981", color: "#10b981", textDecoration: "none" }}
+                                  title="Cobrar cuota en ventanilla con este crédito seleccionado"
                                 >
                                   💰 Cobrar
                                 </Link>
                               )}
                               {puedeGestionar && (
-                                <button
-                                  type="button"
-                                  className="btn secondary"
-                                  style={{ fontSize: "0.72rem", padding: "0.18rem 0.35rem" }}
-                                  title="Liquidar o Cancelar préstamo"
-                                  disabled={estaProcesando}
-                                  onClick={() =>
-                                    setModalAccion({
-                                      prestamo: p,
-                                      nuevoEstado: "CANCELADO",
-                                      titulo: `🏁 Liquidar / Cancelar Crédito ${p.codigo}`,
-                                      mensaje: `¿Confirmas que el crédito de ${p.socio_nombres} ha sido totalmente pagado y liquidado?`,
-                                      colorBoton: "#4b5563",
-                                    })
-                                  }
-                                >
-                                  Finalizar
-                                </button>
+                                (() => {
+                                  const saldoVivo = Number(p.saldo_capital != null ? p.saldo_capital : (p.monto_aprobado ?? p.monto_solicitado));
+                                  const tieneDeuda = saldoVivo > 0.01;
+                                  return (
+                                    <button
+                                      type="button"
+                                      className="btn secondary"
+                                      style={{
+                                        fontSize: "0.72rem",
+                                        padding: "0.18rem 0.35rem",
+                                        borderColor: tieneDeuda ? "rgba(239, 68, 68, 0.4)" : "var(--line)",
+                                        color: tieneDeuda ? "#ef4444" : "var(--ink-soft)",
+                                      }}
+                                      title={tieneDeuda ? `Alerta: Saldo vivo pendiente ${formatoQ(saldoVivo)}. Requiere autorización gerencial.` : "Liquidar crédito solvente"}
+                                      disabled={estaProcesando}
+                                      onClick={() =>
+                                        setModalAccion({
+                                          prestamo: p,
+                                          nuevoEstado: "CANCELADO",
+                                          titulo: tieneDeuda
+                                            ? `⚠️ Autorización de Cancelación con Saldo Activo: ${p.codigo}`
+                                            : `🏁 Liquidar / Cancelar Crédito ${p.codigo}`,
+                                          mensaje: tieneDeuda
+                                            ? `ATENCIÓN: Este crédito aún posee un saldo vivo pendiente de ${formatoQ(saldoVivo)}. Si confirmas la cancelación manual, el préstamo saldrá de cartera activa como CANCELADO sin haber registrado el cobro de capital en caja. ¿Deseas autorizar esta baja especial por Gerencia General / Consejo?`
+                                            : `¿Confirmas que el crédito de ${p.socio_nombres} ha sido totalmente pagado y liquidado (Saldo: Q 0.00)?`,
+                                          colorBoton: tieneDeuda ? "#dc2626" : "#4b5563",
+                                        })
+                                      }
+                                    >
+                                      {tieneDeuda ? "Finalizar ⚠️" : "Liquidar"}
+                                    </button>
+                                  );
+                                })()
                               )}
                             </>
                           )}

@@ -69,6 +69,7 @@ export default function App() {
           <Route path="/aportaciones" element={<AportacionesList />} />
           <Route path="/caja-chica" element={<CajaChica />} />
           <Route path="/auxiliar-caja" element={<AuxiliarCaja />} />
+          <Route path="/caja-auxiliar" element={<AuxiliarCaja />} />
           <Route path="/creditos" element={<CreditosList />} />
           <Route path="/creditos/simulador" element={<CreditoSimulador />} />
           <Route path="/creditos/nuevo" element={<CreditoForm />} />

@@ -382,4 +382,11 @@ Todas las especificaciones operativas y estatutarias acordadas se encuentran doc
     - **Tarjetas de Gastos Interactivas (Drill-Down 1-Clic):** En el panel izquierdo de egresos por categoría, cada tarjeta es interactiva para filtrar instantáneamente los comprobantes de dicho rubro (Cafetería, Combustibles, Internet, etc.) con botón `✕ Ver todas`.
     - **Selector Mensual y Exportación a Excel / CSV:** Barra de herramientas con selector desplegable de mes (`Julio 2026`, `Junio 2026`, etc.) y botón `📥 Excel` para descargar de inmediato el libro de caja chica con detalle de egresos, ingresos, números de documento, categorías y saldo progresivo.
 
+64. **Fase 16: Optimizaciones y Auditoría de Cartera de Créditos (`/creditos`):**
+    - **Saldo Vivo en Línea:** Columna `Saldo Vivo` en color Oro Maya `#BF9903` que visualiza en tiempo real el capital insoluto pendiente de pago frente al monto original otorgado.
+    - **Cobro en Ventanilla en 1 Clic:** El botón `💰 Cobrar` navega hacia `/caja-auxiliar`, abriendo automáticamente el formulario de cobro con el asociado y su crédito precargados.
+    - **Exportación Inmediata a Excel (CSV):** Botón `📥 Excel` en la barra de filtros para descargar la cartera activa con todos sus metadatos contables.
+    - **Protección de Liquidación:** Advertencia gerencial reforzada en el botón `Finalizar ⚠️` si el crédito posee saldo activo > Q 0.00.
+
+
 

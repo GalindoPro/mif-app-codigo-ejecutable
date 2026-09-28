@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import type {
@@ -14,6 +15,11 @@ import LibroCajaReporteModal from "../components/cajaauxiliar/LibroCajaReporteMo
 
 export default function AuxiliarCaja() {
   const { usuario } = useAuth();
+  const [searchParams] = useSearchParams();
+  const paramSocioId = searchParams.get("socioId");
+  const paramPrestamoId = searchParams.get("prestamoId");
+  const paramAccion = searchParams.get("accion");
+
   const puedeElegirAgencia = usuario?.rol === "GERENCIA";
 
   const [agencias, setAgencias] = useState<Agencia[]>([]);
@@ -187,6 +193,9 @@ export default function AuxiliarCaja() {
         <CajaAbierta
           agenciaId={agenciaId}
           detalle={detalle}
+          socioInicialId={paramSocioId}
+          prestamoInicialId={paramPrestamoId}
+          accionInicial={paramAccion}
           onRecargar={() => cargarDetalle(detalle.dia.id)}
           onCerrada={() => {
             setDetalle(null);
