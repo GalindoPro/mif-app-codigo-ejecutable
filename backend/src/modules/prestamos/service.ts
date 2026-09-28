@@ -489,6 +489,7 @@ export interface FiltrosKardexCartera {
   promotorId?: string | null;
   tipo?: TipoPrestamo;
   mes?: string; // YYYY-MM
+  origenCartera?: "OFICIAL_PROMOTOR" | "POR_REGULARIZAR" | "TODOS";
 }
 
 export async function obtenerKardexCartera(filtros: FiltrosKardexCartera) {
@@ -507,6 +508,13 @@ export async function obtenerKardexCartera(filtros: FiltrosKardexCartera) {
   if (filtros.tipo) {
     condiciones.push(`p.tipo = $${idx++}`);
     valores.push(filtros.tipo);
+  }
+
+  // Filtro por origen de cartera (OFICIAL_PROMOTOR por defecto)
+  const origen = filtros.origenCartera || "OFICIAL_PROMOTOR";
+  if (origen !== "TODOS") {
+    condiciones.push(`p.origen_cartera = $${idx++}`);
+    valores.push(origen);
   }
 
   const { rows: prestamos } = await pool.query(
@@ -593,6 +601,21 @@ export async function obtenerKardexCartera(filtros: FiltrosKardexCartera) {
   const sociosPendientes = kardexItems.filter((k) => k.estadoCuotaMes === "PENDIENTE_MES").length;
   const totalCobradoMes = kardexItems.reduce((acc, k) => acc + k.totalPagadoMes, 0);
 
+  const { rows: countsRows } = await pool.query<{
+    count_oficiales: string;
+    count_por_regularizar: string;
+    monto_oficiales: string;
+    monto_por_regularizar: string;
+  }>(`
+    select 
+      count(case when origen_cartera = 'OFICIAL_PROMOTOR' then 1 end) as count_oficiales,
+      count(case when origen_cartera = 'POR_REGULARIZAR' then 1 end) as count_por_regularizar,
+      coalesce(sum(case when origen_cartera = 'OFICIAL_PROMOTOR' then monto_solicitado end), 0) as monto_oficiales,
+      coalesce(sum(case when origen_cartera = 'POR_REGULARIZAR' then monto_solicitado end), 0) as monto_por_regularizar
+    from prestamos
+    where estado in ('DESEMBOLSADO', 'CANCELADO')
+  `);
+
   return {
     items: kardexItems,
     resumen: {
@@ -606,6 +629,10 @@ export async function obtenerKardexCartera(filtros: FiltrosKardexCartera) {
       sociosAlDia,
       sociosPendientes,
       totalCobradoMes,
+      countOficialesPromotor: Number(countsRows[0]?.count_oficiales || 0),
+      countPorRegularizar: Number(countsRows[0]?.count_por_regularizar || 0),
+      montoOficialesPromotor: Number(countsRows[0]?.monto_oficiales || 0),
+      montoPorRegularizar: Number(countsRows[0]?.monto_por_regularizar || 0),
     },
   };
 }

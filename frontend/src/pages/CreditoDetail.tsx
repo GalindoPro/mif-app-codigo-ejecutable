@@ -553,16 +553,121 @@ export default function CreditoDetail() {
 
       {prestamo.amortizacion && (
         <div className="card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+          {/* Banner de Crédito Liquidado Anticipadamente */}
+          {(prestamo.estado === "CANCELADO" || Number(prestamo.saldo_capital) <= 0) && (
+            <div
+              style={{
+                background: "rgba(16, 185, 129, 0.12)",
+                border: "1px solid rgba(16, 185, 129, 0.4)",
+                borderRadius: "8px",
+                padding: "0.85rem 1rem",
+                marginBottom: "1rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.75rem",
+              }}
+            >
+              <span style={{ fontSize: "1.6rem" }}>🎉</span>
+              <div>
+                <strong style={{ color: "#10b981", fontSize: "0.95rem" }}>
+                  Crédito Liquidado al 100% (Saldo Q 0.00)
+                </strong>
+                <p style={{ margin: "0.2rem 0 0", fontSize: "0.82rem", color: "#cbd5e1" }}>
+                  Este crédito fue cancelado en su totalidad mediante amortización anticipada (último recibo{" "}
+                  <strong>{pagos[pagos.length - 1]?.numero_recibo || "Registrado"}</strong> por{" "}
+                  <strong>{formatoQ(pagos[pagos.length - 1]?.total_pagado ?? prestamo.monto_aprobado ?? prestamo.monto_solicitado ?? 0)}</strong>).
+                  Todas las cuotas del cronograma quedan completamente saldadas sin saldo deudor pendiente.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              marginBottom: "1rem",
+              flexWrap: "wrap",
+              gap: "0.5rem",
+            }}
+          >
             <div>
               <h2 style={{ margin: 0 }}>Tabla Oficial de Amortización</h2>
               <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--ink-soft)" }}>
                 Cronograma de {prestamo.plazo_meses} cuotas mensuales calculadas al {prestamo.tasa_interes_mensual}% de interés mensual.
               </p>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.6rem",
+                  flexWrap: "wrap",
+                  marginTop: "0.45rem",
+                }}
+              >
+                {prestamo.estado === "CANCELADO" || Number(prestamo.saldo_capital) <= 0 ? (
+                  <span
+                    style={{
+                      padding: "3px 8px",
+                      borderRadius: "4px",
+                      background: "rgba(16, 185, 129, 0.15)",
+                      color: "#10b981",
+                      fontSize: "0.78rem",
+                      fontWeight: 700,
+                    }}
+                  >
+                    ✓ 100% Amortizado ({prestamo.plazo_meses} de {prestamo.plazo_meses} cuotas saldadas)
+                  </span>
+                ) : (
+                  <>
+                    <span
+                      style={{
+                        padding: "3px 8px",
+                        borderRadius: "4px",
+                        background: "rgba(16, 185, 129, 0.15)",
+                        color: "#10b981",
+                        fontSize: "0.78rem",
+                        fontWeight: 700,
+                      }}
+                    >
+                      ✓ Avance: Cuota {pagos.length} de {prestamo.plazo_meses} (
+                      {Math.max(0, prestamo.plazo_meses - pagos.length)} restantes)
+                    </span>
+                    <span
+                      style={{
+                        padding: "3px 8px",
+                        borderRadius: "4px",
+                        background: "rgba(191, 153, 3, 0.15)",
+                        color: "#BF9903",
+                        fontSize: "0.78rem",
+                        fontWeight: 600,
+                      }}
+                    >
+                      📌 Próxima a pagar: Cuota {pagos.length + 1}
+                    </span>
+                  </>
+                )}
+                {prestamo.es_migracion && (
+                  <span
+                    style={{
+                      padding: "3px 8px",
+                      borderRadius: "4px",
+                      background: "rgba(2, 132, 199, 0.15)",
+                      color: "#38bdf8",
+                      fontSize: "0.78rem",
+                    }}
+                  >
+                    📅 Saldo Inicial Corte 2026: {formatoQ(prestamo.monto_aprobado || prestamo.monto_solicitado)}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="stat-card" style={{ padding: "0.5rem 1rem" }}>
               <span className="label">Total a pagar</span>
-              <span className="value" style={{ fontSize: "1.1rem" }}>{formatoQ(prestamo.amortizacion.totalPagar)}</span>
+              <span className="value" style={{ fontSize: "1.1rem" }}>
+                {formatoQ(prestamo.amortizacion.totalPagar)}
+              </span>
             </div>
           </div>
 
@@ -577,18 +682,40 @@ export default function CreditoDetail() {
                   <th>Abono a Capital</th>
                   <th>Interés (2%)</th>
                   <th>Saldo Actual</th>
+                  <th>Estado Cuota</th>
                 </tr>
               </thead>
               <tbody>
                 {prestamo.amortizacion.tabla.map((c, index) => {
-                  const estaPagada = index < pagos.length;
+                  const estaCanceladoTotal =
+                    prestamo.estado === "CANCELADO" || Number(prestamo.saldo_capital) <= 0;
+                  const estaPagada = estaCanceladoTotal || index < pagos.length;
+                  const esEnCurso = !estaCanceladoTotal && index === pagos.length;
                   const saldoAnterior = Number(c.saldoRestante) + Number(c.capital);
+
                   return (
-                    <tr key={c.numero} style={{ opacity: estaPagada ? 0.6 : 1, background: estaPagada ? "rgba(16, 185, 129, 0.05)" : "transparent" }}>
+                    <tr
+                      key={c.numero}
+                      style={{
+                        opacity: estaPagada ? 0.7 : 1,
+                        background: esEnCurso
+                          ? "rgba(191, 153, 3, 0.12)"
+                          : estaPagada
+                          ? "rgba(16, 185, 129, 0.05)"
+                          : "transparent",
+                        borderLeft: esEnCurso ? "3px solid #BF9903" : "none",
+                      }}
+                    >
                       <td className="mono" style={{ fontWeight: 600 }}>
-                        Cuota {c.numero} {estaPagada && <span title="Cuota pagada" style={{ color: "#10b981", marginLeft: "4px" }}>✔</span>}
+                        Cuota {c.numero}
                       </td>
-                      <td className="mono" style={{ textDecoration: estaPagada ? "line-through" : "none", color: estaPagada ? "var(--ink-soft)" : "inherit" }}>
+                      <td
+                        className="mono"
+                        style={{
+                          textDecoration: estaPagada ? "line-through" : "none",
+                          color: estaPagada ? "var(--ink-soft)" : "inherit",
+                        }}
+                      >
                         {new Date(c.fechaPago).toLocaleDateString("es-GT")}
                       </td>
                       <td className="mono" style={{ fontWeight: 600 }}>
@@ -603,7 +730,37 @@ export default function CreditoDetail() {
                       <td className="mono" style={{ color: estaPagada ? "var(--ink-soft)" : "#d97706" }}>
                         {formatoQ(c.interes)}
                       </td>
-                      <td className="mono" style={{ fontWeight: 700 }}>{formatoQ(c.saldoRestante)}</td>
+                      <td className="mono" style={{ fontWeight: 700 }}>
+                        {formatoQ(estaCanceladoTotal ? 0 : c.saldoRestante)}
+                      </td>
+                      <td>
+                        {estaCanceladoTotal ? (
+                          <span style={{ color: "#10b981", fontSize: "0.72rem", fontWeight: 700 }}>
+                            ✔ Liquidado Anticipado
+                          </span>
+                        ) : index < pagos.length ? (
+                          <span style={{ color: "#10b981", fontSize: "0.72rem", fontWeight: 600 }}>
+                            ✔ Pagada {pagos[index]?.numero_recibo ? `(${pagos[index].numero_recibo})` : ""}
+                          </span>
+                        ) : esEnCurso ? (
+                          <span
+                            style={{
+                              background: "#BF9903",
+                              color: "#000",
+                              fontSize: "0.68rem",
+                              fontWeight: 800,
+                              padding: "2px 6px",
+                              borderRadius: "3px",
+                            }}
+                          >
+                            📌 EN CURSO
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--ink-soft)", fontSize: "0.72rem" }}>
+                            Pendiente
+                          </span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}

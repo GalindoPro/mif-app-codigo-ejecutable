@@ -34,6 +34,7 @@ export default function CreditosList() {
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<string>("");
+  const [origenCartera, setOrigenCartera] = useState<"OFICIAL_PROMOTOR" | "POR_REGULARIZAR" | "TODOS">("OFICIAL_PROMOTOR");
   const [filtroTipoFiador, setFiltroTipoFiador] = useState<"TODOS" | "EXTERNOS" | "SOCIOS">("TODOS");
   const [page, setPage] = useState(1);
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
@@ -110,23 +111,38 @@ export default function CreditosList() {
     }
   }
 
+  const oficialesCount =
+    prestamos?.filter((p) => p.origen_cartera === "OFICIAL_PROMOTOR" || !p.origen_cartera).length ?? 0;
+  const porRegularizarCount =
+    prestamos?.filter((p) => p.origen_cartera === "POR_REGULARIZAR").length ?? 0;
+
+  const prestamosFiltrados = (prestamos || []).filter((p) => {
+    if (origenCartera === "TODOS") return true;
+    if (origenCartera === "POR_REGULARIZAR") return p.origen_cartera === "POR_REGULARIZAR";
+    return p.origen_cartera === "OFICIAL_PROMOTOR" || !p.origen_cartera;
+  });
+
   const totalDesembolsado =
-    prestamos
+    prestamosFiltrados
       ?.filter((p) => p.estado === "DESEMBOLSADO")
       .reduce((acc, p) => acc + Number(p.monto_aprobado ?? p.monto_solicitado), 0) ?? 0;
 
   const totalSaldoVivo =
-    prestamos
+    prestamosFiltrados
       ?.filter((p) => p.estado === "DESEMBOLSADO")
-      .reduce((acc, p) => acc + Number(p.saldo_capital != null ? p.saldo_capital : (p.monto_aprobado ?? p.monto_solicitado)), 0) ?? 0;
+      .reduce(
+        (acc, p) =>
+          acc + Number(p.saldo_capital != null ? p.saldo_capital : (p.monto_aprobado ?? p.monto_solicitado)),
+        0,
+      ) ?? 0;
 
   const totalCuotas =
-    prestamos
+    prestamosFiltrados
       ?.filter((p) => p.estado === "DESEMBOLSADO")
       .reduce((acc, p) => acc + Number(p.cuota_mensual || 0), 0) ?? 0;
 
   function exportarExcel() {
-    if (!prestamos || prestamos.length === 0) return;
+    if (!prestamosFiltrados || prestamosFiltrados.length === 0) return;
     const encabezados = [
       "Código",
       "No. Crédito Anterior",
@@ -143,7 +159,7 @@ export default function CreditosList() {
       "Estado",
       "Fecha Desembolso",
     ];
-    const filas = prestamos.map((p) => [
+    const filas = prestamosFiltrados.map((p) => [
       `"${p.codigo}"`,
       `"${p.numero_credito_anterior || ""}"`,
       `"${(p.socio_nombres || "").replace(/"/g, '""')}"`,
@@ -169,14 +185,14 @@ export default function CreditosList() {
     URL.revokeObjectURL(url);
   }
 
-  const pendientes = prestamos?.filter((p) => p.estado === "SOLICITUD").length ?? 0;
-  const aprobados = prestamos?.filter((p) => p.estado === "APROBADO").length ?? 0;
-  const desembolsados = prestamos?.filter((p) => p.estado === "DESEMBOLSADO").length ?? 0;
-  const cancelados = prestamos?.filter((p) => p.estado === "CANCELADO").length ?? 0;
+  const pendientes = prestamosFiltrados?.filter((p) => p.estado === "SOLICITUD").length ?? 0;
+  const aprobados = prestamosFiltrados?.filter((p) => p.estado === "APROBADO").length ?? 0;
+  const desembolsados = prestamosFiltrados?.filter((p) => p.estado === "DESEMBOLSADO").length ?? 0;
+  const cancelados = prestamosFiltrados?.filter((p) => p.estado === "CANCELADO").length ?? 0;
 
-  const totalCreditos = prestamos?.length ?? 0;
+  const totalCreditos = prestamosFiltrados?.length ?? 0;
   const totalPaginas = Math.max(1, Math.ceil(totalCreditos / pageSize));
-  const prestamosPaginados = prestamos?.slice((page - 1) * pageSize, page * pageSize) ?? [];
+  const prestamosPaginados = prestamosFiltrados?.slice((page - 1) * pageSize, page * pageSize) ?? [];
 
   return (
     <div className="screen-container">
@@ -405,13 +421,50 @@ export default function CreditosList() {
             </div>
 
             <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", alignItems: "center" }}>
+              {/* Segmentación Cartera Oficial vs Por Regularizar */}
+              <div style={{ display: "flex", gap: "0.2rem", background: "var(--paper-raised)", padding: "0.15rem", borderRadius: "6px", border: "1px solid var(--line)", marginRight: "0.35rem" }}>
+                <button
+                  type="button"
+                  className={`btn ${origenCartera === "OFICIAL_PROMOTOR" ? "primary" : "secondary"}`}
+                  style={{ fontSize: "0.72rem", padding: "0.2rem 0.5rem" }}
+                  onClick={() => { setOrigenCartera("OFICIAL_PROMOTOR"); setPage(1); }}
+                  title="Cartera oficial y auditada del promotor"
+                >
+                  📋 Oficial ({oficialesCount})
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${origenCartera === "POR_REGULARIZAR" ? "primary" : "secondary"}`}
+                  style={{
+                    fontSize: "0.72rem",
+                    padding: "0.2rem 0.5rem",
+                    color: origenCartera === "POR_REGULARIZAR" ? "#fff" : "#f59e0b",
+                    background: origenCartera === "POR_REGULARIZAR" ? "#d97706" : "transparent",
+                    borderColor: origenCartera === "POR_REGULARIZAR" ? "#d97706" : "var(--line)",
+                  }}
+                  onClick={() => { setOrigenCartera("POR_REGULARIZAR"); setPage(1); }}
+                  title="Créditos creados desde caja auxiliar pendientes de regularización"
+                >
+                  ⚠️ Por Regularizar ({porRegularizarCount})
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${origenCartera === "TODOS" ? "primary" : "secondary"}`}
+                  style={{ fontSize: "0.72rem", padding: "0.2rem 0.5rem" }}
+                  onClick={() => { setOrigenCartera("TODOS"); setPage(1); }}
+                  title="Ver todos los registros consolidados"
+                >
+                  🌐 Todo ({prestamos?.length ?? 0})
+                </button>
+              </div>
+
               <button
                 type="button"
                 className={`btn ${estadoFiltro === "" ? "primary" : "secondary"}`}
                 style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
                 onClick={() => setEstadoFiltro("")}
               >
-                Todos ({totalCreditos})
+                Estado: Todos ({totalCreditos})
               </button>
               <button
                 type="button"

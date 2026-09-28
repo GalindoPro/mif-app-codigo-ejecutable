@@ -31,3 +31,42 @@ usuariosRouter.post(
     res.status(201).json(await service.crear(data));
   }),
 );
+
+const actualizarSchema = z.object({
+  nombre: z.string().min(2).optional(),
+  email: z.string().email().optional(),
+  rol: z.enum(["GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA", "PROMOTOR"]).optional(),
+  agenciaId: z.string().uuid().nullable().optional(),
+  activo: z.boolean().optional(),
+});
+
+usuariosRouter.put(
+  "/:id",
+  requireRole("GERENCIA"),
+  asyncHandler(async (req, res) => {
+    const data = actualizarSchema.parse(req.body);
+    res.json(await service.actualizar(req.params.id, data));
+  }),
+);
+
+const passwordSchema = z.object({
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+});
+
+usuariosRouter.patch(
+  "/:id/password",
+  requireRole("GERENCIA", "SUPERVISOR"),
+  asyncHandler(async (req, res) => {
+    const data = passwordSchema.parse(req.body);
+    res.json(await service.cambiarPassword(req.params.id, data.password));
+  }),
+);
+
+usuariosRouter.patch(
+  "/:id/toggle-activo",
+  requireRole("GERENCIA"),
+  asyncHandler(async (req, res) => {
+    res.json(await service.toggleActivo(req.params.id));
+  }),
+);
+

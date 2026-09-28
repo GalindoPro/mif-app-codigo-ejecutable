@@ -642,6 +642,7 @@ export interface Prestamo {
   fecha_ultimo_pago_migracion?: string | null;
   es_migracion?: boolean;
   numero_credito_anterior?: string | null;
+  origen_cartera?: "OFICIAL_PROMOTOR" | "POR_REGULARIZAR" | string;
   created_at: string;
   amortizacion?: ResultadoSimulacion;
   tiene_cobro_campo_pendiente?: boolean;
@@ -716,6 +717,10 @@ export interface KardexCarteraRespuesta {
     sociosAlDia: number;
     sociosPendientes: number;
     totalCobradoMes: number;
+    countOficialesPromotor?: number;
+    countPorRegularizar?: number;
+    montoOficialesPromotor?: number;
+    montoPorRegularizar?: number;
   };
 }
 

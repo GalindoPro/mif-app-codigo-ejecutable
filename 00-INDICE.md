@@ -8,11 +8,20 @@ Este documento registra el **avance real y completo** del sistema de la COOPERAT
 
 ### ✅ Módulos Completados y Probados
 
-1. **Autenticación y Matriz de Roles:**
-   - Roles configurados: `ADMIN` (Administrador), `GERENCIA` (Gerencia), `SUPERVISOR` (Jefe de agencia), `CAJERO` (Operador de ventanilla), `CAJA_CHICA` (Operador de caja chica y ventanilla auxiliar) y `PROMOTOR` (Promotor de crédito).
+1. **Autenticación, Matriz de Roles y Gestión de Personal (`/usuarios`):**
+   - Roles configurados: `ADMIN` / `GERENCIA` (Gerencia General), `SUPERVISOR` (Jefe de agencia), `CAJERO` (Operador de ventanilla / Caja Auxiliar), `CAJA_CHICA` (Operador de caja chica) y `PROMOTOR` (Promotor de negocios de crédito).
    - Control de permisos en Frontend y Backend: cada rol ve exclusivamente las opciones y tarjetas que le corresponden.
-   - Gestión de usuarios y asignación de personal a agencias (`/usuarios`).
-   - Base de datos conectada localmente a PostgreSQL 18 (`mif_dev`, usuario `galindo`).
+   - **Personal Oficial Registrado en Base de Datos:**
+     * `Diego - Promotor 1 Chajul` (`diego.promotor@mif.coop`) — Promotor de Negocios 1.
+     * `Walter - Promotor 2 Chajul` (`walter.promotor@mif.coop`) — Promotor de Negocios 2.
+     * `Tereza - Caja Auxiliar Chajul` (`tereza.caja@mif.coop`) — Cajera de Ventanilla y Auxiliar de Caja.
+     * `Rosy - Caja Chica Chajul` (`rosy.cajachica@mif.coop`) — Encargada de Fondo Fijo de Caja Chica.
+     * `Administrador MIF` (`admin@mif.coop`) y `Marta Supervisora Chajul` (`supervisor@mif.coop`).
+   - **Gestión Integral de Usuarios (`Usuarios.tsx`):**
+     * Modal oficial institucional de edición de colaboradores (nombre, correo, rol, agencia).
+     * Modal para cambio y restablecimiento seguro de contraseña por Gerencia con política mínima de 6 caracteres y selector de visibilidad.
+     * Conmutador rápido de acceso activo/inactivo con confirmación.
+   - Base de datos conectada con resiliencia en PostgreSQL.
 
 2. **Módulo de Socios y Padrón de Aportaciones (`/socios` y `/aportaciones`):**
    - **Importación Oficial y Cuadre Matemático Exacto (Q 29,400.00):**
@@ -396,9 +405,22 @@ Todas las especificaciones operativas y estatutarias acordadas se encuentran doc
 
 66. **Fase 18: Reclasificación Contable de Cartera (Hipotecarios vs. Fiduciarios):** Sincronización automatizada con las hojas `HIPOTECARIO` y `FIDUCIARIO` del archivo Excel oficial del Promotor. 53 créditos fueron reclasificados como `HIPOTECARIO` (Q 14.5M, garantía real en Chajul/Ilom/Juil) y 68 como `FIDUCIARIO` (Q 15.6M, fiador solidario), corrigiendo los contadores a 0 en el Kardex y reflejando la composición real en el Balance General (`103-01` y `103-02`).
 
-67. **Fase 19: Fila de Totales Consolidados (`<tfoot>`) en Pantalla para Kardex y Cartera de Préstamos:**
-    - **Visualización Permanente de Totales en Kardex (`/promotor/cartera`):** Fila de pie de tabla con sumatoria dinámica de Valor Crédito (Q 30,168,300.80), Saldo Vivo Insoluto (Q 29,066,388.97) en tono `#BF9903`, Cuotas Mensuales devengadas y contadores de socios al día vs pendientes.
-    - **Visualización Permanente de Totales en Cartera (`/creditos`):** Fila de pie de tabla con sumatoria de Monto Desembolsado, Saldo Vivo de Capital, Cuotas Mensuales a recaudar y contadores de créditos activos y aprobados.
+68. **Fase 20: Sincronización de Plazos Reales del Excel (1 a 15 Años) y Rediseño Panorámico en Una Sola Pantalla (100vh):**
+    - **Plazos y Vencimientos Armónicos:** Corrección del valor por defecto de 12 meses, importando los plazos notariales exactos desde el Excel (`15 años / 180m`, `10 años / 120m`, `5 años / 60m`, etc.) cuadrando al 100% con los vencimientos oficiales (2041, 2036, 2031, etc.).
+    - **Consolidación de Cartera (121 Créditos):** Clarificación contable entre los 66 créditos directos del libro del Promotor y los 55 socios que amortizaron cuotas en ventanilla durante 2026.
+    - **Diseño Panorámico 100vh:** Cintillo de KPIs ejecutivos compactos en 1 fila superior y tabla con scroll interno (`maxHeight: calc(100vh - 275px)`), cabecera fija (`thead sticky`) y fila de totales fija (`tfoot sticky`), logrando visualización completa en una sola pantalla sin desbordamiento.
+
+69. **Fase 21: Fidelidad 1 a 1 al Excel del Promotor (66 Créditos Oficiales Q 15,219,238.31), Segregación de Préstamos por Regularizar y Módulo Validador Estricto al Pie de la Letra:**
+    - **Cartera Oficial al Pie de la Letra:** Reestructuración de la base de datos para que la vista por defecto refleje exactamente los 66 créditos legítimos del libro del Promotor (49 Hipotecarios por Q 15,044,790.75 y 17 Fiduciarios por Q 174,447.56, para un total exacto de Q 15,219,238.31).
+    - **Segregación de Créditos de Ventanilla (`origen_cartera = 'POR_REGULARIZAR'`):** Los abonos y cobros registrados en Caja Auxiliar que aún no cuentan con expediente formal se resguardan en su propia pestaña "Por Regularizar" con alerta informativa y botón de retorno a cartera oficial.
+    - **Módulo y Modal Validador de Excel Oficial:** Auditoría profunda de archivos XLSX con reporte de anomalías tipográficas (ej. `4801..14`), advertencias de celdas vacías y botón de sincronización atómica 1 a 1.
+
+70. **Fase 22: Consolidación de Saldo Inicial al 01/01/2026 e Integración de 191 Cuotas Históricas de Amortización (Q 1,316,010.64):**
+    - **Saldo Inicial 2026 como Estándar Contable:** Aplicación de la regla bancaria de corte al 01/01/2026 para carteras migradas sin necesidad de reconstruir recibos físicos antiguos.
+    - **Historial Completo de Amortizaciones:** Migración atómica de 191 cuotas cobradas en 2026 (150 hipotecarias por Q 1.21M y 41 fiduciarias por Q 100K) con números de recibo (`DOC-2472`, `DOC-2615`, etc.), reduciendo el saldo vivo oficial al 31/07/2026 a Q 13,903,227.67 con cuadre al centavo exacto.
+    - **Kardex y Ficha Expandida en Vivo:** Recálculo mensual de socios al día y visualización cronológica de cada pago amortizado dentro de la ficha de cada crédito.
+
+
 
 
 

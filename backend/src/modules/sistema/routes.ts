@@ -80,19 +80,25 @@ sistemaRouter.post(
     const backendDir = path.resolve(__dirname, "../../..");
     execSync("npm run db:seed:excel", { cwd: backendDir, stdio: "pipe" });
 
+    // 3. Sincronizar cartera oficial al 100% con los 66 créditos y sus 191 pagos históricos 2026
+    const { reestructurarCartera } = await import("../../db/reestructurar-cartera-oficial");
+    await reestructurarCartera();
+    const { importarHistorialAbonosPromotor } = await import("../../db/importar-historial-abonos-promotor");
+    await importarHistorialAbonosPromotor();
+
     if (req.user) {
       await registrarAuditoria({
         usuarioId: req.user.id,
         accion: "CREAR",
         entidad: "sistema",
         entidadId: req.user.id,
-        datosNuevos: { motivo: "Recarga de datos existentes desde libros de Excel" },
+        datosNuevos: { motivo: "Recarga de datos existentes desde libros de Excel con historial de cartera 2026" },
       });
     }
 
     res.json({
       ok: true,
-      mensaje: "Se han recargado exitosamente todos los datos existentes de los libros Excel (568 asociados, 65 créditos activos de cartera y 692 certificados de plazo fijo).",
+      mensaje: "Se han recargado exitosamente todos los datos existentes de los libros Excel (568 asociados, 66 créditos oficiales de cartera con 191 cuotas históricas y 692 certificados de plazo fijo).",
     });
   }),
 );

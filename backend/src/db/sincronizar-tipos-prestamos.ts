@@ -109,6 +109,23 @@ print(json.dumps(items))
 
     console.log(`🔍 Evaluando ${dbPrestamos.length} créditos en la base de datos...`);
 
+    function parsePlazoMeses(raw: string | null): number {
+      if (!raw) return 12;
+      const s = raw.toUpperCase().trim();
+      if (s.includes("15")) return 180;
+      if (s.includes("10")) return 120;
+      if (s.includes("8")) return 96;
+      if (s.includes("7")) return 84;
+      if (s.includes("5")) return 60;
+      if (s.includes("4")) return 48;
+      if (s.includes("1 Y 1/2") || s.includes("1 CON 6") || s.includes("1 ANO CON 6") || s.includes("1 AÑO CON 6")) return 18;
+      if (s.includes("1 CON 3") || s.includes("1 ANO CON 3") || s.includes("1 AÑO CON 3")) return 15;
+      if (s.includes("3")) return 36;
+      if (s.includes("2")) return 24;
+      if (s.includes("1")) return 12;
+      return 12;
+    }
+
     let hipotecariosActualizados = 0;
     let fiduciariosActualizados = 0;
 
@@ -126,15 +143,19 @@ print(json.dumps(items))
         const ubicacion = match.ubicacion || (nuevoTipo === "HIPOTECARIO" ? "Inmueble Chajul" : "Comunidad Chajul");
         const fiador = match.fiador || (nuevoTipo === "HIPOTECARIO" ? "Garantía Hipotecaria (Inmueble / Terreno)" : "Fiador solidario");
         const fVenc = match.fechaVencimiento ? match.fechaVencimiento.slice(0, 10) : null;
+        const fDes = match.fechaDesembolso ? match.fechaDesembolso.slice(0, 10) : null;
+        const plazoMeses = parsePlazoMeses(match.plazoRaw);
 
         await client.query(
           `update prestamos
            set tipo = $1,
-               ubicacion_garantia = coalesce(ubicacion_garantia, $2),
-               nombre_fiador = coalesce(nombre_fiador, $3),
-               fecha_vencimiento = coalesce(fecha_vencimiento, $4)
-           where id = $5`,
-          [nuevoTipo, ubicacion, fiador, fVenc, dp.id]
+               ubicacion_garantia = coalesce($2, ubicacion_garantia),
+               nombre_fiador = coalesce($3, nombre_fiador),
+               plazo_meses = $4,
+               fecha_desembolso = coalesce($5::date, fecha_desembolso),
+               fecha_vencimiento = coalesce($6::date, fecha_vencimiento)
+           where id = $7`,
+          [nuevoTipo, ubicacion, fiador, plazoMeses, fDes, fVenc, dp.id]
         );
 
         if (nuevoTipo === "HIPOTECARIO") {
@@ -146,9 +167,9 @@ print(json.dumps(items))
     }
 
     console.log("\n================================================================================");
-    console.log("✅ RESULTADO DE LA RECLASIFICACIÓN:");
-    console.log(`   🏠 Créditos clasificados como HIPOTECARIOS: ${hipotecariosActualizados}`);
-    console.log(`   🤝 Créditos clasificados como FIDUCIARIOS:   ${dbPrestamos.length - hipotecariosActualizados}`);
+    console.log("✅ RESULTADO DE LA RECLASIFICACIÓN Y ACTUALIZACIÓN DE PLAZOS:");
+    console.log(`   🏠 Créditos clasificados como HIPOTECARIOS con plazo real: ${hipotecariosActualizados}`);
+    console.log(`   🤝 Créditos clasificados como FIDUCIARIOS:                 ${dbPrestamos.length - hipotecariosActualizados}`);
     console.log("================================================================================\n");
 
   } finally {

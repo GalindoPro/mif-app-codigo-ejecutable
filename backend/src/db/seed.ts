@@ -15,7 +15,7 @@ async function main() {
   console.log(`Agencia lista: ${agencia.nombre} (${agencia.id})`);
 
   const email = "admin@mif.coop";
-  const passwordTemporal = "CambiaEsto123!";
+  const passwordTemporal = "Comif2026!";
   const passwordHash = await hashPassword(passwordTemporal);
 
   await pool.query(

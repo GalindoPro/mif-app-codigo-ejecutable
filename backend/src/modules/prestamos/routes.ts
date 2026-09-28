@@ -82,7 +82,27 @@ prestamosRouter.get(
         : (req.query.promotorId as string) || null;
     const tipo = req.query.tipo as any;
     const mes = req.query.mes as string | undefined;
-    res.json(await service.obtenerKardexCartera({ agenciaId, promotorId, tipo, mes }));
+    const origenCartera = req.query.origenCartera as any;
+    res.json(await service.obtenerKardexCartera({ agenciaId, promotorId, tipo, mes, origenCartera }));
+  }),
+);
+
+prestamosRouter.get(
+  "/diagnostico-excel",
+  asyncHandler(async (_req, res) => {
+    const { validarArchivoExcelCartera } = await import("./validadorCartera");
+    const diagnostico = validarArchivoExcelCartera();
+    res.json(diagnostico);
+  }),
+);
+
+prestamosRouter.post(
+  "/reestructurar-cartera",
+  requireRole("ADMIN", "GERENCIA"),
+  asyncHandler(async (_req, res) => {
+    const { reestructurarCartera } = await import("../../db/reestructurar-cartera-oficial");
+    const resultado = await reestructurarCartera();
+    res.json({ ok: true, mensaje: "Cartera reestructurada y sincronizada fielmente con el Excel oficial.", resultado });
   }),
 );
 
