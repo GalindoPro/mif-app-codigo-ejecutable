@@ -447,8 +447,11 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
   const [datos, setDatos] = useState<AnaliticaResponse | null>(null);
   const [cargando, setCargando] = useState(false);
   const [mostrarReporteModal, setMostrarReporteModal] = useState(false);
+  const [mostrarInputOtroMes, setMostrarInputOtroMes] = useState(false);
 
   const MESES_HISTORICOS = [
+    { id: "2026-09", label: "Septiembre 2026" },
+    { id: "2026-08", label: "Agosto 2026" },
     { id: "2026-07", label: "Julio 2026" },
     { id: "2026-06", label: "Junio 2026" },
     { id: "2026-05", label: "Mayo 2026" },
@@ -652,23 +655,51 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
           {modoTemporal === "MES" && (
             <div style={{ display: "inline-flex", gap: "0.3rem", alignItems: "center" }}>
               <select
-                value={mesSeleccionado}
-                onChange={(e) => setMesSeleccionado(e.target.value)}
-                style={{ fontSize: "0.75rem", padding: "0.22rem 0.45rem", fontWeight: 600, background: "var(--paper-raised)" }}
+                value={mostrarInputOtroMes ? "OTRO" : mesSeleccionado}
+                onChange={(e) => {
+                  if (e.target.value === "OTRO") {
+                    setMostrarInputOtroMes(true);
+                  } else {
+                    setMostrarInputOtroMes(false);
+                    setMesSeleccionado(e.target.value);
+                  }
+                }}
+                style={{
+                  fontSize: "0.75rem",
+                  padding: "0.22rem 0.45rem",
+                  fontWeight: 600,
+                  background: "var(--paper-raised)",
+                  color: "var(--ink)",
+                  borderRadius: "6px",
+                  border: "1px solid var(--line)",
+                }}
               >
                 {MESES_HISTORICOS.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.label}
                   </option>
                 ))}
+                <option value="OTRO">🗓️ Otro mes...</option>
               </select>
-              <input
-                type="month"
-                value={mesSeleccionado}
-                onChange={(e) => e.target.value && setMesSeleccionado(e.target.value)}
-                style={{ fontSize: "0.73rem", padding: "0.2rem 0.35rem", width: 110 }}
-                title="Seleccionar cualquier otro mes"
-              />
+
+              {mostrarInputOtroMes && (
+                <input
+                  type="month"
+                  value={mesSeleccionado}
+                  onChange={(e) => e.target.value && setMesSeleccionado(e.target.value)}
+                  style={{
+                    fontSize: "0.74rem",
+                    padding: "0.2rem 0.35rem",
+                    width: 125,
+                    borderRadius: "6px",
+                    border: "1px solid var(--line)",
+                    background: "var(--paper)",
+                    color: "var(--ink)",
+                  }}
+                  title="Seleccionar cualquier otro mes"
+                  autoFocus
+                />
+              )}
             </div>
           )}
 
@@ -753,8 +784,16 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
         </div>
       </div>
 
-      {/* Pestañas de Selección Específica por Cuenta y Producto */}
-      <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", borderBottom: "1px solid var(--line)", paddingBottom: "0.4rem" }}>
+      {/* Pestañas de Selección Específica por Cuenta y Producto (Grid Adaptable Auto-Fit Fintech) */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+          gap: "0.3rem",
+          borderBottom: "1px solid var(--line)",
+          paddingBottom: "0.45rem",
+        }}
+      >
         {CUENTAS_OPCIONES.map((cta) => {
           const isSelected = filtroCuenta === cta.id;
           const count = !datos
@@ -770,25 +809,44 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
               className={`btn btn-xs ${isSelected ? "" : "secondary"}`}
               style={{
                 fontSize: "0.72rem",
-                padding: "0.2rem 0.5rem",
-                display: "inline-flex",
+                padding: "0.22rem 0.45rem",
+                display: "flex",
                 alignItems: "center",
-                gap: "0.3rem",
-                borderRadius: "5px",
-                borderColor: isSelected ? "#0284c7" : undefined,
+                justifyContent: "space-between",
+                gap: "0.25rem",
+                borderRadius: "6px",
+                borderColor: isSelected ? "#0284c7" : "var(--line)",
+                background: isSelected ? "#0284c7" : "var(--paper)",
+                color: isSelected ? "#ffffff" : "var(--ink)",
+                boxShadow: isSelected ? "0 2px 4px rgba(2, 132, 199, 0.2)" : "none",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                minWidth: 0,
               }}
               onClick={() => setFiltroCuenta(cta.id)}
             >
-              <span>{cta.icon}</span>
-              <span>{cta.label}</span>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.28rem",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ flexShrink: 0 }}>{cta.icon}</span>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{cta.label}</span>
+              </span>
               {count > 0 && (
                 <span
                   style={{
-                    background: isSelected ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.06)",
+                    background: isSelected ? "rgba(255,255,255,0.25)" : "rgba(148, 163, 184, 0.18)",
                     borderRadius: "10px",
                     padding: "0.05rem 0.35rem",
                     fontSize: "0.64rem",
                     fontWeight: 700,
+                    flexShrink: 0,
                   }}
                 >
                   {count}

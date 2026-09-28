@@ -137,3 +137,72 @@ export function calcularEdad(fechaNacStr?: string | null): number | null {
   }
   return edad;
 }
+
+/**
+ * Convierte un valor numérico a su representación en letras en Quetzales.
+ * Ej: 500 -> "QUINIENTOS QUETZALES EXACTOS"
+ */
+export function numeroALetras(num: number): string {
+  const enteros = Math.floor(Math.abs(num));
+  const centavos = Math.round((Math.abs(num) - enteros) * 100);
+  const centavosStr = centavos === 0 ? "EXACTOS" : `CON ${centavos.toString().padStart(2, "0")}/100 CENTAVOS`;
+
+  const unidades = ["", "UN", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"];
+  const decenas = ["", "DIEZ", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"];
+  const especiales: Record<number, string> = {
+    11: "ONCE", 12: "DOCE", 13: "TRECE", 14: "CATORCE", 15: "QUINCE",
+    16: "DIECISÉIS", 17: "DIECISIETE", 18: "DIECIOCHO", 19: "DIECINUEVE",
+    21: "VEINTIÚN", 22: "VEINTIDÓS", 23: "VEINTITRÉS", 24: "VEINTICUATRO", 25: "VEINTICINCO",
+    26: "VEINTISÉIS", 27: "VEINTISIETE", 28: "VEINTIOCHO", 29: "VEINTINUEVE",
+  };
+  const centenas = ["", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"];
+
+  function convertirGrupo(n: number): string {
+    if (n === 0) return "";
+    if (n === 100) return "CIEN";
+    let res = "";
+    const c = Math.floor(n / 100);
+    const d = Math.floor((n % 100) / 10);
+    const u = n % 10;
+    const du = n % 100;
+
+    if (c > 0) res += centenas[c] + " ";
+    if (especiales[du]) {
+      res += especiales[du] + " ";
+    } else {
+      if (d > 0) {
+        res += decenas[d];
+        if (u > 0) res += " Y " + unidades[u] + " ";
+        else res += " ";
+      } else if (u > 0) {
+        res += unidades[u] + " ";
+      }
+    }
+    return res.trim();
+  }
+
+  if (enteros === 0) return `CERO QUETZALES ${centavosStr}`;
+
+  let texto = "";
+  const millones = Math.floor(enteros / 1000000);
+  const miles = Math.floor((enteros % 1000000) / 1000);
+  const resto = enteros % 1000;
+
+  if (millones > 0) {
+    if (millones === 1) texto += "UN MILLÓN ";
+    else texto += convertirGrupo(millones) + " MILLONES ";
+  }
+
+  if (miles > 0) {
+    if (miles === 1) texto += "MIL ";
+    else texto += convertirGrupo(miles) + " MIL ";
+  }
+
+  if (resto > 0) {
+    texto += convertirGrupo(resto) + " ";
+  }
+
+  const sufijoMoneda = enteros === 1 ? "QUETZAL" : "QUETZALES";
+  return `${texto.trim()} ${sufijoMoneda} ${centavosStr}`.trim();
+}
+

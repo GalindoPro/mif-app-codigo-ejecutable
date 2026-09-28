@@ -74,9 +74,15 @@ export async function historialDias(agenciaId: string, agenciaVisible: string | 
   return rows;
 }
 
-export async function abrirDia(agenciaId: string, usuarioId: string, agenciaVisible: string | null, saldoInicialManual?: number) {
+export async function abrirDia(
+  agenciaId: string,
+  usuarioId: string,
+  agenciaVisible: string | null,
+  saldoInicialManual?: number,
+  fechaManual?: string,
+) {
   checarAgencia(agenciaId, agenciaVisible);
-  const fecha = hoyISO();
+  const fecha = fechaManual && /^\d{4}-\d{2}-\d{2}$/.test(fechaManual) ? fechaManual : hoyISO();
 
   return withTransaction(async (client) => {
     const { rows: abiertos } = await client.query(
@@ -86,27 +92,36 @@ export async function abrirDia(agenciaId: string, usuarioId: string, agenciaVisi
     if (abiertos[0]) {
       const fechaAbierto = new Date(abiertos[0].fecha).toISOString().slice(0, 10);
       if (fechaAbierto === fecha) return abiertos[0];
-      throw conflict(`Todavía tienes la caja del ${fechaAbierto} sin cerrar. Ciérrala antes de abrir la de hoy.`);
+      throw conflict(`Todavía tienes la caja del ${fechaAbierto} sin cerrar. Ciérrala antes de abrir la del ${fecha}.`);
     }
 
-    const { rows: existeHoy } = await client.query(
+    const { rows: existeFecha } = await client.query(
       `select * from caja_dias where agencia_id = $1 and fecha = $2`,
       [agenciaId, fecha],
     );
-    if (existeHoy[0]) throw conflict("La caja de hoy ya fue cerrada; no se puede volver a abrir.");
+    if (existeFecha[0]) {
+      throw conflict(`La caja del día ${fecha} ya fue cerrada en esta agencia; no se puede volver a abrir como un nuevo día. Si eres Administrador o Supervisor, puedes reabrir el turno.`);
+    }
 
-    const { rows: ultimos } = await client.query(
-      `select * from caja_dias where agencia_id = $1 order by fecha desc limit 1`,
+    // Buscar último cierre previo para arrastre continuo de saldo
+    const { rows: ultimosPrevios } = await client.query(
+      `select * from caja_dias where agencia_id = $1 and fecha < $2 and estado = 'CERRADO' order by fecha desc limit 1`,
+      [agenciaId, fecha],
+    );
+    const { rows: ultimosGeneral } = await client.query(
+      `select * from caja_dias where agencia_id = $1 and estado = 'CERRADO' order by fecha desc limit 1`,
       [agenciaId],
     );
-    const ultimo = ultimos[0] ?? null;
+    const ultimo = ultimosPrevios[0] ?? ultimosGeneral[0] ?? null;
 
     let saldoInicial: number;
-    if (ultimo) {
+    if (saldoInicialManual !== undefined && saldoInicialManual !== null) {
+      saldoInicial = saldoInicialManual;
+    } else if (ultimo && ultimo.saldo_final !== null && ultimo.saldo_final !== undefined) {
       saldoInicial = Number(ultimo.saldo_final);
     } else {
       if (saldoInicialManual === undefined || saldoInicialManual === null) {
-        throw badRequest("Es la primera vez que se abre la caja de esta agencia; indica el saldo inicial.");
+        throw badRequest("No hay saldo de arrastre de una caja previa; indica el saldo inicial para esta fecha.");
       }
       saldoInicial = saldoInicialManual;
     }
@@ -120,6 +135,62 @@ export async function abrirDia(agenciaId: string, usuarioId: string, agenciaVisi
     const dia = rows[0];
     await registrarAuditoria({ entidad: "CajaDia", entidadId: dia.id, accion: "CREAR", usuarioId, datosNuevos: dia });
     return dia;
+  });
+}
+
+export async function reabrirDia(diaId: string, usuarioId: string, agenciaVisible: string | null) {
+  return withTransaction(async (client) => {
+    const { rows: diaRows } = await client.query(`select * from caja_dias where id = $1`, [diaId]);
+    const dia = diaRows[0];
+    if (!dia) throw notFound("Día de caja no encontrado");
+    checarAgencia(dia.agencia_id, agenciaVisible);
+    if (dia.estado !== "CERRADO") throw conflict("La caja no está cerrada.");
+
+    // 1. Validar que no haya otra caja ABIERTA en la misma agencia
+    const { rows: abiertos } = await client.query(
+      `select * from caja_dias where agencia_id = $1 and estado = 'ABIERTO' and id != $2`,
+      [dia.agencia_id, diaId],
+    );
+    if (abiertos[0]) {
+      const fAbierto = new Date(abiertos[0].fecha).toISOString().slice(0, 10);
+      throw conflict(`Tienes la caja del ${fAbierto} abierta actualmente. Ciérrala antes de reabrir la del ${new Date(dia.fecha).toISOString().slice(0, 10)}.`);
+    }
+
+    // 2. Validar que no haya una caja cerrada posterior (para proteger el encadenamiento de saldos)
+    const { rows: posteriores } = await client.query(
+      `select id, fecha from caja_dias where agencia_id = $1 and fecha > $2 and estado = 'CERRADO' order by fecha asc limit 1`,
+      [dia.agencia_id, dia.fecha],
+    );
+    if (posteriores[0]) {
+      const fPost = new Date(posteriores[0].fecha).toISOString().slice(0, 10);
+      throw conflict(`No se puede reabrir la caja del ${new Date(dia.fecha).toISOString().slice(0, 10)} porque ya existe una caja posterior cerrada (${fPost}). Reabrirla desfasaría el encadenamiento de saldos contables.`);
+    }
+
+    // 3. Eliminar arqueo previo registrado para obligar a un nuevo arqueo al cerrar
+    await client.query(`delete from caja_arqueos where caja_dia_id = $1`, [diaId]);
+
+    // 4. Pasar caja_dia a ABIERTO
+    const { rows } = await client.query(
+      `update caja_dias
+       set estado = 'ABIERTO',
+           saldo_final = null,
+           cerrado_por = null,
+           cerrado_at = null
+       where id = $1
+       returning *`,
+      [diaId],
+    );
+    const diaActualizado = rows[0];
+
+    await registrarAuditoria({
+      entidad: "CajaDia",
+      entidadId: diaId,
+      accion: "ACTUALIZAR",
+      usuarioId,
+      datosNuevos: { ...diaActualizado, motivo: "REAPERTURA_SUPERVISADA" },
+    });
+
+    return diaActualizado;
   });
 }
 

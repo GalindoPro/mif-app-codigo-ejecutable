@@ -54,11 +54,27 @@ export default function BuscadorSocio({
 
   if (seleccionado) {
     const esInterAgencia = Boolean(agenciaId && seleccionado.agencia_id && seleccionado.agencia_id !== agenciaId);
+    const cantCreditosSel = seleccionado.creditos_activos ?? 0;
     return (
       <div className="socio-chip">
         <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
           <strong>{seleccionado.nombres}</strong>
           <span className="mono"> · {seleccionado.numero_asociado}</span>
+          {cantCreditosSel > 0 && (
+            <span
+              className="badge"
+              style={{
+                background: "rgba(16, 185, 129, 0.15)",
+                color: "#059669",
+                border: "1px solid rgba(16, 185, 129, 0.4)",
+                fontSize: "0.72rem",
+                fontWeight: 700,
+                padding: "0.12rem 0.45rem",
+              }}
+            >
+              💼 {cantCreditosSel} crédito{cantCreditosSel > 1 ? "s" : ""} activo{cantCreditosSel > 1 ? "s" : ""}
+            </span>
+          )}
           {esInterAgencia && (
             <span
               className="badge"
@@ -97,6 +113,7 @@ export default function BuscadorSocio({
         <ul className="buscador-dropdown">
           {resultados.map((s) => {
             const esOtraAgencia = Boolean(agenciaId && s.agencia_id && s.agencia_id !== agenciaId);
+            const cantCreditos = s.creditos_activos ?? 0;
             return (
               <li key={s.id}>
                 <button
@@ -108,8 +125,30 @@ export default function BuscadorSocio({
                   }}
                   style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
                     <span>{s.nombres}</span>
+                    {cantCreditos > 0 ? (
+                      <span
+                        style={{
+                          fontSize: "0.68rem",
+                          background: "rgba(16, 185, 129, 0.15)",
+                          color: "#059669",
+                          border: "1px solid rgba(16, 185, 129, 0.35)",
+                          padding: "0.08rem 0.4rem",
+                          borderRadius: "4px",
+                          fontWeight: 700,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.2rem",
+                        }}
+                      >
+                        💼 {cantCreditos} crédito{cantCreditos > 1 ? "s" : ""} activo{cantCreditos > 1 ? "s" : ""}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: "0.66rem", color: "var(--ink-soft)" }}>
+                        (Sin préstamos)
+                      </span>
+                    )}
                     {esOtraAgencia && (
                       <span
                         style={{

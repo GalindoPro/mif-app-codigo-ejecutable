@@ -64,14 +64,29 @@ export default function AuxiliarCaja() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estadoInfo]);
 
-  async function abrirCaja(saldoInicial?: number) {
+  async function abrirCaja(saldoInicial?: number, fecha?: string) {
     setError(null);
     setCargando(true);
     try {
-      await api.post("/caja-auxiliar/abrir", { agenciaId, saldoInicial });
+      await api.post("/caja-auxiliar/abrir", { agenciaId, saldoInicial, fecha });
       cargarEstado();
     } catch (err) {
       setError(mensajeError(err));
+      throw err;
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  async function reabrirCaja(diaId: string) {
+    setError(null);
+    setCargando(true);
+    try {
+      await api.post(`/caja-auxiliar/${diaId}/reabrir`);
+      cargarEstado();
+    } catch (err) {
+      setError(mensajeError(err));
+      throw err;
     } finally {
       setCargando(false);
     }
@@ -184,7 +199,11 @@ export default function AuxiliarCaja() {
         <CajaCerradaCard
           agenciaNombre={agenciaActualNombre}
           detalle={estadoInfo.detalle}
+          usuarioRol={usuario?.rol}
+          cargando={cargando}
           onVerHistorial={() => setMostrarHistorial(true)}
+          onReabrir={() => reabrirCaja(estadoInfo.dia.id)}
+          onAbrirNuevaFecha={(saldo, fecha) => abrirCaja(saldo, fecha)}
         />
       )}
 

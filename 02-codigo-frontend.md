@@ -5188,7 +5188,11 @@ export default function AuxiliarCaja() {
         <CajaCerradaCard
           agenciaNombre={agenciaActualNombre}
           detalle={estadoInfo.detalle}
+          usuarioRol={usuario?.rol}
+          cargando={cargando}
           onVerHistorial={() => setMostrarHistorial(true)}
+          onReabrir={() => reabrirCaja(estadoInfo.dia.id)}
+          onAbrirNuevaFecha={(saldo, fecha) => abrirCaja(saldo, fecha)}
         />
       )}
 

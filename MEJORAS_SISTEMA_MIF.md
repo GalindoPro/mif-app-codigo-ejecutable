@@ -4,6 +4,100 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
 
 ---
 
+## 85. Optimización de Botonera de Productos Financieros en Cinta Deslizable y Limpieza del Selector de Mes en Analítica de Tablero
+
+**Objetivo y Reglas de Negocio:**
+1. **Cinta Deslizable Continua en 1 Sola Línea (`Tablero.tsx`):**
+   - Anteriormente, los 11 botones de productos financieros (`Consolidado General`, `Ahorro Corriente`, `Ahorro Programado`, `Infantil`, `Sobre Préstamo`, `DPF`, `Aportaciones`, `Créditos`, `Agente BI`, `Caja Chica`, `Tesorería`) utilizaban `flex-wrap: wrap`, lo cual provocaba que al llegar al ancho límite de pantalla los últimos dos botones (`☕ Caja Chica` y `💵 Tesorería & Ventanilla`) se desbordaran y cayeran aislados a un segundo renglón, rompiendo la armonía visual.
+   - Se transformó la botonera en una cinta horizontal fluida de una sola línea (`white-space: nowrap`, `overflow-x: auto`, `flex-shrink: 0`, `scrollbar-width: thin`), manteniendo todos los 11 productos alineados en una sola fila compacta y deslizable.
+2. **Limpieza del Selector de Meses Históricos:**
+   - Se eliminó la superposición del cuadro nativo `<input type="month">` que se mostraba simultáneamente al `<select>` y quedaba comprimido y cortado en pantalla (mostrando *"julio de 20📅"*).
+   - Ahora el encabezado despliega un menú desplegable limpio con los meses históricos (`Septiembre 2026`, `Agosto 2026`, `Julio 2026` hasta `Enero 2026`), habilitando el campo nativo de mes únicamente si el usuario elige la opción `"🗓️ Otro mes personalizado..."`.
+
+**Archivos modificados:**
+- `frontend/src/pages/Tablero.tsx`
+
+---
+
+## 84. Estandarización Permanente de Modales Fintech y Regla Inmutable de Colores y Tipografía Institucional de COOP COMIF R.L.
+
+**Objetivo y Reglas de Negocio:**
+1. **Corrección Visual de Modales de Ventanilla (`CajaCerradaCard.tsx`):**
+   - Se corrigió la anidación de clases en los modales de apertura de nueva fecha y confirmación de reapertura. Anteriormente, el contenedor interno utilizaba la clase `.modal`, la cual en `app.css` tiene asignada la propiedad `position: fixed; inset: 0`, causando que el modal perdiera su tarjeta y se proyectara desalineado hacia la izquierda sobre un fondo transparente.
+   - Se aplicó la arquitectura oficial: contenedor externo `.modal-overlay` (pantalla completa con `backdrop-filter: blur(8px)`) y tarjeta interior `.modal-card` con fondo opaco institucional `#0f172a`, bordes `1px solid rgba(148, 163, 184, 0.25)`, esquinas redondeadas de `14px`, sombra elevada `box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75)` y centrado automático absoluto en el viewport.
+2. **Aplicación Estricta de la Paleta Institucional COMIF R.L.:**
+   - **Verde Institucional / Esmeralda Cooperativo (`#059669` / `#10b981`):** Botones de acción principal (`Abrir Caja`), insignias de confirmación de fecha (`✓ Martes, 29 de Septiembre de 2026`) y bordes de acento.
+   - **Dorado / Oro Maya (`#BF9903` / `#f59e0b`):** Tarjeta de continuidad de saldos de arrastre del último cierre, cifras en Quetzales y botón de reapertura supervisada (`#d97706`).
+   - **Fondo Dark Slate Profundo (`#0f172a` y `#1e293b`):** Tarjeta del modal y campos de fecha y números con contraste definido y bordes `#334155`.
+   - **Tipografía y Legibilidad:** Títulos en `#f8fafc`, subtítulos en `#94a3b8`, y saldos monetarios obligatoriamente en `"IBM Plex Mono", monospace` con `font-variant-numeric: tabular-nums`.
+3. **Incorporación de la Regla #5 en `AGENTS.md`:**
+   - Queda consignada como regla permanente del sistema no volver a consultar al usuario sobre colores, fondos ni tipografías en futuras ampliaciones, ya que el sistema tiene fijados y automatizados sus tokens y componentes institucionales.
+
+**Archivos modificados:**
+- `frontend/src/components/cajaauxiliar/CajaCerradaCard.tsx`
+- `AGENTS.md`
+
+---
+
+## 83. Gestión Flexible de Apertura de Caja Auxiliar por Fechas Históricas/Futuras y Reapertura Autorizada de Turnos con Protección de Auditoría y Arrastre de Saldos
+
+**Objetivo y Reglas de Negocio:**
+1. **Apertura de Caja para Fechas Históricas No Registradas o Fechas Siguientes:**
+   - Anteriormente, el sistema obligaba a abrir la caja únicamente en la fecha actual del reloj del servidor (`hoyISO()`). Si la caja del día ya se había cerrado, el usuario quedaba bloqueado en la vista de turno finalizado sin posibilidad de abrir una fecha pasada (para registrar recibos físicos pendientes de digitación) o de avanzar al día siguiente de trabajo sin esperar a medianoche.
+   - En `backend/src/modules/cajaauxiliar/service.ts`, la función `abrirDia` ahora admite un parámetro opcional `fechaManual` (formato `YYYY-MM-DD`).
+   - **Regla de Unicidad y Protección:** Se valida que no exista ya una caja cerrada en esa misma fecha para esa agencia (`caja_dias_agencia_id_fecha_key`), arrojando una alerta amigable en caso contrario: *"La caja del día YYYY-MM-DD ya fue cerrada en esta agencia"*.
+   - **Arrastre Continuo y Consecutivo de Saldos:** El saldo inicial se calcula automáticamente tomando el `saldo_final` del último cierre previo disponible cronológicamente, garantizando la continuidad e inmutabilidad contable del efectivo.
+2. **Reapertura de Caja Cerrada con Rol Autorizado (Administrador / Gerencia / Supervisor):**
+   - Se habilitó la ruta `POST /api/caja-auxiliar/:id/reabrir` restringida por middleware a roles `ADMIN`, `GERENCIA` y `SUPERVISOR`.
+   - **Reglas de Auditoría Contable para Reapertura:**
+     * Valida que no exista otra caja abierta simultáneamente en la misma agencia.
+     * Valida que no existan cierres con fechas posteriores que desfasarían el encadenamiento de saldos (integridad de la línea de tiempo).
+     * Anula el arqueo previo (`delete from caja_arqueos`) para exigir obligatoriamente un nuevo arqueo físico y acta firmada al volver a cerrar.
+     * Registra el evento en la bitácora de auditoría (`registrarAuditoria`) con el motivo `REAPERTURA_SUPERVISADA`.
+3. **Interfaz de Usuario y Modales Interactivos en Ventanilla:**
+   - En `AbrirCajaCard.tsx` (Estado `SIN_ABRIR`):
+     * Incorporación del selector nativo `📅 Fecha de Operación de la Caja` (`<input type="date">`) con previsualización en texto legible en español (ej. *"martes, 29 de septiembre de 2026"*).
+     * Indicador del saldo inicial arrastrado automáticamente con opción para ajuste manual en caso de aportes excepcionales de apertura.
+   - En `CajaCerradaCard.tsx` (Estado `CERRADO`):
+     * Botón `➕ Abrir Siguiente Día / Nueva Fecha`: Despliega un modal intuitivo que sugiere por defecto el día siguiente cronológico con el saldo final del cierre previo como nuevo saldo inicial.
+     * Botón `🔓 Reabrir Turno`: Exclusivo para Supervisores y Administradores, con modal de confirmación y aviso de advertencia sobre la necesidad de repetir el arqueo físico.
+   - En `AuxiliarCaja.tsx`: Manejo reactivo de las acciones de apertura y reapertura, recargando el estado en vivo de la ventanilla.
+
+**Archivos modificados:**
+- `backend/src/modules/cajaauxiliar/service.ts`
+- `backend/src/modules/cajaauxiliar/routes.ts`
+- `frontend/src/components/cajaauxiliar/AbrirCajaCard.tsx`
+- `frontend/src/components/cajaauxiliar/CajaCerradaCard.tsx`
+- `frontend/src/pages/AuxiliarCaja.tsx`
+
+---
+
+## 82. Distintivo de Créditos Activos en Buscador de Socios y Rediseño de Recibos a Formato Media Carta con Duplicado (Original Asociado + Copia Archivo de Caja)
+
+**Objetivo y Reglas de Negocio:**
+1. **Diferenciación Inteligente de Homónimos en Cobro de Cartera:**
+   - En la cooperativa coexisten asociadas con nombres similares (por ejemplo, `ROSA BECA CABA DE CABA` con código `CHAJ-00029` quien posee 3 créditos vigentes por más de Q 800,000.00, frente a `ROSA BECA CABA DE BECA` con código `CHAJ-00182` quien solo posee una cuenta de ahorro sin préstamos).
+   - Se optimizó la consulta en backend (`backend/src/modules/socios/service.ts`) para calcular en tiempo real el campo `creditos_activos` a través de una subconsulta de préstamos en estados `DESEMBOLSADO`, `AL_DIA` o `EN_MORA`.
+   - En `BuscadorSocio.tsx`, cada resultado del listado y chip seleccionado ahora muestra el distintivo visual `💼 X créditos activos` resaltado en verde esmeralda o `(Sin préstamos)` en gris, permitiendo al cajero identificar con total certeza a la persona titular del crédito al cobrar en ventanilla.
+2. **Rediseño Integral de Recibos a Formato Media Carta con Talón Duplicado:**
+   - Anteriormente, el comprobante utilizaba un ancho fijo de 80mm para rollo térmico, viéndose reducido en una esquina al imprimirse en impresoras de oficina con hoja tamaño Carta.
+   - En `ReciboMovimientoModal.tsx` y `ReciboCobroCreditoModal.tsx` se implementó la arquitectura oficial de Media Carta:
+     * **Mitad Superior:** `[ ORIGINAL — ASOCIADO / CLIENTE ]` para entrega física al socio.
+     * **Línea Divisoria Central:** `- - - - - - - - - - - - - - - ✂ CORTAR AQUÍ (TALÓN DUPLICADO) ✂ - - - - - - - - - - - - - - -`.
+     * **Mitad Inferior:** `[ COPIA — ARCHIVO DE CAJA / CONTABILIDAD ]` para control diario del cajero.
+     * **Conversión de Monto a Letras:** Incorporación de la función `numeroALetras(num)` en `frontend/src/lib/formatters.ts` para desplegar el valor legal en letras (ej: *"QUINIENTOS QUETZALES EXACTOS"*).
+     * **Doble Casilla de Firmas:** Firma del Cajero(a) Receptor y Firma del Asociado / Beneficiario.
+
+**Archivos modificados y creados:**
+- `backend/src/modules/socios/service.ts`
+- `frontend/src/types.ts`
+- `frontend/src/lib/formatters.ts`
+- `frontend/src/components/BuscadorSocio.tsx`
+- `frontend/src/components/cajaauxiliar/ReciboMovimientoModal.tsx`
+- `frontend/src/components/ReciboCobroCreditoModal.tsx`
+
+---
+
 ## 81. Analítica Financiera de Gerencia por Mes Histórico (Enero–Julio 2026), Selector de Rango Libre y Diagnóstico Estratégico de Detección de Debilidades y Fuga de Liquidez
 
 **Objetivo y Reglas de Negocio:**

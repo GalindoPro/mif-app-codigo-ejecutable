@@ -84,11 +84,14 @@ export async function listar(filtros: FiltrosSocios) {
   const [{ rows }, { rows: countRows }] = await Promise.all([
     pool.query(
       `select s.*, a.nombre as agencia_nombre, a.codigo as agencia_codigo,
-              coalesce(cnt.total_cuentas, 0)::int as total_cuentas
+              coalesce(cnt.total_cuentas, 0)::int as total_cuentas,
+              coalesce(p_cnt.total_creditos_activos, 0)::int as creditos_activos
        from socios s
        join agencias a on a.id = s.agencia_id
        left join (select socio_id, count(*) as total_cuentas from cuentas group by socio_id) cnt
               on cnt.socio_id = s.id
+       left join (select socio_id, count(*) as total_creditos_activos from prestamos where estado = 'DESEMBOLSADO' and saldo_capital > 0 group by socio_id) p_cnt
+              on p_cnt.socio_id = s.id
        ${where}
        order by s.numero_asociado desc, s.created_at desc
        limit $${limitIdx} offset $${offsetIdx}`,

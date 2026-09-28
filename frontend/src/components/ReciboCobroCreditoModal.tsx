@@ -345,6 +345,10 @@ export default function ReciboCobroCreditoModal({ datos, onClose }: Props) {
         {/* ESTILOS DE IMPRESIÓN */}
         <style>{`
           @media print {
+            @page {
+              size: letter portrait;
+              margin: 8mm 12mm;
+            }
             body * {
               visibility: hidden;
             }
@@ -365,14 +369,14 @@ export default function ReciboCobroCreditoModal({ datos, onClose }: Props) {
               visibility: visible;
             }
             #recibo-imprimible {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 100%;
-              max-width: 80mm;
+              position: static !important;
+              width: 100% !important;
+              max-width: 100% !important;
               margin: 0 auto;
-              padding: 8px;
-              border: none !important;
+              padding: 6mm 8mm;
+              border: 1.5px solid #0f172a !important;
+              border-radius: 6px;
+              box-sizing: border-box;
             }
             .no-print {
               display: none !important;

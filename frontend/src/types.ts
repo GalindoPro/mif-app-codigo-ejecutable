@@ -67,6 +67,7 @@ export interface Socio {
   tutor_parentesco?: string | null;
   tutor_telefono?: string | null;
   total_cuentas?: number;
+  creditos_activos?: number;
   created_at: string;
 }
 

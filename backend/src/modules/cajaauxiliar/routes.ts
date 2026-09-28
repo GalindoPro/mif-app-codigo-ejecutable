@@ -96,6 +96,7 @@ cajaAuxiliarRouter.post(
 const abrirSchema = z.object({
   agenciaId: z.string().uuid(),
   saldoInicial: z.number().nonnegative().optional(),
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 cajaAuxiliarRouter.post(
@@ -105,7 +106,7 @@ cajaAuxiliarRouter.post(
     const data = abrirSchema.parse(req.body);
     const visible = agenciaVisible(req);
     if (visible && data.agenciaId !== visible) throw forbidden("No puedes abrir la caja de otra agencia");
-    res.status(201).json(await service.abrirDia(data.agenciaId, req.user!.id, visible, data.saldoInicial));
+    res.status(201).json(await service.abrirDia(data.agenciaId, req.user!.id, visible, data.saldoInicial, data.fecha));
   }),
 );
 
@@ -189,6 +190,14 @@ cajaAuxiliarRouter.post(
   asyncHandler(async (req, res) => {
     const data = cerrarSchema.parse(req.body);
     res.json(await service.cerrarDia(req.params.id, data.conteo, req.user!.id, agenciaVisible(req)));
+  }),
+);
+
+cajaAuxiliarRouter.post(
+  "/:id/reabrir",
+  requireRole("ADMIN", "GERENCIA", "SUPERVISOR"),
+  asyncHandler(async (req, res) => {
+    res.json(await service.reabrirDia(req.params.id, req.user!.id, agenciaVisible(req)));
   }),
 );
 
