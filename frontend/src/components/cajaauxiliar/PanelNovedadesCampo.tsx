@@ -14,6 +14,17 @@ export default function PanelNovedadesCampo({
 }: PanelNovedadesCampoProps) {
   const [novedades, setNovedades] = useState<Cuenta[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [colapsado, setColapsado] = useState(() => {
+    return localStorage.getItem("mif_novedades_campo_colapsado") === "true";
+  });
+
+  const toggleColapsar = () => {
+    setColapsado((prev) => {
+      const nuevo = !prev;
+      localStorage.setItem("mif_novedades_campo_colapsado", String(nuevo));
+      return nuevo;
+    });
+  };
 
   useEffect(() => {
     api
@@ -31,23 +42,57 @@ export default function PanelNovedadesCampo({
         background: "linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)",
         border: "1px solid #a7f3d0",
         borderRadius: "10px",
-        padding: "1rem",
-        marginBottom: "1.5rem",
+        padding: colapsado ? "0.55rem 0.85rem" : "0.85rem 1rem",
+        marginBottom: "1.25rem",
+        transition: "all 0.2s ease",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-        <h3 style={{ margin: 0, fontSize: "0.95rem", color: "#065f46", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-          <span>🔔</span> Novedades de Campo (Cuentas aperturadas por Promotores)
-        </h3>
-        <span className="badge" style={{ background: "#d1fae5", color: "#065f46" }}>
-          {novedades.length} {novedades.length === 1 ? "cuenta reciente" : "cuentas recientes"}
-        </span>
-      </div>
-      <p style={{ margin: "0 0 0.75rem", fontSize: "0.82rem", color: "#047857" }}>
-        El promotor registró estas cuentas con cuotas pactadas en campo. Haz clic para cobrar el depósito en ventanilla sin reescribir datos:
-      </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <button
+          type="button"
+          onClick={toggleColapsar}
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.45rem",
+            color: "#065f46",
+            fontSize: "0.92rem",
+            fontWeight: 800,
+            textAlign: "left",
+          }}
+          title={colapsado ? "Expandir novedades de campo" : "Colapsar novedades de campo"}
+        >
+          <span style={{ fontSize: "0.75rem", transition: "transform 0.2s", transform: colapsado ? "rotate(-90deg)" : "rotate(0deg)" }}>
+            ▼
+          </span>
+          <span>🔔</span> Novedades de Campo
+          <span className="badge" style={{ background: "#d1fae5", color: "#065f46", fontWeight: 700, fontSize: "0.72rem", padding: "0.1rem 0.4rem" }}>
+            {novedades.length} {novedades.length === 1 ? "reciente" : "recientes"}
+          </span>
+        </button>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.75rem" }}>
+        <button
+          type="button"
+          onClick={toggleColapsar}
+          className="btn btn-xs secondary"
+          style={{ fontSize: "0.72rem", padding: "0.18rem 0.45rem", borderRadius: "5px" }}
+          title={colapsado ? "Mostrar cuentas de promotores" : "Ocultar panel"}
+        >
+          {colapsado ? "Mostrar" : "Ocultar"}
+        </button>
+      </div>
+
+      {!colapsado && (
+        <div style={{ marginTop: "0.6rem" }}>
+          <p style={{ margin: "0 0 0.65rem", fontSize: "0.8rem", color: "#047857" }}>
+            El promotor registró estas cuentas con cuotas pactadas en campo. Haz clic para cobrar el depósito en ventanilla sin reescribir datos:
+          </p>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.75rem" }}>
         {novedades.slice(0, 4).map((c) => (
           <div
             key={c.id}
@@ -98,7 +143,9 @@ export default function PanelNovedadesCampo({
             </div>
           </div>
         ))}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

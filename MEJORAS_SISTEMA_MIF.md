@@ -2,6 +2,20 @@
 
 Este documento recopila de forma detallada todas las mejoras funcionales, reglas de negocio, formatos guatemaltecos y optimizaciones contables implementadas en el sistema.
 
+## 88. Panel Colapsable de Novedades de Campo en Caja Auxiliar con Persistencia de Preferencia de Cajero
+
+**Objetivo y Reglas de Negocio:**
+1. **Optimización del Espacio Vertical en Ventanilla (`PanelNovedadesCampo.tsx`):**
+   - Anteriormente, el panel de "Novedades de Campo" (cuentas aperturadas en comunidad por promotores con cuotas pactadas) permanecía siempre expandido en la columna lateral izquierda de la Caja Auxiliar, ocupando más de 400px de altura y empujando las fuentes de fondos y liquidaciones hacia abajo.
+   - Se transformó el panel en un contenedor colapsable interactivo con encabezado accionable, indicador de estado (`▼`/`▶`), insignia con el conteo de cuentas recientes y botón de conmutación `Mostrar / Ocultar`.
+   - **Modo Colapsado:** Reduce la altura a una barra compacta de 36px, dejando la columna izquierda completamente despejada para que el cajero opere ventanilla con máxima velocidad.
+   - **Persistencia en Navegador:** Se vinculó el estado con `localStorage` (`mif_novedades_campo_colapsado`), de modo que si el cajero prefiere mantenerlo cerrado o abierto, el sistema recuerda su elección automáticamente entre recargas y cambios de pantalla.
+
+**Archivos modificados:**
+- `frontend/src/components/cajaauxiliar/PanelNovedadesCampo.tsx`
+
+---
+
 ## 87. Auditoría Diaria Granular desde el Libro de Actas Mensual de la Comisión de Vigilancia y Sanitización de Estados de Asociados
 
 **Objetivo y Reglas de Negocio:**
