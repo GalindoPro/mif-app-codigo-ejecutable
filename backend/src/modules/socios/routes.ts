@@ -13,7 +13,8 @@ sociosRouter.get(
   asyncHandler(async (req, res) => {
     const page = Math.max(1, Number(req.query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 10));
-    const estado = req.query.estado as "ACTIVO" | "INACTIVO" | undefined;
+    const estadoRaw = typeof req.query.estado === "string" ? req.query.estado.toUpperCase() : undefined;
+    const estado = estadoRaw === "ACTIVO" || estadoRaw === "INACTIVO" ? (estadoRaw as "ACTIVO" | "INACTIVO") : undefined;
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
     const interAgencia = req.query.interAgencia === "true";
     const agId = interAgencia ? null : agenciaVisible(req);

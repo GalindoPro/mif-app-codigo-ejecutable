@@ -867,6 +867,7 @@ export interface ConsolidadoFinancieroData {
       };
       reservaInstitucional: number;
       excedenteNetoPeriodo: number;
+      fondoInstitucionalCartera?: number;
       totalPatrimonio: number;
     };
     cuadre: {

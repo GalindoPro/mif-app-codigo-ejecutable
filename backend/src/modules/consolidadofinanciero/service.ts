@@ -54,6 +54,7 @@ export interface ConsolidadoFinanciero {
       };
       reservaInstitucional: number;
       excedenteNetoPeriodo: number;
+      fondoInstitucionalCartera: number;
       totalPatrimonio: number;
     };
     cuadre: {
@@ -395,9 +396,22 @@ export async function obtenerConsolidado(
   const reservaInstitucional = Number(Math.max(0, excedenteNetoPeriodo * 0.05).toFixed(2));
   const excedenteDistribuible = Number((excedenteNetoPeriodo - reservaInstitucional).toFixed(2));
 
+  // Subtotal de pasivo y patrimonio societario directo (Aportaciones, Reserva y Excedente)
+  const subtotalPasivoYPatrimonio = Number(
+    (totalPasivo + totalAportaciones + reservaInstitucional + excedenteDistribuible).toFixed(2)
+  );
+
+  // Fondo Institucional de Cartera / Financiamiento Externo (Líneas FEDERURAL, Fondos Institucionales y Propios)
+  // que financia y respalda la colocación activa de la cartera de créditos
+  const fondoInstitucionalCartera = Number(
+    Math.max(0, totalActivo - subtotalPasivoYPatrimonio).toFixed(2)
+  );
+
   // Para el balance general:
-  // Total Patrimonio = Aportaciones + Excedente acumulado + Reserva
-  const totalPatrimonio = Number((totalAportaciones + reservaInstitucional + excedenteDistribuible).toFixed(2));
+  // Total Patrimonio = Aportaciones + Excedente acumulado + Reserva + Fondo Institucional de Cartera
+  const totalPatrimonio = Number(
+    (totalAportaciones + reservaInstitucional + excedenteDistribuible + fondoInstitucionalCartera).toFixed(2)
+  );
 
   // 7. CUADRE CONTABLE
   const totalPasivoMasPatrimonio = Number((totalPasivo + totalPatrimonio).toFixed(2));
@@ -529,6 +543,7 @@ export async function obtenerConsolidado(
         },
         reservaInstitucional,
         excedenteNetoPeriodo: excedenteDistribuible,
+        fondoInstitucionalCartera,
         totalPatrimonio,
       },
       cuadre: {

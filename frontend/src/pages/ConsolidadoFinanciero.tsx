@@ -99,6 +99,9 @@ export function ConsolidadoFinanciero() {
       });
       lineas.push(`"302-01","Reserva Institucional (5%)",${datos.balanceGeneral.patrimonio.reservaInstitucional.toFixed(2)}`);
       lineas.push(`"303-01","Excedente del Ejercicio",${datos.balanceGeneral.patrimonio.excedenteNetoPeriodo.toFixed(2)}`);
+      if (Number(datos.balanceGeneral.patrimonio.fondoInstitucionalCartera || 0) > 0) {
+        lineas.push(`"304-01","Línea de Crédito FEDERURAL / Fondos Propios de Cartera",${Number(datos.balanceGeneral.patrimonio.fondoInstitucionalCartera).toFixed(2)}`);
+      }
       lineas.push(`"TOTAL PATRIMONIO","",${datos.balanceGeneral.patrimonio.totalPatrimonio.toFixed(2)}`);
       lineas.push(`"TOTAL PASIVO + PATRIMONIO","",${datos.balanceGeneral.cuadre.totalPasivoMasPatrimonio.toFixed(2)}`);
       lineas.push(`"DIFERENCIA DE CUADRE","",${datos.balanceGeneral.cuadre.diferencia.toFixed(2)}`);
@@ -414,7 +417,7 @@ export function ConsolidadoFinanciero() {
                 {tabActiva === "RIESGO" && "MATRIZ DE RIESGO CREDITICIO Y CARTERA EN MORA"}
               </span>
               <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>
-                Al {datos.fechaCorte} · Cuadre exacto: <strong style={{ color: "#059669" }}>Q 0.00</strong>
+                Al {datos.fechaCorte} · Cuadre: <strong style={{ color: datos.balanceGeneral.cuadre.cuadrado ? "#059669" : "#dc2626" }}>Q {datos.balanceGeneral.cuadre.diferencia.toFixed(2)}</strong>
               </span>
             </div>
 
@@ -535,6 +538,13 @@ export function ConsolidadoFinanciero() {
                             <td style={{ padding: "0.15rem 0", color: "#0284c7", fontWeight: 600 }}>Excedente Neto del Ejercicio 2026</td>
                             <td className="mono" style={{ padding: "0.15rem 0", textAlign: "right", fontWeight: 800, color: "#0284c7" }}>{formatoQ(datos.balanceGeneral.patrimonio.excedenteNetoPeriodo)}</td>
                           </tr>
+                          {Number(datos.balanceGeneral.patrimonio.fondoInstitucionalCartera || 0) > 0 && (
+                            <tr style={{ borderBottom: "1px solid var(--line)" }}>
+                              <td className="mono" style={{ padding: "0.15rem 0", color: "var(--ink-soft)" }}>304-01</td>
+                              <td style={{ padding: "0.15rem 0", color: "#059669", fontWeight: 600 }}>Línea de Crédito FEDERURAL / Fondos Propios de Cartera</td>
+                              <td className="mono" style={{ padding: "0.15rem 0", textAlign: "right", fontWeight: 800, color: "#059669" }}>{formatoQ(datos.balanceGeneral.patrimonio.fondoInstitucionalCartera || 0)}</td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>

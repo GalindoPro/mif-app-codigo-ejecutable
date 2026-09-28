@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { formatoQ } from "../types";
-import type { Agencia } from "../types";
+import type { Agencia, DetalleCajaAuxiliar } from "../types";
+import LibroCajaReporteModal from "../components/cajaauxiliar/LibroCajaReporteModal";
+import ActaArqueoModal from "../components/cajaauxiliar/ActaArqueoModal";
 
 interface DiaArqueo {
   id: string;
@@ -62,6 +64,33 @@ export default function LibroArqueoMensual() {
     "Durante la revisión y cotejo documental del presente período, las operaciones de caja se encontraron debidamente soportadas con sus comprobantes y boletas autorizadas. Los saldos en libros coincidieron con el efectivo contado, determinando que los registros de ingresos y egresos fueron llevados con exactitud y estricto apego a los estatutos cooperativos.",
   );
   const [mostrarConfiguracion, setMostrarConfiguracion] = useState(false);
+  const [detalleLibro, setDetalleLibro] = useState<DetalleCajaAuxiliar | null>(null);
+  const [detalleActa, setDetalleActa] = useState<DetalleCajaAuxiliar | null>(null);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
+
+  async function abrirLibro(diaId: string) {
+    try {
+      setCargandoDetalle(true);
+      const { data } = await api.get<DetalleCajaAuxiliar>(`/caja-auxiliar/${diaId}`);
+      setDetalleLibro(data);
+    } catch (e) {
+      alert(mensajeError(e));
+    } finally {
+      setCargandoDetalle(false);
+    }
+  }
+
+  async function abrirActa(diaId: string) {
+    try {
+      setCargandoDetalle(true);
+      const { data } = await api.get<DetalleCajaAuxiliar>(`/caja-auxiliar/${diaId}`);
+      setDetalleActa(data);
+    } catch (e) {
+      alert(mensajeError(e));
+    } finally {
+      setCargandoDetalle(false);
+    }
+  }
 
   useEffect(() => {
     setNumeroActa(`CV-${mesNum}-${añoStr}`);
@@ -521,6 +550,7 @@ export default function LibroArqueoMensual() {
                     <th style={{ width: "85px", textAlign: "right", padding: "2px 4px" }}>Contado</th>
                     <th style={{ width: "70px", textAlign: "right", padding: "2px 4px" }}>Diferencia</th>
                     <th style={{ width: "85px", textAlign: "center", padding: "2px 4px" }}>Resultado</th>
+                    <th className="no-print" style={{ width: "95px", textAlign: "center", padding: "2px 4px" }}>Auditar</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -536,11 +566,37 @@ export default function LibroArqueoMensual() {
                       return (
                         <tr key={d.id}>
                           <td className="mono" style={{ fontWeight: 600, padding: "2px 4px" }}>
-                            {new Date(d.fecha).toLocaleDateString("es-GT", {
-                              weekday: "short",
-                              day: "2-digit",
-                              month: "2-digit",
-                            })}
+                            <span className="only-print">
+                              {new Date(d.fecha).toLocaleDateString("es-GT", {
+                                weekday: "short",
+                                day: "2-digit",
+                                month: "2-digit",
+                              })}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => abrirLibro(d.id)}
+                              disabled={cargandoDetalle}
+                              className="no-print"
+                              style={{
+                                background: "none",
+                                border: "none",
+                                padding: 0,
+                                color: "#059669",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                textDecoration: "underline",
+                                fontSize: "inherit",
+                                fontFamily: "inherit",
+                              }}
+                              title="Auditar recibos y movimientos detallados de este día"
+                            >
+                              {new Date(d.fecha).toLocaleDateString("es-GT", {
+                                weekday: "short",
+                                day: "2-digit",
+                                month: "2-digit",
+                              })}
+                            </button>
                           </td>
                           <td style={{ padding: "2px 4px" }}>
                             {d.cerrado_por_nombre || d.abierto_por_nombre || nombreCajero}
@@ -593,12 +649,48 @@ export default function LibroArqueoMensual() {
                               {d.estado === "ABIERTO" ? "⏳ En Turno" : dif === 0 ? "✓ Cuadrado" : dif > 0 ? "Sobrante" : "Faltante"}
                             </span>
                           </td>
+                          <td className="no-print" style={{ textAlign: "center", padding: "2px 4px" }}>
+                            <div style={{ display: "inline-flex", gap: "3px" }}>
+                              <button
+                                type="button"
+                                onClick={() => abrirLibro(d.id)}
+                                disabled={cargandoDetalle}
+                                className="btn btn-xs"
+                                style={{
+                                  padding: "0.15rem 0.45rem",
+                                  fontSize: "0.7rem",
+                                  background: "#059669",
+                                  borderColor: "#059669",
+                                  color: "#ffffff",
+                                  fontWeight: 600,
+                                  borderRadius: "4px",
+                                }}
+                                title="Ver comprobante y detalle de boletas de este día"
+                              >
+                                🖨️ Libro
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => abrirActa(d.id)}
+                                disabled={cargandoDetalle}
+                                className="btn btn-xs secondary"
+                                style={{
+                                  padding: "0.15rem 0.45rem",
+                                  fontSize: "0.7rem",
+                                  borderRadius: "4px",
+                                }}
+                                title="Ver acta diaria de arqueo con desglose de billetes"
+                              >
+                                📑 Acta
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td colSpan={10} style={{ textAlign: "center", padding: "14px 8px", color: "var(--ink-soft)", fontStyle: "italic" }}>
+                      <td colSpan={11} style={{ textAlign: "center", padding: "14px 8px", color: "var(--ink-soft)", fontStyle: "italic" }}>
                         Sin movimientos de caja registrados en este período mensual (0 operaciones registradas)
                       </td>
                     </tr>
@@ -646,6 +738,7 @@ export default function LibroArqueoMensual() {
                     <td style={{ textAlign: "center", padding: "3px 4px" }}>
                       {(datos?.resumen?.diasConDiferencia ?? 0) === 0 ? "✓ CONFORME" : "REVISADO"}
                     </td>
+                    <td className="no-print" style={{ textAlign: "center", padding: "3px 4px" }}>—</td>
                   </tr>
                 </tfoot>
               </table>
@@ -709,6 +802,24 @@ export default function LibroArqueoMensual() {
             </div>
           </div>
       </div>
+
+      {/* Modales de Auditoría Diaria Interactiva para la Comisión de Vigilancia */}
+      {detalleLibro && (
+        <LibroCajaReporteModal
+          agenciaId={agenciaId}
+          agenciaNombre={agenciaNombre}
+          detalleActual={detalleLibro}
+          onClose={() => setDetalleLibro(null)}
+        />
+      )}
+
+      {detalleActa && (
+        <ActaArqueoModal
+          agenciaNombre={agenciaNombre}
+          detalle={detalleActa}
+          onCerrar={() => setDetalleActa(null)}
+        />
+      )}
     </div>
   );
 }

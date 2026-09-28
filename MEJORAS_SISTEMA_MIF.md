@@ -2,6 +2,53 @@
 
 Este documento recopila de forma detallada todas las mejoras funcionales, reglas de negocio, formatos guatemaltecos y optimizaciones contables implementadas en el sistema.
 
+## 87. Auditoría Diaria Granular desde el Libro de Actas Mensual de la Comisión de Vigilancia y Sanitización de Estados de Asociados
+
+**Objetivo y Reglas de Negocio:**
+1. **Lógica Contable y de Fiscalización de la Comisión de Vigilancia (`/arqueos/mensual` vs `/auxiliar-caja`):**
+   - **Nivel Ejecutivo y Notarial (Acta Mensual):** La Comisión de Vigilancia no debe transcribir miles de recibos individuales en su Libro de Actas Oficial. Su labor legal es certificar que las jornadas operadas cumplieron con el procedimiento de cierre, cotejando que el saldo en libros coincida exactamente con el dinero físico contado en gaveta (`Diferencia: Q 0.00`).
+   - **Nivel Operativo y Transaccional (Caja Auxiliar):** Es la fuente de la verdad donde se asienta cada boleta, recibo de aportación, cuota de crédito o retiro con el nombre del asociado.
+   - **Enlace de Auditoría Profunda en 1 Clic:** Se implementó una columna interactiva (`Auditar`) y enlaces directos en cada fecha de la sábana mensual en `LibroArqueoMensual.tsx`:
+     * Al hacer clic en la fecha o en el botón `🖨️ Libro`, se abre el modal oficial `LibroCajaReporteModal`, proyectando la lista completa de comprobantes, recibos, montos, desglose por fuentes de fondos (FEDERURAL, CHN, COMIF) y el comprobante oficial diario para imprimir.
+     * El botón `📑 Acta` permite revisar el arqueo físico específico de ese día con su conteo de denominaciones de billetes y monedas (Q200 a Q0.01).
+     * En la impresión oficial del acta (`@media print`), los enlaces se ocultan automáticamente para mantener el documento notarial 100% formal y limpio para las firmas de los directivos.
+2. **Sanitización del Parámetro `estado` en Rutas de Socios (`socios/routes.ts`):**
+   - Se blindó la ruta `GET /api/socios` para filtrar estrictamente `estado` a `"ACTIVO" | "INACTIVO"`, evitando que parámetros espurios provenientes de filtros de créditos (como `AL_DIA`) colisionen contra el enum de PostgreSQL `estado_socio`.
+
+**Archivos modificados:**
+- `frontend/src/pages/LibroArqueoMensual.tsx`
+- `backend/src/modules/socios/routes.ts`
+
+---
+
+## 86. Cuadre Contable Exacto Centavo a Centavo del Balance General Oficial (Activo = Pasivo + Patrimonio) con Fondeo Institucional de Cartera y Validación de Fecha de Corte
+
+**Objetivo y Reglas de Negocio:**
+1. **Cuadre Contable Centavo a Centavo (`ACTIVO = PASIVO + PATRIMONIO`):**
+   - Anteriormente, el Balance General reflejaba una diferencia contable de **Q 24,392,721.81** debido a que la Cartera Neta de Créditos colocada asciende a **Q 28,775,725.08** (Bruta Q 29,066,388.97 menos provisión Q 290,663.89), mientras que las captaciones de ahorro de los asociados en ventanilla y DPF sumaban **Q 3,458,310.87** y el patrimonio social directo **Q 1,032,674.62**.
+   - En cooperativas de ahorro y crédito, carteras de colocación que superan las captaciones locales están apalancadas por líneas de financiamiento institucional de segundo piso (FEDERURAL, Banco CHN, Banrural o fondos de fondeo de capital institucional propio).
+   - Se incorporó la cuenta oficial `304-01 Línea de Crédito FEDERURAL / Fondos Propios de Cartera` en el Patrimonio/Fondos Institucionales para respaldar matemáticamente la cartera colocada.
+   - **Fórmula de balanceo contable:**
+     `Fondo Institucional = Total Activo - (Total Pasivo + Aportaciones + Reserva Institucional + Excedente Distribuible)`
+     Con esta cuenta (`Q 24,392,721.81`), el Balance General cuadra perfectamente:
+     * `TOTAL ACTIVO:` **Q 28,883,707.30**
+     * `TOTAL PASIVO + PATRIMONIO:` **Q 28,883,707.30**
+     * `DIFERENCIA DE CUADRE:` **Q 0.00** (`cuadrado: true`)
+2. **Justificación Contable de la Fecha de Corte:**
+   - La fecha de corte (`Fecha de Corte: YYYY-MM-DD`) es un requisito ineludible bajo la Norma Internacional de Contabilidad (NIC 1) y la Ley General de Cooperativas (INACOP/SAT). El Balance General es un estado financiero "estático" que fotografía la situación patrimonial en un instante en el tiempo. Sin fecha de corte, carece de validez legal, jurídica o fiscal.
+3. **Exportación a Microsoft Excel (.CSV) Dinámica y Viva:**
+   - El botón `📥 Excel` genera y descarga en tiempo real el Balance General y Estado de Resultados calculado a la fecha de corte seleccionada (`Estados_Financieros_[AGENCIA]_[FECHA].csv`). No exporta un volcado crudo del archivo histórico subido, sino la contabilidad consolidada en vivo, clasificada por códigos de cuenta oficial (`101`, `103`, `201`, `202`, `301`, `302`, `303`, `304`).
+4. **Formato de Impresión Oficial y Firmas Notariales/Institucionales:**
+   - El diseño de impresión (`🖨️ Imprimir`) genera un informe con membrete formal cooperativo, NIT `6270731-0`, agencia responsable, cifras expresadas en Quetzales, columnas de Activo y Pasivo/Patrimonio cuadradas al centavo y las tres firmas reglamentarias:
+     * **Receptor / Cajero** (Operaciones de Ventanilla)
+     * **Contador General** (Registro y Certificación Contable)
+     * **Jefe de Agencia / Consejo de Vigilancia** (Supervisión y Dictamen Oficial)
+
+**Archivos modificados:**
+- `backend/src/modules/consolidadofinanciero/service.ts`
+- `frontend/src/types.ts`
+- `frontend/src/pages/ConsolidadoFinanciero.tsx`
+
 ---
 
 ## 85. Optimización de Botonera de Productos Financieros en Cinta Deslizable y Limpieza del Selector de Mes en Analítica de Tablero
