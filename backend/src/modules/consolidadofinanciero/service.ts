@@ -129,7 +129,7 @@ export async function obtenerConsolidado(
 
   const filtroAgenciaCuentas = agenciaId ? "AND c.agencia_id = $1" : "";
   const filtroAgenciaPrestamos = agenciaId ? "AND p.agencia_id = $1" : "";
-  const filtroAgenciaCajaAux = agenciaId ? "AND m.agencia_origen_id = $1" : "";
+  const filtroAgenciaCajaAux = agenciaId ? "AND m.agencia_id = $1" : "";
   const filtroAgenciaCajaChica = agenciaId ? "AND cc.agencia_id = $1" : "";
   const valoresParam = agenciaId ? [agenciaId] : [];
 
@@ -148,7 +148,7 @@ export async function obtenerConsolidado(
   const queryCajaVentanilla = `
     SELECT coalesce(sum(case when tipo = 'INGRESO' then monto else -monto end), 0)::numeric(14,2) as saldo
     FROM caja_movimientos_auxiliar m
-    WHERE fecha <= $1 ${agenciaId ? "AND m.caja_dia_id IN (SELECT id FROM caja_dias_auxiliar WHERE agencia_id = $2)" : ""}
+    WHERE fecha <= $1 ${agenciaId ? "AND m.agencia_id = $2" : ""}
   `;
   const paramsCajaVentanilla = agenciaId ? [fechaCorte, agenciaId] : [fechaCorte];
   const { rows: cvRows } = await queryWithRetry(queryCajaVentanilla, paramsCajaVentanilla);
@@ -291,15 +291,16 @@ export async function obtenerConsolidado(
   const totalPasivo = Number((totalCaptacionesAhorro + totalPlazoFijo).toFixed(2));
 
   // 5. ESTADO DE RESULTADOS (INGRESOS, COSTOS Y GASTOS)
-  // 5.1 Ingresos por préstamos y caja
+  // 5.1 Ingresos por préstamos, comisiones y caja
   const queryIngresos = `
     SELECT 
-      coalesce(sum(interes), 0)::numeric(14,2) as total_intereses,
-      coalesce(sum(mora), 0)::numeric(14,2) as total_mora,
-      coalesce(sum(otros), 0)::numeric(14,2) as total_comisiones
-    FROM prestamo_pagos pp
-    JOIN prestamos p ON p.id = pp.prestamo_id
-    WHERE pp.fecha_pago <= $1 ${filtroAgenciaPrestamos}
+      coalesce(sum(case when categoria in ('INTERES_PRESTAMO', 'INTERES_FIDUCIARIO') then monto else 0 end), 0)::numeric(14,2) as total_intereses,
+      coalesce(sum(case when categoria = 'MORA_PRESTAMO' then monto else 0 end), 0)::numeric(14,2) as total_mora,
+      coalesce(sum(case when categoria = 'COMISION_PRESTAMO' then monto else 0 end), 0)::numeric(14,2) as total_comisiones,
+      coalesce(sum(case when categoria = 'CUOTA_INGRESO' then monto else 0 end), 0)::numeric(14,2) as total_cuotas,
+      coalesce(sum(case when categoria = 'INGRESO_VARIO' then monto else 0 end), 0)::numeric(14,2) as total_varios
+    FROM ingresos_comif
+    WHERE fecha <= $1 ${agenciaId ? "AND agencia_id = $2" : ""}
   `;
   const paramsIngresos = agenciaId ? [fechaCorte, agenciaId] : [fechaCorte];
   const { rows: ingRows } = await queryWithRetry(queryIngresos, paramsIngresos);
@@ -307,30 +308,22 @@ export async function obtenerConsolidado(
   const interesesPrestamos = Number(ingRows[0]?.total_intereses || 0);
   const moraPrestamos = Number(ingRows[0]?.total_mora || 0);
   const comisionesPrestamos = Number(ingRows[0]?.total_comisiones || 0);
-
-  // Cuotas de ingreso / membresías en caja
-  const queryCuotasIngreso = `
-    SELECT coalesce(sum(monto), 0)::numeric(14,2) as total_membresias
-    FROM caja_movimientos_auxiliar m
-    WHERE categoria = 'INGRESO_ASOCIADO' AND fecha <= $1 ${filtroAgenciaCajaAux}
-  `;
-  const paramsCuotas = agenciaId ? [fechaCorte, agenciaId] : [fechaCorte];
-  const { rows: membresiasRows } = await queryWithRetry(queryCuotasIngreso, paramsCuotas);
-  const cuotasIngresoMembresias = Number(membresiasRows[0]?.total_membresias || 0);
+  const cuotasIngresoMembresias = Number(ingRows[0]?.total_cuotas || 0);
+  const ingresosVarios = Number(ingRows[0]?.total_varios || 0);
 
   // Servicios bancarios (BI) comisiones estimadas
   const queryServiciosBI = `
     SELECT count(*)::int as total_ops, coalesce(sum(monto), 0)::numeric(14,2) as volumen
     FROM caja_movimientos_auxiliar m
-    WHERE categoria IN ('BI_DEPOSITO', 'BI_RETIRO', 'BI_PAGO_SERVICIO', 'BI_REMESA')
-      AND fecha <= $1 ${filtroAgenciaCajaAux}
+    WHERE categoria IN ('DEPOSITO_BI', 'RETIRO_BI', 'SERVICIOS_BI', 'REMESA_BI')
+      AND fecha <= $1 ${agenciaId ? "AND m.agencia_id = $2" : ""}
   `;
-  const { rows: biRows } = await queryWithRetry(queryServiciosBI, paramsCuotas);
+  const { rows: biRows } = await queryWithRetry(queryServiciosBI, paramsIngresos);
   // Comisión aproximada institucional Q1.50 por operación procesada BI
   const comisionBancariaBI = Number((Number(biRows[0]?.total_ops || 0) * 1.5).toFixed(2));
 
   const totalIngresosFinancieros = Number(
-    (interesesPrestamos + moraPrestamos + comisionesPrestamos + cuotasIngresoMembresias + comisionBancariaBI).toFixed(2)
+    (interesesPrestamos + moraPrestamos + comisionesPrestamos + cuotasIngresoMembresias + comisionBancariaBI + ingresosVarios).toFixed(2)
   );
 
   const rubrosIngresos: DetalleRubro[] = [
@@ -341,16 +334,20 @@ export async function obtenerConsolidado(
     { concepto: "Cuotas de Ingreso y Membresías Estatutarias", codigo: "501-05", monto: cuotasIngresoMembresias },
   ];
 
-  // 5.2 Costos Financieros (Intereses liquidados de Plazo Fijo)
+  // 5.2 Costos Financieros (Intereses devengados o liquidados de Plazo Fijo en el año)
   const queryCostosPF = `
-    SELECT coalesce(sum(monto_liquidado - monto_deposito), 0)::numeric(14,2) as intereses_pagados
+    SELECT coalesce(sum(pf.interes_neto), 0)::numeric(14,2) as intereses_pagados
     FROM plazo_fijo_contratos pf
     JOIN cuentas c ON c.id = pf.cuenta_id
-    WHERE pf.estado = 'LIQUIDADO' AND pf.fecha_retiro <= $1 ${filtroAgenciaCuentas}
+    WHERE pf.estado = 'LIQUIDADO' 
+      AND (pf.fecha_retiro is null or pf.fecha_retiro >= '2026-01-01')
+      AND (pf.fecha_retiro is null or pf.fecha_retiro <= $1)
+      ${agenciaId ? "AND c.agencia_id = $2" : ""}
   `;
   const paramsCostos = agenciaId ? [fechaCorte, agenciaId] : [fechaCorte];
   const { rows: costosRows } = await queryWithRetry(queryCostosPF, paramsCostos);
   const interesesPagadosPF = Math.max(0, Number(costosRows[0]?.intereses_pagados || 0));
+
 
   const totalCostosFinancieros = Number(interesesPagadosPF.toFixed(2));
   const rubrosCostos: DetalleRubro[] = [
@@ -362,10 +359,10 @@ export async function obtenerConsolidado(
   // 5.3 Gastos Operativos (Caja Chica por categorías)
   const queryGastos = `
     SELECT 
-      coalesce(categoria, 'GASTOS_VARIOS') as categoria,
+      coalesce(categoria::text, 'GASTOS_DIVERSOS') as categoria,
       coalesce(sum(monto), 0)::numeric(14,2) as total_monto
     FROM caja_chica_comprobantes cc
-    WHERE tipo = 'EGRESO' AND fecha <= $1 ${filtroAgenciaCajaChica}
+    WHERE tipo = 'EGRESO' AND fecha <= $1 ${agenciaId ? "AND cc.agencia_id = $2" : ""}
     GROUP BY categoria
     ORDER BY total_monto DESC
   `;

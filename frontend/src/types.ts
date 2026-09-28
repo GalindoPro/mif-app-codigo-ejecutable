@@ -813,3 +813,107 @@ export interface CobroCampo {
   updated_at: string;
   liquidado_at?: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Estados Financieros y Balance General (Fase 10)
+// ---------------------------------------------------------------------------
+export interface DetalleRubroFinanciero {
+  concepto: string;
+  codigo?: string;
+  monto: number;
+  subcuenta?: string;
+  porcentaje?: number;
+}
+
+export interface ConsolidadoFinancieroData {
+  fechaGeneracion: string;
+  fechaCorte: string;
+  agencia: {
+    id: string | null;
+    nombre: string;
+    codigo: string;
+  };
+  balanceGeneral: {
+    activo: {
+      disponible: {
+        total: number;
+        rubros: DetalleRubroFinanciero[];
+      };
+      cartera: {
+        totalBruto: number;
+        provisionEstimada: number;
+        totalNeto: number;
+        rubros: DetalleRubroFinanciero[];
+      };
+      totalActivo: number;
+    };
+    pasivo: {
+      captacionesAhorro: {
+        total: number;
+        rubros: DetalleRubroFinanciero[];
+      };
+      plazoFijo: {
+        capitalVigente: number;
+        interesesPorPagar: number;
+        total: number;
+      };
+      totalPasivo: number;
+    };
+    patrimonio: {
+      aportacionesCapital: {
+        total: number;
+        rubros: DetalleRubroFinanciero[];
+      };
+      reservaInstitucional: number;
+      excedenteNetoPeriodo: number;
+      totalPatrimonio: number;
+    };
+    cuadre: {
+      totalActivo: number;
+      totalPasivoMasPatrimonio: number;
+      diferencia: number;
+      cuadrado: boolean;
+    };
+  };
+  estadoResultados: {
+    ingresosFinancieros: {
+      total: number;
+      rubros: DetalleRubroFinanciero[];
+    };
+    costosFinancieros: {
+      total: number;
+      rubros: DetalleRubroFinanciero[];
+    };
+    margenFinancieroBruto: number;
+    gastosOperativos: {
+      total: number;
+      rubros: DetalleRubroFinanciero[];
+    };
+    excedenteNeto: number;
+  };
+  calidadCartera: {
+    carteraTotal: number;
+    creditosVigentes: number;
+    creditosMora: number;
+    indiceMorosidad: number;
+    tramosMora: {
+      alDia: { monto: number; cantidad: number; porcentaje: number };
+      rango1_30: { monto: number; cantidad: number; porcentaje: number };
+      rango31_60: { monto: number; cantidad: number; porcentaje: number };
+      rango61_90: { monto: number; cantidad: number; porcentaje: number };
+      mas90: { monto: number; cantidad: number; porcentaje: number };
+    };
+  };
+  desgloseAgencias: Array<{
+    agenciaId: string;
+    nombre: string;
+    codigo: string;
+    activoTotal: number;
+    carteraTotal: number;
+    captacionesTotal: number;
+    aportacionesTotal: number;
+    excedenteNeto: number;
+    morosidadPorcentaje: number;
+    sociosActivos: number;
+  }>;
+}

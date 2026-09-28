@@ -1408,7 +1408,10 @@ export async function liquidarPlazoFijo(
 export async function analiticaServicios(
   agenciaId: string | null | undefined,
   agenciaVisible: string | null,
-  periodo: "dia" | "semana" | "mes" | "anio" = "mes",
+  periodo: "dia" | "semana" | "mes" | "anio" | "personalizado" = "mes",
+  mes?: string,
+  fechaInicio?: string,
+  fechaFin?: string,
 ) {
   let filtroAgenciaAux = "";
   let filtroAgenciaCuentas = "";
@@ -1426,12 +1429,23 @@ export async function analiticaServicios(
   }
 
   let fechaInicioSql = "current_date - interval '30 days'";
-  if (periodo === "dia") {
+  let fechaFinSql = "current_date + interval '1 day'";
+
+  if (mes && /^\d{4}-\d{2}$/.test(mes)) {
+    fechaInicioSql = `'${mes}-01'::date`;
+    fechaFinSql = `('${mes}-01'::date + interval '1 month' - interval '1 day')::date`;
+  } else if (fechaInicio && fechaFin && /^\d{4}-\d{2}-\d{2}$/.test(fechaInicio) && /^\d{4}-\d{2}-\d{2}$/.test(fechaFin)) {
+    fechaInicioSql = `'${fechaInicio}'::date`;
+    fechaFinSql = `'${fechaFin}'::date`;
+  } else if (periodo === "dia") {
     fechaInicioSql = "current_date";
+    fechaFinSql = "current_date";
   } else if (periodo === "semana") {
     fechaInicioSql = "current_date - interval '7 days'";
+    fechaFinSql = "current_date";
   } else if (periodo === "anio") {
     fechaInicioSql = "date_trunc('year', current_date)";
+    fechaFinSql = "current_date";
   }
 
   const query = `
@@ -1444,7 +1458,7 @@ export async function analiticaServicios(
         m.monto as monto
       from caja_movimientos_auxiliar m
       join caja_dias d on d.id = m.caja_dia_id
-      where d.fecha >= ${fechaInicioSql} and d.fecha <= current_date + interval '1 day' ${filtroAgenciaAux}
+      where d.fecha >= ${fechaInicioSql} and d.fecha <= ${fechaFinSql} ${filtroAgenciaAux}
 
       union all
 
@@ -1465,7 +1479,7 @@ export async function analiticaServicios(
       from cuentas c
       where c.saldo_inicial > 0
         and c.created_at::date >= ${fechaInicioSql}
-        and c.created_at::date <= current_date + interval '1 day'
+        and c.created_at::date <= ${fechaFinSql}
         ${filtroAgenciaCuentas}
 
       union all
@@ -1491,7 +1505,7 @@ export async function analiticaServicios(
         m.monto as monto
       from movimientos m
       join cuentas c on c.id = m.cuenta_id
-      where m.fecha >= ${fechaInicioSql} and m.fecha <= current_date + interval '1 day' ${filtroAgenciaCuentas}
+      where m.fecha >= ${fechaInicioSql} and m.fecha <= ${fechaFinSql} ${filtroAgenciaCuentas}
         and not exists (select 1 from caja_movimientos_auxiliar cma where cma.movimiento_id = m.id)
 
       union all
@@ -1504,7 +1518,7 @@ export async function analiticaServicios(
         p.monto_aprobado as monto
       from prestamos p
       where coalesce(p.fecha_aprobacion, p.created_at::date) >= ${fechaInicioSql}
-        and coalesce(p.fecha_aprobacion, p.created_at::date) <= current_date + interval '1 day'
+        and coalesce(p.fecha_aprobacion, p.created_at::date) <= ${fechaFinSql}
         ${filtroAgenciaPrestamos}
 
       union all
@@ -1517,7 +1531,7 @@ export async function analiticaServicios(
         cc.monto as monto
       from caja_chica_comprobantes cc
       where cc.fecha >= ${fechaInicioSql}
-        and cc.fecha <= current_date + interval '1 day'
+        and cc.fecha <= ${fechaFinSql}
         ${filtroAgenciaCajaChica}
     )
     select 
@@ -1538,7 +1552,7 @@ export async function analiticaServicios(
         m.monto as monto
       from caja_movimientos_auxiliar m
       join caja_dias d on d.id = m.caja_dia_id
-      where d.fecha >= ${fechaInicioSql} and d.fecha <= current_date + interval '1 day' ${filtroAgenciaAux}
+      where d.fecha >= ${fechaInicioSql} and d.fecha <= ${fechaFinSql} ${filtroAgenciaAux}
 
       union all
 
@@ -1549,7 +1563,7 @@ export async function analiticaServicios(
       from cuentas c
       where c.saldo_inicial > 0
         and c.created_at::date >= ${fechaInicioSql}
-        and c.created_at::date <= current_date + interval '1 day'
+        and c.created_at::date <= ${fechaFinSql}
         ${filtroAgenciaCuentas}
 
       union all
@@ -1560,7 +1574,7 @@ export async function analiticaServicios(
         m.monto as monto
       from movimientos m
       join cuentas c on c.id = m.cuenta_id
-      where m.fecha >= ${fechaInicioSql} and m.fecha <= current_date + interval '1 day' ${filtroAgenciaCuentas}
+      where m.fecha >= ${fechaInicioSql} and m.fecha <= ${fechaFinSql} ${filtroAgenciaCuentas}
         and not exists (select 1 from caja_movimientos_auxiliar cma where cma.movimiento_id = m.id)
 
       union all
@@ -1571,7 +1585,7 @@ export async function analiticaServicios(
         p.monto_aprobado as monto
       from prestamos p
       where coalesce(p.fecha_aprobacion, p.created_at::date) >= ${fechaInicioSql}
-        and coalesce(p.fecha_aprobacion, p.created_at::date) <= current_date + interval '1 day'
+        and coalesce(p.fecha_aprobacion, p.created_at::date) <= ${fechaFinSql}
         ${filtroAgenciaPrestamos}
 
       union all
@@ -1582,7 +1596,7 @@ export async function analiticaServicios(
         cc.monto as monto
       from caja_chica_comprobantes cc
       where cc.fecha >= ${fechaInicioSql}
-        and cc.fecha <= current_date + interval '1 day'
+        and cc.fecha <= ${fechaFinSql}
         ${filtroAgenciaCajaChica}
     )
     select 

@@ -54,8 +54,11 @@ cajaAuxiliarRouter.get(
   "/analitica-servicios",
   asyncHandler(async (req, res) => {
     const agenciaId = (req.query.agenciaId as string) || req.user?.agenciaId || undefined;
-    const periodo = (req.query.periodo as "dia" | "semana" | "mes" | "anio") || "mes";
-    res.json(await service.analiticaServicios(agenciaId, agenciaVisible(req), periodo));
+    const periodo = (req.query.periodo as "dia" | "semana" | "mes" | "anio" | "personalizado") || "mes";
+    const mes = typeof req.query.mes === "string" ? req.query.mes : undefined;
+    const fechaInicio = typeof req.query.fechaInicio === "string" ? req.query.fechaInicio : undefined;
+    const fechaFin = typeof req.query.fechaFin === "string" ? req.query.fechaFin : undefined;
+    res.json(await service.analiticaServicios(agenciaId, agenciaVisible(req), periodo, mes, fechaInicio, fechaFin));
   }),
 );
 

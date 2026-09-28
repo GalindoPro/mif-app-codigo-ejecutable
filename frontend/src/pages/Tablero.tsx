@@ -4,6 +4,7 @@ import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { formatoQ } from "../types";
 import type { ResumenDashboard } from "../types";
+import DiagnosticoGerencialReporteModal from "../components/DiagnosticoGerencialReporteModal";
 import {
   PieChart,
   Pie,
@@ -436,11 +437,26 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
   const puedeElegirAgencia = usuario?.rol === "GERENCIA";
   const [agencias, setAgencias] = useState<any[]>([]);
   const [agenciaId, setAgenciaId] = useState(agenciaIdInicial || usuario?.agenciaId || "");
+  const [modoTemporal, setModoTemporal] = useState<"RAPIDO" | "MES" | "RANGO">("MES");
   const [periodo, setPeriodo] = useState<"dia" | "semana" | "mes" | "anio">("mes");
+  const [mesSeleccionado, setMesSeleccionado] = useState<string>("2026-07");
+  const [rangoInicio, setRangoInicio] = useState<string>("2026-07-01");
+  const [rangoFin, setRangoFin] = useState<string>("2026-07-31");
   const [filtroCuenta, setFiltroCuenta] = useState<string>("TODOS");
   const [modoVista, setModoVista] = useState<"BALANCE" | "TENDENCIA">("BALANCE");
   const [datos, setDatos] = useState<AnaliticaResponse | null>(null);
   const [cargando, setCargando] = useState(false);
+  const [mostrarReporteModal, setMostrarReporteModal] = useState(false);
+
+  const MESES_HISTORICOS = [
+    { id: "2026-07", label: "Julio 2026" },
+    { id: "2026-06", label: "Junio 2026" },
+    { id: "2026-05", label: "Mayo 2026" },
+    { id: "2026-04", label: "Abril 2026" },
+    { id: "2026-03", label: "Marzo 2026" },
+    { id: "2026-02", label: "Febrero 2026" },
+    { id: "2026-01", label: "Enero 2026" },
+  ];
 
   useEffect(() => {
     if (puedeElegirAgencia) {
@@ -452,9 +468,21 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
 
   function cargarAnalitica(silencioso = false) {
     if (!silencioso) setCargando(true);
+    const queryParams: any = { agenciaId: agenciaId || undefined };
+    if (modoTemporal === "RAPIDO") {
+      queryParams.periodo = periodo;
+    } else if (modoTemporal === "MES") {
+      queryParams.periodo = "mes";
+      queryParams.mes = mesSeleccionado;
+    } else if (modoTemporal === "RANGO") {
+      queryParams.periodo = "personalizado";
+      queryParams.fechaInicio = rangoInicio;
+      queryParams.fechaFin = rangoFin;
+    }
+
     api
       .get<AnaliticaResponse>("/caja-auxiliar/analitica-servicios", {
-        params: { agenciaId: agenciaId || undefined, periodo },
+        params: queryParams,
       })
       .then(({ data }) => setDatos(data))
       .catch(() => {})
@@ -482,9 +510,35 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
     };
-  }, [agenciaId, periodo]);
+  }, [agenciaId, periodo, modoTemporal, mesSeleccionado, rangoInicio, rangoFin]);
 
-  const periodoLabel = periodo === "dia" ? "Día actual" : periodo === "semana" ? "Últimos 7 días" : periodo === "mes" ? "Últimos 30 días" : "Año actual";
+  const periodoLabel =
+    modoTemporal === "MES"
+      ? (() => {
+          const m = MESES_HISTORICOS.find((x) => x.id === mesSeleccionado);
+          return m ? m.label : `Mes ${mesSeleccionado}`;
+        })()
+      : modoTemporal === "RANGO"
+        ? `Del ${rangoInicio || "..."} al ${rangoFin || "..."}`
+        : periodo === "dia"
+          ? "Día actual"
+          : periodo === "semana"
+            ? "Últimos 7 días"
+            : periodo === "mes"
+              ? "Últimos 30 días"
+              : "Año actual";
+
+  // Fecha de corte recomendada para auditar estados financieros
+  const fechaCorteAuditoria =
+    modoTemporal === "MES"
+      ? (() => {
+          const [y, m] = mesSeleccionado.split("-").map(Number);
+          const lastDay = new Date(y, m, 0).getDate();
+          return `${mesSeleccionado}-${String(lastDay).padStart(2, "0")}`;
+        })()
+      : modoTemporal === "RANGO"
+        ? rangoFin || new Date().toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0];
 
   // Filtrado específico por producto / cuenta
   const serviciosFiltrados = !datos
@@ -501,6 +555,24 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
   const opEgresosFiltro = serviciosFiltrados.filter((s) => s.flujo === "EGRESO").reduce((acc, s) => acc + s.cantidad, 0);
   const flujoNetoFiltro = totalIngresosFiltro - totalEgresosFiltro;
   const servicioTopFiltro = serviciosFiltrados[0] ?? null;
+
+  // Diagnóstico financiero para toma de decisiones de Gerencia
+  const ratioSalida = totalIngresosFiltro > 0 ? (totalEgresosFiltro / totalIngresosFiltro) * 100 : totalEgresosFiltro > 0 ? 999 : 0;
+  const depositosAhorro = serviciosFiltrados
+    .filter((s) => s.producto.startsWith("AHORRO") && s.flujo === "INGRESO")
+    .reduce((acc, s) => acc + s.totalMonto, 0);
+  const retirosAhorro = serviciosFiltrados
+    .filter((s) => s.producto.startsWith("AHORRO") && s.flujo === "EGRESO")
+    .reduce((acc, s) => acc + s.totalMonto, 0);
+  const cobroCreditos = serviciosFiltrados
+    .filter((s) => s.flujo === "INGRESO" && (s.producto === "CREDITOS" || s.categoria?.includes("PRESTAMO") || s.label?.toLowerCase().includes("abono") || s.label?.toLowerCase().includes("prestamo")))
+    .reduce((acc, s) => acc + s.totalMonto, 0);
+  const desembolsoCreditos = serviciosFiltrados
+    .filter((s) => s.flujo === "EGRESO" && (s.producto === "CREDITOS" || s.categoria?.includes("PRESTAMO") || s.label?.toLowerCase().includes("desembolso")))
+    .reduce((acc, s) => acc + s.totalMonto, 0);
+  const gastoCajaChica = serviciosFiltrados
+    .filter((s) => s.producto === "CAJA_CHICA" || s.categoria?.includes("CHICA") || s.label?.toLowerCase().includes("chica"))
+    .reduce((acc, s) => acc + s.totalMonto, 0);
 
   // Cuentas disponibles con sus conteos
   const CUENTAS_OPCIONES = [
@@ -529,13 +601,13 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
             </span>
           </div>
           <p style={{ margin: "0.15rem 0 0", fontSize: "0.74rem", color: "var(--ink-soft)" }}>
-            Desglose específico de entradas, salidas y flujo monetario ({periodoLabel})
+            Auditoría de movimientos, debilidades y flujo de caja (<strong>{periodoLabel}</strong>)
           </p>
         </div>
 
         <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
           {puedeElegirAgencia && agencias.length > 0 && (
-            <select value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} style={{ maxWidth: 170, fontSize: "0.76rem", padding: "0.25rem 0.45rem" }}>
+            <select value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} style={{ maxWidth: 160, fontSize: "0.75rem", padding: "0.22rem 0.45rem" }}>
               <option value="">🏢 Todas las Agencias</option>
               {agencias.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -545,61 +617,137 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
             </select>
           )}
 
-          {/* Conmutador de Modo Dual */}
+          {/* Conmutador de Modo Temporal: Rápido vs Por Mes vs Rango Libre */}
+          <div style={{ display: "inline-flex", background: "var(--mono-bg)", borderRadius: "6px", padding: "0.15rem", border: "1px solid var(--line)" }}>
+            <button
+              type="button"
+              className={`btn btn-xs ${modoTemporal === "MES" ? "" : "secondary"}`}
+              style={{ fontSize: "0.73rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
+              onClick={() => setModoTemporal("MES")}
+              title="Analizar un mes histórico completo (Enero a Julio 2026 o posterior)"
+            >
+              📅 Por Mes
+            </button>
+            <button
+              type="button"
+              className={`btn btn-xs ${modoTemporal === "RANGO" ? "" : "secondary"}`}
+              style={{ fontSize: "0.73rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
+              onClick={() => setModoTemporal("RANGO")}
+              title="Filtro libre desde fecha inicio hasta fecha fin"
+            >
+              📆 Rango Libre
+            </button>
+            <button
+              type="button"
+              className={`btn btn-xs ${modoTemporal === "RAPIDO" ? "" : "secondary"}`}
+              style={{ fontSize: "0.73rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
+              onClick={() => setModoTemporal("RAPIDO")}
+              title="Filtros relativos (Día, Semana, 30 días, Año)"
+            >
+              ⚡ Rápido
+            </button>
+          </div>
+
+          {/* Controles según Modo Temporal */}
+          {modoTemporal === "MES" && (
+            <div style={{ display: "inline-flex", gap: "0.3rem", alignItems: "center" }}>
+              <select
+                value={mesSeleccionado}
+                onChange={(e) => setMesSeleccionado(e.target.value)}
+                style={{ fontSize: "0.75rem", padding: "0.22rem 0.45rem", fontWeight: 600, background: "var(--paper-raised)" }}
+              >
+                {MESES_HISTORICOS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="month"
+                value={mesSeleccionado}
+                onChange={(e) => e.target.value && setMesSeleccionado(e.target.value)}
+                style={{ fontSize: "0.73rem", padding: "0.2rem 0.35rem", width: 110 }}
+                title="Seleccionar cualquier otro mes"
+              />
+            </div>
+          )}
+
+          {modoTemporal === "RANGO" && (
+            <div style={{ display: "inline-flex", gap: "0.25rem", alignItems: "center" }}>
+              <input
+                type="date"
+                value={rangoInicio}
+                onChange={(e) => setRangoInicio(e.target.value)}
+                style={{ fontSize: "0.73rem", padding: "0.2rem 0.35rem", width: 115 }}
+                title="Fecha inicio"
+              />
+              <span style={{ fontSize: "0.7rem", color: "var(--ink-soft)" }}>al</span>
+              <input
+                type="date"
+                value={rangoFin}
+                onChange={(e) => setRangoFin(e.target.value)}
+                style={{ fontSize: "0.73rem", padding: "0.2rem 0.35rem", width: 115 }}
+                title="Fecha fin"
+              />
+            </div>
+          )}
+
+          {modoTemporal === "RAPIDO" && (
+            <div style={{ display: "inline-flex", background: "var(--mono-bg)", borderRadius: "6px", padding: "0.15rem", border: "1px solid var(--line)" }}>
+              <button
+                type="button"
+                className={`btn btn-xs ${periodo === "dia" ? "" : "secondary"}`}
+                style={{ fontSize: "0.72rem", padding: "0.2rem 0.4rem", borderRadius: "4px" }}
+                onClick={() => setPeriodo("dia")}
+              >
+                Día
+              </button>
+              <button
+                type="button"
+                className={`btn btn-xs ${periodo === "semana" ? "" : "secondary"}`}
+                style={{ fontSize: "0.72rem", padding: "0.2rem 0.4rem", borderRadius: "4px" }}
+                onClick={() => setPeriodo("semana")}
+              >
+                Semana
+              </button>
+              <button
+                type="button"
+                className={`btn btn-xs ${periodo === "mes" ? "" : "secondary"}`}
+                style={{ fontSize: "0.72rem", padding: "0.2rem 0.4rem", borderRadius: "4px" }}
+                onClick={() => setPeriodo("mes")}
+              >
+                30d
+              </button>
+              <button
+                type="button"
+                className={`btn btn-xs ${periodo === "anio" ? "" : "secondary"}`}
+                style={{ fontSize: "0.72rem", padding: "0.2rem 0.4rem", borderRadius: "4px" }}
+                onClick={() => setPeriodo("anio")}
+              >
+                Año
+              </button>
+            </div>
+          )}
+
+          {/* Conmutador de Visualización: Balance vs Tendencia */}
           <div style={{ display: "inline-flex", background: "var(--mono-bg)", borderRadius: "6px", padding: "0.15rem", border: "1px solid var(--line)" }}>
             <button
               type="button"
               className={`btn btn-xs ${modoVista === "BALANCE" ? "" : "secondary"}`}
-              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
+              style={{ fontSize: "0.73rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
               onClick={() => setModoVista("BALANCE")}
               title="Ver balance de entradas vs salidas y ranking de movimientos"
             >
-              📊 Balance & Distribución
+              📊 Balance
             </button>
             <button
               type="button"
               className={`btn btn-xs ${modoVista === "TENDENCIA" ? "" : "secondary"}`}
-              style={{ fontSize: "0.74rem", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
+              style={{ fontSize: "0.73rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
               onClick={() => setModoVista("TENDENCIA")}
               title="Ver evolución cronológica de captaciones y retiros"
             >
-              📈 Tendencia Temporal
-            </button>
-          </div>
-
-          {/* Filtros de Período */}
-          <div style={{ display: "inline-flex", background: "var(--mono-bg)", borderRadius: "6px", padding: "0.15rem", border: "1px solid var(--line)" }}>
-            <button
-              type="button"
-              className={`btn btn-xs ${periodo === "dia" ? "" : "secondary"}`}
-              style={{ fontSize: "0.74rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
-              onClick={() => setPeriodo("dia")}
-            >
-              Día
-            </button>
-            <button
-              type="button"
-              className={`btn btn-xs ${periodo === "semana" ? "" : "secondary"}`}
-              style={{ fontSize: "0.74rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
-              onClick={() => setPeriodo("semana")}
-            >
-              Semana
-            </button>
-            <button
-              type="button"
-              className={`btn btn-xs ${periodo === "mes" ? "" : "secondary"}`}
-              style={{ fontSize: "0.74rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
-              onClick={() => setPeriodo("mes")}
-            >
-              Mes
-            </button>
-            <button
-              type="button"
-              className={`btn btn-xs ${periodo === "anio" ? "" : "secondary"}`}
-              style={{ fontSize: "0.74rem", padding: "0.2rem 0.45rem", borderRadius: "4px" }}
-              onClick={() => setPeriodo("anio")}
-            >
-              Año
+              📈 Curva
             </button>
           </div>
         </div>
@@ -651,7 +799,7 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
         })}
       </div>
 
-      {cargando && <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", padding: "0.5rem" }}>Cargando analítica en vivo...</div>}
+      {cargando && <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", padding: "0.5rem" }}>Cargando analítica en vivo para {periodoLabel}...</div>}
 
       {!cargando && (!datos || serviciosFiltrados.length === 0) && (
         <div className="alert info" style={{ margin: "0.5rem 0", padding: "0.5rem 0.75rem", fontSize: "0.78rem" }}>
@@ -680,12 +828,12 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
             </div>
 
             <div className="kpi-tile" style={{ minHeight: 50, padding: "0.4rem 0.65rem", borderLeft: `4px solid ${flujoNetoFiltro >= 0 ? "#0284c7" : "#f59e0b"}` }}>
-              <span className="kpi-tile-label">⚖️ Flujo Neto del Período</span>
+              <span className="kpi-tile-label">⚖️ Flujo Neto ({periodoLabel})</span>
               <span className="kpi-tile-value mono" style={{ color: flujoNetoFiltro >= 0 ? "#0284c7" : "#d97706", fontSize: "0.98rem", margin: "0.1rem 0" }}>
                 {flujoNetoFiltro >= 0 ? "+" : ""}{formatoQ(flujoNetoFiltro)}
               </span>
               <span className="kpi-tile-sub" style={{ fontSize: "0.68rem" }}>
-                {flujoNetoFiltro >= 0 ? "Superávit neto de captación" : "Déficit / Colocación neta"}
+                {flujoNetoFiltro >= 0 ? "Superávit neto de captación" : "Déficit / Drenaje de liquidez"}
               </span>
             </div>
 
@@ -699,6 +847,120 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
                   ? `${servicioTopFiltro.cantidad} op. (${totalOperacionesFiltro > 0 ? Math.round((servicioTopFiltro.cantidad / totalOperacionesFiltro) * 1000) / 10 : 0}%)`
                   : ""}
               </span>
+            </div>
+          </div>
+
+          {/* Card de Diagnóstico Estratégico de Gerencia: Detección Inteligente de Debilidades y Fortalezas */}
+          <div
+            style={{
+              background: "var(--paper-raised)",
+              border: `1px solid ${flujoNetoFiltro >= 0 ? "rgba(16, 185, 129, 0.35)" : "rgba(239, 68, 68, 0.35)"}`,
+              borderLeft: `4px solid ${flujoNetoFiltro >= 0 ? "#10b981" : "#ef4444"}`,
+              borderRadius: "8px",
+              padding: "0.6rem 0.85rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.45rem",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.4rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <span style={{ fontSize: "1rem" }}>{flujoNetoFiltro >= 0 ? "🛡️" : "⚠️"}</span>
+                <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--ink)" }}>
+                  Diagnóstico Estratégico de Gerencia ({periodoLabel})
+                </span>
+                <span
+                  style={{
+                    fontSize: "0.68rem",
+                    padding: "0.1rem 0.4rem",
+                    borderRadius: "4px",
+                    fontWeight: 700,
+                    background: flujoNetoFiltro >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                    color: flujoNetoFiltro >= 0 ? "#059669" : "#dc2626",
+                  }}
+                >
+                  {flujoNetoFiltro >= 0 ? "SUPERÁVIT DE LIQUIDEZ" : "DÉFICIT DE CAJA / ALTA COLOCACIÓN"}
+                </span>
+              </div>
+
+              <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => setMostrarReporteModal(true)}
+                  className="btn btn-xs"
+                  style={{
+                    fontSize: "0.72rem",
+                    padding: "0.22rem 0.55rem",
+                    background: "#0284c7",
+                    color: "#ffffff",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.3rem",
+                  }}
+                  title="Emitir dictamen oficial para Gerencia con firmas y descarga en PDF o Excel"
+                >
+                  <span>🖨️</span> Reporte Oficial PDF / Excel
+                </button>
+
+                <Link
+                  to={`/consolidado-financiero?fechaCorte=${fechaCorteAuditoria}`}
+                  className="btn btn-xs secondary"
+                  style={{ fontSize: "0.72rem", padding: "0.22rem 0.5rem", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
+                  title={`Auditar Balance General y Estado de Resultados al corte ${fechaCorteAuditoria}`}
+                >
+                  <span>📑</span> Estados Financieros al {fechaCorteAuditoria}
+                </Link>
+              </div>
+            </div>
+
+            {/* Parrilla de Diagnóstico en 3 Columnas Clave */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.5rem", fontSize: "0.74rem" }}>
+              {/* Factor 1: Presión de Salidas sobre Entradas */}
+              <div style={{ background: "var(--mono-bg)", padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
+                <div style={{ fontWeight: 600, color: "var(--ink)", marginBottom: "0.2rem", display: "flex", justifyContent: "space-between" }}>
+                  <span>🌊 Tasa de Salida de Efectivo</span>
+                  <span className="mono" style={{ color: ratioSalida > 100 ? "#dc2626" : "#059669", fontWeight: 700 }}>
+                    {ratioSalida.toFixed(1)}%
+                  </span>
+                </div>
+                <p style={{ margin: 0, color: "var(--ink-soft)", lineHeight: 1.35 }}>
+                  {ratioSalida > 100
+                    ? `⚠️ Alerta: Por cada Q100 que ingresaron, salieron Q${ratioSalida.toFixed(1)}. Salidas superan los ingresos en Q${formatoQ(Math.abs(flujoNetoFiltro))}.`
+                    : `✅ Liquidez Óptima: Por cada Q100 que ingresaron, únicamente salieron Q${ratioSalida.toFixed(1)}. Excelente capacidad de retención de fondos.`}
+                </p>
+              </div>
+
+              {/* Factor 2: Comportamiento Ahorro vs Retiros */}
+              <div style={{ background: "var(--mono-bg)", padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
+                <div style={{ fontWeight: 600, color: "var(--ink)", marginBottom: "0.2rem", display: "flex", justifyContent: "space-between" }}>
+                  <span>💰 Captación vs Fuga de Ahorros</span>
+                  <span className="mono" style={{ color: depositosAhorro >= retirosAhorro ? "#059669" : "#dc2626", fontWeight: 700 }}>
+                    Dep: {formatoQ(depositosAhorro)} | Ret: {formatoQ(retirosAhorro)}
+                  </span>
+                </div>
+                <p style={{ margin: 0, color: "var(--ink-soft)", lineHeight: 1.35 }}>
+                  {retirosAhorro > depositosAhorro
+                    ? `⚠️ Debilidad en Ahorros: Los retiros superaron a los nuevos depósitos en Q${formatoQ(retirosAhorro - depositosAhorro)}. Se aconseja fidelización o tasa escalonada.`
+                    : depositosAhorro > 0
+                      ? `✅ Fortaleza: Captaciones netas de ahorro positivas (+Q${formatoQ(depositosAhorro - retirosAhorro)}). Confianza sólida de los asociados.`
+                      : `ℹ️ Sin variación sustancial en cuentas de ahorros en este corte.`}
+                </p>
+              </div>
+
+              {/* Factor 3: Colocación y Recuperación de Cartera */}
+              <div style={{ background: "var(--mono-bg)", padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
+                <div style={{ fontWeight: 600, color: "var(--ink)", marginBottom: "0.2rem", display: "flex", justifyContent: "space-between" }}>
+                  <span>💼 Dinámica de Créditos y Gastos</span>
+                  <span className="mono" style={{ color: "#0284c7", fontWeight: 700 }}>
+                    Cobro: {formatoQ(cobroCreditos)}
+                  </span>
+                </div>
+                <p style={{ margin: 0, color: "var(--ink-soft)", lineHeight: 1.35 }}>
+                  {cobroCreditos > 0
+                    ? `✅ Cobranza Activa: Se recuperaron ${formatoQ(cobroCreditos)} en amortizaciones e intereses. ${desembolsoCreditos > 0 ? `Desembolsos del mes: ${formatoQ(desembolsoCreditos)}.` : ""} ${gastoCajaChica > 0 ? `Gastos menores: ${formatoQ(gastoCajaChica)}.` : ""}`
+                    : `⚠️ Atención: Nula o baja recuperación de cuotas de crédito registrada en este período. Verificar gestión de cobro.`}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -968,6 +1230,27 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
             </div>
           )}
         </>
+      )}
+
+      {mostrarReporteModal && datos && (
+        <DiagnosticoGerencialReporteModal
+          isOpen={mostrarReporteModal}
+          onClose={() => setMostrarReporteModal(false)}
+          periodoLabel={periodoLabel}
+          agenciaNombre={agencias.find((a) => a.id === agenciaId)?.nombre || "Agencia Chajul"}
+          fechaCorte={fechaCorteAuditoria}
+          servicios={serviciosFiltrados}
+          totalIngresos={totalIngresosFiltro}
+          totalEgresos={totalEgresosFiltro}
+          flujoNeto={flujoNetoFiltro}
+          ratioSalida={ratioSalida}
+          depositosAhorro={depositosAhorro}
+          retirosAhorro={retirosAhorro}
+          cobroCreditos={cobroCreditos}
+          desembolsoCreditos={desembolsoCreditos}
+          gastoCajaChica={gastoCajaChica}
+          usuarioNombre={usuario?.nombre}
+        />
       )}
     </div>
   );

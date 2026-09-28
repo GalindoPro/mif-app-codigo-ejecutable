@@ -28,6 +28,7 @@ import Auditoria from "./pages/Auditoria";
 import Alertas from "./pages/Alertas";
 import Sesiones from "./pages/Sesiones";
 import TrasladosInterAgencia from "./pages/TrasladosInterAgencia";
+import { ConsolidadoFinanciero } from "./pages/ConsolidadoFinanciero";
 
 import { useAuth } from "./context/AuthContext";
 
@@ -85,6 +86,7 @@ export default function App() {
           <Route path="/alertas" element={<Alertas />} />
           <Route path="/sesiones" element={<Sesiones />} />
           <Route path="/traslados" element={<TrasladosInterAgencia />} />
+          <Route path="/consolidado-financiero" element={<ConsolidadoFinanciero />} />
 
         </Route>
         <Route path="*" element={<InicioRedirect />} />

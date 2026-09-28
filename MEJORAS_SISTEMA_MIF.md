@@ -4,6 +4,43 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
 
 ---
 
+## 81. Analítica Financiera de Gerencia por Mes Histórico (Enero–Julio 2026), Selector de Rango Libre y Diagnóstico Estratégico de Detección de Debilidades y Fuga de Liquidez
+
+**Objetivo y Reglas de Negocio:**
+1. **Auditoría y Análisis Mes a Mes para la Gerencia y Consejo Directivo:**
+   - La gerencia requería auditar meses históricos específicos (por ejemplo Enero 2026, Abril 2026, etc.) o rangos libres de fechas, sin limitarse a una ventana relativa de 30 días, para comprender exactamente en qué mes hubo debilidades (fuga de liquidez, caída en recuperación de créditos, incremento de retiros sobre captaciones o gastos operativos).
+2. **Motor de Consultas Temporales Dinámicas en Backend:**
+   - En `backend/src/modules/cajaauxiliar/service.ts`, la función `analiticaServicios()` fue ampliada para admitir:
+     * `periodo`: `"dia" | "semana" | "mes" | "anio" | "personalizado"`.
+     * `mes`: formato `"YYYY-MM"` (ej. `2026-04`, `2026-01`).
+     * `fechaInicio` y `fechaFin`: formato `"YYYY-MM-DD"`.
+   - Cálculo automático de límites de fecha mediante SQL (`TO_DATE(mes, 'YYYY-MM')` y `TO_DATE + INTERVAL '1 month' - INTERVAL '1 day'`), asegurando que tanto las operaciones de ventanilla (`caja_movimientos_auxiliar`), aperturas de cuentas (`cuentas`), movimientos directos (`movimientos`), desembolsos de créditos (`prestamos`) y comprobantes de caja chica (`caja_chica_comprobantes`) se filtren con precisión milimétrica al mes o rango seleccionado.
+3. **Selector Frontal Multi-Modo en Tablero (`Tablero.tsx`):**
+   - Incorporación de 3 modos de análisis en el encabezado de `PanelGraficaServicios`:
+     * `📅 Por Mes`: Menú desplegable con los 7 meses históricos oficiales de la migración (Julio, Junio, Mayo, Abril, Marzo, Febrero y Enero 2026) más un selector nativo `<input type="month">` para cualquier mes futuro.
+     * `📆 Rango Libre`: Selectores de fecha inicio (`Desde`) y fecha fin (`Hasta`).
+     * `⚡ Rápido`: Filtros ejecutivos relativos (Día, Semana, 30 días, Año).
+4. **Card de Diagnóstico Estratégico de Gerencia (Detección de Debilidades):**
+   - Tarjeta ejecutiva con semáforo inteligente (Verde para Superávit de Liquidez, Rojo para Déficit de Caja / Fuerte Colocación).
+   - **Tasa de Salida de Efectivo (%):** Porcentaje de salidas frente a ingresos. Emite alerta cuando el drenaje supera el 100% de lo captado.
+   - **Captación vs Fuga de Ahorros:** Comparativa directa de nuevos depósitos frente a retiros de ahorros, alertando oportunamente cuando los retiros superan a los depósitos para sugerir planes de fidelización o tasas escalonadas.
+   - **Dinámica de Cobro de Cartera y Gastos Operativos:** Monitorización de la cobranza activa de cuotas e intereses de créditos y porcentaje de gastos de caja chica.
+   - **Acceso Directo a Estados Financieros:** Botón `📑 Auditar Estados Financieros al [Fecha Corte]` que redirige directamente a `/consolidado-financiero?fechaCorte=YYYY-MM-DD` para auditar el Balance General y el Estado de Resultados a ese mismo corte contable.
+
+5. **Emisión de Reporte Notarial Oficial en PDF y Descarga en Excel (`DiagnosticoGerencialReporteModal.tsx`):**
+   - Incorporación del botón `🖨️ Reporte Oficial PDF / Excel` en la tarjeta de diagnóstico gerencial.
+   - Despliegue de modal con membrete institucional formal de la **COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."**, semáforo de auditoría, 4 tarjetas de flujo (Ingresos, Salidas, Flujo Neto, Tasa de Salida), dictamen estructurado de 4 factores clave, tabla desglosada por producto y 3 casillas de firmas notariales (Gerente General, Presidente Consejo Administración, Comisión de Vigilancia).
+   - Botón `📥 Descargar Excel`: Genera un archivo `.csv` compatible con Excel con codificación UTF-8 con BOM, encabezados ejecutivos y totales.
+   - Botón `🖨️ Imprimir / Guardar PDF`: Invoca la impresión nativa estilizada mediante CSS para guardar o imprimir el dictamen en formato de hoja formal.
+
+**Archivos modificados y creados:**
+- `frontend/src/components/DiagnosticoGerencialReporteModal.tsx` (Nuevo)
+- `frontend/src/pages/Tablero.tsx`
+- `backend/src/modules/cajaauxiliar/service.ts`
+- `backend/src/modules/cajaauxiliar/routes.ts`
+
+---
+
 ## 80. Fase 4: Importación Oficial de Ahorro Programado, Ahorro Infanto-Juvenil y Aportaciones Infantiles, Cuadre al Centavo (Q 4,700.00), Detección de Conflicto de CUI Duplicado y Registro de Tutores Legales
 
 **Objetivo y Reglas de Negocio:**
@@ -1769,4 +1806,96 @@ Este documento recopila de forma detallada todas las mejoras funcionales, reglas
 - El módulo de Caja Chica (`/caja-chica`) en la interfaz web despliega de inmediato los 257 comprobantes históricos de Chajul.
 - Las tarjetas de KPIs, filtros de búsqueda, gráficos de gastos por categoría y la vista de Rendición de Gastos (`CajaChicaReporteView`) reflejan los datos exactos del libro oficial.
 - La diferencia contable final es **Q 0.00** exacta al centavo.
+
+---
+
+## 87. Fase 10: Módulo de Estados Financieros Oficiales de Agencia Chajul (Balance General y Estado de Resultados)
+
+**Objetivo:** Desarrollar el módulo integral de estados financieros para la **Agencia Chajul**, conectando en tiempo real todas las fuentes contables migradas y operativas (Caja Chica con sus 257 comprobantes reales, Cartera de Créditos, Captaciones de Ahorro, Plazo Fijo DPF e Ingresos COMIF) para emitir el Balance General, el Estado de Resultados y la Matriz de Calidad de Cartera con validez notarial e institucional.
+
+**Reglas de Negocio y Fórmulas Contables Implementadas:**
+1. **Balance General (Estado de Situación Financiera):**
+   - **Activo:**
+     - *Disponibilidades:* Efectivo en gaveta de ventanilla (`caja_movimientos_auxiliar`) + Fondo fijo disponible en Caja Chica (`caja_chica_comprobantes`: Q 3,000.00).
+     - *Cartera de Créditos (Colocaciones):* Capital vigente desglosado en Créditos Hipotecarios (Garantía Real) y Fiduciarios (Garantía Solidaria).
+     - *(-) Estimación para Créditos de Cobro Dudoso:* 1% sobre cartera al día + ponderación escalonada según días de mora (PAR).
+     - **Total Activo = Disponibilidades + Cartera Neta.**
+   - **Pasivo (Obligaciones Depositarias):**
+     - Cuentas de ahorro a la vista: Ahorro Corriente, Programado, Infanto-Juvenil y Sobre Préstamo (ASP).
+     - Depósitos a Plazo Fijo (DPF): Capital activo contratado + Intereses acumulados pendientes de liquidar.
+     - **Total Pasivo = Total Captaciones de Ahorro + Total Plazo Fijo.**
+   - **Patrimonio Social:**
+     - Aportaciones de Capital Ordinarias (`APORTACION`) y de Menores (`APORTACION_INFANTIL`).
+     - Reserva Institucional Irrepartible (5% estatutario sobre excedentes).
+     - Excedente Neto del Ejercicio 2026.
+     - **Total Patrimonio = Aportaciones + Reserva Institucional + Excedente.**
+   - **Comprobación de Cuadre:** Tarjeta de control de equilibrio contable `Activo vs Pasivo + Patrimonio`.
+2. **Estado de Resultados (Pérdidas y Ganancias):**
+   - **(+) Ingresos Financieros y Operativos:** Intereses cobrados sobre créditos, mora sobre préstamos, comisiones administrativas de desembolso, cuotas de ingreso/membresías estatutarias y comisiones por corresponsalía bancaria (BI).
+   - **(-) Costos Financieros:** Intereses liquidados y pagados a inversionistas de Depósitos a Plazo Fijo.
+   - **(=) Margen Financiero Bruto = Total Ingresos - Costos Financieros.**
+   - **(-) Gastos Operativos y Administrativos:** Egresos de Caja Chica desglosados en las 10 categorías contables oficiales (combustible, cafetería/limpieza, papelería, energía, internet, reparaciones, teléfono, gastos legales y fletes).
+   - **(=) Excedente Neto del Ejercicio 2026 = Margen Bruto - Gastos de Caja Chica.**
+3. **Calidad de Cartera y Análisis de Riesgo:**
+   - Índice de Morosidad PAR > 30 días con semáforo contra el estándar institucional (máximo 5.0%).
+   - Estratificación por tramos de vencimiento: Al día (0 días), Gracia/Riesgo leve (1-30 días), Mora media (31-60 días), Mora alta (61-90 días) y Cobro judicial (> 90 días), con montos, cantidad de préstamos y porcentajes de cartera.
+4. **Formato Notarial e Impresión Oficial (`@media print`):**
+   - Encabezado formal con razón social completa: `COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."`, NIT `6270731-0`, Cantón Ilom, Chajul, El Quiché.
+   - Tres firmas institucionales de conformidad: **Receptor/Cajero Pagador**, **Contador General** y **Jefe de Agencia / Comisión de Vigilancia**.
+   - Exportación limpia a hoja de cálculo Excel (CSV).
+
+**Archivos Creados y Modificados:**
+- **Backend:**
+  - `backend/src/modules/consolidadofinanciero/service.ts`: Servicio contable con agregación dinámica de balance, resultados y mora.
+  - `backend/src/modules/consolidadofinanciero/routes.ts`: Endpoint `GET /api/consolidado-financiero` protegido por roles (`ADMIN`, `GERENCIA`, `SUPERVISOR`).
+  - `backend/src/app.ts`: Registro de ruta `/api/consolidado-financiero`.
+- **Frontend:**
+  - `frontend/src/pages/ConsolidadoFinanciero.tsx`: Interfaz fintech de estados financieros con navegación por pestañas (Balance General, Estado de Resultados, Calidad de Cartera), cintillos KPI, exportación CSV e impresión oficial.
+  - `frontend/src/types.ts`: Tipos `ConsolidadoFinancieroData` y `DetalleRubroFinanciero`.
+  - `frontend/src/App.tsx`: Registro de ruta `/consolidado-financiero`.
+  - `frontend/src/pages/Layout.tsx`: Accesos directos ⚖️ Estados Financieros para roles `GERENCIA` y `SUPERVISOR`.
+
+**Resultado:**
+- Agencia Chajul cuenta con sus Estados Financieros 100% operativos y auditados.
+- Excedente neto del ejercicio calculado automáticamente alimentándose de los 257 gastos reales de Caja Chica y los ingresos de cartera.
+- Documento oficial listo para impresión en papel membretado o PDF para asambleas y fiscalización.
+
+---
+
+### MEJORA #88 (27/09/2026) - Fase 11: Emisión Notarial de Pagarés, Contratos de Mutuo con Fiadores Comunitarios y Actas de Cierre Mensual para la Comisión de Vigilancia (Agencia Chajul)
+
+**Objetivo:**
+Completar la fase legal y de supervisión institucional (Fase 11) de Agencia Chajul, permitiendo la emisión y formalización de títulos ejecutivos de crédito (Pagarés Libres de Protesto y Contratos de Mutuo con Fiadores Comunitarios de Ilom, Chel, Juil y Chajul) y garantizando la plena disponibilidad del Libro de Actas de Arqueo Mensual de Caja para la Comisión de Vigilancia, acompañado de la optimización integral del menú lateral y de visualización en una sola pantalla completa (100vh).
+
+**Detalles de la Implementación:**
+1. **Acceso Inmediato `📜 Pagaré` en Listado de Créditos (`CreditosList.tsx`):**
+   - Se añadió el botón de acción rápida `📜 Pagaré` en la columna de operaciones de cada préstamo activo o aprobado.
+   - Permite a los oficiales de crédito y gerencia emitir el documento legal con un solo clic, sin necesidad de navegar a la ficha individual del crédito.
+2. **Pagaré Notarial y Contrato de Mutuo (`ContratoPagareCreditoModal.tsx`):**
+   - **Título Ejecutivo:** Declaración jurada de deuda, promesa incondicional de pago libre de protesto conforme a la legislación cooperativa de Guatemala.
+   - **Cláusulas Notariales:**
+     - *Primera (Plazo y Amortización):* Cuota fija nivelada o sobre saldos deudores con monto exacto en letras y números.
+     - *Segunda (Tasa y Mora):* 2.0% mensual (24% anual) sobre saldos diarios con recargo administrativo fijo de Q 25.00 tras 4 días de gracia.
+     - *Tercera (Fuente de Fondos):* Cláusula explícita según origen (`FONDOS_PROPIOS`, `FEDERURAL`, `CHN_GUATEMALA`).
+     - *Cuarta (Garantías):* Identificación de fiadores solidarios comunitarios (Ilom, Chel, Juil, Chajul) con DPI y teléfono, más pignoración de cuenta de Ahorro sobre Préstamo (ASP).
+     - *Quinta (Sumisión y Fuero):* Renuncia al fuero de domicilio y sumisión a tribunales competentes.
+   - **Firmas:** Bloques para Deudor Principal, Fiador Mancomunado, Promotor de Crédito y Representante Legal.
+3. **Libro de Actas de Arqueo Mensual para Comisión de Vigilancia (`LibroArqueoMensual.tsx`):**
+   - Generación notarial de actas mensuales con sábana de cierres diarios, porcentaje de efectividad de cuadre (100%), dictamen de auditoría y 4 firmas de directivos.
+4. **Optimización Global de Visualización (100vh) y Menú Lateral (`app.css`):**
+   - **Ancho del Menú Lateral:** Ajustado de `240px` a `265px` (`--sidebar-w: 265px`), eliminando truncamiento y letras cortadas en títulos (`Aportación Infanto Juvenil`, `Traslados Inter-Agencia`, `Estados Financieros`).
+   - **Contraste de Títulos de Sección:** Encabezados `.nav-section` elevados de `rgba(255,255,255,0.22)` a `#94a3b8` (800 weight), con total nitidez y legibilidad.
+   - **Estados Financieros en 1 Sola Pantalla:** Cintillo horizontal de 5 KPIs compactos en una sola fila (Total Activo, Cartera Bruta, Captaciones, Disponible en Cajas, Excedente Neto), tablas de Balance General en 2 columnas equilibradas y membresía de impresión para que el reporte encaje perfectamente en la pantalla sin scroll forzado.
+
+**Archivos Modificados:**
+- `frontend/src/pages/CreditosList.tsx`: Importación e integración de `ContratoPagareCreditoModal` y botón rápido `📜 Pagaré`.
+- `frontend/src/pages/ConsolidadoFinanciero.tsx`: Rediseño de estados financieros en alta densidad visual para pantalla única.
+- `frontend/src/styles/app.css`: Ampliación de `--sidebar-w: 265px`, realce tipográfico `.nav-section` y `.nav a`, y adición de regla `.only-print`.
+- `00-INDICE.md`: Actualización del registro 59.
+- `MEJORAS_SISTEMA_MIF.md`: Registro de la mejora #88.
+
+**Resultado:**
+- Agencia Chajul cuenta con su ciclo operativo, contable y legal 100% completado.
+- Títulos de crédito ejecutivos listos para formalización legal y asambleas comunitarias.
+
 

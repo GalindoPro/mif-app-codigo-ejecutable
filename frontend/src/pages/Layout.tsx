@@ -226,6 +226,7 @@ export default function Layout() {
           {usuario?.rol === "SUPERVISOR" && (<>
             <Section label="Supervisión y Control" />
             <NavItem to="/tablero"         icon="📊" label="Tablero y Analítica"    onClick={closeSidebar} />
+            <NavItem to="/consolidado-financiero" icon="⚖️" label="Estados Financieros" onClick={closeSidebar} />
             <NavItem to="/arqueos/mensual" icon="📑" label="Libro Mensual Arqueos"  onClick={closeSidebar} />
             <Section label="Cartera y Créditos" />
             <NavItem to="/creditos"         icon="📄" label="Bandeja de Créditos"   onClick={closeSidebar} />
@@ -242,6 +243,7 @@ export default function Layout() {
           {usuario?.rol === "GERENCIA" && (<>
             <Section label="Control General" />
             <NavItem to="/tablero"         icon="📊" label="Tablero Global"        onClick={closeSidebar} />
+            <NavItem to="/consolidado-financiero" icon="⚖️" label="Estados Financieros" onClick={closeSidebar} />
             <NavItem to="/arqueos/mensual" icon="📑" label="Libro Mensual Arqueos" onClick={closeSidebar} />
 
             <Section label="Operaciones" />

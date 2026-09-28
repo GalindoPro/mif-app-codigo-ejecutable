@@ -1,5 +1,5 @@
 :root {
-  --sidebar-w: 240px;
+  --sidebar-w: 265px;
   --sidebar-collapsed-w: 56px;
   --sidebar-transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -237,12 +237,12 @@
 
 /* Section labels */
 .nav-section {
-  font-size: 0.58rem;
+  font-size: 0.64rem;
   font-weight: 800;
-  color: rgba(255,255,255,0.22);
+  color: #94a3b8; /* Crisp and fully legible slate-400 */
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  padding: 0.65rem 0.55rem 0.2rem;
+  letter-spacing: 0.08em;
+  padding: 0.7rem 0.65rem 0.25rem;
   white-space: nowrap;
   overflow: hidden;
   transition: opacity var(--sidebar-transition), height var(--sidebar-transition), padding var(--sidebar-transition);
@@ -258,12 +258,12 @@
 .nav a {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem 0.6rem;
-  border-radius: 8px;
-  color: rgba(255,255,255,0.48);
+  gap: 0.65rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 7px;
+  color: #cbd5e1; /* High contrast readable slate-200 */
   text-decoration: none;
-  font-size: 0.81rem;
+  font-size: 0.82rem;
   font-weight: 500;
   transition: all 0.18s ease;
   position: relative;
@@ -271,17 +271,19 @@
   overflow: hidden;
 }
 .nav a .nav-icon {
-  font-size: 1rem;
+  font-size: 1.05rem;
   flex-shrink: 0;
   width: 22px;
   text-align: center;
-  opacity: 0.75;
+  opacity: 0.9;
   transition: opacity 0.15s, transform 0.15s;
 }
 .nav a .nav-label {
   transition: opacity var(--sidebar-transition), width var(--sidebar-transition);
   white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
 }
 .shell.sidebar-collapsed .nav a .nav-label {
   opacity: 0;
@@ -449,10 +451,14 @@
 }
 
 .content {
-  padding: 1rem 1.5rem;
+  padding: 0.75rem 1.25rem;
   max-width: none;
   width: 100%;
   box-sizing: border-box;
+}
+
+.only-print {
+  display: none !important;
 }
 
 .dashboard-grid {
@@ -1515,6 +1521,10 @@ td a {
   .link-btn,
   .sidebar-backdrop {
     display: none !important;
+  }
+
+  .only-print {
+    display: block !important;
   }
 
   /* Si se imprime desde un MODAL renderizado en document.body (createPortal),

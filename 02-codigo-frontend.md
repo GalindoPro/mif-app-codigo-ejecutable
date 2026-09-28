@@ -249,6 +249,7 @@ import Auditoria from "./pages/Auditoria";
 import Alertas from "./pages/Alertas";
 import Sesiones from "./pages/Sesiones";
 import TrasladosInterAgencia from "./pages/TrasladosInterAgencia";
+import { ConsolidadoFinanciero } from "./pages/ConsolidadoFinanciero";
 
 import { useAuth } from "./context/AuthContext";
 
@@ -306,6 +307,7 @@ export default function App() {
           <Route path="/alertas" element={<Alertas />} />
           <Route path="/sesiones" element={<Sesiones />} />
           <Route path="/traslados" element={<TrasladosInterAgencia />} />
+          <Route path="/consolidado-financiero" element={<ConsolidadoFinanciero />} />
 
         </Route>
         <Route path="*" element={<InicioRedirect />} />
@@ -1151,6 +1153,110 @@ export interface CobroCampo {
   created_at: string;
   updated_at: string;
   liquidado_at?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Estados Financieros y Balance General (Fase 10)
+// ---------------------------------------------------------------------------
+export interface DetalleRubroFinanciero {
+  concepto: string;
+  codigo?: string;
+  monto: number;
+  subcuenta?: string;
+  porcentaje?: number;
+}
+
+export interface ConsolidadoFinancieroData {
+  fechaGeneracion: string;
+  fechaCorte: string;
+  agencia: {
+    id: string | null;
+    nombre: string;
+    codigo: string;
+  };
+  balanceGeneral: {
+    activo: {
+      disponible: {
+        total: number;
+        rubros: DetalleRubroFinanciero[];
+      };
+      cartera: {
+        totalBruto: number;
+        provisionEstimada: number;
+        totalNeto: number;
+        rubros: DetalleRubroFinanciero[];
+      };
+      totalActivo: number;
+    };
+    pasivo: {
+      captacionesAhorro: {
+        total: number;
+        rubros: DetalleRubroFinanciero[];
+      };
+      plazoFijo: {
+        capitalVigente: number;
+        interesesPorPagar: number;
+        total: number;
+      };
+      totalPasivo: number;
+    };
+    patrimonio: {
+      aportacionesCapital: {
+        total: number;
+        rubros: DetalleRubroFinanciero[];
+      };
+      reservaInstitucional: number;
+      excedenteNetoPeriodo: number;
+      totalPatrimonio: number;
+    };
+    cuadre: {
+      totalActivo: number;
+      totalPasivoMasPatrimonio: number;
+      diferencia: number;
+      cuadrado: boolean;
+    };
+  };
+  estadoResultados: {
+    ingresosFinancieros: {
+      total: number;
+      rubros: DetalleRubroFinanciero[];
+    };
+    costosFinancieros: {
+      total: number;
+      rubros: DetalleRubroFinanciero[];
+    };
+    margenFinancieroBruto: number;
+    gastosOperativos: {
+      total: number;
+      rubros: DetalleRubroFinanciero[];
+    };
+    excedenteNeto: number;
+  };
+  calidadCartera: {
+    carteraTotal: number;
+    creditosVigentes: number;
+    creditosMora: number;
+    indiceMorosidad: number;
+    tramosMora: {
+      alDia: { monto: number; cantidad: number; porcentaje: number };
+      rango1_30: { monto: number; cantidad: number; porcentaje: number };
+      rango31_60: { monto: number; cantidad: number; porcentaje: number };
+      rango61_90: { monto: number; cantidad: number; porcentaje: number };
+      mas90: { monto: number; cantidad: number; porcentaje: number };
+    };
+  };
+  desgloseAgencias: Array<{
+    agenciaId: string;
+    nombre: string;
+    codigo: string;
+    activoTotal: number;
+    carteraTotal: number;
+    captacionesTotal: number;
+    aportacionesTotal: number;
+    excedenteNeto: number;
+    morosidadPorcentaje: number;
+    sociosActivos: number;
+  }>;
 }
 ```
 
@@ -6150,6 +6256,7 @@ export default function Layout() {
           {usuario?.rol === "SUPERVISOR" && (<>
             <Section label="Supervisión y Control" />
             <NavItem to="/tablero"         icon="📊" label="Tablero y Analítica"    onClick={closeSidebar} />
+            <NavItem to="/consolidado-financiero" icon="⚖️" label="Estados Financieros" onClick={closeSidebar} />
             <NavItem to="/arqueos/mensual" icon="📑" label="Libro Mensual Arqueos"  onClick={closeSidebar} />
             <Section label="Cartera y Créditos" />
             <NavItem to="/creditos"         icon="📄" label="Bandeja de Créditos"   onClick={closeSidebar} />
@@ -6166,6 +6273,7 @@ export default function Layout() {
           {usuario?.rol === "GERENCIA" && (<>
             <Section label="Control General" />
             <NavItem to="/tablero"         icon="📊" label="Tablero Global"        onClick={closeSidebar} />
+            <NavItem to="/consolidado-financiero" icon="⚖️" label="Estados Financieros" onClick={closeSidebar} />
             <NavItem to="/arqueos/mensual" icon="📑" label="Libro Mensual Arqueos" onClick={closeSidebar} />
 
             <Section label="Operaciones" />

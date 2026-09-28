@@ -12,6 +12,7 @@ import {
 import type { EstadoPrestamo, Prestamo, FiadorItem, CobroCampo } from "../types";
 import { formatearDPI, formatearTelefono } from "../lib/formatters";
 import { CobroCampoModal } from "../components/promotor/CobroCampoModal";
+import ContratoPagareCreditoModal from "../components/ContratoPagareCreditoModal";
 
 export default function CreditosList() {
   const { usuario } = useAuth();
@@ -27,6 +28,7 @@ export default function CreditosList() {
   const [cargandoFiadores, setCargandoFiadores] = useState(false);
   const [cobrosPendientes, setCobrosPendientes] = useState<CobroCampo[]>([]);
   const [modalCobroPrestamo, setModalCobroPrestamo] = useState<{ id: string; socioId: string; socioNombres: string, cobroExistente?: CobroCampo } | null>(null);
+  const [prestamoParaContrato, setPrestamoParaContrato] = useState<Prestamo | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
@@ -611,6 +613,17 @@ export default function CreditosList() {
                             </>
                           )}
 
+                          {/* Botón Pagaré Notarial */}
+                          <button
+                            type="button"
+                            className="btn secondary"
+                            style={{ fontSize: "0.72rem", padding: "0.15rem 0.4rem", display: "flex", alignItems: "center", gap: "0.2rem" }}
+                            title="Emitir Pagaré Libre de Protesto y Contrato de Mutuo"
+                            onClick={() => setPrestamoParaContrato(p)}
+                          >
+                            📜 Pagaré
+                          </button>
+
                           {/* Botón Ver Ficha */}
                           <Link
                             to={`/creditos/${p.id}`}
@@ -991,6 +1004,13 @@ export default function CreditosList() {
             setModalCobroPrestamo(null);
             cargar();
           }}
+        />
+      )}
+
+      {prestamoParaContrato && (
+        <ContratoPagareCreditoModal
+          prestamo={prestamoParaContrato}
+          onClose={() => setPrestamoParaContrato(null)}
         />
       )}
     </div>
