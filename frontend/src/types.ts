@@ -277,6 +277,7 @@ export interface CajaChicaComprobante {
   usuario_id: string;
   usuario_nombre: string;
   usuario_rol?: string;
+  saldo_acumulado?: string | number;
   created_at: string;
 }
 

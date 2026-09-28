@@ -377,3 +377,9 @@ Todas las especificaciones operativas y estatutarias acordadas se encuentran doc
     - **Acceso Directo de Auditoría:** Enlace contextual en 1 clic para auditar el Balance General y Estado de Resultados exacto a la fecha de corte del mes analizado (`/consolidado-financiero?fechaCorte=YYYY-MM-DD`).
     - **Reporte Notarial y Descarga en Excel/PDF:** Botón `🖨️ Reporte Oficial PDF / Excel` en la tarjeta gerencial que abre el documento notarial formal con membrete COMIF-R.L., semáforo de liquidez, desglose de 4 factores de riesgo y 3 casillas de firmas de fiscalización (Gerencia, Consejo y Vigilancia), permitiendo exportar directamente a Excel (CSV con UTF-8 BOM) o imprimir/guardar en PDF en 1 hoja limpia.
 
+63. **Fase 15: Auditoría Avanzada y Optimizaciones de Caja Chica (`/caja-chica`):**
+    - **Saldo en Caja Progresivo Histórico (`saldo_acumulado`):** Incorporación de función ventana contable (`SUM(...) OVER (PARTITION BY agencia_id ORDER BY fecha ASC, created_at ASC, id ASC)`) en el backend que calcula el saldo exacto en caja después de cada comprobante y lo visualiza en la tabla en color Oro Maya `#BF9903` con tipografía `IBM Plex Mono`.
+    - **Tarjetas de Gastos Interactivas (Drill-Down 1-Clic):** En el panel izquierdo de egresos por categoría, cada tarjeta es interactiva para filtrar instantáneamente los comprobantes de dicho rubro (Cafetería, Combustibles, Internet, etc.) con botón `✕ Ver todas`.
+    - **Selector Mensual y Exportación a Excel / CSV:** Barra de herramientas con selector desplegable de mes (`Julio 2026`, `Junio 2026`, etc.) y botón `📥 Excel` para descargar de inmediato el libro de caja chica con detalle de egresos, ingresos, números de documento, categorías y saldo progresivo.
+
+

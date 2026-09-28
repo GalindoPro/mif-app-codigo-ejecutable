@@ -61,6 +61,8 @@ export default function CajaChica() {
   const [mostrarReporte, setMostrarReporte] = useState(false);
   const [editarRegistro, setEditarRegistro] = useState<CajaChicaComprobante | null>(null);
   const [agencias, setAgencias] = useState<Agencia[]>([]);
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string>("");
+  const [mesFiltro, setMesFiltro] = useState<string>("");
 
   const [agenciaId, setAgenciaId] = useState(usuario?.agenciaId ?? "");
   const [tipo, setTipo] = useState<"INGRESO" | "EGRESO">("EGRESO");
@@ -109,7 +111,14 @@ export default function CajaChica() {
 
   function cargar() {
     api
-      .get<ListaCajaChica>("/caja-chica", { params: { q: q || undefined } })
+      .get<ListaCajaChica>("/caja-chica", {
+        params: {
+          q: q || undefined,
+          categoria: categoriaFiltro || undefined,
+          mes: mesFiltro || undefined,
+          agenciaId: agenciaId || undefined,
+        },
+      })
       .then(({ data }) => setResultado(data))
       .catch((err) => setError(mensajeError(err)));
   }
@@ -122,7 +131,45 @@ export default function CajaChica() {
     const timeout = setTimeout(cargar, 250);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
+  }, [q, categoriaFiltro, mesFiltro, agenciaId]);
+
+  function exportarExcel() {
+    if (!resultado || resultado.data.length === 0) return;
+    const lineas: string[] = [];
+    lineas.push("COOPERATIVA MAYA INVERSIONES FUTURAS R.L. (COMIF-R.L.)");
+    lineas.push(`LIBRO AUXILIAR DE CAJA CHICA — ${mesFiltro ? `Período: ${mesFiltro}` : "Consolidado Histórico Completo"}`);
+    if (categoriaFiltro) {
+      lineas.push(`Filtro por Categoría: ${CATEGORIA_CAJA_CHICA_LABEL[categoriaFiltro as CategoriaCajaChica] || categoriaFiltro}`);
+    }
+    lineas.push(`Fecha de Emisión: ${new Date().toLocaleDateString("es-GT")}`);
+    lineas.push("");
+    lineas.push("FECHA,NO. DOC,BENEFICIARIO / PROVEEDOR,DESCRIPCIÓN / CONCEPTO,TIPO,CATEGORÍA,INGRESO (Q),EGRESO (Q),SALDO EN CAJA (Q),REGISTRADO POR");
+
+    resultado.data.forEach((c) => {
+      const fechaStr = new Date(c.fecha).toLocaleDateString("es-GT");
+      const doc = c.numero_documento || "DTE";
+      const ben = `"${(c.beneficiario || "").replace(/"/g, '""')}"`;
+      const desc = `"${(c.descripcion || "").replace(/"/g, '""')}"`;
+      const tipoStr = c.tipo;
+      const catStr = c.categoria ? `"${CATEGORIA_CAJA_CHICA_LABEL[c.categoria] || c.categoria}"` : '""';
+      const ingreso = c.tipo === "INGRESO" ? Number(c.monto).toFixed(2) : "";
+      const egreso = c.tipo === "EGRESO" ? Number(c.monto).toFixed(2) : "";
+      const saldo = c.saldo_acumulado != null ? Number(c.saldo_acumulado).toFixed(2) : "";
+      const usuario = `"${c.usuario_nombre || ""}"`;
+
+      lineas.push(`${fechaStr},"${doc}",${ben},${desc},${tipoStr},${catStr},${ingreso},${egreso},${saldo},${usuario}`);
+    });
+
+    lineas.push("");
+    lineas.push(`"TOTALES",,,,,"Total Ingresos:",${resultado.totalIngresos.toFixed(2)},"Total Egresos:",${resultado.totalEgresos.toFixed(2)},"Saldo en Caja:",${resultado.saldoActual.toFixed(2)}`);
+
+    const blob = new Blob(["\uFEFF" + lineas.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Caja_Chica_${mesFiltro || "Consolidado"}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+  }
 
   useEffect(() => {
     if (!mostrarForm || !agenciaId) return;
@@ -639,9 +686,22 @@ export default function CajaChica() {
                   <h3 style={{ margin: 0, fontSize: "0.92rem", color: "var(--ink)", display: "flex", alignItems: "center", gap: "0.35rem" }}>
                     <span>📊</span> Egresos por Categoría
                   </h3>
-                  <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)" }}>
-                    {resultado?.totalesPorCategoria.length ?? 0} rubros
-                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                    {categoriaFiltro && (
+                      <button
+                        type="button"
+                        onClick={() => setCategoriaFiltro("")}
+                        className="btn btn-xs secondary"
+                        style={{ fontSize: "0.68rem", padding: "0.15rem 0.4rem", color: "#dc2626" }}
+                        title="Quitar filtro de categoría"
+                      >
+                        ✕ Ver todas
+                      </button>
+                    )}
+                    <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)" }}>
+                      {resultado?.totalesPorCategoria.length ?? 0} rubros
+                    </span>
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
@@ -651,30 +711,45 @@ export default function CajaChica() {
                       c.categoria === "SIN_CATEGORIA"
                         ? "Sin categoría"
                         : CATEGORIA_CAJA_CHICA_LABEL[c.categoria as CategoriaCajaChica] ?? c.categoria;
+                    const esSeleccionado = categoriaFiltro === c.categoria;
 
                     return (
                       <div
                         key={c.categoria}
+                        onClick={() => setCategoriaFiltro((prev) => (prev === c.categoria ? "" : c.categoria))}
                         style={{
-                          background: "var(--paper)",
-                          border: "1px solid var(--line)",
+                          background: esSeleccionado ? "rgba(5, 150, 105, 0.08)" : "var(--paper)",
+                          border: esSeleccionado ? "1.5px solid #059669" : "1px solid var(--line)",
                           borderRadius: "6px",
                           padding: "0.45rem 0.6rem",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
                         }}
+                        title={esSeleccionado ? "Clic para quitar filtro" : `Clic para filtrar solo ${label}`}
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.8rem", marginBottom: "0.2rem" }}>
-                          <span style={{ fontWeight: 600, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 190 }} title={label}>
-                            {label}
+                          <span
+                            style={{
+                              fontWeight: esSeleccionado ? 800 : 600,
+                              color: esSeleccionado ? "#059669" : "var(--ink)",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              maxWidth: 180,
+                            }}
+                            title={label}
+                          >
+                            {esSeleccionado ? `✓ ${label}` : label}
                           </span>
-                          <span className="mono" style={{ fontWeight: 700, color: "var(--ink)" }}>
+                          <span className="mono" style={{ fontWeight: 700, color: esSeleccionado ? "#059669" : "var(--ink)" }}>
                             {formatoQ(c.total)}
                           </span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                           <div style={{ flex: 1, height: "5px", background: "var(--mono-bg)", borderRadius: "3px", overflow: "hidden" }}>
-                            <div style={{ width: `${pct}%`, height: "100%", background: "var(--accent)" }} />
+                            <div style={{ width: `${pct}%`, height: "100%", background: esSeleccionado ? "#059669" : "var(--accent)" }} />
                           </div>
-                          <span style={{ fontSize: "0.68rem", color: "var(--ink-soft)", minWidth: "30px", textAlign: "right" }}>{pct}%</span>
+                          <span style={{ fontSize: "0.68rem", color: esSeleccionado ? "#059669" : "var(--ink-soft)", minWidth: "30px", textAlign: "right", fontWeight: esSeleccionado ? 700 : 400 }}>{pct}%</span>
                         </div>
                       </div>
                     );
@@ -692,8 +767,8 @@ export default function CajaChica() {
           {/* PANEL DERECHO: BUSCADOR + TABLA DE COMPROBANTES CON SCROLL INTERNO */}
           <div className="screen-panel" style={{ padding: 0 }}>
             {/* BARRA DE HERRAMIENTAS Y BÚSQUEDA INTEGRADA */}
-            <div style={{ padding: "0.6rem 0.85rem", borderBottom: "1px solid var(--line)", display: "flex", gap: "0.6rem", alignItems: "center", flexShrink: 0 }}>
-              <div style={{ flex: 1 }}>
+            <div style={{ padding: "0.6rem 0.85rem", borderBottom: "1px solid var(--line)", display: "flex", gap: "0.6rem", alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 220 }}>
                 <input
                   placeholder="🔍 Buscar por beneficiario, descripción o documento…"
                   value={q}
@@ -709,6 +784,50 @@ export default function CajaChica() {
                   }}
                 />
               </div>
+
+              {/* SELECTOR DE MES */}
+              <select
+                value={mesFiltro}
+                onChange={(e) => setMesFiltro(e.target.value)}
+                style={{
+                  padding: "0.42rem 0.65rem",
+                  fontSize: "0.82rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--line)",
+                  background: "var(--paper)",
+                  color: "var(--ink)",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                <option value="">📅 Todos los meses</option>
+                <option value="2026-07">Julio 2026</option>
+                <option value="2026-06">Junio 2026</option>
+                <option value="2026-05">Mayo 2026</option>
+                <option value="2026-04">Abril 2026</option>
+                <option value="2026-03">Marzo 2026</option>
+                <option value="2026-02">Febrero 2026</option>
+                <option value="2026-01">Enero 2026</option>
+              </select>
+
+              {/* BOTÓN EXCEL */}
+              <button
+                type="button"
+                onClick={exportarExcel}
+                className="btn secondary"
+                title="Descargar libro de caja chica en formato CSV/Excel"
+                style={{
+                  fontSize: "0.8rem",
+                  padding: "0.42rem 0.75rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                📥 Excel
+              </button>
+
               <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)", whiteSpace: "nowrap" }}>
                 {resultado?.data.length ?? 0} comprobantes
               </span>
@@ -725,6 +844,7 @@ export default function CajaChica() {
                     <th>Tipo</th>
                     <th>Categoría</th>
                     <th style={{ textAlign: "right" }}>Monto</th>
+                    <th style={{ textAlign: "right", color: "#BF9903" }}>Saldo en Caja</th>
                     <th>Registrado Por</th>
                     <th style={{ textAlign: "center", width: "40px" }}>Acción</th>
                   </tr>
@@ -770,6 +890,17 @@ export default function CajaChica() {
                         }}
                       >
                         {c.tipo === "EGRESO" ? "−" : "+"} {formatoQ(c.monto)}
+                      </td>
+                      <td
+                        className="mono"
+                        style={{
+                          textAlign: "right",
+                          fontWeight: 700,
+                          color: "#BF9903",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {c.saldo_acumulado != null ? formatoQ(Number(c.saldo_acumulado)) : "—"}
                       </td>
                       <td style={{ fontSize: "0.76rem", color: "var(--ink-soft)" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>

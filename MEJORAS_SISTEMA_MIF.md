@@ -2053,4 +2053,39 @@ Completar la fase legal y de supervisión institucional (Fase 11) de Agencia Cha
 - Agencia Chajul cuenta con su ciclo operativo, contable y legal 100% completado.
 - Títulos de crédito ejecutivos listos para formalización legal y asambleas comunitarias.
 
+---
+
+### MEJORA #89 (28/09/2026) - Optimizaciones de Caja Chica: Saldo Progresivo Histórico en Línea, Filtrado Interactivo por Categoría, Selector de Mes y Descarga en Excel
+
+**Objetivo:**
+Elevar la pantalla operativa y de control de Caja Chica (`/caja-chica`) al estándar de auditoría financiera, permitiendo fiscalizar el saldo en efectivo de la caja en cada comprobante registrado, filtrar de inmediato por categoría de gasto con un solo clic, seleccionar meses o periodos específicos de auditoría y exportar el libro auxiliar en Excel (CSV).
+
+**Detalles de la Implementación:**
+1. **Saldo en Caja Progresivo Histórico (`saldo_acumulado` con CTE en Backend):**
+   - En `backend/src/modules/cajachica/service.ts`, se incorporó una función ventana contable (`SUM(...) OVER (PARTITION BY c.agencia_id ORDER BY c.fecha ASC, c.created_at ASC, c.id ASC)`).
+   - Calcula el saldo exacto en caja que quedó inmediatamente después de cada ingreso o egreso, manteniendo la trazabilidad histórica inmutable independientemente de los filtros aplicados en pantalla.
+2. **Filtrado Dinámico en Backend por Mes y Categoría:**
+   - En `backend/src/modules/cajachica/service.ts` y `routes.ts`, se incorporaron los parámetros query `mes` (formato `YYYY-MM`) y `categoria`.
+   - Permite consultar períodos contables mensuales cerrados y fiscalizar rubros específicos directamente en base de datos.
+3. **Columna "Saldo en Caja" en la Tabla de Comprobantes (`CajaChica.tsx`):**
+   - En la tabla de comprobantes se agregó la columna `Saldo en Caja` con tipografía de alta precisión `IBM Plex Mono` y color Oro Maya `#BF9903`, permitiendo a la Comisión de Vigilancia y Contabilidad verificar de un vistazo cómo se movió el efectivo disponible tras cada comprobante.
+4. **Tarjetas de Rubros Interactivas en el Panel Izquierdo:**
+   - Cada tarjeta de categoría de gasto ahora es cliqueable, permitiendo filtrar la tabla de comprobantes con un solo toque (`Cafetería y limpieza`, `Combustibles y lubricantes`, `Internet`, etc.).
+   - Se muestra un botón `✕ Ver todas` para regresar al listado consolidado.
+5. **Selector Mensual y Exportación a Excel / CSV en la Barra de Herramientas:**
+   - Selector desplegable de mes contable (`📅 Todos los meses`, `Julio 2026`, `Junio 2026`, etc.).
+   - Botón `📥 Excel` para descargar en un clic el libro de caja chica con fecha, beneficiario, descripción, documento, tipo, categoría, monto, saldo en caja y usuario registrador.
+
+**Archivos Modificados:**
+- `backend/src/modules/cajachica/service.ts`
+- `backend/src/modules/cajachica/routes.ts`
+- `frontend/src/types.ts`
+- `frontend/src/pages/CajaChica.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+- `00-INDICE.md`
+
+**Resultado:**
+- Cuadre y auditoría de Caja Chica 100% transparente para administradores, contabilidad y comisión de vigilancia.
+
+
 

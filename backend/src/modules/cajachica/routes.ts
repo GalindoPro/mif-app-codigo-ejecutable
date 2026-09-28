@@ -13,7 +13,9 @@ cajaChicaRouter.get(
   requireRole("GERENCIA", "SUPERVISOR", "CAJERO", "CAJA_CHICA"),
   asyncHandler(async (req, res) => {
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
-    res.json(await service.listar({ agenciaId: agenciaVisible(req), q }));
+    const categoria = typeof req.query.categoria === "string" && req.query.categoria ? req.query.categoria : undefined;
+    const mes = typeof req.query.mes === "string" && req.query.mes ? req.query.mes : undefined;
+    res.json(await service.listar({ agenciaId: agenciaVisible(req), q, categoria, mes }));
   }),
 );
 

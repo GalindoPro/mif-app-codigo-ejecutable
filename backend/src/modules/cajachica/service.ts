@@ -2,7 +2,12 @@ import { pool } from "../../db/pool";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { conflict } from "../../utils/errors";
 
-export async function listar(params: { agenciaId: string | null; q?: string }) {
+export async function listar(params: {
+  agenciaId: string | null;
+  q?: string;
+  mes?: string;
+  categoria?: string;
+}) {
   const condiciones: string[] = [];
   const valores: unknown[] = [];
 
@@ -12,17 +17,34 @@ export async function listar(params: { agenciaId: string | null; q?: string }) {
   }
   if (params.q) {
     valores.push(`%${params.q.toLowerCase()}%`);
-    condiciones.push(`(lower(c.beneficiario) like $${valores.length} or lower(c.descripcion) like $${valores.length})`);
+    condiciones.push(
+      `(lower(c.beneficiario) like $${valores.length} or lower(c.descripcion) like $${valores.length} or lower(coalesce(c.numero_documento, '')) like $${valores.length})`,
+    );
+  }
+  if (params.categoria) {
+    valores.push(params.categoria);
+    condiciones.push(`c.categoria = $${valores.length}`);
+  }
+  if (params.mes) {
+    valores.push(params.mes);
+    condiciones.push(`to_char(c.fecha, 'YYYY-MM') = $${valores.length}`);
   }
   const where = condiciones.length ? `where ${condiciones.join(" and ")}` : "";
 
   const [{ rows: comprobantes }, { rows: totales }, { rows: porCategoria }] = await Promise.all([
     pool.query(
-      `select c.*, u.nombre as usuario_nombre, u.rol as usuario_rol
-       from caja_chica_comprobantes c join usuarios u on u.id = c.usuario_id
+      `with base as (
+         select c.*, u.nombre as usuario_nombre, u.rol as usuario_rol,
+                sum(case when c.tipo = 'INGRESO' then c.monto else -c.monto end) over (
+                  partition by c.agencia_id order by c.fecha asc, c.created_at asc, c.id asc
+                ) as saldo_acumulado
+         from caja_chica_comprobantes c
+         join usuarios u on u.id = c.usuario_id
+       )
+       select * from base c
        ${where}
        order by c.fecha desc, c.created_at desc
-       limit 200`,
+       limit 500`,
       valores,
     ),
     pool.query(
