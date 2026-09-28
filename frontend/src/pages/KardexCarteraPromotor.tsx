@@ -11,7 +11,7 @@ export default function KardexCarteraPromotor() {
 
   const [mes, setMes] = useState(hoyMes);
   const [tabTipo, setTabTipo] = useState<"TODOS" | TipoPrestamo>("TODOS");
-  const [origenCartera, setOrigenCartera] = useState<"OFICIAL_PROMOTOR" | "POR_REGULARIZAR" | "TODOS">("OFICIAL_PROMOTOR");
+  const [promotorSel, setPromotorSel] = useState<"TODOS" | "DIEGO" | "WALTER">("TODOS");
   const [busqueda, setBusqueda] = useState("");
   const [kardex, setKardex] = useState<KardexCarteraRespuesta | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -30,13 +30,13 @@ export default function KardexCarteraPromotor() {
   useEffect(() => {
     setPage(1);
     cargarKardex();
-  }, [mes, tabTipo, origenCartera]);
+  }, [mes, tabTipo, promotorSel]);
 
   async function cargarKardex() {
     setCargando(true);
     setError(null);
     try {
-      const params: Record<string, string> = { mes, origenCartera };
+      const params: Record<string, string> = { mes, promotorSel, origenCartera: "TODOS" };
       if (tabTipo !== "TODOS") params.tipo = tabTipo;
       const { data } = await api.get<KardexCarteraRespuesta>("/prestamos/kardex-cartera", { params });
       setKardex(data);
@@ -415,67 +415,70 @@ export default function KardexCarteraPromotor() {
           gap: "0.5rem",
         }}
       >
-        <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", alignItems: "center" }}>
           <button
             type="button"
-            className={`btn ${origenCartera === "OFICIAL_PROMOTOR" && tabTipo === "TODOS" ? "" : "secondary"}`}
+            className={`btn ${promotorSel === "TODOS" && tabTipo === "TODOS" ? "" : "secondary"}`}
             style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
             onClick={() => {
-              setOrigenCartera("OFICIAL_PROMOTOR");
+              setPromotorSel("TODOS");
               setTabTipo("TODOS");
             }}
           >
-            📋 Oficial Promotor ({kardex?.resumen.countOficialesPromotor ?? 66})
+            🌐 Toda la Cartera ({kardex?.resumen.countTotal ?? 150})
           </button>
           <button
             type="button"
-            className={`btn ${origenCartera === "OFICIAL_PROMOTOR" && tabTipo === "HIPOTECARIO" ? "" : "secondary"}`}
-            style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
-            onClick={() => {
-              setOrigenCartera("OFICIAL_PROMOTOR");
-              setTabTipo("HIPOTECARIO");
-            }}
-          >
-            🏡 Hipotecario ({kardex?.resumen.countHipotecarios ?? 49})
-          </button>
-          <button
-            type="button"
-            className={`btn ${origenCartera === "OFICIAL_PROMOTOR" && tabTipo === "FIDUCIARIO" ? "" : "secondary"}`}
-            style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
-            onClick={() => {
-              setOrigenCartera("OFICIAL_PROMOTOR");
-              setTabTipo("FIDUCIARIO");
-            }}
-          >
-            🤝 Fiduciario ({kardex?.resumen.countFiduciarios ?? 17})
-          </button>
-          <button
-            type="button"
-            className={`btn ${origenCartera === "POR_REGULARIZAR" ? "" : "secondary"}`}
+            className={`btn ${promotorSel === "DIEGO" ? "" : "secondary"}`}
             style={{
               fontSize: "0.78rem",
               padding: "0.25rem 0.6rem",
-              borderColor: origenCartera === "POR_REGULARIZAR" ? "#d97706" : "rgba(217, 119, 6, 0.4)",
-              color: origenCartera === "POR_REGULARIZAR" ? "#ffffff" : "#f59e0b",
-              background: origenCartera === "POR_REGULARIZAR" ? "#d97706" : "rgba(217, 119, 6, 0.12)",
+              borderColor: promotorSel === "DIEGO" ? "#059669" : undefined,
+              color: promotorSel === "DIEGO" ? "#ffffff" : undefined,
+              background: promotorSel === "DIEGO" ? "#059669" : undefined,
+              fontWeight: 600,
             }}
             onClick={() => {
-              setOrigenCartera("POR_REGULARIZAR");
+              setPromotorSel("DIEGO");
               setTabTipo("TODOS");
             }}
           >
-            ⚠️ Por Regularizar ({kardex?.resumen.countPorRegularizar ?? 55})
+            🌾 Promotor 1: Diego Laynez ({kardex?.resumen.countDiego ?? 84})
           </button>
           <button
             type="button"
-            className={`btn ${origenCartera === "TODOS" ? "" : "secondary"}`}
-            style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+            className={`btn ${promotorSel === "WALTER" ? "" : "secondary"}`}
+            style={{
+              fontSize: "0.78rem",
+              padding: "0.25rem 0.6rem",
+              borderColor: promotorSel === "WALTER" ? "#0284c7" : undefined,
+              color: promotorSel === "WALTER" ? "#ffffff" : undefined,
+              background: promotorSel === "WALTER" ? "#0284c7" : undefined,
+              fontWeight: 600,
+            }}
             onClick={() => {
-              setOrigenCartera("TODOS");
+              setPromotorSel("WALTER");
               setTabTipo("TODOS");
             }}
           >
-            🌐 Ver Todo ({(kardex?.resumen.countOficialesPromotor ?? 66) + (kardex?.resumen.countPorRegularizar ?? 55)})
+            🌾 Promotor 2: Walter Mendoza ({kardex?.resumen.countWalter ?? 66})
+          </button>
+          <span style={{ color: "var(--line)", margin: "0 0.2rem" }}>|</span>
+          <button
+            type="button"
+            className={`btn ${tabTipo === "HIPOTECARIO" ? "" : "secondary"}`}
+            style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+            onClick={() => setTabTipo(tabTipo === "HIPOTECARIO" ? "TODOS" : "HIPOTECARIO")}
+          >
+            🏡 Hipotecario ({kardex?.resumen.countHipotecarios ?? 71})
+          </button>
+          <button
+            type="button"
+            className={`btn ${tabTipo === "FIDUCIARIO" ? "" : "secondary"}`}
+            style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+            onClick={() => setTabTipo(tabTipo === "FIDUCIARIO" ? "TODOS" : "FIDUCIARIO")}
+          >
+            🤝 Fiduciario ({kardex?.resumen.countFiduciarios ?? 79})
           </button>
         </div>
 
@@ -488,40 +491,6 @@ export default function KardexCarteraPromotor() {
           />
         </div>
       </div>
-
-      {/* Banner Explicativo de Préstamos por Regularizar */}
-      {origenCartera === "POR_REGULARIZAR" && (
-        <div
-          style={{
-            background: "rgba(217, 119, 6, 0.12)",
-            border: "1px solid rgba(217, 119, 6, 0.4)",
-            borderRadius: "6px",
-            padding: "0.45rem 0.75rem",
-            marginBottom: "0.45rem",
-            fontSize: "0.78rem",
-            color: "#f59e0b",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "0.5rem",
-          }}
-        >
-          <div>
-            <strong>⚠️ Vista de Préstamos por Regularizar ({itemsFiltrados.length}):</strong> Estos créditos corresponden a pagos y cobros de ventanilla registrados en Caja Auxiliar que aún no tienen legajo oficial en el archivo del Promotor. Están resguardados para no alterar la cartera oficial de 66 créditos legítimos.
-          </div>
-          <button
-            type="button"
-            className="btn secondary"
-            style={{ fontSize: "0.72rem", padding: "0.2rem 0.5rem", whiteSpace: "nowrap" }}
-            onClick={() => {
-              setOrigenCartera("OFICIAL_PROMOTOR");
-              setTabTipo("TODOS");
-            }}
-          >
-            ← Volver a Cartera Oficial
-          </button>
-        </div>
-      )}
 
       {/* Contenido / Tabla */}
       {cargando && <div className="card">Cargando Kardex de cartera...</div>}

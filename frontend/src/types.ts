@@ -717,6 +717,12 @@ export interface KardexCarteraRespuesta {
     sociosAlDia: number;
     sociosPendientes: number;
     totalCobradoMes: number;
+    countDiego?: number;
+    countWalter?: number;
+    countTotal?: number;
+    montoDiego?: number;
+    montoWalter?: number;
+    montoTotal?: number;
     countOficialesPromotor?: number;
     countPorRegularizar?: number;
     montoOficialesPromotor?: number;

@@ -1543,7 +1543,11 @@ td a {
   /* Estructura base de la aplicación cuando se imprime una pantalla estándar sin modal */
   #root,
   .shell,
-  .content {
+  .content,
+  .content:has(.screen-container),
+  .content:has(.caja-chica-reporte-screen),
+  .screen-container,
+  .caja-chica-reporte-screen {
     display: block !important;
     position: static !important;
     width: 100% !important;
@@ -1553,6 +1557,7 @@ td a {
     overflow: visible !important;
     height: auto !important;
     min-height: auto !important;
+    max-height: none !important;
     box-shadow: none !important;
     border: none !important;
     background: transparent !important;

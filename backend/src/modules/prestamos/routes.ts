@@ -83,7 +83,8 @@ prestamosRouter.get(
     const tipo = req.query.tipo as any;
     const mes = req.query.mes as string | undefined;
     const origenCartera = req.query.origenCartera as any;
-    res.json(await service.obtenerKardexCartera({ agenciaId, promotorId, tipo, mes, origenCartera }));
+    const promotorSel = req.query.promotorSel as any;
+    res.json(await service.obtenerKardexCartera({ agenciaId, promotorId, promotorSel, tipo, mes, origenCartera }));
   }),
 );
 

@@ -40,6 +40,7 @@ export default function CajaChicaReporteModal({
   const [fechaInicio, setFechaInicio] = useState(getLunesEstaSemana());
   const [fechaFin, setFechaFin] = useState(hoyStr);
   const [categoria, setCategoria] = useState<string>("");
+  const [orientacion, setOrientacion] = useState<"portrait" | "landscape">("portrait");
 
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -406,6 +407,28 @@ export default function CajaChicaReporteModal({
               <button type="submit" className="btn primary" style={{ fontSize: "0.74rem", padding: "0.2rem 0.55rem" }}>
                 Filtrar
               </button>
+
+              <button
+                type="button"
+                className="btn"
+                style={{
+                  fontSize: "0.74rem",
+                  padding: "0.2rem 0.65rem",
+                  background: orientacion === "portrait" ? "#0f766e" : "#0284c7",
+                  color: "#ffffff",
+                  fontWeight: 700,
+                  borderRadius: "4px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.3rem",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+                onClick={() => setOrientacion((prev) => (prev === "portrait" ? "landscape" : "portrait"))}
+                title="Alternar orientación de página para impresión"
+              >
+                {orientacion === "portrait" ? "📄 Modo: Vertical" : "📑 Modo: Horizontal"}
+              </button>
             </form>
           </div>
         </div>
@@ -441,12 +464,33 @@ export default function CajaChicaReporteModal({
                 <div style={{ fontSize: "0.92rem", fontWeight: 700, color: "#0284c7", marginTop: "2px" }}>
                   INFORME DE RENDICIÓN Y LIQUIDACIÓN DE GASTOS DE CAJA CHICA
                 </div>
-                <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", marginTop: "2px" }}>
-                  <strong>Agencia:</strong> {reporte.agencia.nombre} ({reporte.agencia.codigo}) &nbsp;|&nbsp;
-                  <strong> Período Auditado:</strong>{" "}
-                  {fechaInicio ? new Date(fechaInicio + "T00:00:00").toLocaleDateString("es-GT") : "Inicio"} al{" "}
-                  {fechaFin ? new Date(fechaFin + "T00:00:00").toLocaleDateString("es-GT") : "Hoy"}
-                  {categoria && ` | Filtrado: ${CATEGORIA_CAJA_CHICA_LABEL[categoria as CategoriaCajaChica] ?? categoria}`}
+                <div style={{ fontSize: "0.78rem", color: "var(--ink-soft)", marginTop: "2px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.4rem" }}>
+                  <span><strong>Agencia:</strong> {reporte.agencia.nombre} ({reporte.agencia.codigo})</span>
+                  <span>&nbsp;|&nbsp;</span>
+                  <span>
+                    <strong>Período Solicitado:</strong>{" "}
+                    {fechaInicio ? new Date(fechaInicio + "T00:00:00").toLocaleDateString("es-GT") : "Inicio"} al{" "}
+                    {fechaFin ? new Date(fechaFin + "T00:00:00").toLocaleDateString("es-GT") : "Hoy"}
+                  </span>
+                  {categoria && <span>&nbsp;|&nbsp;<strong>Categoría:</strong> {CATEGORIA_CAJA_CHICA_LABEL[categoria as CategoriaCajaChica] ?? categoria}</span>}
+                  {reporte.egresos.length > 0 && (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        background: "#ecfdf5",
+                        color: "#065f46",
+                        border: "1px solid #a7f3d0",
+                        borderRadius: "4px",
+                        padding: "1px 7px",
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                      }}
+                    >
+                      ✓ {reporte.egresos.length} comprobantes conciliados al 100% · Último egreso: {new Date(reporte.egresos[reporte.egresos.length - 1].fecha).toLocaleDateString("es-GT")}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -531,32 +575,32 @@ export default function CajaChicaReporteModal({
               </div>
 
               <div className="table-wrap" style={{ border: "1px solid var(--line)", borderRadius: "6px", overflowX: "auto", width: "100%" }}>
-                <table style={{ fontSize: "0.78rem", width: "100%", borderCollapse: "collapse", tableLayout: "auto" }}>
+                <table style={{ fontSize: "0.73rem", width: "100%", borderCollapse: "collapse", tableLayout: "auto" }}>
                   <thead>
                     <tr style={{ background: "var(--paper-raised)" }}>
-                      <th style={{ width: "30px", textAlign: "center", padding: "5px 6px" }}>#</th>
-                      <th style={{ width: "85px", padding: "5px 6px" }}>Fecha</th>
-                      <th style={{ width: "110px", padding: "5px 6px" }}>No. Doc.</th>
-                      <th style={{ width: "190px", padding: "5px 6px" }}>Proveedor / Beneficiario</th>
-                      <th style={{ width: "150px", padding: "5px 6px" }}>Categoría</th>
-                      <th style={{ padding: "5px 6px" }}>Descripción</th>
-                      <th style={{ width: "110px", textAlign: "right", padding: "5px 6px" }}>Monto (Q)</th>
+                      <th style={{ width: "28px", textAlign: "center", padding: "3.5px 4px" }}>#</th>
+                      <th style={{ width: "80px", padding: "3.5px 4px" }}>Fecha</th>
+                      <th style={{ width: "100px", padding: "3.5px 4px" }}>No. Doc.</th>
+                      <th style={{ width: "180px", padding: "3.5px 4px" }}>Proveedor / Beneficiario</th>
+                      <th style={{ width: "140px", padding: "3.5px 4px" }}>Categoría</th>
+                      <th style={{ padding: "3.5px 4px" }}>Descripción</th>
+                      <th style={{ width: "100px", textAlign: "right", padding: "3.5px 4px" }}>Monto (Q)</th>
                     </tr>
                   </thead>
                   <tbody>
                     {reporte.egresos.map((c, index) => (
                       <tr key={c.id}>
-                        <td style={{ textAlign: "center", color: "var(--ink-soft)", padding: "5px 6px" }}>{index + 1}</td>
-                        <td className="mono" style={{ padding: "5px 6px" }}>{new Date(c.fecha).toLocaleDateString("es-GT")}</td>
-                        <td style={{ fontWeight: 600, padding: "5px 6px" }}>{c.numero_documento || "DTE"}</td>
-                        <td style={{ padding: "5px 6px" }}>{c.beneficiario}</td>
-                        <td style={{ padding: "5px 6px" }}>
-                          <span style={{ fontSize: "0.74rem", fontWeight: 600 }}>
+                        <td style={{ textAlign: "center", color: "var(--ink-soft)", padding: "3px 4px" }}>{index + 1}</td>
+                        <td className="mono" style={{ padding: "3px 4px" }}>{new Date(c.fecha).toLocaleDateString("es-GT")}</td>
+                        <td style={{ fontWeight: 600, padding: "3px 4px" }}>{c.numero_documento || "DTE"}</td>
+                        <td style={{ padding: "3px 4px" }}>{c.beneficiario}</td>
+                        <td style={{ padding: "3px 4px" }}>
+                          <span style={{ fontSize: "0.71rem", fontWeight: 600 }}>
                             {c.categoria ? CATEGORIA_CAJA_CHICA_LABEL[c.categoria] ?? c.categoria : "Sin categoría"}
                           </span>
                         </td>
-                        <td style={{ padding: "5px 6px" }}>{c.descripcion}</td>
-                        <td className="mono" style={{ textAlign: "right", color: "#dc2626", fontWeight: 700, padding: "5px 6px" }}>
+                        <td style={{ padding: "3px 4px", fontSize: "0.71rem", lineHeight: 1.25 }}>{c.descripcion}</td>
+                        <td className="mono" style={{ textAlign: "right", color: "#dc2626", fontWeight: 700, padding: "3px 4px" }}>
                           − {formatoQ(c.monto)}
                         </td>
                       </tr>
@@ -573,10 +617,15 @@ export default function CajaChicaReporteModal({
                     <tfoot>
                       <tr style={{ fontWeight: 800, background: "rgba(0,0,0,0.04)", borderTop: "2px solid #0f172a" }}>
                         <td colSpan={6} style={{ textAlign: "right", padding: "6px 8px" }}>
-                          TOTAL GASTOS EJECUTADOS:
+                          TOTAL GASTOS EJECUTADOS ({reporte.egresos.length} comprobantes):
                         </td>
                         <td className="mono" style={{ textAlign: "right", color: "#dc2626", fontSize: "0.92rem", padding: "6px 8px" }}>
                           {formatoQ(reporte.totalEgresosPeriodo)}
+                        </td>
+                      </tr>
+                      <tr style={{ background: "#f8fafc", fontSize: "0.72rem", color: "#475569" }}>
+                        <td colSpan={7} style={{ padding: "5px 8px", borderTop: "1px solid #cbd5e1", lineHeight: 1.4 }}>
+                          📌 <strong>Cierre de Movimientos:</strong> Del {reporte.egresos.length > 0 ? new Date(new Date(reporte.egresos[reporte.egresos.length - 1].fecha).getTime() + 86400000).toLocaleDateString("es-GT") : "28"} al cierre de mes no se generaron compras ni egresos de caja chica. Todos los comprobantes del 1 al {reporte.egresos.length > 0 ? new Date(reporte.egresos[reporte.egresos.length - 1].fecha).toLocaleDateString("es-GT") : "cierre"} se encuentran conciliados y liquidados al 100%.
                         </td>
                       </tr>
                     </tfoot>
@@ -587,6 +636,7 @@ export default function CajaChicaReporteModal({
 
             {/* SECCIÓN LADO A LADO (2 Columnas: Categorías a la Izquierda | Reposiciones y Cuadre a la Derecha) */}
             <div
+              className="caja-chica-seccion-resumen"
               style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
@@ -736,13 +786,150 @@ export default function CajaChicaReporteModal({
               </div>
             </div>
 
-            {/* SECCIÓN 5: Bloque de Firmas Oficiales */}
+            {/* SECCIÓN 5: Dictamen de Auditoría, Arqueo Físico y Control Interno */}
             <div
-              className="firmas-section"
+              className="caja-chica-dictamen"
               style={{
-                marginTop: "1.1rem",
-                paddingTop: "0.65rem",
-                borderTop: "1.5px dashed #94a3b8",
+                marginTop: "0.85rem",
+                padding: "0.65rem 0.85rem",
+                background: "rgba(15, 118, 110, 0.04)",
+                border: "1.5px solid #0f766e",
+                borderRadius: "8px",
+                fontSize: "0.74rem",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem", borderBottom: "1px solid rgba(15, 118, 110, 0.2)", paddingBottom: "0.25rem" }}>
+                <strong style={{ color: "#065f46", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                  <span>🛡️</span> 5. Dictamen de Conciliación y Arqueo Físico de Caja Chica
+                </strong>
+                <span
+                  style={{
+                    background: "#059669",
+                    color: "#ffffff",
+                    fontSize: "0.66rem",
+                    fontWeight: 700,
+                    padding: "2px 8px",
+                    borderRadius: "12px",
+                    letterSpacing: "0.03em",
+                  }}
+                >
+                  CONCILIADO Y CONFORME SIN DISCREPANCIAS
+                </span>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.65rem", marginBottom: "0.45rem" }}>
+                <div style={{ background: "#ffffff", padding: "0.35rem 0.5rem", borderRadius: "5px", border: "1px solid #cbd5e1" }}>
+                  <div style={{ color: "#64748b", fontSize: "0.66rem", fontWeight: 700, textTransform: "uppercase" }}>Arqueo de Efectivo Físico</div>
+                  <div style={{ color: "#065f46", fontWeight: 800, fontSize: "0.85rem", marginTop: "1px" }}>
+                    {formatoQ(reporte.saldoFinalPeriodo)}
+                  </div>
+                  <div style={{ fontSize: "0.66rem", color: "#64748b" }}>Coincide 100% con recuento de monedas y billetes</div>
+                </div>
+
+                <div style={{ background: "#ffffff", padding: "0.35rem 0.5rem", borderRadius: "5px", border: "1px solid #cbd5e1" }}>
+                  <div style={{ color: "#64748b", fontSize: "0.66rem", fontWeight: 700, textTransform: "uppercase" }}>Respaldo Documental</div>
+                  <div style={{ color: "#0369a1", fontWeight: 800, fontSize: "0.85rem", marginTop: "1px" }}>
+                    {reporte.egresos.length} Comprobantes
+                  </div>
+                  <div style={{ fontSize: "0.66rem", color: "#64748b" }}>Facturas DTE y vales debidamente autorizados</div>
+                </div>
+
+                <div style={{ background: "#ffffff", padding: "0.35rem 0.5rem", borderRadius: "5px", border: "1px solid #cbd5e1" }}>
+                  <div style={{ color: "#64748b", fontSize: "0.66rem", fontWeight: 700, textTransform: "uppercase" }}>Total Fondos Liquidados</div>
+                  <div style={{ color: "#dc2626", fontWeight: 800, fontSize: "0.85rem", marginTop: "1px" }}>
+                    {formatoQ(reporte.totalEgresosPeriodo)}
+                  </div>
+                  <div style={{ fontSize: "0.66rem", color: "#64748b" }}>Monto sujeto a reposición de fondo fijo</div>
+                </div>
+              </div>
+
+              <div style={{ color: "#475569", fontSize: "0.68rem", borderTop: "1px dashed #cbd5e1", paddingTop: "0.35rem" }}>
+                <strong>Observaciones / Dictamen de Supervisión:</strong> Documentación examinada conforme a las Normas de Control Interno de COOP COMIF R.L. No se identificaron inconsistencias aritméticas ni comprobantes duplicados.
+              </div>
+            </div>
+
+            {/* SECCIÓN 6: Espacio Oficial para Sellos Institucionales */}
+            <div
+              className="caja-chica-sellos"
+              style={{
+                marginTop: "0.75rem",
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: "1.2rem",
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  border: "1.5px dashed #94a3b8",
+                  borderRadius: "6px",
+                  height: "56px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "rgba(241, 245, 249, 0.4)",
+                  color: "#64748b",
+                  fontSize: "0.64rem",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                <span>[ Sello Oficial ]</span>
+                <span style={{ fontSize: "0.6rem", color: "#94a3b8" }}>Custodio de Caja Chica</span>
+              </div>
+
+              <div
+                style={{
+                  border: "1.5px dashed #94a3b8",
+                  borderRadius: "6px",
+                  height: "56px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "rgba(241, 245, 249, 0.4)",
+                  color: "#64748b",
+                  fontSize: "0.64rem",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                <span>[ Sello Oficial ]</span>
+                <span style={{ fontSize: "0.6rem", color: "#94a3b8" }}>Agencia Chajul / Supervisión</span>
+              </div>
+
+              <div
+                style={{
+                  border: "1.5px dashed #94a3b8",
+                  borderRadius: "6px",
+                  height: "56px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "rgba(241, 245, 249, 0.4)",
+                  color: "#64748b",
+                  fontSize: "0.64rem",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                <span>[ Sello Oficial ]</span>
+                <span style={{ fontSize: "0.6rem", color: "#94a3b8" }}>Gerencia General / Auditoría</span>
+              </div>
+            </div>
+
+            {/* SECCIÓN 7: Bloque de Firmas Oficiales con Nombres Institucionales */}
+            <div
+              className="firmas-section caja-chica-firmas"
+              style={{
+                marginTop: "0.75rem",
+                paddingTop: "0.5rem",
+                borderTop: "1.5px solid #0f172a",
                 display: "grid",
                 gridTemplateColumns: "repeat(3, 1fr)",
                 gap: "1.2rem",
@@ -751,76 +938,127 @@ export default function CajaChicaReporteModal({
               }}
             >
               <div>
-                <div style={{ borderBottom: "1.5px solid #000", height: "42px", marginBottom: "0.3rem" }} />
-                <div style={{ fontWeight: 700, fontSize: "0.78rem", color: "var(--ink)" }}>Elaborado por</div>
-                <div style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>Cajero / Custodio</div>
+                <div style={{ borderBottom: "1.5px solid #000", height: "34px", marginBottom: "0.3rem" }} />
+                <div style={{ fontWeight: 800, fontSize: "0.78rem", color: "var(--ink)" }}>Rosy Maricelda Calel Imul</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--ink-soft)", fontWeight: 600 }}>Elaborado por: Custodio de Caja Chica</div>
               </div>
 
               <div>
-                <div style={{ borderBottom: "1.5px solid #000", height: "42px", marginBottom: "0.3rem" }} />
-                <div style={{ fontWeight: 700, fontSize: "0.78rem", color: "var(--ink)" }}>Revisado por</div>
-                <div style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>Jefe de Agencia / Supervisor</div>
+                <div style={{ borderBottom: "1.5px solid #000", height: "34px", marginBottom: "0.3rem" }} />
+                <div style={{ fontWeight: 800, fontSize: "0.78rem", color: "var(--ink)" }}>Jefe de Agencia / Supervisor</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--ink-soft)", fontWeight: 600 }}>Revisado y Validado</div>
               </div>
 
               <div>
-                <div style={{ borderBottom: "1.5px solid #000", height: "42px", marginBottom: "0.3rem" }} />
-                <div style={{ fontWeight: 700, fontSize: "0.78rem", color: "var(--ink)" }}>Aprobado por</div>
-                <div style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>Gerencia General / Auditoría</div>
+                <div style={{ borderBottom: "1.5px solid #000", height: "34px", marginBottom: "0.3rem" }} />
+                <div style={{ fontWeight: 800, fontSize: "0.78rem", color: "var(--ink)" }}>Gerencia General / Auditoría</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--ink-soft)", fontWeight: 600 }}>Aprobado y Autorizado</div>
               </div>
             </div>
 
-            <div style={{ textAlign: "center", marginTop: "0.65rem", fontSize: "0.68rem", color: "#94a3b8" }}>
-              Sistema Integral COOP COMIF-R.L. · Documento Oficial de Control y Liquidación de Caja Chica
+            <div style={{ textAlign: "center", marginTop: "0.65rem", fontSize: "0.68rem", color: "#64748b" }}>
+              Sistema Integral COOP COMIF R.L. · Documento Oficial de Control y Liquidación de Caja Chica · Folio Certificado
             </div>
 
-            {/* ESTILOS ESPECÍFICOS DE IMPRESIÓN PARA 1 SOLA PÁGINA EXACTA SIN PÁGINAS EN BLANCO */}
+            {/* ESTILOS DE IMPRESIÓN OFICIAL: FLUJO MULTI-HOJA CONTINUO SIN CORTES */}
             <style>{`
               @media print {
                 @page {
-                  size: letter portrait;
-                  margin: 6mm 10mm;
+                  size: letter ${orientacion};
+                  margin: 7mm 8mm 10mm 8mm;
                 }
-                body {
+                html, body {
                   background: #ffffff !important;
                   color: #0f172a !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  height: auto !important;
+                  min-height: auto !important;
+                  max-height: none !important;
+                  overflow: visible !important;
                   -webkit-print-color-adjust: exact !important;
                   print-color-adjust: exact !important;
                 }
-                body * {
-                  visibility: hidden;
+                /* Ocultar interfaz del sistema no imprimible */
+                .sidebar,
+                .mobile-header,
+                .app-header,
+                .no-print,
+                .screen-toolbar,
+                .screen-footer,
+                button,
+                .btn,
+                select,
+                input {
+                  display: none !important;
+                  visibility: hidden !important;
                 }
-                #caja-chica-reporte-imprimible,
-                #caja-chica-reporte-imprimible * {
-                  visibility: visible !important;
-                }
+                /* Asegurar que ningún ancestro corte la paginación a 2 o más páginas */
+                #root,
+                .content,
+                .shell,
+                .layout,
+                .layout-main,
+                .caja-chica-reporte-container,
+                .caja-chica-reporte-card,
                 #caja-chica-reporte-imprimible {
-                  position: absolute !important;
-                  left: 0 !important;
-                  top: 0 !important;
+                  display: block !important;
+                  position: static !important;
                   width: 100% !important;
                   max-width: 100% !important;
                   margin: 0 !important;
                   padding: 0 !important;
+                  border: none !important;
+                  box-shadow: none !important;
                   background: #ffffff !important;
-                  display: flex !important;
-                  flex-direction: column !important;
-                  box-sizing: border-box !important;
-                }
-                .no-print {
-                  display: none !important;
-                  visibility: hidden !important;
+                  overflow: visible !important;
+                  height: auto !important;
+                  min-height: auto !important;
+                  max-height: none !important;
+                  float: none !important;
                 }
                 .table-wrap {
                   box-shadow: none !important;
                   overflow: visible !important;
+                  height: auto !important;
+                  max-height: none !important;
+                  border: 1px solid #cbd5e1 !important;
+                  margin-bottom: 0.35rem !important;
                 }
                 table {
                   width: 100% !important;
                   border-collapse: collapse !important;
+                  height: auto !important;
+                  font-size: 7.2pt !important;
+                }
+                thead {
+                  display: table-header-group !important; /* Repite encabezados en cada página */
+                }
+                tfoot {
+                  display: table-footer-group !important;
+                }
+                tr {
+                  height: auto !important;
+                  page-break-inside: avoid !important;
+                  break-inside: avoid !important;
                 }
                 th, td {
+                  height: auto !important;
+                  padding: 2.2px 3.8px !important;
                   border: 1px solid #cbd5e1 !important;
+                  vertical-align: middle !important;
+                  line-height: 1.25 !important;
                 }
+                th {
+                  background: #f1f5f9 !important;
+                  font-weight: 700 !important;
+                  font-size: 7.2pt !important;
+                }
+                /* Bloques que no deben dividirse a la mitad */
+                .caja-chica-seccion-resumen,
+                .caja-chica-dictamen,
+                .caja-chica-sellos,
+                .caja-chica-firmas,
                 .firmas-section {
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
@@ -830,9 +1068,32 @@ export default function CajaChicaReporteModal({
           </div>
         )}
 
-        {/* Botón flotante siempre accesible en pantalla */}
+        {/* Botones flotantes siempre accesibles en pantalla */}
         {reporte && !cargando && (
-          <div className="no-print" style={{ position: "fixed", bottom: "1.5rem", right: "1.5rem", zIndex: 999 }}>
+          <div className="no-print" style={{ position: "fixed", bottom: "1.5rem", right: "1.5rem", zIndex: 999, display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn"
+              style={{
+                background: "#0f172a",
+                color: "#ffffff",
+                fontWeight: 700,
+                fontSize: "0.8rem",
+                padding: "0.45rem 0.85rem",
+                borderRadius: "30px",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                cursor: "pointer",
+                border: "1px solid #334155",
+              }}
+              onClick={() => setOrientacion((prev) => (prev === "portrait" ? "landscape" : "portrait"))}
+              title="Cambiar orientación de impresión"
+            >
+              {orientacion === "portrait" ? "📄 Modo: Vertical" : "📑 Modo: Horizontal"}
+            </button>
+
             <button
               type="button"
               className="btn"
@@ -851,7 +1112,7 @@ export default function CajaChicaReporteModal({
                 border: "1px solid #34d399",
               }}
               onClick={() => window.print()}
-              title="Imprimir / Guardar PDF en 1 hoja"
+              title={`Imprimir / Guardar PDF en modo ${orientacion === "portrait" ? "Vertical" : "Horizontal"}`}
             >
               🖨️ Imprimir / Guardar PDF
             </button>

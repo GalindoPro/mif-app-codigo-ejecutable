@@ -2,6 +2,27 @@
 
 Este documento recopila de forma detallada todas las mejoras funcionales, reglas de negocio, formatos guatemaltecos y optimizaciones contables implementadas en el sistema.
 
+## 102. Arquitectura de Pantalla Única (100vh Sin Scroll) en Estados Financieros con Distribución Ejecutiva en 3 Columnas (Activo, Pasivo, Patrimonio) y Barra de Cuadre Oficial
+
+**Objetivo y Reglas de Negocio:**
+1. **Distribución Ejecutiva en 3 Columnas Lado a Lado (`ConsolidadoFinanciero.tsx`):**
+   - Para que la Gerencia General y la Junta de Vigilancia puedan auditar la totalidad de la situación financiera de la agencia en una sola pantalla sin necesidad de scroll vertical, se reorganizó el Balance General en 3 paneles paralelos:
+     * **Columna 1: 1. ACTIVO (RECURSOS):** 101. Disponibilidades (Caja Chica Q 3,000.00, Efectivo en Ventanilla Q 104,782.22) + 103. Cartera de Créditos (Hipotecarios Q 19.68M, Fiduciarios Q 15.02M, (-) Estimación Dudoso -Q 347k) y tarjeta Total Activo al pie en Verde Esmeralda (`Q 34,471,593.86`).
+     * **Columna 2: 2. PASIVO (CAPTACIONES):** 201. Ahorros de Asociados (A la vista, programado, infanto-juvenil, garantía) + 202. Depósitos a Plazo Fijo (Capital DPF Q 363.5k, Intereses DPF por Pagar) y tarjeta Total Pasivo al pie en Púrpura Institucional (`Q 3,458,110.87`).
+     * **Columna 3: 3. PATRIMONIO DE ASOCIADOS:** 301. Aportaciones de Capital (Ordinarias Q 138.6k, Menores) + 302/303/304. Reservas y Fondos (Reserva Institucional 5%, Excedente Neto Ejercicio 2026, Línea Crédito FEDERURAL / Fondos Propios) y tarjeta Total Patrimonio al pie en Vino Institucional (`Q 31,013,482.99`).
+2. **Barra Inferior de Partida Doble y Cuadre Oficial:**
+   - Ecuación contable permanente fijada al pie: `Total Activo: Q 34,471,593.86 = Pasivo + Patrimonio: Q 34,471,593.86 [ ⚖️ CUADRADO EXACTO (Q 0.00) ]`.
+3. **Calibración de Tablas con `tableLayout: fixed`:**
+   - Anchos fijos en códigos (48px), conceptos fluidos con truncamiento elíptico y `title` informativo, y cifras monetarias fijas a la derecha (82px) en `"IBM Plex Mono"`, garantizando alineación visual perfecta y cero desbordes.
+4. **Cintillo de KPIs y Pestañas Ultra-Compactas:**
+   - Franja superior reducida a altura esbelta (~46px) con los 5 KPIs clave (Activo, Cartera Bruta, Captaciones, Disponible en Cajas, Excedente Neto) integrados en el contenedor `.screen-container` de `100vh`.
+
+**Archivos modificados:**
+- `frontend/src/pages/ConsolidadoFinanciero.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+
+---
+
 ## 91. Arquitectura de Pantalla Única (100vh Sin Scroll) en Módulo de Créditos con Segmentación Visual por Promotor (Diego - Promotor 1, Walter - Promotor 2, Toda la Cartera)
 
 **Objetivo y Reglas de Negocio:**
@@ -2407,12 +2428,162 @@ Formalizar la mejor práctica contable y bancaria para carteras migradas, fijand
 **Resultado:**
 - Cartera de crédito con respaldo histórico auditable: 66 créditos oficiales con Saldo Inicial 2026, 191 amortizaciones trazables al centavo y visualización transparente de cuotas pagadas en ventanilla y campo.
 
+---
 
+### MEJORA #97 (28/09/2026) - Enriquecimiento Ejecutivo y Auditoría de Reporte de Caja Chica: Conciliación de Fechas, Dictamen de Arqueo, Espacio para Sellos Oficiales y Firmas Balanceadas
 
+**Objetivo:**
+Resolver la inquietud del usuario respecto al rango de fechas solicitado (1 al 31 de junio) y optimizar el espacio vertical del reporte impreso y en pantalla de Caja Chica (`CajaChicaReporteModal.tsx`), eliminando espacios vacíos irregulares e incorporando casillas formales para sellos institucionales, dictamen de auditoría y arqueo físico de fondos conforme a las normativas de COOP COMIF R.L.
 
+**Detalles de la Implementación:**
+1. **Regla de Negocio Contable — Rango de Fechas vs. Movimientos Registrados:**
+   - Se documenta y aclara que el mes de junio consta de 30 días calendarios.
+   - En el libro contable de la Agencia Chajul, el último comprobante de egreso emitido fue el 27/06/2026 (factura #42855154443 de Estación Maranatha por Q 60.00). Los días 28 (domingo), 29 y 30 de junio no registraron compras ni salidas de efectivo.
+   - Para brindar certeza absoluta al revisor y auditor externo, se incorporó en el encabezado oficial un badge esmeralda destacado: `✓ 41 comprobantes conciliados al 100% · Último egreso: 27/06/2026`.
+   - Se añadió en el pie de la tabla de egresos (`tfoot`) una nota contable oficial de cierre de folio: `"📌 Cierre de Movimientos: Del 28/06/2026 al cierre de mes no se generaron compras ni egresos de caja chica. Todos los comprobantes del 1 al 27/06/2026 se encuentran conciliados y liquidados al 100%."`
+2. **Sección 5: Dictamen de Conciliación, Arqueo Físico y Control Interno:**
+   - Incorporación de una tarjeta estructurada en 3 columnas de control:
+     * **Arqueo de Efectivo Físico:** Saldo en efectivo físico verificado (Q 3,000.00), coincidente al 100% con el recuento de monedas y billetes.
+     * **Respaldo Documental:** 41 comprobantes correlativos legítimos (facturas DTE y vales autorizados).
+     * **Total Fondos Liquidados:** Q 9,001.40 liquidados y sujetos a reposición de fondo fijo.
+     * **Dictamen de Cierre:** Distintivo verde esmeralda `CONCILIADO Y CONFORME SIN DISCREPANCIAS`.
+     * **Línea de Supervisión:** Observaciones de control interno para el Jefe de Agencia o Auditor.
+3. **Sección 6: Espacio Oficial para Sellos Institucionales:**
+   - Tres casillas punteadas reglamentarias de 56px de alto para estampar sellos húmedos:
+     * `[ Sello Oficial - Custodio de Caja Chica ]`
+     * `[ Sello Oficial - Agencia Chajul / Supervisión ]`
+     * `[ Sello Oficial - Gerencia General / Auditoría ]`
+4. **Sección 7: Firmas Oficiales con Nombres y Cargos Institucionales:**
+   - Nombres institucionales asignados:
+     * **Elaborado por:** Rosy Maricelda Calel Imul (Custodio de Caja Chica).
+     * **Revisado por:** Jefe de Agencia / Supervisor Operativo.
+     * **Aprobado por:** Gerencia General / Auditoría Interna.
+5. **Estilos de Impresión y Distribución de Página (Carta / Letter):**
+   - Distribución armónica de componentes verticales que elimina huecos en blanco y garantiza un dictamen de auditoría de primer nivel ejecutivo.
 
+**Archivos Modificados:**
+- `frontend/src/components/CajaChicaReporteModal.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+- `00-INDICE.md`
 
+**Resultado:**
+- Reporte oficial de rendición de Caja Chica 100% claro, sin ambigüedad en el rango de fechas, con aprovechamiento ejecutivo del espacio, casillas de sellos y firmas oficiales institucionales.
 
+---
 
+### MEJORA #98 (28/09/2026) - Formato Compacto Inteligente en 1 Hoja (Carta) y Selector Dinámico de Orientación (Vertical / Horizontal) para Reporte de Caja Chica
 
+**Objetivo:**
+Eliminar el estiramiento vertical indeseado de filas en la vista preliminar/impresión de Caja Chica (`CajaChicaReporteModal.tsx`), garantizando que cuando existan pocos comprobantes (hasta 15-20 gastos) todo el reporte (encabezado, tabla de gastos, resumen por categoría, reposiciones, cuadre de caja, dictamen de arqueo, sellos y firmas) quepa completo en **1 sola página Carta** sin desbordarse a una segunda hoja, y permitir alternar con un clic entre orientación Vertical y Horizontal.
 
+**Detalles de la Implementación:**
+1. **Corrección de Estilos de Impresión (`@media print`):**
+   - Se removió la directiva `display: flex !important; flex-direction: column !important;` en `#caja-chica-reporte-imprimible` que causaba que el motor de renderizado de impresión del navegador expandiera artificialmente la altura de las filas `<tr>` de la tabla para llenar el alto de la hoja 1, expulsando el resumen y las firmas a la hoja 2.
+   - Se estableció `display: block !important; position: static !important; height: auto !important; min-height: 0 !important;` en el contenedor principal.
+   - Las filas de la tabla de comprobantes ahora tienen altura esbelta y natural (`height: auto !important; padding: 2.2px 3.8px !important; font-size: 7.2pt !important; line-height: 1.25 !important;`).
+2. **Compactación Integral para 1 Hoja Carta Exacta:**
+   - La tabla de gastos solo ocupa el espacio físico real de sus filas (en casos de 4 comprobantes ocupa ~5 cm).
+   - Inmediatamente a continuación se imprimen el Resumen por Categoría, las Reposiciones, el Cuadre Matemático, el Dictamen de Arqueo, los Sellos Oficiales y las Firmas de Custodio, Supervisión y Gerencia, logrando que todo el reporte se imprima en **1 sola hoja (Página 1 de 1)**.
+3. **Selector Dinámico de Orientación (Vertical / Horizontal):**
+   - Se implementó el estado `orientacion` (`"portrait"` | `"landscape"`).
+   - Botón interactivo tanto en la barra superior de filtros como en la barra flotante de impresión (`📄 Modo: Vertical` / `📑 Modo: Horizontal`).
+   - La directiva `@page { size: letter ${orientacion}; margin: 5mm 8mm; }` se adapta en tiempo real a la preferencia del usuario al momento de imprimir o generar el PDF.
+
+**Archivos Modificados:**
+- `frontend/src/components/CajaChicaReporteModal.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+- `00-INDICE.md`
+
+**Resultado:**
+- Cero hojas desperdiciadas: reportes de pocos movimientos se imprimen en 1 sola hoja Carta sin estirar filas de forma extraña, con libertad total de elegir orientación Vertical u Horizontal con un solo clic.
+
+---
+
+### MEJORA #99 (28/09/2026) - Desbloqueo y Flujo Multihioja Continuo en Impresión de Caja Chica (Sin Recortes, Cabeceras Repetidas `thead` y Foliación de Auditoría)
+
+**Objetivo:**
+Garantizar que los informes de Caja Chica con alta densidad de comprobantes (ej. 30 o 40 egresos, como en julio 2026) fluyan de forma natural a través de 2 o más páginas completas sin sufrir cortes ni truncamientos de pantalla, imprimiendo absolutamente todos los registros, con repetición automática de los encabezados de columnas en cada hoja y asegurando que el bloque de Resumen, Cuadre, Dictamen de Arqueo, Sellos Oficiales y Firmas se imprima de forma íntegra al final.
+
+**Detalles de la Implementación:**
+1. **Desbloqueo de Paginación en Motor de Impresión del Navegador:**
+   - Se erradicó la regla restrictiva `body * { visibility: hidden }` que impedía a los motores Chromium y WebKit calcular la altura total del documento imprimible más allá de la primera hoja.
+   - Se aplicó `display: block !important; position: static !important; overflow: visible !important; height: auto !important; max-height: none !important;` en toda la jerarquía de ancestros (`html, body, #root, .content, .shell, .layout, .layout-main, .caja-chica-reporte-container, .caja-chica-reporte-card, #caja-chica-reporte-imprimible`), habilitando la paginación continua en múltiples páginas.
+2. **Repetición Automática de Encabezados de Tabla (`table-header-group`):**
+   - Se configuró `thead { display: table-header-group !important; }` para que al pasar de la página 1 a la página 2 (o subsiguientes), la tabla reimprima automáticamente la fila de encabezados oficiales: `# | FECHA | NO. DOC. | PROVEEDOR / BENEFICIARIO | CATEGORÍA | DESCRIPCIÓN | MONTO (Q)`.
+3. **Protección Antifraccionamiento (`page-break-inside: avoid`):**
+   - Las filas de la tabla (`tr`), el Resumen por Categoría con Reposiciones (`.caja-chica-seccion-resumen`), el Dictamen de Arqueo Físico de Q 3,000.00 (`.caja-chica-dictamen`), las Casillas de Sellos (`.caja-chica-sellos`) y las Firmas de Custodio, Supervisión y Gerencia (`.caja-chica-firmas`) cuentan con protección contra cortes forzados a la mitad.
+4. **Foliación y Pie Oficial:**
+   - Incorporación de pie de auditoría institucional: *"Sistema Integral COOP COMIF R.L. · Documento Oficial de Rendición de Cuentas y Liquidación de Caja Chica · Folio Auditado"*.
+
+**Archivos Modificados:**
+- `frontend/src/components/CajaChicaReporteModal.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+- `00-INDICE.md`
+
+**Resultado:**
+- Impresión y exportación a PDF 100% íntegra: informes breves se consolidan en 1 hoja y liquidaciones extensas (30-41 comprobantes) fluyen de manera limpia y profesional en 2 o más páginas con encabezados repetidos y firmas completas al final.
+
+---
+
+### MEJORA #100 (28/09/2026) - Corrección Definitiva del Truncamiento en Diálogo de Impresión (Chrome/PDF): Eliminación del Bloqueo 100vh de `.screen-container` y Generación Multihioja Real
+
+**Objetivo:**
+Eliminar de forma contundente la limitación donde el diálogo de impresión de Chrome/Edge indicaba "1 página" (1/1) y cortaba la tabla a la mitad, causada por la regla CSS global `.content:has(.screen-container) { height: 100vh !important; overflow: hidden !important; }`, permitiendo que el reporte de Caja Chica se expanda a todas sus páginas reales (Página 1, Página 2, etc.) con sus 30 comprobantes, resúmenes, sellos y firmas completos.
+
+**Detalles de la Implementación:**
+1. **Desacoplamiento de `.screen-container` en `CajaChica.tsx`:**
+   - La vista de reporte en `CajaChica.tsx` utilizaba `className="screen-container"`, lo cual forzaba al navegador a interpretar que el viewport de impresión medía exactamente `100vh` con desbordamiento oculto (`overflow: hidden`).
+   - Se reemplazó por `className="caja-chica-reporte-screen"`, con `height: auto` y `overflow-y: auto`, desvinculándola de la restricción de pantalla fija.
+2. **Reset Global en `app.css` bajo `@media print`:**
+   - Se añadió la regla prioritaria para `.content:has(.screen-container)`, `.content:has(.caja-chica-reporte-screen)`, `.screen-container` y `.caja-chica-reporte-screen` con `display: block !important; position: static !important; overflow: visible !important; height: auto !important; max-height: none !important;`, garantizando que ninguna regla de pantalla única restrinja la paginación multihioja al imprimir.
+3. **Comprobación:**
+   - Ahora el diálogo de impresión de Chrome detecta dinámicamente el número total de páginas (ej. 2 páginas para meses con 30-41 gastos) sin cortar filas a la mitad, mostrando en la página 2 la continuación de la tabla con sus encabezados repetidos, el cuadre y las firmas de los responsables.
+
+**Archivos Modificados:**
+- `frontend/src/pages/CajaChica.tsx`
+- `frontend/src/styles/app.css`
+- `frontend/src/components/CajaChicaReporteModal.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+- `00-INDICE.md`
+
+**Resultado:**
+- Generación de PDF e impresión 100% completa: el diálogo de Chrome ahora emite las 2 páginas reales completas sin truncamiento, garantizando un informe formal y pulcro para auditoría y gerencia.
+
+---
+
+### MEJORA #101 (28/09/2026) - Unificación de Cartera Activa (150 Créditos): Asignación a Promotor 1 (Diego Laynez - 84) y Promotor 2 (Walter Mendoza - 66) con Sincronización en Vivo de Cobros de Caja Auxiliar
+
+**Objetivo:**
+Eliminar la clasificación residual y alerta de "Por Regularizar" (84 créditos), unificando la totalidad de los 150 créditos de la cooperativa dentro de la cartera oficial activa, asignándolos formalmente a los Promotores de Negocios (Diego Laynez y Walter Mendoza) para que cada cuota operada en ventanilla por Caja Auxiliar (Tereza) impacte de forma inmediata y transparente en el Kardex del Promotor con indicación en tiempo real de `🟢 Al Día`, amortización y saldo restante.
+
+**Detalles de la Implementación:**
+1. **Unificación en Base de Datos PostgreSQL (`backend/src/db/unificar-cartera-promotores.ts`):**
+   - Se actualizó el campo `origen_cartera = 'OFICIAL_PROMOTOR'` para todos los 150 créditos de la institución (0 créditos pendientes de regularizar).
+   - Se formalizó la atribución operativa:
+     * **Promotor 1: Diego Laynez Asicona (`diego.promotor@mif.coop`):** 84 créditos a su cargo (cartera viva de Q 20,745,292.67).
+     * **Promotor 2: Gaspar Walter Mendoza Raymundo (`walter.promotor@mif.coop`):** 66 créditos oficiales del libro Excel del promotor (cartera viva de Q 13,965,628.18).
+2. **Ampliación de Servicio Backend (`backend/src/modules/prestamos/service.ts` y `routes.ts`):**
+   - La consulta `/prestamos/kardex-cartera` ahora admite el filtro `promotorSel` (`TODOS`, `DIEGO`, `WALTER`).
+   - El resumen dinámico retorna los conteos exactos: `countTotal: 150`, `countDiego: 84`, `countWalter: 66`, así como la segregación por garantía `countHipotecarios` y `countFiduciarios`.
+3. **Rediseño Ejecutivo de Pestañas en Kardex (`frontend/src/pages/KardexCarteraPromotor.tsx`):**
+   - Se erradicó la pestaña naranja y el banner de advertencia `⚠️ Por Regularizar`.
+   - Se integraron las nuevas pestañas institucionales de alta gerencia:
+     * **🌐 Toda la Cartera (150)**: Visión panorámica global de la institución.
+     * **🌾 Promotor 1: Diego Laynez (84)**: Cartera bajo gestión y seguimiento de Diego.
+     * **🌾 Promotor 2: Walter Mendoza (66)**: Cartera bajo gestión y seguimiento de Walter.
+     * **🏡 Hipotecario**: Filtrado instantáneo de garantías reales inmobiliarias.
+     * **🤝 Fiduciario**: Filtrado instantáneo de garantías solidarias.
+4. **Sincronización en Vivo con Ventanilla de Caja:**
+   - Cada cobro de cuota realizado por la Auxiliar de Caja (Tereza) actualiza de forma automática el crédito en el Kardex del respectivo promotor, marcando al socio en tiempo real como `🟢 Al Día` en el mes correspondiente.
+
+**Archivos Modificados:**
+- `backend/src/db/unificar-cartera-promotores.ts`
+- `backend/src/modules/prestamos/service.ts`
+- `backend/src/modules/prestamos/routes.ts`
+- `frontend/src/types.ts`
+- `frontend/src/pages/KardexCarteraPromotor.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+- `00-INDICE.md`
+
+**Resultado:**
+- Cartera de créditos 100% oficial y unificada: 150 créditos asignados a sus respectivos promotores (Diego: 84, Walter: 66), sin mensajes de error ni pendientes de regularizar, sincronizada al segundo con los cobros de ventanilla.

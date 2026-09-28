@@ -333,7 +333,7 @@ export default function CajaChica() {
 
   if (mostrarReporte) {
     return (
-      <div className="screen-container" style={{ overflowY: "auto", overflowX: "hidden", height: "auto", maxHeight: "none", width: "100%" }}>
+      <div className="caja-chica-reporte-screen" style={{ width: "100%", height: "auto", minHeight: "100%", overflowY: "auto" }}>
         <CajaChicaReporteView
           agenciaId={agenciaId || agencias[0]?.id || ""}
           agencias={agencias}

