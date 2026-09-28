@@ -85,6 +85,8 @@ sistemaRouter.post(
     await reestructurarCartera();
     const { importarHistorialAbonosPromotor } = await import("../../db/importar-historial-abonos-promotor");
     await importarHistorialAbonosPromotor();
+    const { aplicarAtribucionOperativa } = await import("../../db/aplicar-atribucion-operativa");
+    await aplicarAtribucionOperativa();
 
     if (req.user) {
       await registrarAuditoria({

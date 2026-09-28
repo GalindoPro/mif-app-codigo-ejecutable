@@ -2,6 +2,45 @@
 
 Este documento recopila de forma detallada todas las mejoras funcionales, reglas de negocio, formatos guatemaltecos y optimizaciones contables implementadas en el sistema.
 
+## 91. Arquitectura de Pantalla Única (100vh Sin Scroll) en Módulo de Créditos con Segmentación Visual por Promotor (Diego - Promotor 1, Walter - Promotor 2, Toda la Cartera)
+
+**Objetivo y Reglas de Negocio:**
+1. **Pestañas de Supervisión Directa por Promotor (`CreditosList.tsx`):**
+   - Para que el Supervisor y la Gerencia no se confundan con el volumen de créditos y puedan auditar a cada colaborador en 1 solo clic, se incorporó la barra de segmentación con selector activo:
+     * **`🌐 Toda la Cartera (150)`:** Vista consolidada general por defecto (Q 34,710,920.85).
+     * **`🌾 Diego - Promotor 1 (84)`:** Filtra exclusivamente los 84 créditos asignados a Diego con sus métricas dinámicas de saldo y cartera activa.
+     * **`🌾 Walter - Promotor 2 (66)`:** Filtra los 66 créditos oficiales auditados del Promotor 2 (Kardex).
+2. **Arquitectura de Pantalla Única 100vh (Cero Scroll de Ventana):**
+   - **Compactación de Franja KPI:** Se redujeron las 5 tarjetas superiores a una cuadrícula horizontal delgada (~36px de alto), recalculando automáticamente cartera activa, cuotas y saldos vivos según el promotor seleccionado.
+   - **Barra de Búsqueda y Estados en 1 Sola Línea:** Unificación del input de búsqueda con los filtros rápidos (`Estado: Todos`, `⚡ Desembolso`, `Cobro`, `Pagados` y `📊 Excel`) eliminando saltos de línea molestos.
+   - **Scroll Interno Exclusivo de Tabla:** Contenedor `.table-scroll-container` con `flex: 1` y cabecera fija (`sticky`), permitiendo revisar las filas con máxima fluidez mientras el encabezado y la paginación permanecen inmóviles.
+   - **Regla CSS `.content:has(.screen-container)`:** Cero desborde en el contenedor global con márgenes calibrados a la altura exacta del monitor del supervisor.
+
+**Archivos modificados:**
+- `frontend/src/pages/CreditosList.tsx`
+- `frontend/src/styles/app.css`
+
+---
+
+## 90. Atribución Operativa Fiel al 100% de Transacciones por Puesto y Excel de Origen (Walter - Promotor 2, Diego - Promotor 1, Tereza - Auxiliar de Caja, Rosy - Caja Chica y Gerencia)
+
+**Objetivo y Reglas de Negocio:**
+1. **Segregación y Atribución Fiel de Operaciones Contables en Base de Datos:**
+   - Para que la pantalla de Gerencia General y los reportes de fiscalización proyecten la trazabilidad operativa real de la cooperativa en lugar de un administrador genérico, se implementó el algoritmo de atribución integral ([aplicar-atribucion-operativa.ts](file:///Users/galindo/Documents/proyects/carpet/mif-app-codigo-ejecutable/backend/src/db/aplicar-atribucion-operativa.ts)):
+     * **Promotor 2 (Walter):** Asignación de los 66 créditos oficiales auditados del archivo `promotor 2` con sus 191 amortizaciones y expediente de garantías.
+     * **Promotor 1 (Diego):** Asignación de los 84 créditos de cartera cobrados en ventanilla de caja para control de cobro y auditoría directa.
+     * **Caja Auxiliar (Tereza):** Atribución de 326 cobros de cartera en ventanilla, 8 jornadas de apertura/cierre de caja diaria, 2,630 movimientos de caja auxiliar, 10 arqueos físicos de billetes y monedas, 5,469 transacciones de libretas de ahorro y aportaciones, y 516 partidas del libro de ingresos.
+     * **Caja Chica (Rosy):** Atribución de 230 comprobantes de compras y gastos operativos menores de la agencia.
+     * **Gerencia General (Administrador MIF):** Atribución y custodia de las 27 reposiciones de fondo fijo mediante cheques institucionales.
+     * **Bitácora de Auditoría:** Alineación de los registros históricos con el ID de cada operador correspondiente.
+2. **Inclusión Permanente en la Cadena de Datos:** Se integró en `/recargar-datos` de `sistema/routes.ts` para que cualquier recarga o sincronización conserve intacta la autoría operativa.
+
+**Archivos modificados:**
+- `backend/src/db/aplicar-atribucion-operativa.ts`
+- `backend/src/modules/sistema/routes.ts`
+
+---
+
 ## 89. Gestión y Actualización Oficial de Personal de COOP COMIF R.L. (Diego, Walter, Tereza, Rosy), Modales de Edición y Restablecimiento Seguro de Contraseñas
 
 **Objetivo y Reglas de Negocio:**

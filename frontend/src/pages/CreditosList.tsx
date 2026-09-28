@@ -34,7 +34,7 @@ export default function CreditosList() {
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<string>("");
-  const [origenCartera, setOrigenCartera] = useState<"OFICIAL_PROMOTOR" | "POR_REGULARIZAR" | "TODOS">("OFICIAL_PROMOTOR");
+  const [filtroPromotor, setFiltroPromotor] = useState<"TODOS" | "DIEGO" | "WALTER">("TODOS");
   const [filtroTipoFiador, setFiltroTipoFiador] = useState<"TODOS" | "EXTERNOS" | "SOCIOS">("TODOS");
   const [page, setPage] = useState(1);
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
@@ -111,15 +111,38 @@ export default function CreditosList() {
     }
   }
 
-  const oficialesCount =
-    prestamos?.filter((p) => p.origen_cartera === "OFICIAL_PROMOTOR" || !p.origen_cartera).length ?? 0;
-  const porRegularizarCount =
-    prestamos?.filter((p) => p.origen_cartera === "POR_REGULARIZAR").length ?? 0;
+  const diegoCount =
+    prestamos?.filter(
+      (p) =>
+        (p.promotor_nombre && p.promotor_nombre.toUpperCase().includes("DIEGO")) ||
+        p.origen_cartera === "POR_REGULARIZAR",
+    ).length ?? 0;
+
+  const walterCount =
+    prestamos?.filter(
+      (p) =>
+        (p.promotor_nombre && p.promotor_nombre.toUpperCase().includes("WALTER")) ||
+        p.origen_cartera === "OFICIAL_PROMOTOR" ||
+        (!p.origen_cartera && (!p.promotor_nombre || !p.promotor_nombre.toUpperCase().includes("DIEGO"))),
+    ).length ?? 0;
+
+  const totalCount = prestamos?.length ?? 0;
 
   const prestamosFiltrados = (prestamos || []).filter((p) => {
-    if (origenCartera === "TODOS") return true;
-    if (origenCartera === "POR_REGULARIZAR") return p.origen_cartera === "POR_REGULARIZAR";
-    return p.origen_cartera === "OFICIAL_PROMOTOR" || !p.origen_cartera;
+    if (filtroPromotor === "DIEGO") {
+      return (
+        (p.promotor_nombre && p.promotor_nombre.toUpperCase().includes("DIEGO")) ||
+        p.origen_cartera === "POR_REGULARIZAR"
+      );
+    }
+    if (filtroPromotor === "WALTER") {
+      return (
+        (p.promotor_nombre && p.promotor_nombre.toUpperCase().includes("WALTER")) ||
+        (p.origen_cartera === "OFICIAL_PROMOTOR" &&
+          (!p.promotor_nombre || !p.promotor_nombre.toUpperCase().includes("DIEGO")))
+      );
+    }
+    return true;
   });
 
   const totalDesembolsado =
@@ -195,133 +218,185 @@ export default function CreditosList() {
   const prestamosPaginados = prestamosFiltrados?.slice((page - 1) * pageSize, page * pageSize) ?? [];
 
   return (
-    <div className="screen-container">
+    <div
+      className="screen-container"
+      style={{
+        height: "calc(100vh - 1.8rem)",
+        maxHeight: "calc(100vh - 1.8rem)",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.28rem",
+      }}
+    >
       {/* CABECERA COMPACTA DE 1 LÍNEA CON TABS INTEGRADAS */}
-      <div className="screen-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-          <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.2rem" }}>
+      <div className="screen-header" style={{ paddingBottom: "0.25rem", borderBottom: "1px solid var(--line)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "0.35rem", margin: 0, fontSize: "1.15rem" }}>
             <span>📑</span> Créditos
           </h1>
-          <div style={{ display: "flex", gap: "0.25rem", background: "var(--paper-raised)", padding: "0.18rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+          <div style={{ display: "flex", gap: "0.2rem", background: "var(--paper-raised)", padding: "0.15rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
             <button
               type="button"
               onClick={() => setPestanaActiva("CREDITOS")}
               style={{
-                padding: "0.22rem 0.65rem",
+                padding: "0.18rem 0.55rem",
                 borderRadius: "6px",
                 border: "none",
-                fontSize: "0.8rem",
+                fontSize: "0.78rem",
                 fontWeight: 700,
                 cursor: "pointer",
                 background: pestanaActiva === "CREDITOS" ? "var(--primary, #0284c7)" : "transparent",
                 color: pestanaActiva === "CREDITOS" ? "#fff" : "var(--ink-soft)",
                 display: "flex",
                 alignItems: "center",
-                gap: "0.35rem",
+                gap: "0.3rem",
               }}
             >
               <span>Cartera</span>
-              <span style={{ fontSize: "0.72rem", opacity: 0.9 }}>({totalCreditos})</span>
+              <span style={{ fontSize: "0.7rem", opacity: 0.9 }}>({totalCreditos})</span>
             </button>
             <button
               type="button"
               onClick={() => setPestanaActiva("FIADORES")}
               style={{
-                padding: "0.22rem 0.65rem",
+                padding: "0.18rem 0.55rem",
                 borderRadius: "6px",
                 border: "none",
-                fontSize: "0.8rem",
+                fontSize: "0.78rem",
                 fontWeight: 700,
                 cursor: "pointer",
                 background: pestanaActiva === "FIADORES" ? "var(--accent, #0ea5e9)" : "transparent",
                 color: pestanaActiva === "FIADORES" ? "#fff" : "var(--ink-soft)",
                 display: "flex",
                 alignItems: "center",
-                gap: "0.35rem",
+                gap: "0.3rem",
               }}
             >
               <span>👥 Fiadores</span>
-              {fiadores && <span style={{ fontSize: "0.72rem", opacity: 0.9 }}>({fiadores.length})</span>}
+              {fiadores && <span style={{ fontSize: "0.7rem", opacity: 0.9 }}>({fiadores.length})</span>}
             </button>
           </div>
+
+          {/* TABS DE PROMOTORES: DIEGO (84), WALTER (66), TODA LA CARTERA (150) */}
+          {pestanaActiva === "CREDITOS" && (
+            <div style={{ display: "flex", gap: "0.2rem", background: "var(--paper-raised)", padding: "0.15rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+              <button
+                type="button"
+                className={`btn ${filtroPromotor === "TODOS" ? "primary" : "secondary"}`}
+                style={{ fontSize: "0.72rem", padding: "0.18rem 0.5rem" }}
+                onClick={() => { setFiltroPromotor("TODOS"); setPage(1); }}
+                title="Ver cartera global consolidada"
+              >
+                🌐 Toda la Cartera ({totalCount})
+              </button>
+              <button
+                type="button"
+                className={`btn ${filtroPromotor === "DIEGO" ? "primary" : "secondary"}`}
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "0.18rem 0.5rem",
+                  background: filtroPromotor === "DIEGO" ? "#059669" : "transparent",
+                  borderColor: filtroPromotor === "DIEGO" ? "#059669" : "var(--line)",
+                  color: filtroPromotor === "DIEGO" ? "#fff" : "#10b981",
+                  fontWeight: 700,
+                }}
+                onClick={() => { setFiltroPromotor("DIEGO"); setPage(1); }}
+                title="Filtrar créditos asignados a Diego (Promotor 1)"
+              >
+                🌾 Diego - Promotor 1 ({diegoCount})
+              </button>
+              <button
+                type="button"
+                className={`btn ${filtroPromotor === "WALTER" ? "primary" : "secondary"}`}
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "0.18rem 0.5rem",
+                  background: filtroPromotor === "WALTER" ? "#BF9903" : "transparent",
+                  borderColor: filtroPromotor === "WALTER" ? "#BF9903" : "var(--line)",
+                  color: filtroPromotor === "WALTER" ? "#fff" : "#BF9903",
+                  fontWeight: 700,
+                }}
+                onClick={() => { setFiltroPromotor("WALTER"); setPage(1); }}
+                title="Filtrar créditos asignados a Walter (Promotor 2)"
+              >
+                🌾 Walter - Promotor 2 ({walterCount})
+              </button>
+            </div>
+          )}
         </div>
 
-        <div style={{ display: "flex", gap: "0.45rem", alignItems: "center" }}>
-          <Link to="/creditos/simulador" className="btn secondary" style={{ fontSize: "0.78rem", padding: "0.3rem 0.65rem" }}>
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+          <Link to="/creditos/simulador" className="btn secondary" style={{ fontSize: "0.75rem", padding: "0.22rem 0.55rem" }}>
             📊 Simulador
           </Link>
-          <Link to="/creditos/nuevo" className="btn" style={{ fontSize: "0.78rem", padding: "0.3rem 0.75rem", fontWeight: 700 }}>
+          <Link to="/creditos/nuevo" className="btn" style={{ fontSize: "0.75rem", padding: "0.22rem 0.65rem", fontWeight: 700 }}>
             + Nueva solicitud
           </Link>
         </div>
       </div>
 
-      {mensajeExito && <div className="alert success" style={{ padding: "0.4rem 0.75rem", fontSize: "0.82rem", margin: 0 }}>{mensajeExito}</div>}
-      {error && <div className="alert error" style={{ padding: "0.4rem 0.75rem", fontSize: "0.82rem", margin: 0 }}>{error}</div>}
+      {mensajeExito && <div className="alert success" style={{ padding: "0.3rem 0.65rem", fontSize: "0.8rem", margin: 0 }}>{mensajeExito}</div>}
+      {error && <div className="alert error" style={{ padding: "0.3rem 0.65rem", fontSize: "0.8rem", margin: 0 }}>{error}</div>}
 
       {pestanaActiva === "CREDITOS" ? (
         <>
-          {/* FRANJA HORIZONTAL DE KPIS COMPACTA (TARJETAS FINTECH CON BORDE DE COLOR) */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
+          {/* KPI CARDS EN 1 SOLA FILA COMPACTA */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.35rem", marginBottom: "0.15rem" }}>
             {/* CARTERA ACTIVA */}
             <div
               style={{
                 background: "var(--paper)",
                 border: "1px solid var(--line)",
                 borderLeft: "4px solid #059669",
-                borderRadius: "8px",
-                padding: "0.45rem 0.65rem",
+                borderRadius: "6px",
+                padding: "0.25rem 0.5rem",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
                 cursor: "pointer",
-                boxShadow: estadoFiltro === "DESEMBOLSADO" ? "0 0 0 2px #059669" : "0 1px 3px rgba(0,0,0,0.04)",
+                boxShadow: estadoFiltro === "DESEMBOLSADO" ? "0 0 0 2px #059669" : "none",
               }}
               onClick={() => setEstadoFiltro(estadoFiltro === "DESEMBOLSADO" ? "" : "DESEMBOLSADO")}
               title="Filtrar por préstamos en cobro activo"
             >
-              <div>
-                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#059669", display: "block", letterSpacing: "0.02em" }}>
+              <div style={{ minWidth: 0, overflow: "hidden" }}>
+                <span style={{ fontSize: "0.58rem", fontWeight: 700, color: "#059669", display: "block", whiteSpace: "nowrap" }}>
                   CARTERA ACTIVA ({desembolsados})
                 </span>
-                <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
+                <span style={{ fontSize: "0.92rem", fontWeight: 800, color: "var(--ink)", fontFamily: "monospace", display: "block", whiteSpace: "nowrap" }}>
                   {formatoQ(totalSaldoVivo)}
                 </span>
-                {totalDesembolsado > totalSaldoVivo && (
-                  <span style={{ fontSize: "0.62rem", color: "var(--ink-soft)", display: "block" }}>
-                    Desembolsado: {formatoQ(totalDesembolsado)}
-                  </span>
-                )}
               </div>
-              <span style={{ fontSize: "1.2rem" }}>💼</span>
+              <span style={{ fontSize: "1rem", opacity: 0.85, marginLeft: "0.25rem" }}>💼</span>
             </div>
 
             {/* POR DESEMBOLSAR */}
             <div
               style={{
-                background: aprobados > 0 ? "rgba(2, 132, 199, 0.06)" : "var(--paper)",
+                background: aprobados > 0 ? "rgba(2, 132, 199, 0.08)" : "var(--paper)",
                 border: "1px solid var(--line)",
                 borderLeft: "4px solid #0284c7",
-                borderRadius: "8px",
-                padding: "0.45rem 0.65rem",
+                borderRadius: "6px",
+                padding: "0.25rem 0.5rem",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
                 cursor: "pointer",
-                boxShadow: estadoFiltro === "APROBADO" ? "0 0 0 2px #0284c7" : "0 1px 3px rgba(0,0,0,0.04)",
+                boxShadow: estadoFiltro === "APROBADO" ? "0 0 0 2px #0284c7" : "none",
               }}
               onClick={() => setEstadoFiltro(estadoFiltro === "APROBADO" ? "" : "APROBADO")}
-              title="Filtrar créditos aprobados listos para desembolso"
+              title="Filtrar créditos aprobados"
             >
               <div>
-                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", display: "block", letterSpacing: "0.02em" }}>
+                <span style={{ fontSize: "0.58rem", fontWeight: 700, color: "#0284c7", display: "block" }}>
                   POR DESEMBOLSAR
                 </span>
-                <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#0284c7", fontFamily: "monospace" }}>
+                <span style={{ fontSize: "0.92rem", fontWeight: 800, color: "#0284c7", fontFamily: "monospace" }}>
                   {aprobados}
                 </span>
               </div>
-              <span style={{ fontSize: "1.2rem" }}>⚡</span>
+              <span style={{ fontSize: "1rem", opacity: 0.85 }}>⚡</span>
             </div>
 
             {/* EN SOLICITUD */}
@@ -330,148 +405,111 @@ export default function CreditosList() {
                 background: "var(--paper)",
                 border: "1px solid var(--line)",
                 borderLeft: "4px solid #f59e0b",
-                borderRadius: "8px",
-                padding: "0.45rem 0.65rem",
+                borderRadius: "6px",
+                padding: "0.25rem 0.5rem",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
                 cursor: "pointer",
-                boxShadow: estadoFiltro === "SOLICITUD" ? "0 0 0 2px #f59e0b" : "0 1px 3px rgba(0,0,0,0.04)",
+                boxShadow: estadoFiltro === "SOLICITUD" ? "0 0 0 2px #f59e0b" : "none",
               }}
               onClick={() => setEstadoFiltro(estadoFiltro === "SOLICITUD" ? "" : "SOLICITUD")}
               title="Filtrar solicitudes en evaluación"
             >
               <div>
-                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#d97706", display: "block", letterSpacing: "0.02em" }}>
+                <span style={{ fontSize: "0.58rem", fontWeight: 700, color: "#d97706", display: "block" }}>
                   EN SOLICITUD
                 </span>
-                <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#d97706", fontFamily: "monospace" }}>
+                <span style={{ fontSize: "0.92rem", fontWeight: 800, color: "#d97706", fontFamily: "monospace" }}>
                   {pendientes}
                 </span>
               </div>
-              <span style={{ fontSize: "1.2rem" }}>⏳</span>
+              <span style={{ fontSize: "1rem", opacity: 0.85 }}>⏳</span>
             </div>
 
-            {/* CANCELADOS / PAGADOS */}
+            {/* SOLVENTES / PAGADOS */}
             <div
               style={{
                 background: "var(--paper)",
                 border: "1px solid var(--line)",
-                borderLeft: "4px solid #64748b",
-                borderRadius: "8px",
-                padding: "0.45rem 0.65rem",
+                borderLeft: "4px solid #10b981",
+                borderRadius: "6px",
+                padding: "0.25rem 0.5rem",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
                 cursor: "pointer",
-                boxShadow: estadoFiltro === "CANCELADO" ? "0 0 0 2px #64748b" : "0 1px 3px rgba(0,0,0,0.04)",
+                boxShadow: estadoFiltro === "CANCELADO" ? "0 0 0 2px #10b981" : "none",
               }}
               onClick={() => setEstadoFiltro(estadoFiltro === "CANCELADO" ? "" : "CANCELADO")}
               title="Filtrar créditos pagados o solventes"
             >
               <div>
-                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--ink-soft)", display: "block", letterSpacing: "0.02em" }}>
+                <span style={{ fontSize: "0.58rem", fontWeight: 700, color: "#10b981", display: "block" }}>
                   SOLVENTES / PAGADOS
                 </span>
-                <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "var(--ink)", fontFamily: "monospace" }}>
+                <span style={{ fontSize: "0.92rem", fontWeight: 800, color: "#10b981", fontFamily: "monospace" }}>
                   {cancelados}
                 </span>
               </div>
-              <span style={{ fontSize: "1.2rem" }}>✅</span>
+              <span style={{ fontSize: "1rem", opacity: 0.85 }}>✅</span>
             </div>
 
-            {/* TOTAL CRÉDITOS */}
+            {/* TOTAL CARTERA SELECCIONADA */}
             <div
               style={{
                 background: "var(--paper)",
                 border: "1px solid var(--line)",
                 borderLeft: "4px solid #6366f1",
-                borderRadius: "8px",
-                padding: "0.45rem 0.65rem",
+                borderRadius: "6px",
+                padding: "0.25rem 0.5rem",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
                 cursor: "pointer",
-                boxShadow: estadoFiltro === "" ? "0 0 0 2px #6366f1" : "0 1px 3px rgba(0,0,0,0.04)",
+                boxShadow: estadoFiltro === "" ? "0 0 0 2px #6366f1" : "none",
               }}
               onClick={() => setEstadoFiltro("")}
-              title="Ver todos los créditos"
+              title="Ver todos los créditos del filtro actual"
             >
               <div>
-                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", display: "block", letterSpacing: "0.02em" }}>
-                  TOTAL CRÉDITOS
+                <span style={{ fontSize: "0.58rem", fontWeight: 700, color: "#6366f1", display: "block" }}>
+                  TOTAL MOSTRADOS
                 </span>
-                <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#6366f1", fontFamily: "monospace" }}>
-                  {prestamos?.length ?? 0}
+                <span style={{ fontSize: "0.92rem", fontWeight: 800, color: "#6366f1", fontFamily: "monospace" }}>
+                  {totalCreditos}
                 </span>
               </div>
-              <span style={{ fontSize: "1.2rem" }}>📊</span>
+              <span style={{ fontSize: "1rem", opacity: 0.85 }}>📊</span>
             </div>
           </div>
 
-          {/* FILTROS Y CHIPS RÁPIDOS EN 1 SOLA LÍNEA COMPACTA */}
-          <div className="screen-toolbar">
-            <div className="searchbar" style={{ flex: 1, minWidth: 240, marginBottom: 0 }}>
+          {/* BARRA DE HERRAMIENTAS ULTRA-COMPACTA EN 1 LÍNEA */}
+          <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", marginBottom: "0.2rem" }}>
+            <div className="searchbar" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
               <input
                 placeholder="🔍 Buscar por socio, código de crédito o DPI…"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                style={{ padding: "0.35rem 0.65rem", fontSize: "0.82rem" }}
+                style={{ padding: "0.24rem 0.55rem", fontSize: "0.8rem", width: "100%", borderRadius: "6px" }}
               />
             </div>
 
-            <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", alignItems: "center" }}>
-              {/* Segmentación Cartera Oficial vs Por Regularizar */}
-              <div style={{ display: "flex", gap: "0.2rem", background: "var(--paper-raised)", padding: "0.15rem", borderRadius: "6px", border: "1px solid var(--line)", marginRight: "0.35rem" }}>
-                <button
-                  type="button"
-                  className={`btn ${origenCartera === "OFICIAL_PROMOTOR" ? "primary" : "secondary"}`}
-                  style={{ fontSize: "0.72rem", padding: "0.2rem 0.5rem" }}
-                  onClick={() => { setOrigenCartera("OFICIAL_PROMOTOR"); setPage(1); }}
-                  title="Cartera oficial y auditada del promotor"
-                >
-                  📋 Oficial ({oficialesCount})
-                </button>
-                <button
-                  type="button"
-                  className={`btn ${origenCartera === "POR_REGULARIZAR" ? "primary" : "secondary"}`}
-                  style={{
-                    fontSize: "0.72rem",
-                    padding: "0.2rem 0.5rem",
-                    color: origenCartera === "POR_REGULARIZAR" ? "#fff" : "#f59e0b",
-                    background: origenCartera === "POR_REGULARIZAR" ? "#d97706" : "transparent",
-                    borderColor: origenCartera === "POR_REGULARIZAR" ? "#d97706" : "var(--line)",
-                  }}
-                  onClick={() => { setOrigenCartera("POR_REGULARIZAR"); setPage(1); }}
-                  title="Créditos creados desde caja auxiliar pendientes de regularización"
-                >
-                  ⚠️ Por Regularizar ({porRegularizarCount})
-                </button>
-                <button
-                  type="button"
-                  className={`btn ${origenCartera === "TODOS" ? "primary" : "secondary"}`}
-                  style={{ fontSize: "0.72rem", padding: "0.2rem 0.5rem" }}
-                  onClick={() => { setOrigenCartera("TODOS"); setPage(1); }}
-                  title="Ver todos los registros consolidados"
-                >
-                  🌐 Todo ({prestamos?.length ?? 0})
-                </button>
-              </div>
-
+            <div style={{ display: "flex", gap: "0.25rem", alignItems: "center", flexShrink: 0 }}>
               <button
                 type="button"
                 className={`btn ${estadoFiltro === "" ? "primary" : "secondary"}`}
-                style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
+                style={{ fontSize: "0.72rem", padding: "0.18rem 0.45rem" }}
                 onClick={() => setEstadoFiltro("")}
               >
-                Estado: Todos ({totalCreditos})
+                Todos ({totalCreditos})
               </button>
               <button
                 type="button"
                 className={`btn ${estadoFiltro === "APROBADO" ? "primary" : "secondary"}`}
                 style={{
-                  fontSize: "0.75rem",
-                  padding: "0.25rem 0.55rem",
+                  fontSize: "0.72rem",
+                  padding: "0.18rem 0.45rem",
                   borderColor: "#3b82f6",
                   color: estadoFiltro === "APROBADO" ? "#fff" : "#3b82f6",
                   fontWeight: aprobados > 0 ? 700 : 400,
@@ -483,7 +521,7 @@ export default function CreditosList() {
               <button
                 type="button"
                 className={`btn ${estadoFiltro === "DESEMBOLSADO" ? "primary" : "secondary"}`}
-                style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
+                style={{ fontSize: "0.72rem", padding: "0.18rem 0.45rem" }}
                 onClick={() => setEstadoFiltro(estadoFiltro === "DESEMBOLSADO" ? "" : "DESEMBOLSADO")}
               >
                 Cobro ({desembolsados})
@@ -491,27 +529,19 @@ export default function CreditosList() {
               <button
                 type="button"
                 className={`btn ${estadoFiltro === "CANCELADO" ? "primary" : "secondary"}`}
-                style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
+                style={{ fontSize: "0.72rem", padding: "0.18rem 0.45rem" }}
                 onClick={() => setEstadoFiltro(estadoFiltro === "CANCELADO" ? "" : "CANCELADO")}
               >
                 Pagados ({cancelados})
               </button>
-
-              {/* BOTÓN EXPORTAR EXCEL */}
               <button
                 type="button"
-                onClick={exportarExcel}
                 className="btn secondary"
-                title="Descargar listado de créditos filtrados en formato CSV/Excel"
-                style={{
-                  fontSize: "0.75rem",
-                  padding: "0.25rem 0.6rem",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.25rem",
-                }}
+                style={{ fontSize: "0.72rem", padding: "0.18rem 0.5rem" }}
+                onClick={exportarExcel}
+                title="Descargar Cartera en Excel"
               >
-                📥 Excel
+                📊 Excel
               </button>
             </div>
           </div>
