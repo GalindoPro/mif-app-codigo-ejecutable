@@ -241,9 +241,9 @@ export default function KardexCarteraPromotor() {
   }
 
   return (
-    <div>
+    <div className="screen-container" style={{ width: "100%", maxWidth: "100%" }}>
       {/* Encabezado Compacto */}
-      <div className="page-head" style={{ marginBottom: "0.5rem", paddingBottom: "0.35rem" }}>
+      <div className="page-head" style={{ marginBottom: "0.25rem", paddingBottom: "0.2rem", flexShrink: 0 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <span style={{ fontSize: "1.3rem" }}>📂</span>
@@ -504,7 +504,8 @@ export default function KardexCarteraPromotor() {
           className="card no-print"
           style={{
             padding: 0,
-            maxHeight: "calc(100vh - 275px)",
+            flex: 1,
+            minHeight: 0,
             overflowY: "auto",
             border: "1px solid var(--line)",
             borderRadius: "8px",

@@ -188,28 +188,28 @@ export default function LibroArqueoMensual() {
   }
 
   return (
-    <div>
+    <div className="screen-container" style={{ width: "100%", maxWidth: "100%" }}>
       {/* ========================================================================= */}
       {/* PANEL DE CONFIGURACIÓN Y CONTROLES (NO PRINT)                             */}
       {/* ========================================================================= */}
-      <div className="no-print">
-        <div className="page-head" style={{ marginBottom: "0.75rem", paddingBottom: "0.5rem" }}>
+      <div className="no-print" style={{ flexShrink: 0 }}>
+        <div className="page-head" style={{ marginBottom: "0.35rem", paddingBottom: "0.3rem" }}>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "1.3rem" }}>📑</span>
-              <h1 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 800 }}>Libro de Actas de Arqueo Mensual de Caja</h1>
-              <span className="badge" style={{ background: "#fef3c7", color: "#92400e", fontWeight: 700, fontSize: "0.72rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "1.2rem" }}>📑</span>
+              <h1 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800 }}>Libro de Actas de Arqueo Mensual de Caja</h1>
+              <span className="badge" style={{ background: "#fef3c7", color: "#92400e", fontWeight: 700, fontSize: "0.68rem" }}>
                 Comisión de Vigilancia
               </span>
             </div>
-            <p style={{ margin: "0.15rem 0 0", fontSize: "0.78rem" }}>
+            <p style={{ margin: "0.1rem 0 0", fontSize: "0.72rem", color: "var(--ink-soft)" }}>
               Emisión de actas oficiales con formato estatutario notarial para la Comisión de Vigilancia y Auditoría Interna.
             </p>
           </div>
 
-          <div style={{ display: "flex", gap: "0.45rem", alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <label htmlFor="mes-picker" style={{ fontSize: "0.8rem", fontWeight: 600 }}>
+          <div style={{ display: "flex", gap: "0.35rem", alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+              <label htmlFor="mes-picker" style={{ fontSize: "0.75rem", fontWeight: 600 }}>
                 Mes:
               </label>
               <input
@@ -217,12 +217,12 @@ export default function LibroArqueoMensual() {
                 type="month"
                 value={mes}
                 onChange={(e) => setMes(e.target.value)}
-                style={{ padding: "0.3rem 0.45rem", borderRadius: "6px", fontSize: "0.82rem" }}
+                style={{ padding: "0.2rem 0.4rem", borderRadius: "5px", fontSize: "0.78rem" }}
               />
             </div>
 
             {puedeElegirAgencia && (
-              <select value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} style={{ maxWidth: 170, fontSize: "0.82rem", padding: "0.3rem 0.45rem" }}>
+              <select value={agenciaId} onChange={(e) => setAgenciaId(e.target.value)} style={{ maxWidth: 170, fontSize: "0.78rem", padding: "0.2rem 0.4rem" }}>
                 {agencias.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.nombre}
@@ -236,7 +236,7 @@ export default function LibroArqueoMensual() {
               className="btn secondary"
               onClick={exportarCSV}
               disabled={cargando}
-              style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem" }}
+              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
             >
               📥 Excel (CSV)
             </button>
@@ -245,17 +245,17 @@ export default function LibroArqueoMensual() {
               className="btn"
               onClick={() => window.print()}
               disabled={cargando}
-              style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem" }}
+              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem", background: "#059669", borderColor: "#059669", color: "#ffffff", fontWeight: 700 }}
             >
               🖨️ Imprimir Acta Oficial
             </button>
           </div>
         </div>
 
-        {error && <div className="alert error" style={{ margin: "0.4rem 0", padding: "0.5rem 0.75rem", fontSize: "0.82rem" }}>{error}</div>}
+        {error && <div className="alert error" style={{ margin: "0.25rem 0", padding: "0.35rem 0.65rem", fontSize: "0.78rem" }}>{error}</div>}
 
         {/* Panel Desplegable de Parámetros Notariales */}
-        <div className="card" style={{ marginBottom: "0.75rem", background: "var(--paper-raised)", padding: "0.55rem 0.85rem" }}>
+        <div className="card" style={{ marginBottom: "0.4rem", background: "var(--paper-raised)", padding: "0.4rem 0.75rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
               <span style={{ fontSize: "0.84rem", fontWeight: 700, color: "var(--accent)" }}>
@@ -395,13 +395,16 @@ export default function LibroArqueoMensual() {
       {/* ACTA OFICIAL NOTARIAL / ESTATUTARIA (PANTALLA E IMPRESIÓN)                */}
       {/* ========================================================================= */}
       <div
-        className="card"
+        className="card print-report"
         style={{
           background: "var(--paper)",
           border: "1px solid var(--line)",
-          padding: "1.1rem 1.4rem",
+          padding: "0.85rem 1.25rem",
           width: "100%",
           boxSizing: "border-box",
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
         }}
       >
         {/* Encabezado Institucional */}

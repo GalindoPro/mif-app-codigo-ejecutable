@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ROL_LABEL, TIPOS_AHORRO } from "../types";
 import { api, mensajeError } from "../lib/api";
@@ -86,6 +86,52 @@ export default function Layout() {
     ? usuario.nombre.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
     : "U";
 
+  const location = useLocation();
+  const isAhorroRoute = location.pathname.startsWith("/ahorros");
+  const isAdminRoute = ["/alertas", "/usuarios", "/agencias", "/traslados", "/auditoria", "/sesiones"].some((p) =>
+    location.pathname.startsWith(p)
+  );
+
+  const [ahorrosOpen, setAhorrosOpen] = useState(() => {
+    if (isAhorroRoute) return true;
+    const saved = localStorage.getItem("mif_nav_ahorros_open");
+    return saved !== null ? saved === "true" : false;
+  });
+
+  const [adminOpen, setAdminOpen] = useState(() => {
+    if (isAdminRoute) return true;
+    const saved = localStorage.getItem("mif_nav_admin_open");
+    return saved !== null ? saved === "true" : false;
+  });
+
+  useEffect(() => {
+    if (isAhorroRoute && !ahorrosOpen) {
+      setAhorrosOpen(true);
+    }
+  }, [location.pathname, isAhorroRoute]);
+
+  useEffect(() => {
+    if (isAdminRoute && !adminOpen) {
+      setAdminOpen(true);
+    }
+  }, [location.pathname, isAdminRoute]);
+
+  const toggleAhorros = () => {
+    setAhorrosOpen((prev) => {
+      const next = !prev;
+      localStorage.setItem("mif_nav_ahorros_open", String(next));
+      return next;
+    });
+  };
+
+  const toggleAdmin = () => {
+    setAdminOpen((prev) => {
+      const next = !prev;
+      localStorage.setItem("mif_nav_admin_open", String(next));
+      return next;
+    });
+  };
+
   // NavItem with universal tooltip
   function NavItem({ to, icon, label, onClick }: { to: string; icon: string; label: string; onClick?: () => void }) {
     return (
@@ -99,6 +145,74 @@ export default function Layout() {
         <span className="nav-icon">{icon}</span>
         <span className="nav-label">{label}</span>
       </NavLink>
+    );
+  }
+
+  function NavFolder({
+    icon,
+    label,
+    isOpen,
+    onToggle,
+    children,
+    badge,
+  }: {
+    icon: string;
+    label: string;
+    isOpen: boolean;
+    onToggle: () => void;
+    children: React.ReactNode;
+    badge?: number | string;
+  }) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        <button
+          type="button"
+          onClick={onToggle}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "0.5rem",
+            padding: "0.32rem 0.55rem",
+            background: isOpen ? "rgba(255,255,255,0.06)" : "transparent",
+            border: "none",
+            borderRadius: "6px",
+            color: isOpen ? "#f8fafc" : "#cbd5e1",
+            cursor: "pointer",
+            width: "100%",
+            textAlign: "left",
+            transition: "all 0.15s ease",
+          }}
+          onMouseEnter={(e: any) => showTooltip(e, label)}
+          onMouseLeave={hideTooltip}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", overflow: "hidden" }}>
+            <span className="nav-icon" style={{ fontSize: "1rem", width: "22px", textAlign: "center" }}>{icon}</span>
+            {!collapsed && (
+              <span style={{ fontSize: "0.78rem", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {label}
+              </span>
+            )}
+          </div>
+          {!collapsed && (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              {badge && (
+                <span style={{ fontSize: "0.62rem", background: "rgba(148,163,184,0.18)", padding: "0.08rem 0.35rem", borderRadius: "10px", color: "#94a3b8" }}>
+                  {badge}
+                </span>
+              )}
+              <span style={{ fontSize: "0.62rem", color: "#94a3b8", transform: isOpen ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s ease" }}>
+                ▶
+              </span>
+            </div>
+          )}
+        </button>
+        {isOpen && !collapsed && (
+          <div style={{ display: "flex", flexDirection: "column", paddingLeft: "0.65rem", borderLeft: "1px dashed rgba(255,255,255,0.15)", marginLeft: "0.85rem", marginTop: "0.1rem", gap: "0.05rem" }}>
+            {children}
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -234,9 +348,17 @@ export default function Layout() {
             <NavItem to="/auxiliar-caja"    icon="💵" label="Arqueos e Hist. Caja"  onClick={closeSidebar} />
             <Section label="Padrón y Captaciones" />
             <NavItem to="/socios"             icon="👥" label="Padrón de Socios"     onClick={closeSidebar} />
-            <NavItem to="/aportaciones"       icon="🏛️" label="Aportaciones Capital" onClick={closeSidebar} />
-            <NavItem to="/ahorros/corriente"  icon="💰" label="Cuentas de Ahorro"    onClick={closeSidebar} />
-            <NavItem to="/ahorros/plazo-fijo" icon="📈" label="Plazo Fijo"           onClick={closeSidebar} />
+            <NavItem to="/aportaciones"       icon="🏛️" label="Padrón Capital Social" onClick={closeSidebar} />
+            <NavFolder
+              icon="🏦"
+              label="Cuentas de Ahorro"
+              badge="2"
+              isOpen={ahorrosOpen}
+              onToggle={toggleAhorros}
+            >
+              <NavItem to="/ahorros/corriente"  icon="💰" label="Ahorro Corriente" onClick={closeSidebar} />
+              <NavItem to="/ahorros/plazo-fijo" icon="📈" label="Plazo Fijo"       onClick={closeSidebar} />
+            </NavFolder>
           </>)}
 
           {/* ── GERENCIA (control total) ── */}
@@ -254,33 +376,49 @@ export default function Layout() {
 
             <Section label="Socios y Captaciones" />
             <NavItem to="/socios"       icon="👥" label="Socios"       onClick={closeSidebar} />
-            <NavItem to="/aportaciones" icon="🏛️" label="Aportaciones" onClick={closeSidebar} />
-            {TIPOS_AHORRO.map((t) => (
-              <NavItem key={t.slug} to={`/ahorros/${t.slug}`} icon="🏦" label={t.titulo} onClick={closeSidebar} />
-            ))}
+            <NavItem to="/aportaciones" icon="🏛️" label="Padrón Capital Social" onClick={closeSidebar} />
+            <NavFolder
+              icon="🏦"
+              label="Ahorros y DPF"
+              badge="7"
+              isOpen={ahorrosOpen}
+              onToggle={toggleAhorros}
+            >
+              {TIPOS_AHORRO.map((t) => (
+                <NavItem key={t.slug} to={`/ahorros/${t.slug}`} icon="🔹" label={t.titulo} onClick={closeSidebar} />
+              ))}
+            </NavFolder>
 
             <Section label="Administración" />
-            <NavItem to="/alertas"   icon="🔔" label="Panel de Alertas"      onClick={closeSidebar} />
-            <NavItem to="/usuarios"  icon="👤" label="Usuarios"              onClick={closeSidebar} />
-            <NavItem to="/agencias"  icon="🏢" label="Agencias"              onClick={closeSidebar} />
-            <NavItem to="/traslados" icon="🔀" label="Traslados Inter-Agencia" onClick={closeSidebar} />
-            <NavItem to="/auditoria" icon="🔍" label="Bitácora de Auditoría" onClick={closeSidebar} />
-            <NavItem to="/sesiones"  icon="🛡️" label="Sesiones Activas"      onClick={closeSidebar} />
+            <NavFolder
+              icon="⚙️"
+              label="Seguridad y Control"
+              badge="6"
+              isOpen={adminOpen}
+              onToggle={toggleAdmin}
+            >
+              <NavItem to="/alertas"   icon="🔔" label="Alertas"             onClick={closeSidebar} />
+              <NavItem to="/usuarios"  icon="👤" label="Usuarios"            onClick={closeSidebar} />
+              <NavItem to="/agencias"  icon="🏢" label="Agencias"            onClick={closeSidebar} />
+              <NavItem to="/traslados" icon="🔀" label="Traslados Inter"     onClick={closeSidebar} />
+              <NavItem to="/auditoria" icon="🔍" label="Bitácora Auditoría"  onClick={closeSidebar} />
+              <NavItem to="/sesiones"  icon="🛡️" label="Sesiones Activas"    onClick={closeSidebar} />
+            </NavFolder>
           </>)}
         </nav>
 
         {/* ── CONTROL DE DATOS (solo ADMIN) ── */}
         {usuario?.rol === "GERENCIA" && !collapsed && (
           <div style={{
-            padding: "0.5rem 0.75rem",
+            padding: "0.35rem 0.65rem",
             background: "rgba(2,132,199,0.07)",
             borderTop: "1px solid rgba(255,255,255,0.04)",
             borderBottom: "1px solid rgba(255,255,255,0.04)",
             flexShrink: 0,
           }}>
             <div style={{
-              fontSize: "0.56rem", fontWeight: 800, color: "rgba(56,189,248,0.6)",
-              textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.35rem",
+              fontSize: "0.54rem", fontWeight: 800, color: "rgba(56,189,248,0.7)",
+              textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.2rem",
             }}>
               ⚙️ Control de Datos
             </div>
@@ -289,9 +427,9 @@ export default function Layout() {
                 type="button" onClick={handleRecargarGlobal}
                 disabled={recargando || reseteando}
                 style={{
-                  flex: 1, fontSize: "0.66rem", padding: "0.3rem 0.35rem",
+                  flex: 1, fontSize: "0.64rem", padding: "0.22rem 0.3rem",
                   background: "rgba(2,132,199,0.15)", color: "#38bdf8",
-                  border: "1px solid rgba(56,189,248,0.2)", borderRadius: "6px",
+                  border: "1px solid rgba(56,189,248,0.2)", borderRadius: "5px",
                   cursor: "pointer", fontWeight: 600,
                   opacity: recargando || reseteando ? 0.5 : 1,
                 }}
@@ -301,9 +439,9 @@ export default function Layout() {
                 type="button" onClick={handleResetGlobal}
                 disabled={reseteando || recargando}
                 style={{
-                  flex: 1, fontSize: "0.66rem", padding: "0.3rem 0.35rem",
+                  flex: 1, fontSize: "0.64rem", padding: "0.22rem 0.3rem",
                   background: "rgba(220,38,38,0.15)", color: "#f87171",
-                  border: "1px solid rgba(248,113,113,0.2)", borderRadius: "6px",
+                  border: "1px solid rgba(248,113,113,0.2)", borderRadius: "5px",
                   cursor: "pointer", fontWeight: 600,
                   opacity: reseteando || recargando ? 0.5 : 1,
                 }}

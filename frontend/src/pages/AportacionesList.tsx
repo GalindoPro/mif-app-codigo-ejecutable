@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { formatoQ } from "../types";
@@ -9,6 +9,11 @@ export default function AportacionesList() {
   const [aportaciones, setAportaciones] = useState<AportacionSocio[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const [filtroPeriodo, setFiltroPeriodo] = useState<"TODOS" | "ACTUAL_2026" | "HISTORICO">("ACTUAL_2026");
+  const [filtroAno, setFiltroAno] = useState<string>("");
+  const [fechaDesde, setFechaDesde] = useState<string>("");
+  const [fechaHasta, setFechaHasta] = useState<string>("");
+  const [filtroEstadoAportacion, setFiltroEstadoAportacion] = useState<"CUBIERTOS" | "PENDIENTES" | "TODOS">("CUBIERTOS");
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
@@ -28,10 +33,76 @@ export default function AportacionesList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
-  const totalCapital = aportaciones?.reduce((sum, a) => sum + Number(a.total_aportaciones), 0) ?? 0;
-  const totalSocios = aportaciones?.length ?? 0;
+  const esAportacion2026 = (a: AportacionSocio) => {
+    if (!a.fecha_ingreso) return false;
+    const f = a.fecha_ingreso.includes("T") ? a.fecha_ingreso.split("T")[0] : a.fecha_ingreso;
+    return f.startsWith("2026") || f >= "2026-01-01";
+  };
+
+  const anosDisponibles = useMemo(() => {
+    if (!aportaciones) return [];
+    const setAnos = new Set<string>();
+    aportaciones.forEach((a) => {
+      if (a.fecha_ingreso) {
+        const ano = a.fecha_ingreso.slice(0, 4);
+        if (ano && ano.length === 4) setAnos.add(ano);
+      }
+    });
+    return Array.from(setAnos).sort().reverse();
+  }, [aportaciones]);
+
+  const aportacionesActuales = useMemo(() => aportaciones?.filter(esAportacion2026) ?? [], [aportaciones]);
+  const aportacionesHistoricas = useMemo(() => aportaciones?.filter((a) => !esAportacion2026(a)) ?? [], [aportaciones]);
+
+  const sociosConAportacion = useMemo(() => aportaciones?.filter((a) => Number(a.total_aportaciones) > 0) ?? [], [aportaciones]);
+  const sociosPendientes = useMemo(() => aportaciones?.filter((a) => Number(a.total_aportaciones) <= 0) ?? [], [aportaciones]);
+
+  const aportacionesFiltradas = useMemo(() => {
+    if (!aportaciones) return [];
+    let lista = aportaciones;
+
+    // Filtro temporal rápido
+    if (filtroPeriodo === "ACTUAL_2026") {
+      lista = lista.filter(esAportacion2026);
+    } else if (filtroPeriodo === "HISTORICO") {
+      lista = lista.filter((a) => !esAportacion2026(a));
+    }
+
+    // Filtro por año específico
+    if (filtroAno) {
+      lista = lista.filter((a) => a.fecha_ingreso && a.fecha_ingreso.startsWith(filtroAno));
+    }
+
+    // Filtro por rango exacto de fechas (Desde / Hasta)
+    if (fechaDesde) {
+      lista = lista.filter((a) => {
+        if (!a.fecha_ingreso) return false;
+        const f = a.fecha_ingreso.slice(0, 10);
+        return f >= fechaDesde;
+      });
+    }
+    if (fechaHasta) {
+      lista = lista.filter((a) => {
+        if (!a.fecha_ingreso) return false;
+        const f = a.fecha_ingreso.slice(0, 10);
+        return f <= fechaHasta;
+      });
+    }
+
+    // Filtro por estado de aportación
+    if (filtroEstadoAportacion === "CUBIERTOS") {
+      lista = lista.filter((a) => Number(a.total_aportaciones) > 0);
+    } else if (filtroEstadoAportacion === "PENDIENTES") {
+      lista = lista.filter((a) => Number(a.total_aportaciones) <= 0);
+    }
+
+    return lista;
+  }, [aportaciones, filtroPeriodo, filtroAno, fechaDesde, fechaHasta, filtroEstadoAportacion]);
+
+  const totalCapital = aportacionesFiltradas.reduce((sum, a) => sum + Number(a.total_aportaciones), 0);
+  const totalSocios = aportacionesFiltradas.length;
   const totalPaginas = Math.max(1, Math.ceil(totalSocios / pageSize));
-  const aportacionesPaginadas = aportaciones?.slice((page - 1) * pageSize, page * pageSize) ?? [];
+  const aportacionesPaginadas = aportacionesFiltradas.slice((page - 1) * pageSize, page * pageSize);
   const promedioAportacion = totalSocios > 0 ? totalCapital / totalSocios : 0;
 
   function formatearFechaCorta(f: string | null | undefined): string {
@@ -47,16 +118,16 @@ export default function AportacionesList() {
   return (
     <div className="screen-container">
       {/* CABECERA COMPACTA DE 1 LÍNEA */}
-      <div className="screen-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", flexWrap: "wrap" }}>
-          <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.2rem" }}>
+      <div className="screen-header" style={{ paddingBottom: "0.25rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.15rem" }}>
             <span>🏛️</span> Padrón de Aportaciones
           </h1>
           <span
             style={{
               fontSize: "0.72rem",
               fontWeight: 700,
-              padding: "0.15rem 0.5rem",
+              padding: "0.12rem 0.45rem",
               borderRadius: "4px",
               background: "rgba(16, 185, 129, 0.15)",
               color: "#10b981",
@@ -67,52 +138,51 @@ export default function AportacionesList() {
           </span>
         </div>
 
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
           <button
             type="button"
             className="btn secondary"
             onClick={() => window.print()}
-            style={{ padding: "0.3rem 0.65rem", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.3rem" }}
+            style={{ padding: "0.22rem 0.55rem", fontSize: "0.76rem", display: "flex", alignItems: "center", gap: "0.3rem" }}
           >
             <span>🖨️</span> Imprimir Padrón
           </button>
           <Link
             to="/socios/nuevo"
             className="btn"
-            style={{ padding: "0.3rem 0.75rem", fontSize: "0.8rem", textDecoration: "none" }}
+            style={{ padding: "0.22rem 0.65rem", fontSize: "0.76rem", textDecoration: "none", fontWeight: 700 }}
           >
             + Nuevo socio
           </Link>
         </div>
       </div>
 
-      {error && <div className="alert error" style={{ margin: "0.25rem 0", padding: "0.4rem 0.75rem", fontSize: "0.82rem" }}>{error}</div>}
+      {error && <div className="alert error" style={{ margin: "0.2rem 0", padding: "0.3rem 0.6rem", fontSize: "0.78rem" }}>{error}</div>}
 
-      {/* STRIP DE KPIS HORIZONTALES CON ESTILO FINTECH */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
+      {/* STRIP DE KPIS HORIZONTALES EN 1 SOLA FILA ULTRA-COMPACTA */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.35rem", flexShrink: 0 }}>
         {/* CAPITAL SOCIAL APORTADO */}
         <div
           style={{
             background: "rgba(5, 150, 105, 0.06)",
             border: "1px solid rgba(5, 150, 105, 0.3)",
             borderLeft: "4px solid #059669",
-            borderRadius: "8px",
-            padding: "0.45rem 0.65rem",
+            borderRadius: "6px",
+            padding: "0.25rem 0.5rem",
             display: "flex",
             flexDirection: "column",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#059669", letterSpacing: "0.03em" }}>
-              CAPITAL SOCIAL OFICIAL
+            <span style={{ fontSize: "0.62rem", fontWeight: 700, color: "#059669", letterSpacing: "0.03em" }}>
+              CAPITAL SOCIAL FILTRADO
             </span>
-            <span style={{ fontSize: "0.85rem" }}>🏛️</span>
+            <span style={{ fontSize: "0.75rem" }}>🏛️</span>
           </div>
-          <span style={{ fontSize: "1.15rem", fontWeight: 800, color: "#059669", fontFamily: "monospace" }}>
+          <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "#059669", fontFamily: "monospace", lineHeight: 1.2 }}>
             {formatoQ(totalCapital)}
           </span>
-          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Patrimonio cooperativo</span>
+          <span style={{ fontSize: "0.6rem", color: "var(--ink-soft)" }}>Patrimonio en padrón</span>
         </div>
 
         {/* ASOCIADOS EN PADRÓN */}
@@ -121,23 +191,22 @@ export default function AportacionesList() {
             background: "var(--paper)",
             border: "1px solid var(--line)",
             borderLeft: "4px solid #6366f1",
-            borderRadius: "8px",
-            padding: "0.45rem 0.65rem",
+            borderRadius: "6px",
+            padding: "0.25rem 0.5rem",
             display: "flex",
             flexDirection: "column",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", letterSpacing: "0.03em" }}>
-              ASOCIADOS EN PADRÓN
+            <span style={{ fontSize: "0.62rem", fontWeight: 700, color: "#6366f1", letterSpacing: "0.03em" }}>
+              ASOCIADOS FILTRADOS
             </span>
-            <span style={{ fontSize: "0.85rem" }}>👥</span>
+            <span style={{ fontSize: "0.75rem" }}>👥</span>
           </div>
-          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#6366f1", fontFamily: "monospace" }}>
+          <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "#6366f1", fontFamily: "monospace", lineHeight: 1.2 }}>
             {totalSocios}
           </span>
-          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Socios activos inscritos</span>
+          <span style={{ fontSize: "0.6rem", color: "var(--ink-soft)" }}>Socios mostrados</span>
         </div>
 
         {/* APORTACIÓN PROMEDIO */}
@@ -146,23 +215,22 @@ export default function AportacionesList() {
             background: "var(--paper)",
             border: "1px solid var(--line)",
             borderLeft: "4px solid #0284c7",
-            borderRadius: "8px",
-            padding: "0.45rem 0.65rem",
+            borderRadius: "6px",
+            padding: "0.25rem 0.5rem",
             display: "flex",
             flexDirection: "column",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>
+            <span style={{ fontSize: "0.62rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>
               APORTACIÓN PROMEDIO
             </span>
-            <span style={{ fontSize: "0.85rem" }}>📈</span>
+            <span style={{ fontSize: "0.75rem" }}>📈</span>
           </div>
-          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#0284c7", fontFamily: "monospace" }}>
+          <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "#0284c7", fontFamily: "monospace", lineHeight: 1.2 }}>
             {formatoQ(promedioAportacion)}
           </span>
-          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Por asociado activo</span>
+          <span style={{ fontSize: "0.6rem", color: "var(--ink-soft)" }}>Por asociado activo</span>
         </div>
 
         {/* CUMPLIMIENTO ESTATUTARIO */}
@@ -171,36 +239,284 @@ export default function AportacionesList() {
             background: "var(--paper)",
             border: "1px solid var(--line)",
             borderLeft: "4px solid #10b981",
-            borderRadius: "8px",
-            padding: "0.45rem 0.65rem",
+            borderRadius: "6px",
+            padding: "0.25rem 0.5rem",
             display: "flex",
             flexDirection: "column",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#10b981", letterSpacing: "0.03em" }}>
-              CUMPLIMIENTO ESTATUTARIO
+            <span style={{ fontSize: "0.62rem", fontWeight: 700, color: "#10b981", letterSpacing: "0.03em" }}>
+              CUMPLIMIENTO ESTATUTO
             </span>
-            <span style={{ fontSize: "0.85rem" }}>✓</span>
+            <span style={{ fontSize: "0.75rem" }}>✓</span>
           </div>
-          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#10b981", fontFamily: "monospace" }}>
+          <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "#10b981", fontFamily: "monospace", lineHeight: 1.2 }}>
             Min. Q 100.00
           </span>
-          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Norma cooperativa activa</span>
+          <span style={{ fontSize: "0.6rem", color: "var(--ink-soft)" }}>Norma cooperativa activa</span>
         </div>
       </div>
 
-      {/* BARRA DE BÚSQUEDA COMPACTA */}
-      <div className="screen-toolbar">
-        <div style={{ position: "relative", flex: 1, maxWidth: 480 }}>
+      {/* BARRA DE HERRAMIENTAS CON SEGMENTACIÓN TEMPORAL Y RANGO DE FECHAS */}
+      <div className="screen-toolbar" style={{ flexWrap: "wrap", gap: "0.35rem", padding: "0.25rem 0.4rem", flexShrink: 0 }}>
+        {/* SEGMENTACIÓN TEMPORAL (2026 VS HISTÓRICO) */}
+        <div style={{ display: "inline-flex", background: "var(--paper-raised, rgba(15,23,42,0.6))", padding: "2px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroPeriodo("ACTUAL_2026");
+              setFiltroAno("");
+              setFechaDesde("");
+              setFechaHasta("");
+              setPage(1);
+            }}
+            style={{
+              padding: "0.22rem 0.55rem",
+              fontSize: "0.74rem",
+              fontWeight: filtroPeriodo === "ACTUAL_2026" && !filtroAno && !fechaDesde ? 700 : 500,
+              background: filtroPeriodo === "ACTUAL_2026" && !filtroAno && !fechaDesde ? "#059669" : "transparent",
+              color: filtroPeriodo === "ACTUAL_2026" && !filtroAno && !fechaDesde ? "#fff" : "var(--ink-soft)",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            🌱 Ejercicio 2026
+            <span style={{ fontSize: "0.66rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 4px", borderRadius: "8px" }}>
+              {aportacionesActuales.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroPeriodo("HISTORICO");
+              setFiltroAno("");
+              setFechaDesde("");
+              setFechaHasta("");
+              setPage(1);
+            }}
+            style={{
+              padding: "0.22rem 0.55rem",
+              fontSize: "0.74rem",
+              fontWeight: filtroPeriodo === "HISTORICO" && !filtroAno && !fechaDesde ? 700 : 500,
+              background: filtroPeriodo === "HISTORICO" && !filtroAno && !fechaDesde ? "#BF9903" : "transparent",
+              color: filtroPeriodo === "HISTORICO" && !filtroAno && !fechaDesde ? "#0f172a" : "var(--ink-soft)",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            📜 Histórico Anterior
+            <span style={{ fontSize: "0.66rem", opacity: 0.9, background: "rgba(0,0,0,0.15)", padding: "1px 4px", borderRadius: "8px" }}>
+              {aportacionesHistoricas.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroPeriodo("TODOS");
+              setFiltroAno("");
+              setFechaDesde("");
+              setFechaHasta("");
+              setPage(1);
+            }}
+            style={{
+              padding: "0.22rem 0.55rem",
+              fontSize: "0.74rem",
+              fontWeight: filtroPeriodo === "TODOS" && !filtroAno && !fechaDesde ? 700 : 500,
+              background: filtroPeriodo === "TODOS" && !filtroAno && !fechaDesde ? "#0284c7" : "transparent",
+              color: filtroPeriodo === "TODOS" && !filtroAno && !fechaDesde ? "#fff" : "var(--ink-soft)",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            🌐 Consolidado
+            <span style={{ fontSize: "0.66rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 4px", borderRadius: "8px" }}>
+              {aportaciones?.length || 0}
+            </span>
+          </button>
+        </div>
+
+        {/* SELECTOR DE ESTADO DE APORTACIÓN */}
+        <div style={{ display: "inline-flex", background: "var(--paper-raised, rgba(15,23,42,0.6))", padding: "2px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroEstadoAportacion("CUBIERTOS");
+              setPage(1);
+            }}
+            style={{
+              padding: "0.22rem 0.5rem",
+              fontSize: "0.74rem",
+              fontWeight: filtroEstadoAportacion === "CUBIERTOS" ? 700 : 500,
+              background: filtroEstadoAportacion === "CUBIERTOS" ? "#10b981" : "transparent",
+              color: filtroEstadoAportacion === "CUBIERTOS" ? "#0f172a" : "var(--ink-soft)",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "3px",
+            }}
+          >
+            ✓ Cubiertos ({sociosConAportacion.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroEstadoAportacion("PENDIENTES");
+              setPage(1);
+            }}
+            style={{
+              padding: "0.22rem 0.5rem",
+              fontSize: "0.74rem",
+              fontWeight: filtroEstadoAportacion === "PENDIENTES" ? 700 : 500,
+              background: filtroEstadoAportacion === "PENDIENTES" ? "#d97706" : "transparent",
+              color: filtroEstadoAportacion === "PENDIENTES" ? "#fff" : "var(--ink-soft)",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "3px",
+            }}
+          >
+            ⚠️ Pendientes ({sociosPendientes.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroEstadoAportacion("TODOS");
+              setPage(1);
+            }}
+            style={{
+              padding: "0.22rem 0.5rem",
+              fontSize: "0.74rem",
+              fontWeight: filtroEstadoAportacion === "TODOS" ? 700 : 500,
+              background: filtroEstadoAportacion === "TODOS" ? "#64748b" : "transparent",
+              color: filtroEstadoAportacion === "TODOS" ? "#fff" : "var(--ink-soft)",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+            }}
+          >
+            Todos
+          </button>
+        </div>
+
+        {/* SELECTOR ESPECÍFICO DE AÑO */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+          <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)", fontWeight: 600 }}>📅 Año:</span>
+          <select
+            value={filtroAno}
+            onChange={(e) => {
+              setFiltroAno(e.target.value);
+              setFechaDesde("");
+              setFechaHasta("");
+              setPage(1);
+            }}
+            style={{
+              padding: "0.22rem 0.45rem",
+              borderRadius: "6px",
+              border: "1px solid var(--line)",
+              background: "var(--paper)",
+              color: "var(--ink)",
+              fontSize: "0.76rem",
+              fontWeight: 600,
+            }}
+          >
+            <option value="">Todos</option>
+            {anosDisponibles.map((ano) => (
+              <option key={ano} value={ano}>
+                Año {ano} {ano === "2026" ? "(Actual)" : "(Histórico)"}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* FILTRO DE RANGO DE FECHAS */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+          <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>Desde:</span>
+          <input
+            type="date"
+            value={fechaDesde}
+            onChange={(e) => {
+              setFechaDesde(e.target.value);
+              setFiltroAno("");
+              setPage(1);
+            }}
+            style={{
+              padding: "0.18rem 0.4rem",
+              borderRadius: "6px",
+              border: "1px solid var(--line)",
+              background: "var(--paper)",
+              color: "var(--ink)",
+              fontSize: "0.74rem",
+            }}
+          />
+          <span style={{ fontSize: "0.72rem", color: "var(--ink-soft)" }}>Hasta:</span>
+          <input
+            type="date"
+            value={fechaHasta}
+            onChange={(e) => {
+              setFechaHasta(e.target.value);
+              setFiltroAno("");
+              setPage(1);
+            }}
+            style={{
+              padding: "0.18rem 0.4rem",
+              borderRadius: "6px",
+              border: "1px solid var(--line)",
+              background: "var(--paper)",
+              color: "var(--ink)",
+              fontSize: "0.74rem",
+            }}
+          />
+          {(fechaDesde || fechaHasta || filtroAno) && (
+            <button
+              type="button"
+              onClick={() => {
+                setFechaDesde("");
+                setFechaHasta("");
+                setFiltroAno("");
+                setPage(1);
+              }}
+              style={{
+                padding: "0.18rem 0.4rem",
+                borderRadius: "4px",
+                border: "1px solid var(--line)",
+                background: "transparent",
+                color: "var(--ink-soft)",
+                fontSize: "0.7rem",
+                cursor: "pointer",
+              }}
+              title="Limpiar fechas"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* BUSCADOR */}
+        <div style={{ position: "relative", flex: 1, minWidth: 160, maxWidth: 260 }}>
           <span
             style={{
               position: "absolute",
-              left: "0.65rem",
+              left: "0.6rem",
               top: "50%",
               transform: "translateY(-50%)",
-              fontSize: "0.85rem",
+              fontSize: "0.8rem",
               color: "var(--ink-soft)",
               pointerEvents: "none",
             }}
@@ -209,13 +525,13 @@ export default function AportacionesList() {
           </span>
           <input
             type="text"
-            placeholder="Buscar por nombre, DPI o número de asociado..."
+            placeholder="Buscar socio, DPI o código…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             style={{
               width: "100%",
-              padding: "0.38rem 0.65rem 0.38rem 2rem",
-              fontSize: "0.82rem",
+              padding: "0.24rem 0.55rem 0.24rem 1.8rem",
+              fontSize: "0.78rem",
               borderRadius: "6px",
               border: "1px solid var(--line)",
               background: "var(--paper)",
@@ -230,14 +546,14 @@ export default function AportacionesList() {
         <table className="table-compact">
           <thead>
             <tr>
-              <th style={{ minWidth: 110 }}>NO. ASOCIADO</th>
-              <th style={{ minWidth: 220 }}>NOMBRES DEL ASOCIADO</th>
-              <th style={{ minWidth: 120 }}>DPI</th>
-              <th style={{ minWidth: 100 }}>GÉNERO</th>
-              <th style={{ minWidth: 120, textAlign: "right" }}>CAPITAL APORTADO</th>
-              <th style={{ minWidth: 220 }}>PERSONA BENEFICIARIA</th>
-              <th style={{ minWidth: 100 }}>FECHA INGRESO</th>
-              <th style={{ minWidth: 80, textAlign: "center" }}>ESTADO</th>
+              <th style={{ minWidth: 95 }}>NO. ASOCIADO</th>
+              <th style={{ minWidth: 180 }}>NOMBRES DEL ASOCIADO</th>
+              <th style={{ minWidth: 105 }}>DPI</th>
+              <th style={{ minWidth: 60, textAlign: "center" }}>GÉNERO</th>
+              <th style={{ minWidth: 115, textAlign: "right" }}>CAPITAL APORTADO</th>
+              <th style={{ minWidth: 170 }}>PERSONA BENEFICIARIA</th>
+              <th style={{ minWidth: 95, textAlign: "center" }}>FECHA INGRESO</th>
+              <th style={{ minWidth: 70, textAlign: "center" }}>ESTADO</th>
             </tr>
           </thead>
           <tbody>
@@ -260,25 +576,34 @@ export default function AportacionesList() {
                   )}
                 </td>
                 <td className="mono" style={{ fontSize: "0.8rem" }}>{a.dpi ? formatearDPI(a.dpi) : "—"}</td>
-                <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                    <span
-                      style={{
-                        padding: "0.1rem 0.4rem",
-                        borderRadius: "4px",
-                        fontSize: "0.72rem",
-                        fontWeight: 600,
-                        background: "var(--mono-bg)",
-                        color: a.genero === "F" ? "#f472b6" : a.genero === "M" ? "#60a5fa" : "var(--ink-soft)",
-                        border: "1px solid var(--line)",
-                      }}
-                    >
-                      {a.genero === "F" ? "F" : a.genero === "M" ? "M" : "—"}
-                    </span>
-                  </div>
+                <td style={{ textAlign: "center" }}>
+                  <span
+                    style={{
+                      padding: "0.1rem 0.35rem",
+                      borderRadius: "4px",
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      background: "var(--mono-bg)",
+                      color: a.genero === "F" ? "#f472b6" : a.genero === "M" ? "#60a5fa" : "var(--ink-soft)",
+                      border: "1px solid var(--line)",
+                    }}
+                  >
+                    {a.genero === "F" ? "F" : a.genero === "M" ? "M" : "—"}
+                  </span>
                 </td>
-                <td className="mono" style={{ fontWeight: 700, color: "var(--accent)", textAlign: "right" }}>
-                  {formatoQ(a.total_aportaciones)}
+                <td className="mono" style={{ textAlign: "right" }}>
+                  {Number(a.total_aportaciones) > 0 ? (
+                    <span style={{ fontWeight: 700, color: "#10b981" }}>
+                      {formatoQ(a.total_aportaciones)}
+                    </span>
+                  ) : (
+                    <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end" }}>
+                      <span style={{ color: "var(--ink-soft)", fontSize: "0.78rem" }}>Q 0.00</span>
+                      <span style={{ fontSize: "0.62rem", color: "#f59e0b", background: "rgba(245, 158, 11, 0.15)", padding: "0.05rem 0.3rem", borderRadius: "3px", fontWeight: 600 }}>
+                        Pendiente
+                      </span>
+                    </div>
+                  )}
                 </td>
                 <td>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
@@ -307,7 +632,40 @@ export default function AportacionesList() {
                   )}
                 </td>
                 <td className="mono" style={{ fontSize: "0.8rem" }}>
-                  {formatearFechaCorta(a.fecha_ingreso)}
+                  <div style={{ fontWeight: 600 }}>{formatearFechaCorta(a.fecha_ingreso)}</div>
+                  {esAportacion2026(a) ? (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        fontSize: "0.62rem",
+                        color: "#10b981",
+                        background: "rgba(16, 185, 129, 0.12)",
+                        padding: "0.05rem 0.3rem",
+                        borderRadius: "3px",
+                        fontWeight: 700,
+                        border: "1px solid rgba(16, 185, 129, 0.25)",
+                        marginTop: "2px",
+                      }}
+                    >
+                      🌱 2026
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        fontSize: "0.62rem",
+                        color: "#BF9903",
+                        background: "rgba(191, 153, 3, 0.12)",
+                        padding: "0.05rem 0.3rem",
+                        borderRadius: "3px",
+                        fontWeight: 700,
+                        border: "1px solid rgba(191, 153, 3, 0.25)",
+                        marginTop: "2px",
+                      }}
+                    >
+                      📜 Histórico
+                    </span>
+                  )}
                 </td>
                 <td style={{ textAlign: "center" }}>
                   <span className={`badge ${a.estado.toLowerCase()}`} style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}>
@@ -363,23 +721,31 @@ export default function AportacionesList() {
               COOPERATIVA MAYA INVERSIONES FUTURAS R.L. "COMIF-R.L."
             </div>
             <div style={{ fontSize: "9.5pt", fontWeight: 700, color: "#059669", marginTop: "2px" }}>
-              PADRÓN GENERAL OFICIAL DE ASOCIADOS Y CAPITAL SOCIAL APORTADO
+              {filtroPeriodo === "ACTUAL_2026"
+                ? "PADRÓN OFICIAL DE ASOCIADOS — EJERCICIO 2026"
+                : filtroPeriodo === "HISTORICO"
+                ? "PADRÓN OFICIAL DE ASOCIADOS — HISTÓRICO ANTERIOR (PREVIO 2026)"
+                : "PADRÓN GENERAL OFICIAL DE ASOCIADOS Y CAPITAL SOCIAL APORTADO"}
             </div>
             <div style={{ fontSize: "7.5pt", color: "#475569", marginTop: "2px" }}>
               San Gaspar Chajul, El Quiché, Guatemala · Sistema Contable y Financiero COMIF-R.L.
+              {filtroAno && ` · Año: ${filtroAno}`}
+              {(fechaDesde || fechaHasta) && ` · Período: ${fechaDesde || "Inicio"} al ${fechaHasta || "Actual"}`}
             </div>
           </div>
           <div style={{ textAlign: "right", fontSize: "7.5pt", color: "#334155" }}>
             <div><strong>Emisión:</strong> {new Date().toLocaleDateString("es-GT", { day: "2-digit", month: "2-digit", year: "numeric" })} {new Date().toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}</div>
-            <div><strong>Total Asociados:</strong> {totalSocios} inscritos</div>
-            {q && <div><strong>Filtro aplicado:</strong> "{q}"</div>}
+            <div><strong>Segmento:</strong> {filtroPeriodo === "ACTUAL_2026" ? "Ejercicio 2026" : filtroPeriodo === "HISTORICO" ? "Histórico Anterior (Pre-2026)" : "Consolidado Completo"}</div>
+            <div><strong>Filtro Aportación:</strong> {filtroEstadoAportacion === "CUBIERTOS" ? "Aportación Cubierta (Min Q 100)" : filtroEstadoAportacion === "PENDIENTES" ? "Pendientes de Aportación" : "Todos"}</div>
+            <div><strong>Total Asociados:</strong> {totalSocios} en padrón</div>
+            {q && <div><strong>Búsqueda:</strong> "{q}"</div>}
           </div>
         </div>
 
         {/* RESUMEN FINANCIERO OFICIAL */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginBottom: "10px" }}>
           <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
-            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>CAPITAL SOCIAL TOTAL</div>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>CAPITAL SOCIAL FILTRADO</div>
             <div style={{ fontSize: "10pt", fontWeight: 800, color: "#059669", fontFamily: "monospace" }}>{formatoQ(totalCapital)}</div>
           </div>
           <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
@@ -411,7 +777,7 @@ export default function AportacionesList() {
             </tr>
           </thead>
           <tbody>
-            {(aportaciones ?? []).map((a, index) => (
+            {aportacionesFiltradas.map((a, index) => (
               <tr key={a.socio_id} style={{ background: index % 2 === 0 ? "#ffffff" : "#f8fafc" }}>
                 <td style={{ textAlign: "center", border: "1px solid #cbd5e1", padding: "3px 2px" }}>
                   {index + 1}

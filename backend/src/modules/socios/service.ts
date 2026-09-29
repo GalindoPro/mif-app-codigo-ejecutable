@@ -84,14 +84,28 @@ export async function listar(filtros: FiltrosSocios) {
   const [{ rows }, { rows: countRows }] = await Promise.all([
     pool.query(
       `select s.*, a.nombre as agencia_nombre, a.codigo as agencia_codigo,
-              coalesce(cnt.total_cuentas, 0)::int as total_cuentas,
+              coalesce(c_agg.total_cuentas, 0)::int as total_cuentas,
+              coalesce(c_agg.tiene_aportacion, false) as tiene_aportacion,
+              coalesce(c_agg.tiene_ahorro_corriente, false) as tiene_ahorro_corriente,
+              coalesce(c_agg.tiene_plazo_fijo, false) as tiene_plazo_fijo,
               coalesce(p_cnt.total_creditos_activos, 0)::int as creditos_activos
        from socios s
        join agencias a on a.id = s.agencia_id
-       left join (select socio_id, count(*) as total_cuentas from cuentas group by socio_id) cnt
-              on cnt.socio_id = s.id
-       left join (select socio_id, count(*) as total_creditos_activos from prestamos where estado = 'DESEMBOLSADO' and saldo_capital > 0 group by socio_id) p_cnt
-              on p_cnt.socio_id = s.id
+       left join (
+         select socio_id,
+                count(*) as total_cuentas,
+                bool_or(tipo = 'APORTACION' and estado = 'ACTIVA') as tiene_aportacion,
+                bool_or(tipo = 'AHORRO_CORRIENTE' and estado = 'ACTIVA') as tiene_ahorro_corriente,
+                bool_or(tipo = 'AHORRO_PLAZO_FIJO' and estado = 'ACTIVA') as tiene_plazo_fijo
+         from cuentas
+         group by socio_id
+       ) c_agg on c_agg.socio_id = s.id
+       left join (
+         select socio_id, count(*) as total_creditos_activos
+         from prestamos
+         where estado = 'DESEMBOLSADO' and saldo_capital > 0
+         group by socio_id
+       ) p_cnt on p_cnt.socio_id = s.id
        ${where}
        order by s.numero_asociado desc, s.created_at desc
        limit $${limitIdx} offset $${offsetIdx}`,
@@ -658,7 +672,7 @@ export async function listarAportaciones(params: { agenciaId: string | null; q?:
     left join saldos_cuenta sc on sc.cuenta_id = c.id
     ${where}
     group by s.id, a.nombre
-    order by s.numero_asociado desc
+    order by s.numero_asociado asc
   `;
 
   const { rows } = await pool.query(query, valores);

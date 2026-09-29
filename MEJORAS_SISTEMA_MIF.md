@@ -2,6 +2,196 @@
 
 Este documento recopila de forma detallada todas las mejoras funcionales, reglas de negocio, formatos guatemaltecos y optimizaciones contables implementadas en el sistema.
 
+## 110. Ordenamiento Correlativo Ascendente y Segmentación de Cumplimiento en Padrón de Capital Social (`/aportaciones`): Con Aportación Cubierta (691) vs Pendientes de Pago (16)
+
+**Objetivo y Reglas de Negocio:**
+1. **Diagnóstico del Saldo en Cero (Q 0.00) en Pantalla:**
+   - La consulta anterior ordenaba a los socios de forma descendente (`ORDER BY s.numero_asociado DESC`).
+   - Por esta razón, la primera página mostraba a los asociados con los códigos más altos (`CHAJ-00692` a `CHAJ-00706`), los cuales corresponden a **16 prestatarios o solicitantes de crédito** importados desde las carteras de préstamos de los promotores que aún no han pasado a ventanilla a aperturar su libreta de aportación estatutaria inicial.
+2. **Ordenamiento Natural Correlativo Ascendente (`backend/src/modules/socios/service.ts`):**
+   - Se ajustó la consulta SQL para ordenar de forma ascendente (`ORDER BY s.numero_asociado ASC`), desplegando de inmediato desde la primera página a los socios fundadores y activos con sus aportaciones reales cubiertas (desde `CHAJ-00001` en adelante con Q 100.00, Q 200.00, Q 300.00, etc.).
+3. **Pestañas de Segmentación en Padrón de Capital Social (`AportacionesList.tsx`):**
+   - **`🏛️ Con Aportación Cubierta (691)` (Activo por defecto):** Muestra con total transparencia exclusivamente a los 691 socios aportantes con libreta activa (Capital Social acumulado: **Q 138,600.00**).
+   - **`⚠️ Pendientes de Aportación (16)`:** Permite a la Gerencia y Cajeros auditar de inmediato qué solicitantes de crédito tienen pendiente cancelar su aportación estatutaria de Q 100.00.
+   - **`🌐 Padrón General (707)`:** Despliega el universo total de asociados inscritos.
+4. **Distintivos Visuales y Fidelidad en Padrón Impreso:**
+   - Si el socio tiene aportación cubierta, se resalta en verde esmeralda con la cifra oficial. Si está pendiente, se despliega `Q 0.00` con insignia ámbar `[⚠️ Pendiente]`.
+   - El Padrón General Imprimible (`print-only`) ahora respeta con exactitud la pestaña seleccionada, recalculando en el membrete y tabla el total de asociados e importe de capital social.
+
+**Archivos modificados:**
+- `backend/src/modules/socios/service.ts`
+- `frontend/src/pages/AportacionesList.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+
+---
+
+## 109. Clarificación Estructural de Menús: "Padrón Capital Social" vs "Cuentas de Aportación" y Regla de Afiliación (Q 150.00: Q 50 Cuota de Ingreso + Q 100 Aportación Estatutaria)
+
+**Objetivo y Reglas de Negocio:**
+1. **Diferenciación Conceptual entre Padrón Social y Libreta Financiera:**
+   - **`🏛️ Padrón Capital Social` (`/aportaciones`):** Ubicado en la sección *Socios y Captaciones*, enfocado en la auditoría de asociados como dueños de la entidad (DPI, personas beneficiarias, fecha de ingreso y verificación del cumplimiento estatutario del mínimo legal de Q 100.00).
+   - **`🔹 Cuentas de Aportación` (`/ahorros/aportacion`):** Ubicado dentro del acordeón *Ahorros y DPF*, enfocado en la libreta contable individual (Cuenta 301 de Patrimonio), permitiendo visualizar saldos vivos, depósitos en ventanilla, devoluciones y recibos.
+2. **Regla de Ingreso de Nuevos Asociados (COMIF R.L.):**
+   - Paquete de Afiliación Oficial de **Q 150.00**:
+     * **Q 50.00 — Cuota de Ingreso / Inscripción:** Pago administrativo único por apertura de expediente y emisión de libreta. Es un ingreso operativo de la cooperativa y **no es reembolsable**.
+     * **Q 100.00 — Aportación Estatutaria Inicial:** Capital social del socio (Cuenta 301.01). Otorga calidad de asociado activo y **es reembolsable** en caso de retiro formal de la cooperativa.
+3. **Renombramiento en Menú de Navegación (`Layout.tsx` y `types.ts`):**
+   - Se actualizó el menú para los roles de Gerencia y Supervisión eliminando la ambigüedad de nombres repetidos.
+
+**Archivos modificados:**
+- `frontend/src/pages/Layout.tsx`
+- `frontend/src/types.ts`
+- `MEJORAS_SISTEMA_MIF.md`
+
+---
+
+## 108. Segmentación Temporal Universal (`🌱 Ejercicio Actual 2026` vs `📜 Histórico Anterior` vs `🌐 Consolidado`), Selector Específico de Año (`📅 Año`) en Ahorros, Plazo Fijo y Cartera de Créditos con Fidelidad en Padrón Impreso
+
+**Objetivo y Reglas de Negocio:**
+1. **Universalización de la Temporalidad en Todas las Cuentas de Ahorro (`/ahorros/*`):**
+   - Para que la Gerencia General y los Auditores cuenten con una herramienta ágil y profesional de supervisión contable, la segmentación temporal creada originalmente para Aportaciones se extendió a todas las carteras de ahorro (`Ahorro Corriente`, `Programado`, `Infanto Juvenil`, `Sobre Préstamo`):
+     * **`🌱 Ejercicio Actual 2026`:** Filtra únicamente las cuentas que registran movimientos o captaciones durante el ejercicio 2026.
+     * **`📜 Histórico Anterior`:** Agrupa las cuentas que pertenecen a años previos y que no han tenido transacciones en 2026, manteniéndolas catalogadas como historial auditable sin contaminar el flujo de caja del año actual.
+     * **`🌐 Consolidado Total`:** Muestra la totalidad de cuentas activas en la Agencia Chajul.
+2. **Segmentación y Auditoría en Depósitos a Plazo Fijo (`/ahorros/plazo-fijo`):**
+   - Se segmentó el universo de **695 certificados de inversión**:
+     * **8 Certificados Vigentes / 2026:** Inversiones activas de asociados con vigencia o apertura en 2026 (Capital comprometido: **Q 612,988.88**).
+     * **687 Certificados Históricos:** Inversiones constituidas y liquidadas en ejercicios anteriores (2018 a 2022) que forman parte del historial de captaciones institucionales.
+   - En cada fila de la tabla se despliega un distintivo bicolor: `[🌱 2026]` en esmeralda o `[📜 Histórico]` en pizarra, junto con el estado del contrato (`Vigente / Activo` vs `Liquidado / Pagado`).
+3. **Segmentación Temporal en Cartera de Créditos (`/creditos`):**
+   - Integración de los 3 segmentos temporales y selector de año en la bandeja de créditos, conviviendo armoniosamente con los filtros de promotores (`Toda la Cartera`, `Diego - Promotor 1`, `Walter - Promotor 2`).
+   - Los 150 créditos desembolsados en 2026 quedan clasificados en `🌱 Ejercicio 2026 (150)`, y se identifican con chip distintivo `🌱 2026` en la columna de estado.
+4. **Fidelidad y Cuadre en Reporte Oficial de Impresión (PDF / Impresora):**
+   - El Padrón General Imprimible (`print-only`) ahora refleja con exactitud la lista filtrada (`cuentasFiltradas` y `contratosFiltrados`), mostrando en el membrete institucional el **Período Auditado** (`Ejercicio Actual 2026`, `Histórico Anterior` o `Año Fiscal [filtroAno]`) y recalculando automáticamente las tarjetas KPI impresas (Capital Captado, Cuentas Activas, Intereses).
+5. **Selector Específico de Año (`📅 Selector de Año`):**
+   - Se añadió tanto en `/ahorros/*`, `/ahorros/plazo-fijo` como en `/creditos` un menú desplegable que extrae dinámicamente los años con registros (`Año 2026 (Actual)`, `Año 2022 (Histórico)`, `Año 2021`, etc.), permitiendo a la Auditoría fiscalizar cualquier año específico en un solo clic.
+6. **Enriquecimiento del Backend (`backend/src/modules/cuentas/service.ts`):**
+   - Inclusión de la subconsulta `m_info` en el listado general de cuentas para proveer en tiempo real las banderas `tiene_movimiento_2026` y `ultima_fecha_movimiento`.
+   - Corrección de integridad de saldo captado en `resumen()` para evitar multiplicaciones por joins repetidos (Saldo legítimo en Ahorro Corriente: **Q 3,090,108.37**).
+
+**Archivos modificados:**
+- `backend/src/modules/cuentas/service.ts`
+- `frontend/src/types.ts`
+- `frontend/src/pages/AhorroList.tsx`
+- `frontend/src/pages/PlazoFijoList.tsx`
+- `frontend/src/pages/CreditosList.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+
+---
+
+## 107. Pestañas Ejecutivas de Segmentación Temporal en Aportaciones (`/ahorros/aportacion`): Ejercicio Actual 2026 vs Histórico Anterior
+
+**Objetivo y Reglas de Negocio:**
+1. **Separación de Flujo de Capital Actual (2026) vs Fondo Histórico:**
+   - Para que la Gerencia General y los Auditores distingan con certeza cuánto capital se ha captado en el año en curso frente al saldo que venía acumulado de ejercicios anteriores, se integró la detección temporal por cuenta (`m_info.tiene_movimiento_2026` y `ultima_fecha_movimiento`) en `backend/src/modules/cuentas/service.ts`.
+2. **Pestañas Ejecutivas de Filtrado en Pantalla (`AhorroList.tsx`):**
+   - En el encabezado del módulo de Aportación Estatutaria (`/ahorros/aportacion`), se incorporó una botonera de tres segmentos rápidos:
+     * **`🌱 Ejercicio Actual 2026 (145)`:** Filtra exclusivamente los 145 asociados que aportaron o se afiliaron durante el 2026 (flujo neto de Q 14,000.00).
+     * **`📜 Histórico Anterior (548)`:** Muestra los 548 asociados fundadores o de ejercicios previos (fondo acumulado anterior).
+     * **`🌐 Consolidado Total (691)`:** Muestra el padrón institucional completo (Q 138,600.00).
+3. **Indicador de Período en Filas de Tabla:**
+   - Cada fila despliega un distintivo dinámico (`🌱 2026` en verde esmeralda o `📜 Histórico` en gris pizarra), permitiendo identificar la antigüedad de la aportación directamente en el padrón.
+
+**Archivos modificados:**
+- `backend/src/modules/cuentas/service.ts`
+- `frontend/src/types.ts`
+- `frontend/src/pages/AhorroList.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+
+---
+
+## 106. Insignias Visuales de Productos Activos en el Padrón de Socios (`/socios`) y Detección de Multiproductos (Aportación, Ahorro Corriente, DPF y Créditos)
+
+**Objetivo y Reglas de Negocio:**
+1. **Transparencia y Distinción Inmediata de Productos por Asociado:**
+   - Para erradicar confusiones en la Gerencia y Operadores sobre si un socio es solo aportante institucional o maneja otros productos financieros en la Agencia Chajul, se enriqueció la consulta de base de datos (`backend/src/modules/socios/service.ts`) agrupando en subconsulta (`bool_or`) el estado de los productos vinculados a su ID:
+     * `tiene_aportacion`: Si cuenta con Aportación Estatutaria activa de Capital Social.
+     * `tiene_ahorro_corriente`: Si posee libreta de Ahorro Corriente a la vista activa.
+     * `tiene_plazo_fijo`: Si posee certificados de Depósito a Plazo Fijo (DPF).
+     * `creditos_activos`: Conteo de préstamos vigentes con saldo capital > 0.
+2. **Componente Visual de Insignias Institucionales (`SociosList.tsx`):**
+   - En cada fila del padrón, debajo del nombre y DPI del socio, se despliegan automáticamente micro-insignias estilizadas con alto contraste:
+     * `[🏛️ Aportación]` (Verde esmeralda cooperativo `#059669`).
+     * `[💰 Ahorro Corriente]` (Azul cielo bancario `#0284c7`).
+     * `[📈 Plazo Fijo]` (Púrpura institucional `#9333ea`).
+     * `[📄 Crédito Vigente]` (Oro Maya / Ámbar `#d97706`).
+   - Esto permite que de un vistazo rápido se identifique qué asociados son exclusivamente fundadores, quiénes ahorran en ventanilla y quiénes están en cobranza de préstamos.
+
+**Archivos modificados:**
+- `backend/src/modules/socios/service.ts`
+- `frontend/src/types.ts`
+- `frontend/src/pages/SociosList.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+
+---
+
+## 105. Corrección de Integridad Contable en Saldo Total Captado de Ahorros (`backend/src/modules/cuentas/service.ts`) y Verificación de Exclusividad de Agencia Chajul
+
+**Objetivo y Reglas de Negocio:**
+1. **Verificación de Exclusividad de Agencia Chajul:**
+   - Se auditó la base de datos confirmando que el **100% de las 691 cuentas de Aportación Estatutaria** y el **100% de las 220 cuentas de Ahorro Corriente** pertenecen única y exclusivamente a la **Agencia Chajul** (código `CHAJUL`). No existen registros asignados a Nebaj ni a Acul en estas carteras.
+   - Las cuentas **no están repetidas**: cada cuenta cuenta con su identificador único UUID, código de libreta/asociado oficial y titular individual asignado.
+2. **Corrección de Sumatoria SQL en Resumen de Cuentas (`resumen()`):**
+   - **Diagnóstico:** La consulta anterior en `/cuentas/resumen` unía (`left join`) la tabla de `saldos_cuenta` con la tabla de `movimientos` en una sola expresión. Al hacer esto, si una cuenta poseía múltiples depósitos o retiros (por ejemplo 15 movimientos), su saldo actual se sumaba 15 veces, inflando el Saldo Total Captado de Ahorro Corriente erróneamente a Q 13,889,829.47.
+   - **Solución Implementada:** Se desacopló la consulta en dos operaciones independientes:
+     * Consulta 1: Suma el saldo vivo real de cada cuenta (`sc.saldo_actual`) una sola vez agrupada por tipo de ahorro y agencia.
+     * Consulta 2: Suma el acumulado histórico de depósitos y retiros.
+   - **Resultado Oficial:** El Saldo Total Captado de Ahorro Corriente se sitúa en su cifra contable legítima de **Q 3,090,108.37**, en perfecta concordancia con el Balance General y los Estados Financieros de la cooperativa. En Aportaciones Estatutarias se fija en **Q 138,600.00** para las 691 cuentas activas.
+
+**Archivos modificados:**
+- `backend/src/modules/cuentas/service.ts`
+- `MEJORAS_SISTEMA_MIF.md`
+
+---
+
+## 104. Persistencia Inteligente de Acordeones en Menú Lateral y Adaptación a Pantalla Única 100vh de Vistas Operativas Secundarias (Caja Chica, Socios y Auxiliar)
+
+**Objetivo y Reglas de Negocio:**
+1. **Persistencia y Auto-Expansión Inteligente de Acordeones (`Layout.tsx`):**
+   - Integración de almacenamiento local (`localStorage`) para recordar la preferencia del usuario en los grupos `"mif_nav_ahorros_open"` y `"mif_nav_admin_open"`.
+   - Auto-expansión reactiva inmediata cuando el usuario entra o navega a cualquier submódulo hijo (ej. `/ahorros/plazo-fijo`, `/usuarios`, `/agencias`), garantizando que la ruta activa nunca quede oculta.
+2. **Adaptación a Pantalla Única 100vh en Caja Chica (`CajaChica.tsx`):**
+   - Erradicación del div envolvente que causaba scroll en la ventana global del navegador.
+   - Acoplamiento directo de `.screen-split-layout` (Panel de categorías y comprobantes) al alto disponible (`flex: 1; min-height: 0; overflow: hidden;`).
+   - Bloqueo de altura en KPIs superiores (`flexShrink: 0`) y scroll vertical fluido exclusivo dentro de la tabla de comprobantes `.table-scroll-container`.
+3. **Adaptación a Pantalla Única 100vh en Padrón de Socios y Prospectos (`SociosList.tsx`):**
+   - Franja superior de KPIs (`TOTAL ASOCIADOS`, `PROSPECTOS / FIADORES`, `VISTA ACTUAL`) asegurada con `flexShrink: 0`.
+   - Navegación fluida entre Padrón y Prospectos con paginación anclada en el pie (`.screen-footer`) y tabla interactiva con scroll interno.
+4. **Verificación Operativa en Auxiliar de Caja (`AuxiliarCaja.tsx`, `CajaAbierta.tsx`):**
+   - Confirmación de arquitectura de pantalla dividida (`.screen-split-layout`) en 2 columnas (Ventanilla / Novedades vs. Resumen y Movimientos en vivo).
+
+**Archivos modificados:**
+- `frontend/src/pages/Layout.tsx`
+- `frontend/src/pages/CajaChica.tsx`
+- `frontend/src/pages/SociosList.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+
+---
+
+## 103. Arquitectura Integral de Pantalla Única (100vh Sin Scroll): Menú Lateral Plegable con Acordeones Inteligentes y Adaptación Ejecutiva de Vistas Operativas (Libro de Arqueos, Créditos y Kardex)
+
+**Objetivo y Reglas de Negocio:**
+1. **Menú Lateral Izquierdo (Sidebar) Adaptado al 100% en Una Sola Pantalla (`Layout.tsx`, `app.css`):**
+   - Para erradicar el scroll vertical excesivo en la barra de navegación lateral y mantener todas las opciones al alcance de la Gerencia en cualquier monitor o laptop:
+     * **Acordeón Inteligente "Ahorros y DPF":** Agrupa los 7 tipos de ahorro en una carpeta plegable interactiva con badge contador `(7)`, flecha indicadora y apertura automática cuando el usuario navega en `/ahorros/*`.
+     * **Acordeón Inteligente "Seguridad y Control":** Agrupa los 6 módulos administrativos (Alertas, Usuarios, Agencias, Traslados, Auditoría, Sesiones) con badge `(6)` y estado reactivo según la ruta activa.
+     * **Compactación Visual Institucional:** Reducción de espaciados verticales (`padding: 0.28rem 0.5rem` en enlaces y `0.38rem` en secciones) y ajuste esbelto del cabezal de marca y badge de agencia.
+     * **Control de Datos Compacto:** Rediseño de los botones `Excel` y `Reset` en una sola franja horizontal delgada.
+2. **Adaptación de Pantallas a Pantalla Única 100vh (`.screen-container`):**
+   - **Libro de Actas de Arqueo Mensual (`LibroArqueoMensual.tsx`):** Cabecera fija, panel notarial compacto y tarjeta del acta con scroll interno exclusivo (`flex: 1; overflow-y: auto`), permitiendo leer o imprimir el acta sin desbordar la ventana principal del navegador.
+   - **Kardex de Cartera de Préstamos (`KardexCarteraPromotor.tsx`):** Franja de 6 KPIs panorámica compacta, tabs de promotor (Toda la Cartera, Diego Laynez, Walter Mendoza), tabla con scroll vertical interno y pie de tabla consolidado (`TOTAL CONSOLIDADO Q 34,710,920.85`) anclado fijamente.
+   - **Bandeja de Créditos (`CreditosList.tsx`):** Homologación al estándar `screen-container` con paginador fijo y cabecera unificada.
+
+**Archivos modificados:**
+- `frontend/src/pages/Layout.tsx`
+- `frontend/src/styles/app.css`
+- `frontend/src/pages/LibroArqueoMensual.tsx`
+- `frontend/src/pages/KardexCarteraPromotor.tsx`
+- `frontend/src/pages/CreditosList.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+
+---
+
 ## 102. Arquitectura de Pantalla Única (100vh Sin Scroll) en Estados Financieros con Distribución Ejecutiva en 3 Columnas (Activo, Pasivo, Patrimonio) y Barra de Cuadre Oficial
 
 **Objetivo y Reglas de Negocio:**
@@ -2587,3 +2777,37 @@ Eliminar la clasificación residual y alerta de "Por Regularizar" (84 créditos)
 
 **Resultado:**
 - Cartera de créditos 100% oficial y unificada: 150 créditos asignados a sus respectivos promotores (Diego: 84, Walter: 66), sin mensajes de error ni pendientes de regularizar, sincronizada al segundo con los cobros de ventanilla.
+
+---
+
+### MEJORA #102 (28/09/2026) - Rediseño a Pantalla Única (100vh) y Verificación Temporal 2026 vs. Histórico en Padrón de Aportaciones (Capital Social)
+
+**Objetivo:**
+Ajustar la vista del Padrón de Aportaciones (`/aportaciones`) al estándar estricto de pantalla única institucional (`100vh` con cero scroll de ventana y scroll interno independiente en la tabla de asociados), incorporando segmentación temporal automática para distinguir el Ejercicio 2026 frente a registros anteriores a 2026 (Histórico Anterior / Previo 2026), selector de año dinámico y rango de fechas exacto (`Desde:` / `Hasta:`).
+
+**Detalles de la Implementación:**
+1. **Arquitectura Visual de Pantalla Única (`.screen-container`):**
+   - Integración de contenedor de alta densidad sin desborde exterior vertical.
+   - Encabezado ultra-compacto con título institucional, distintivo verde y botones de acción (`🖨️ Imprimir Padrón` y `+ Nuevo socio`).
+   - Fila de 4 tarjetas KPI optimizadas (~42px de alto): `CAPITAL SOCIAL FILTRADO`, `ASOCIADOS FILTRADOS`, `APORTACIÓN PROMEDIO` y `CUMPLIMIENTO ESTATUTO (Min. Q 100.00)`.
+   - Contenedor de tabla con encabezado sticky (`thead`) y barra de paginación fija en el pie inferior (`Mostrando 10 de N asociados`).
+2. **Segmentación y Filtros Temporales (2026 vs. Histórico Anterior):**
+   - **🌱 Ejercicio 2026:** Filtra asociados cuya fecha de ingreso o registro corresponda al año 2026 (161 registros / 144 paginados en lista activa).
+   - **📜 Histórico Anterior:** Filtra asociados o fondos consolidados previos a 2026 (ej. `CHAJ-00000 FONDO CONSOLIDADO DE APORTACIONES HISTÓRICAS` con fecha `31/12/2025` y Q 15,200.00).
+   - **🌐 Consolidado / Padrón General:** Vista consolidada de la totalidad de asociados (707 asociados y Q 138,600.00 en capital social).
+   - **Filtro por Año (`📅 Año`):** Desplegable dinámico con los años presentes en la base de datos (2026, 2025).
+   - **Rango de Fechas Preciso:** Entradas `Desde:` y `Hasta:` con botón para limpiar filtros (`✕`).
+3. **Indicador Visual en Cada Fila de la Tabla:**
+   - La columna `FECHA INGRESO` despliega la fecha formateada (`dd/mm/aaaa`) acompañada de una etiqueta distintiva:
+     * `🌱 2026` (esmeralda suave) para socios ingresados en el ejercicio en curso.
+     * `📜 Histórico` (oro maya suave) para socios o aportaciones previas al 2026.
+4. **Optimización de Anchos de Columna:**
+   - Reducción proporcional y balanceada de anchos mínimos (`NO. ASOCIADO: 95px`, `NOMBRES: 180px`, `DPI: 105px`, `GÉNERO: 60px (centrado)`, `CAPITAL: 115px`, `BENEFICIARIO: 170px`, `FECHA: 95px (centrado)`, `ESTADO: 70px (centrado)`), asegurando que las 8 columnas encajen perfectamente en monitores estándar sin corte horizontal.
+
+**Archivos Modificados:**
+- `frontend/src/pages/AportacionesList.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+
+**Resultado:**
+- Padrón de Capital Social con navegación fluida en una sola pantalla (100vh), clasificación nítida e instantánea entre el ejercicio vigente 2026 y el historial acumulado anterior, filtro por fechas personalizadas y trazabilidad institucional completa.
+

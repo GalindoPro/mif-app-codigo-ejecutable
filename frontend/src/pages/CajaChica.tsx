@@ -346,9 +346,8 @@ export default function CajaChica() {
 
   return (
     <div className="screen-container">
-      <div>
-        {/* CABECERA COMPACTA DE 1 LÍNEA */}
-        <div className="screen-header">
+      {/* CABECERA COMPACTA DE 1 LÍNEA */}
+      <div className="screen-header" style={{ flexShrink: 0 }}>
           <div>
             <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
               <span>📥</span> Caja Chica
@@ -393,7 +392,7 @@ export default function CajaChica() {
 
         {/* CINTILLO SUPERIOR DE KPIS COMPACTOS FINTECH */}
         {resultado && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem", margin: "0.4rem 0" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem", margin: "0.4rem 0", flexShrink: 0 }}>
             {/* SALDO ACTUAL */}
             <div
               style={{
@@ -932,7 +931,6 @@ export default function CajaChica() {
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 }

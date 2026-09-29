@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import {
@@ -14,6 +14,8 @@ export default function PlazoFijoList() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<string>("");
+  const [filtroPeriodo, setFiltroPeriodo] = useState<"TODOS" | "ACTUAL_2026" | "HISTORICO">("ACTUAL_2026");
+  const [filtroAno, setFiltroAno] = useState<string>("");
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
@@ -36,6 +38,40 @@ export default function PlazoFijoList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, estadoFiltro]);
 
+  const esContrato2026 = (c: PlazoFijoContrato) =>
+    c.estado === "ACTIVO" ||
+    (c.fecha_inicio && c.fecha_inicio.startsWith("2026")) ||
+    (c.fecha_vencimiento && c.fecha_vencimiento >= "2026-01-01");
+
+  const contratosActuales = useMemo(() => contratos?.filter(esContrato2026) ?? [], [contratos]);
+  const contratosHistoricos = useMemo(() => contratos?.filter((c) => !esContrato2026(c)) ?? [], [contratos]);
+
+  const anosDisponibles = useMemo(() => {
+    if (!contratos) return [];
+    const setAnos = new Set<string>();
+    contratos.forEach((c) => {
+      if (c.fecha_vencimiento) setAnos.add(c.fecha_vencimiento.slice(0, 4));
+      if (c.fecha_inicio) setAnos.add(c.fecha_inicio.slice(0, 4));
+    });
+    return Array.from(setAnos).filter((a) => a && a.length === 4).sort().reverse();
+  }, [contratos]);
+
+  const contratosFiltrados = useMemo(() => {
+    if (!contratos) return [];
+    let lista = contratos;
+    if (filtroPeriodo === "ACTUAL_2026") lista = contratosActuales;
+    else if (filtroPeriodo === "HISTORICO") lista = contratosHistoricos;
+
+    if (filtroAno) {
+      lista = lista.filter(
+        (c) =>
+          (c.fecha_vencimiento && c.fecha_vencimiento.startsWith(filtroAno)) ||
+          (c.fecha_inicio && c.fecha_inicio.startsWith(filtroAno))
+      );
+    }
+    return lista;
+  }, [contratos, filtroPeriodo, filtroAno, contratosActuales, contratosHistoricos]);
+
   const activos = contratos?.filter((c) => c.estado === "ACTIVO") ?? [];
   const totalInversionActiva = activos.reduce((sum, c) => sum + Number(c.monto_deposito), 0);
   const totalInteresesComprometidos = activos.reduce((sum, c) => sum + Number(c.interes_neto || c.interes_generado), 0);
@@ -43,9 +79,9 @@ export default function PlazoFijoList() {
   const hoy = new Date().toISOString().slice(0, 10);
   const porVencerOyaVencidos = activos.filter((c) => c.fecha_vencimiento <= hoy).length;
 
-  const totalCertificados = contratos?.length ?? 0;
+  const totalCertificados = contratosFiltrados.length;
   const totalPaginas = Math.max(1, Math.ceil(totalCertificados / pageSize));
-  const contratosPaginados = contratos?.slice((page - 1) * pageSize, page * pageSize) ?? [];
+  const contratosPaginados = contratosFiltrados.slice((page - 1) * pageSize, page * pageSize);
 
   function formatearFechaCorta(f: string | null | undefined): string {
     if (!f) return "—";
@@ -222,9 +258,123 @@ export default function PlazoFijoList() {
         </div>
       </div>
 
-      {/* BARRA DE FILTROS COMPACTA */}
-      <div className="screen-toolbar">
-        <div style={{ position: "relative", flex: 1, maxWidth: 440 }}>
+      {/* BARRA DE FILTROS COMPACTA CON SEGMENTACIÓN TEMPORAL */}
+      <div className="screen-toolbar" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
+        {/* SEGMENTACIÓN TEMPORAL RÁPIDA */}
+        <div style={{ display: "inline-flex", background: "var(--paper-raised, rgba(15,23,42,0.6))", padding: "2px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroPeriodo("ACTUAL_2026");
+              setFiltroAno("");
+              setPage(1);
+            }}
+            style={{
+              padding: "0.3rem 0.65rem",
+              fontSize: "0.78rem",
+              fontWeight: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? 700 : 500,
+              background: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? "#059669" : "transparent",
+              color: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? "#fff" : "var(--ink-soft)",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              transition: "all 0.15s ease",
+            }}
+          >
+            🌱 Ejercicio 2026
+            <span style={{ fontSize: "0.7rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 5px", borderRadius: "10px" }}>
+              {contratosActuales.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroPeriodo("HISTORICO");
+              setFiltroAno("");
+              setPage(1);
+            }}
+            style={{
+              padding: "0.3rem 0.65rem",
+              fontSize: "0.78rem",
+              fontWeight: filtroPeriodo === "HISTORICO" && !filtroAno ? 700 : 500,
+              background: filtroPeriodo === "HISTORICO" && !filtroAno ? "#BF9903" : "transparent",
+              color: filtroPeriodo === "HISTORICO" && !filtroAno ? "#0f172a" : "var(--ink-soft)",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              transition: "all 0.15s ease",
+            }}
+          >
+            📜 Histórico Anterior
+            <span style={{ fontSize: "0.7rem", opacity: 0.9, background: "rgba(0,0,0,0.15)", padding: "1px 5px", borderRadius: "10px" }}>
+              {contratosHistoricos.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroPeriodo("TODOS");
+              setFiltroAno("");
+              setPage(1);
+            }}
+            style={{
+              padding: "0.3rem 0.65rem",
+              fontSize: "0.78rem",
+              fontWeight: filtroPeriodo === "TODOS" && !filtroAno ? 700 : 500,
+              background: filtroPeriodo === "TODOS" && !filtroAno ? "#0284c7" : "transparent",
+              color: filtroPeriodo === "TODOS" && !filtroAno ? "#fff" : "var(--ink-soft)",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              transition: "all 0.15s ease",
+            }}
+          >
+            🌐 Consolidado
+            <span style={{ fontSize: "0.7rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 5px", borderRadius: "10px" }}>
+              {contratos?.length || 0}
+            </span>
+          </button>
+        </div>
+
+        {/* SELECTOR ESPECÍFICO DE AÑO */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+          <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)", fontWeight: 600 }}>📅 Año:</span>
+          <select
+            value={filtroAno}
+            onChange={(e) => {
+              setFiltroAno(e.target.value);
+              setPage(1);
+            }}
+            style={{
+              padding: "0.35rem 0.6rem",
+              borderRadius: "6px",
+              border: "1px solid var(--line)",
+              background: "var(--paper)",
+              color: "var(--ink)",
+              fontSize: "0.8rem",
+              fontWeight: 600,
+            }}
+          >
+            <option value="">Todos los años</option>
+            {anosDisponibles.map((ano) => (
+              <option key={ano} value={ano}>
+                Año {ano} {ano === "2026" ? "(Actual)" : "(Histórico)"}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* BUSCADOR */}
+        <div style={{ position: "relative", flex: 1, minWidth: 200, maxWidth: 360 }}>
           <span
             style={{
               position: "absolute",
@@ -255,6 +405,7 @@ export default function PlazoFijoList() {
           />
         </div>
 
+        {/* FILTRO ESTADO */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <select
             value={estadoFiltro}
@@ -350,12 +501,27 @@ export default function PlazoFijoList() {
                     {formatoQ(c.interes_neto)}
                   </td>
                   <td style={{ textAlign: "center" }}>
-                    <span
-                      className={`badge ${c.estado === "ACTIVO" ? (estaVencido ? "danger" : "activo") : "inactivo"}`}
-                      style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}
-                    >
-                      {ESTADO_PLAZO_FIJO_LABEL[c.estado]}
-                    </span>
+                    <div style={{ display: "inline-flex", flexDirection: "column", gap: "2px", alignItems: "center" }}>
+                      <span
+                        className={`badge ${c.estado === "ACTIVO" ? (estaVencido ? "danger" : "activo") : "inactivo"}`}
+                        style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}
+                      >
+                        {ESTADO_PLAZO_FIJO_LABEL[c.estado]}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "0.65rem",
+                          fontWeight: 600,
+                          padding: "0.05rem 0.35rem",
+                          borderRadius: "4px",
+                          background: esContrato2026(c) ? "rgba(16, 185, 129, 0.15)" : "rgba(148, 163, 184, 0.15)",
+                          color: esContrato2026(c) ? "#10b981" : "var(--ink-soft)",
+                          border: `1px solid ${esContrato2026(c) ? "rgba(16, 185, 129, 0.3)" : "rgba(148, 163, 184, 0.2)"}`,
+                        }}
+                      >
+                        {esContrato2026(c) ? "🌱 2026" : "📜 Histórico"}
+                      </span>
+                    </div>
                   </td>
                 </tr>
               );
@@ -415,32 +581,41 @@ export default function PlazoFijoList() {
           </div>
           <div style={{ textAlign: "right", fontSize: "7.5pt", color: "#334155" }}>
             <div><strong>Emisión:</strong> {new Date().toLocaleDateString("es-GT", { day: "2-digit", month: "2-digit", year: "numeric" })} {new Date().toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}</div>
-            <div><strong>Total Certificados:</strong> {totalCertificados} ({activos.length} activos)</div>
-            {q && <div><strong>Filtro aplicado:</strong> "{q}"</div>}
+            <div><strong>Período Auditado:</strong> {filtroAno ? `Año Fiscal ${filtroAno}` : filtroPeriodo === "ACTUAL_2026" ? "Ejercicio Actual 2026" : filtroPeriodo === "HISTORICO" ? "Histórico Anterior" : "Consolidado Total"}</div>
+            <div><strong>Total Certificados Filtrados:</strong> {totalCertificados} ({contratosFiltrados.filter(c => c.estado === "ACTIVO").length} vigentes)</div>
+            {q && <div><strong>Filtro búsqueda:</strong> "{q}"</div>}
           </div>
         </div>
 
-        {/* RESUMEN FINANCIERO OFICIAL */}
+        {/* RESUMEN FINANCIERO OFICIAL FILTRADO */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginBottom: "10px" }}>
           <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
-            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>CAPITAL TOTAL CAPTADO</div>
-            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#7c3aed", fontFamily: "monospace" }}>{formatoQ(totalInversionActiva)}</div>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>CAPITAL TOTAL FILTRADO</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#7c3aed", fontFamily: "monospace" }}>
+              {formatoQ(contratosFiltrados.reduce((sum, c) => sum + Number(c.monto_deposito), 0))}
+            </div>
           </div>
           <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
             <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>CERTIFICADOS VIGENTES</div>
-            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#1e293b", fontFamily: "monospace" }}>{activos.length}</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#1e293b", fontFamily: "monospace" }}>
+              {contratosFiltrados.filter(c => c.estado === "ACTIVO").length}
+            </div>
           </div>
           <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
             <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>INTERESES COMPROMETIDOS</div>
-            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#d97706", fontFamily: "monospace" }}>{formatoQ(totalInteresesComprometidos)}</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#d97706", fontFamily: "monospace" }}>
+              {formatoQ(contratosFiltrados.reduce((sum, c) => sum + Number(c.interes_neto || c.interes_generado), 0))}
+            </div>
           </div>
           <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
             <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>VENCIDOS / POR VENCER</div>
-            <div style={{ fontSize: "10pt", fontWeight: 800, color: porVencerOyaVencidos > 0 ? "#dc2626" : "#059669", fontFamily: "monospace" }}>{porVencerOyaVencidos}</div>
+            <div style={{ fontSize: "10pt", fontWeight: 800, color: "#dc2626", fontFamily: "monospace" }}>
+              {contratosFiltrados.filter(c => c.estado === "ACTIVO" && c.fecha_vencimiento <= hoy).length}
+            </div>
           </div>
         </div>
 
-        {/* TABLA COMPLETA CON TODOS LOS CERTIFICADOS REGISTRADOS */}
+        {/* TABLA COMPLETA CON CERTIFICADOS FILTRADOS */}
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "7.2pt", marginBottom: "15px" }}>
           <thead>
             <tr style={{ background: "#0f172a", color: "#ffffff" }}>
@@ -451,11 +626,11 @@ export default function PlazoFijoList() {
               <th style={{ width: "13%", textAlign: "right", padding: "4px 4px", color: "#ffffff" }}>DEPÓSITO (Q)</th>
               <th style={{ width: "10%", textAlign: "center", padding: "4px 4px", color: "#ffffff" }}>PLAZO / TASA</th>
               <th style={{ width: "10%", textAlign: "center", padding: "4px 4px", color: "#ffffff" }}>VENCE</th>
-              <th style={{ width: "10%", textAlign: "center", padding: "4px 4px", color: "#ffffff" }}>ESTADO</th>
+              <th style={{ width: "10%", textAlign: "center", padding: "4px 4px", color: "#ffffff" }}>ESTADO / EJERCICIO</th>
             </tr>
           </thead>
           <tbody>
-            {(contratos ?? []).map((c, index) => {
+            {contratosFiltrados.map((c, index) => {
               const estaVencido = c.estado === "ACTIVO" && c.fecha_vencimiento <= hoy;
               return (
                 <tr key={c.id} style={{ background: index % 2 === 0 ? "#ffffff" : "#f8fafc" }}>

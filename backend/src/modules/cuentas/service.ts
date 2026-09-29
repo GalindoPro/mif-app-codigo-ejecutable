@@ -52,12 +52,21 @@ export async function listar(params: {
     `select c.*, s.nombres as socio_nombres, s.numero_asociado,
             a.nombre as agencia_nombre, a.codigo as agencia_codigo,
             p.codigo as prestamo_codigo, p.estado as prestamo_estado,
-            coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
+            coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual,
+            coalesce(m_info.tiene_movimiento_2026, false) as tiene_movimiento_2026,
+            m_info.ultima_fecha_movimiento
      from cuentas c
      join socios s on s.id = c.socio_id
      join agencias a on a.id = c.agencia_id
      left join prestamos p on p.id = c.prestamo_id
      left join saldos_cuenta sc on sc.cuenta_id = c.id
+     left join (
+       select cuenta_id,
+              max(fecha) as ultima_fecha_movimiento,
+              bool_or(fecha >= '2026-01-01') as tiene_movimiento_2026
+       from movimientos
+       group by cuenta_id
+     ) m_info on m_info.cuenta_id = c.id
      where ${condiciones.join(" and ")}
      order by c.created_at desc`,
     valores,
@@ -75,24 +84,35 @@ export async function resumen(params: { tipo: TipoCuentaAhorro; agenciaId: strin
   }
   const where = condiciones.join(" and ");
 
-  const { rows } = await pool.query(
+  // 1. Saldo total y conteo de cuentas (sin multiplicar por movimientos)
+  const { rows: saldoRows } = await pool.query(
     `select
        count(distinct c.id)::int as total_cuentas,
-       coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0) as saldo_total,
-       coalesce(sum(case when m.tipo = 'DEPOSITO' then m.monto else 0 end), 0) as total_depositos,
-       coalesce(sum(case when m.tipo = 'RETIRO' then m.monto else 0 end), 0) as total_retiros
+       coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0) as saldo_total
      from cuentas c
      left join saldos_cuenta sc on sc.cuenta_id = c.id
-     left join movimientos m on m.cuenta_id = c.id
      where ${where}`,
     valores,
   );
-  const fila = rows[0];
+
+  // 2. Flujo histórico de depósitos y retiros
+  const { rows: movRows } = await pool.query(
+    `select
+       coalesce(sum(case when m.tipo = 'DEPOSITO' then m.monto else 0 end), 0) as total_depositos,
+       coalesce(sum(case when m.tipo = 'RETIRO' then m.monto else 0 end), 0) as total_retiros
+     from cuentas c
+     join movimientos m on m.cuenta_id = c.id
+     where ${where}`,
+    valores,
+  );
+
+  const filaSaldo = saldoRows[0];
+  const filaMov = movRows[0];
   return {
-    totalCuentas: Number(fila.total_cuentas),
-    saldoTotal: Number(fila.saldo_total),
-    totalDepositos: Number(fila.total_depositos),
-    totalRetiros: Number(fila.total_retiros),
+    totalCuentas: Number(filaSaldo?.total_cuentas || 0),
+    saldoTotal: Number(filaSaldo?.saldo_total || 0),
+    totalDepositos: Number(filaMov?.total_depositos || 0),
+    totalRetiros: Number(filaMov?.total_retiros || 0),
   };
 }
 

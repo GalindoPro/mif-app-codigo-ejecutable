@@ -67,6 +67,9 @@ export interface Socio {
   tutor_parentesco?: string | null;
   tutor_telefono?: string | null;
   total_cuentas?: number;
+  tiene_aportacion?: boolean;
+  tiene_ahorro_corriente?: boolean;
+  tiene_plazo_fijo?: boolean;
   creditos_activos?: number;
   created_at: string;
 }
@@ -166,6 +169,8 @@ export interface Cuenta {
   titular_menor_parentesco?: string | null;
   titular_menor_cui?: string | null;
   titular_menor_fecha_nacimiento?: string | null;
+  tiene_movimiento_2026?: boolean;
+  ultima_fecha_movimiento?: string | null;
   created_at: string;
 }
 
@@ -224,8 +229,8 @@ export const TIPOS_AHORRO: AhorroTipoConfig[] = [
   {
     tipo: "APORTACION",
     slug: "aportacion",
-    titulo: "Aportación Estatutaria",
-    descripcion: "Capital social institucional del asociado.",
+    titulo: "Cuentas de Aportación",
+    descripcion: "Libretas y movimientos de aportaciones de capital social.",
   },
   {
     tipo: "APORTACION_INFANTIL",

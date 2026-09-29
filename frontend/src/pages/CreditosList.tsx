@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -35,6 +35,8 @@ export default function CreditosList() {
   const [q, setQ] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<string>("");
   const [filtroPromotor, setFiltroPromotor] = useState<"TODOS" | "DIEGO" | "WALTER">("TODOS");
+  const [filtroPeriodo, setFiltroPeriodo] = useState<"TODOS" | "ACTUAL_2026" | "HISTORICO">("ACTUAL_2026");
+  const [filtroAno, setFiltroAno] = useState<string>("");
   const [filtroTipoFiador, setFiltroTipoFiador] = useState<"TODOS" | "EXTERNOS" | "SOCIOS">("TODOS");
   const [page, setPage] = useState(1);
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
@@ -128,22 +130,51 @@ export default function CreditosList() {
 
   const totalCount = prestamos?.length ?? 0;
 
-  const prestamosFiltrados = (prestamos || []).filter((p) => {
-    if (filtroPromotor === "DIEGO") {
-      return (
-        (p.promotor_nombre && p.promotor_nombre.toUpperCase().includes("DIEGO")) ||
-        p.origen_cartera === "POR_REGULARIZAR"
-      );
-    }
-    if (filtroPromotor === "WALTER") {
-      return (
-        (p.promotor_nombre && p.promotor_nombre.toUpperCase().includes("WALTER")) ||
-        (p.origen_cartera === "OFICIAL_PROMOTOR" &&
-          (!p.promotor_nombre || !p.promotor_nombre.toUpperCase().includes("DIEGO")))
-      );
-    }
-    return true;
-  });
+  const esPrestamo2026 = (p: Prestamo) => {
+    const f = p.fecha_desembolso || p.fecha_solicitud || p.created_at;
+    return Boolean(f && f.startsWith("2026"));
+  };
+
+  const anosDisponibles = useMemo(() => {
+    if (!prestamos) return [];
+    const setAnos = new Set<string>();
+    prestamos.forEach((p) => {
+      const f = p.fecha_desembolso || p.fecha_solicitud || p.created_at;
+      if (f) setAnos.add(f.slice(0, 4));
+    });
+    return Array.from(setAnos).filter((a) => a && a.length === 4).sort().reverse();
+  }, [prestamos]);
+
+  const prestamosActuales = useMemo(() => prestamos?.filter(esPrestamo2026) ?? [], [prestamos]);
+  const prestamosHistoricos = useMemo(() => prestamos?.filter((p) => !esPrestamo2026(p)) ?? [], [prestamos]);
+
+  const prestamosFiltrados = useMemo(() => {
+    return (prestamos || []).filter((p) => {
+      if (filtroPromotor === "DIEGO") {
+        const match =
+          (p.promotor_nombre && p.promotor_nombre.toUpperCase().includes("DIEGO")) ||
+          p.origen_cartera === "POR_REGULARIZAR";
+        if (!match) return false;
+      }
+      if (filtroPromotor === "WALTER") {
+        const match =
+          (p.promotor_nombre && p.promotor_nombre.toUpperCase().includes("WALTER")) ||
+          (p.origen_cartera === "OFICIAL_PROMOTOR" &&
+            (!p.promotor_nombre || !p.promotor_nombre.toUpperCase().includes("DIEGO")));
+        if (!match) return false;
+      }
+
+      if (filtroPeriodo === "ACTUAL_2026" && !esPrestamo2026(p)) return false;
+      if (filtroPeriodo === "HISTORICO" && esPrestamo2026(p)) return false;
+
+      if (filtroAno) {
+        const f = p.fecha_desembolso || p.fecha_solicitud || p.created_at;
+        if (!f || !f.startsWith(filtroAno)) return false;
+      }
+
+      return true;
+    });
+  }, [prestamos, filtroPromotor, filtroPeriodo, filtroAno]);
 
   const totalDesembolsado =
     prestamosFiltrados
@@ -218,17 +249,7 @@ export default function CreditosList() {
   const prestamosPaginados = prestamosFiltrados?.slice((page - 1) * pageSize, page * pageSize) ?? [];
 
   return (
-    <div
-      className="screen-container"
-      style={{
-        height: "calc(100vh - 1.8rem)",
-        maxHeight: "calc(100vh - 1.8rem)",
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.28rem",
-      }}
-    >
+    <div className="screen-container" style={{ width: "100%", maxWidth: "100%" }}>
       {/* CABECERA COMPACTA DE 1 LÍNEA CON TABS INTEGRADAS */}
       <div className="screen-header" style={{ paddingBottom: "0.25rem", borderBottom: "1px solid var(--line)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
@@ -484,9 +505,119 @@ export default function CreditosList() {
             </div>
           </div>
 
-          {/* BARRA DE HERRAMIENTAS ULTRA-COMPACTA EN 1 LÍNEA */}
-          <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", marginBottom: "0.2rem" }}>
-            <div className="searchbar" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
+          {/* BARRA DE HERRAMIENTAS ULTRA-COMPACTA CON SEGMENTACIÓN TEMPORAL */}
+          <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", marginBottom: "0.2rem", flexWrap: "wrap" }}>
+            {/* SEGMENTACIÓN TEMPORAL EJERCICIO ACTUAL VS HISTÓRICO */}
+            <div style={{ display: "inline-flex", background: "var(--paper-raised, rgba(15,23,42,0.6))", padding: "2px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setFiltroPeriodo("ACTUAL_2026");
+                  setFiltroAno("");
+                  setPage(1);
+                }}
+                style={{
+                  padding: "0.22rem 0.55rem",
+                  fontSize: "0.74rem",
+                  fontWeight: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? 700 : 500,
+                  background: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? "#059669" : "transparent",
+                  color: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? "#fff" : "var(--ink-soft)",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                }}
+              >
+                🌱 Ejercicio 2026
+                <span style={{ fontSize: "0.68rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 4px", borderRadius: "8px" }}>
+                  {prestamosActuales.length}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFiltroPeriodo("HISTORICO");
+                  setFiltroAno("");
+                  setPage(1);
+                }}
+                style={{
+                  padding: "0.22rem 0.55rem",
+                  fontSize: "0.74rem",
+                  fontWeight: filtroPeriodo === "HISTORICO" && !filtroAno ? 700 : 500,
+                  background: filtroPeriodo === "HISTORICO" && !filtroAno ? "#BF9903" : "transparent",
+                  color: filtroPeriodo === "HISTORICO" && !filtroAno ? "#0f172a" : "var(--ink-soft)",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                }}
+              >
+                📜 Histórico
+                <span style={{ fontSize: "0.68rem", opacity: 0.9, background: "rgba(0,0,0,0.15)", padding: "1px 4px", borderRadius: "8px" }}>
+                  {prestamosHistoricos.length}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFiltroPeriodo("TODOS");
+                  setFiltroAno("");
+                  setPage(1);
+                }}
+                style={{
+                  padding: "0.22rem 0.55rem",
+                  fontSize: "0.74rem",
+                  fontWeight: filtroPeriodo === "TODOS" && !filtroAno ? 700 : 500,
+                  background: filtroPeriodo === "TODOS" && !filtroAno ? "#0284c7" : "transparent",
+                  color: filtroPeriodo === "TODOS" && !filtroAno ? "#fff" : "var(--ink-soft)",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                }}
+              >
+                🌐 Consolidado
+                <span style={{ fontSize: "0.68rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 4px", borderRadius: "8px" }}>
+                  {prestamos?.length || 0}
+                </span>
+              </button>
+            </div>
+
+            {/* SELECTOR ESPECÍFICO DE AÑO */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+              <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)", fontWeight: 600 }}>📅 Año:</span>
+              <select
+                value={filtroAno}
+                onChange={(e) => {
+                  setFiltroAno(e.target.value);
+                  setPage(1);
+                }}
+                style={{
+                  padding: "0.24rem 0.45rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--line)",
+                  background: "var(--paper)",
+                  color: "var(--ink)",
+                  fontSize: "0.76rem",
+                  fontWeight: 600,
+                }}
+              >
+                <option value="">Todos los años</option>
+                {anosDisponibles.map((ano) => (
+                  <option key={ano} value={ano}>
+                    Año {ano} {ano === "2026" ? "(Actual)" : "(Histórico)"}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="searchbar" style={{ flex: 1, minWidth: 180, marginBottom: 0 }}>
               <input
                 placeholder="🔍 Buscar por socio, código de crédito o DPI…"
                 value={q}
@@ -631,20 +762,35 @@ export default function CreditosList() {
                         {p.promotor_nombre ?? <span style={{ color: "var(--ink-soft)" }}>—</span>}
                       </td>
                       <td style={{ textAlign: "center" }}>
-                        <span
-                          className={`badge ${
-                            p.estado === "DESEMBOLSADO"
-                              ? "activo"
-                              : p.estado === "APROBADO"
-                              ? "info"
-                              : p.estado === "SOLICITUD"
-                              ? "warning"
-                              : "inactivo"
-                          }`}
-                          style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}
-                        >
-                          {ESTADO_PRESTAMO_LABEL[p.estado]}
-                        </span>
+                        <div style={{ display: "inline-flex", flexDirection: "column", gap: "2px", alignItems: "center" }}>
+                          <span
+                            className={`badge ${
+                              p.estado === "DESEMBOLSADO"
+                                ? "activo"
+                                : p.estado === "APROBADO"
+                                ? "info"
+                                : p.estado === "SOLICITUD"
+                                ? "warning"
+                                : "inactivo"
+                            }`}
+                            style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}
+                          >
+                            {ESTADO_PRESTAMO_LABEL[p.estado]}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "0.65rem",
+                              fontWeight: 600,
+                              padding: "0.05rem 0.35rem",
+                              borderRadius: "4px",
+                              background: esPrestamo2026(p) ? "rgba(16, 185, 129, 0.15)" : "rgba(148, 163, 184, 0.15)",
+                              color: esPrestamo2026(p) ? "#10b981" : "var(--ink-soft)",
+                              border: `1px solid ${esPrestamo2026(p) ? "rgba(16, 185, 129, 0.3)" : "rgba(148, 163, 184, 0.2)"}`,
+                            }}
+                          >
+                            {esPrestamo2026(p) ? "🌱 2026" : "📜 Histórico"}
+                          </span>
+                        </div>
                       </td>
 
                       {/* COLUMNA DE ACCIONES RÁPIDAS EN 1 FILA COMPACTA */}

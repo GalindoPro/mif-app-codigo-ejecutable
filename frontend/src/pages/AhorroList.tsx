@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import { formatoQ, TIPOS_AHORRO } from "../types";
@@ -13,6 +13,8 @@ export default function AhorroList() {
   const [cuentas, setCuentas] = useState<Cuenta[] | null>(null);
   const [resumen, setResumen] = useState<ResumenCuentas | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filtroPeriodo, setFiltroPeriodo] = useState<"TODOS" | "ACTUAL_2026" | "HISTORICO">("TODOS");
+  const [filtroAno, setFiltroAno] = useState<string>("");
 
   const [page, setPage] = useState(1);
   const pageSize = 10;
@@ -40,12 +42,45 @@ export default function AhorroList() {
       .catch((err) => setError(mensajeError(err)));
   }, [config]);
 
+  const cuentasActuales = useMemo(() => cuentas?.filter((c) => c.tiene_movimiento_2026) ?? [], [cuentas]);
+  const cuentasHistoricas = useMemo(() => cuentas?.filter((c) => !c.tiene_movimiento_2026) ?? [], [cuentas]);
+
+  const anosDisponibles = useMemo(() => {
+    if (!cuentas) return [];
+    const setAnos = new Set<string>();
+    cuentas.forEach((c) => {
+      if (c.ultima_fecha_movimiento) setAnos.add(c.ultima_fecha_movimiento.slice(0, 4));
+      if (c.created_at) setAnos.add(c.created_at.slice(0, 4));
+    });
+    return Array.from(setAnos).filter((a) => a && a.length === 4).sort().reverse();
+  }, [cuentas]);
+
+  const cuentasFiltradas = useMemo(() => {
+    if (!cuentas) return [];
+    let lista = cuentas;
+    if (filtroPeriodo === "ACTUAL_2026") lista = cuentasActuales;
+    else if (filtroPeriodo === "HISTORICO") lista = cuentasHistoricas;
+
+    if (filtroAno) {
+      lista = lista.filter(
+        (c) =>
+          (c.ultima_fecha_movimiento && c.ultima_fecha_movimiento.startsWith(filtroAno)) ||
+          (c.created_at && c.created_at.startsWith(filtroAno))
+      );
+    }
+    return lista;
+  }, [cuentas, filtroPeriodo, filtroAno, cuentasActuales, cuentasHistoricas]);
+
   if (!config) return <div className="alert error">Tipo de ahorro no reconocido.</div>;
 
-  const saldoTotal = resumen?.saldoTotal ?? cuentas?.reduce((acc, c) => acc + Number(c.saldo_actual), 0) ?? 0;
-  const totalCuentas = cuentas?.length ?? 0;
+  const totalCuentas = cuentasFiltradas.length;
+  const saldoTotal =
+    filtroPeriodo !== "TODOS"
+      ? cuentasFiltradas.reduce((acc, c) => acc + Number(c.saldo_actual), 0)
+      : resumen?.saldoTotal ?? cuentasFiltradas.reduce((acc, c) => acc + Number(c.saldo_actual), 0);
+
   const totalPaginas = Math.max(1, Math.ceil(totalCuentas / pageSize));
-  const cuentasPaginadas = cuentas?.slice((page - 1) * pageSize, page * pageSize) ?? [];
+  const cuentasPaginadas = cuentasFiltradas.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="screen-container">
@@ -67,6 +102,22 @@ export default function AhorroList() {
             }}
           >
             {config.descripcion}
+          </span>
+          <span
+            style={{
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              padding: "0.15rem 0.5rem",
+              borderRadius: "4px",
+              background: "rgba(59, 130, 246, 0.12)",
+              color: "#3b82f6",
+              border: "1px solid rgba(59, 130, 246, 0.25)",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.25rem",
+            }}
+          >
+            <span>📍</span> Agencia Chajul
           </span>
         </div>
 
@@ -200,9 +251,107 @@ export default function AhorroList() {
         </div>
       </div>
 
-      {/* BARRA DE BÚSQUEDA COMPACTA */}
+      {/* BARRA DE BÚSQUEDA Y PESTAÑAS DE FILTRO */}
       <div className="screen-toolbar">
-        <div style={{ position: "relative", flex: 1, maxWidth: 480 }}>
+        <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", alignItems: "center" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroPeriodo("ACTUAL_2026");
+              setPage(1);
+            }}
+            style={{
+              padding: "0.26rem 0.65rem",
+              borderRadius: "6px",
+              fontSize: "0.78rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              border: filtroPeriodo === "ACTUAL_2026" ? "1.5px solid #059669" : "1px solid var(--line)",
+              background: filtroPeriodo === "ACTUAL_2026" ? "rgba(16, 185, 129, 0.15)" : "var(--paper-raised)",
+              color: filtroPeriodo === "ACTUAL_2026" ? "#10b981" : "var(--ink-soft)",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.3rem",
+            }}
+          >
+            <span>🌱</span> Ejercicio Actual 2026 ({cuentasActuales.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroPeriodo("HISTORICO");
+              setPage(1);
+            }}
+            style={{
+              padding: "0.26rem 0.65rem",
+              borderRadius: "6px",
+              fontSize: "0.78rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              border: filtroPeriodo === "HISTORICO" ? "1.5px solid #d97706" : "1px solid var(--line)",
+              background: filtroPeriodo === "HISTORICO" ? "rgba(217, 119, 6, 0.15)" : "var(--paper-raised)",
+              color: filtroPeriodo === "HISTORICO" ? "#f59e0b" : "var(--ink-soft)",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.3rem",
+            }}
+          >
+            <span>📜</span> Histórico Anterior ({cuentasHistoricas.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroPeriodo("TODOS");
+              setFiltroAno("");
+              setPage(1);
+            }}
+            style={{
+              padding: "0.26rem 0.65rem",
+              borderRadius: "6px",
+              fontSize: "0.78rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              border: filtroPeriodo === "TODOS" && !filtroAno ? "1.5px solid #0284c7" : "1px solid var(--line)",
+              background: filtroPeriodo === "TODOS" && !filtroAno ? "rgba(2, 132, 199, 0.15)" : "var(--paper-raised)",
+              color: filtroPeriodo === "TODOS" && !filtroAno ? "#38bdf8" : "var(--ink-soft)",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.3rem",
+            }}
+          >
+            <span>🌐</span> Consolidado Total ({cuentas?.length ?? 0})
+          </button>
+        </div>
+
+        {/* SELECTOR ESPECÍFICO DE AÑO */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+          <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)", fontWeight: 600 }}>📅 Año:</span>
+          <select
+            value={filtroAno}
+            onChange={(e) => {
+              setFiltroAno(e.target.value);
+              setPage(1);
+            }}
+            style={{
+              padding: "0.32rem 0.55rem",
+              borderRadius: "6px",
+              border: "1px solid var(--line)",
+              background: "var(--paper)",
+              color: "var(--ink)",
+              fontSize: "0.8rem",
+              fontWeight: 600,
+            }}
+          >
+            <option value="">Todos los años</option>
+            {anosDisponibles.map((ano) => (
+              <option key={ano} value={ano}>
+                Año {ano} {ano === "2026" ? "(Actual)" : "(Histórico)"}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ position: "relative", flex: 1, maxWidth: 420 }}>
           <span
             style={{
               position: "absolute",
@@ -269,9 +418,24 @@ export default function AhorroList() {
                   {formatoQ(c.saldo_actual)}
                 </td>
                 <td style={{ textAlign: "center" }}>
-                  <span className={`badge ${c.estado === "ACTIVA" ? "activo" : "inactivo"}`} style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}>
-                    {c.estado === "ACTIVA" ? "Activa" : "Cerrada"}
-                  </span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem", alignItems: "center" }}>
+                    <span className={`badge ${c.estado === "ACTIVA" ? "activo" : "inactivo"}`} style={{ fontSize: "0.72rem", padding: "0.15rem 0.45rem" }}>
+                      {c.estado === "ACTIVA" ? "Activa" : "Cerrada"}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "0.64rem",
+                        fontWeight: 700,
+                        padding: "0.08rem 0.35rem",
+                        borderRadius: "4px",
+                        background: c.tiene_movimiento_2026 ? "rgba(16, 185, 129, 0.12)" : "rgba(100, 116, 139, 0.12)",
+                        color: c.tiene_movimiento_2026 ? "#059669" : "#94a3b8",
+                        border: c.tiene_movimiento_2026 ? "1px solid rgba(16, 185, 129, 0.25)" : "1px solid rgba(100, 116, 139, 0.2)",
+                      }}
+                    >
+                      {c.tiene_movimiento_2026 ? "🌱 2026" : "📜 Histórico"}
+                    </span>
+                  </div>
                 </td>
                 <td style={{ textAlign: "right" }}>
                   <Link
@@ -339,19 +503,20 @@ export default function AhorroList() {
           </div>
           <div style={{ textAlign: "right", fontSize: "7.5pt", color: "#334155" }}>
             <div><strong>Emisión:</strong> {new Date().toLocaleDateString("es-GT", { day: "2-digit", month: "2-digit", year: "numeric" })} {new Date().toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}</div>
-            <div><strong>Total Cuentas:</strong> {totalCuentas} ({cuentas?.filter(c => c.estado === "ACTIVA").length ?? 0} activas)</div>
-            {q && <div><strong>Filtro aplicado:</strong> "{q}"</div>}
+            <div><strong>Período Auditado:</strong> {filtroAno ? `Año Fiscal ${filtroAno}` : filtroPeriodo === "ACTUAL_2026" ? "Ejercicio Actual 2026" : filtroPeriodo === "HISTORICO" ? "Histórico Anterior" : "Consolidado Total"}</div>
+            <div><strong>Total Cuentas Filtradas:</strong> {totalCuentas} ({cuentasFiltradas.filter(c => c.estado === "ACTIVA").length} activas)</div>
+            {q && <div><strong>Filtro búsqueda:</strong> "{q}"</div>}
           </div>
         </div>
 
         {/* RESUMEN FINANCIERO OFICIAL */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginBottom: "10px" }}>
           <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
-            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>SALDO TOTAL CAPTADO</div>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>SALDO CAPTADO FILTRADO</div>
             <div style={{ fontSize: "10pt", fontWeight: 800, color: "#0284c7", fontFamily: "monospace" }}>{formatoQ(saldoTotal)}</div>
           </div>
           <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
-            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>TOTAL CUENTAS</div>
+            <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: 700 }}>PADRÓN DE CUENTAS</div>
             <div style={{ fontSize: "10pt", fontWeight: 800, color: "#1e293b", fontFamily: "monospace" }}>{totalCuentas}</div>
           </div>
           <div style={{ border: "1px solid #cbd5e1", padding: "4px 8px", background: "#f8fafc", borderRadius: "4px" }}>
@@ -372,11 +537,11 @@ export default function AhorroList() {
               <th style={{ width: "18%", textAlign: "left", padding: "4px 4px", color: "#ffffff" }}>NO. DE CUENTA</th>
               <th style={{ width: "45%", textAlign: "left", padding: "4px 4px", color: "#ffffff" }}>ASOCIADO / TITULAR</th>
               <th style={{ width: "20%", textAlign: "right", padding: "4px 4px", color: "#ffffff" }}>SALDO ACTUAL (Q)</th>
-              <th style={{ width: "14%", textAlign: "center", padding: "4px 4px", color: "#ffffff" }}>ESTADO</th>
+              <th style={{ width: "14%", textAlign: "center", padding: "4px 4px", color: "#ffffff" }}>ESTADO / EJERCICIO</th>
             </tr>
           </thead>
           <tbody>
-            {(cuentas ?? []).map((c, index) => (
+            {cuentasFiltradas.map((c, index) => (
               <tr key={c.id} style={{ background: index % 2 === 0 ? "#ffffff" : "#f8fafc" }}>
                 <td style={{ textAlign: "center", border: "1px solid #cbd5e1", padding: "3px 2px" }}>
                   {index + 1}

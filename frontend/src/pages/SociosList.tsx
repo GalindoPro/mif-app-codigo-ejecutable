@@ -159,7 +159,7 @@ export default function SociosList() {
       )}
 
       {/* FRANJA DE KPIS COMPACTA FINTECH */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem", flexShrink: 0 }}>
         {/* TOTAL ASOCIADOS */}
         <div
           style={{
@@ -293,6 +293,73 @@ export default function SociosList() {
                           {s.telefono && <span>Tel: <span className="mono">{s.telefono}</span></span>}
                         </div>
                       )}
+                      {/* INSIGNIAS DE PRODUCTOS ACTIVOS */}
+                      <div style={{ display: "flex", gap: "0.25rem", flexWrap: "wrap", marginTop: "0.25rem" }}>
+                        {s.tiene_aportacion && (
+                          <span
+                            style={{
+                              fontSize: "0.65rem",
+                              fontWeight: 700,
+                              padding: "0.08rem 0.35rem",
+                              borderRadius: "4px",
+                              background: "rgba(16, 185, 129, 0.12)",
+                              color: "#059669",
+                              border: "1px solid rgba(16, 185, 129, 0.25)",
+                            }}
+                            title="Aportación Estatutaria Activa (Capital Social)"
+                          >
+                            🏛️ Aportación
+                          </span>
+                        )}
+                        {s.tiene_ahorro_corriente && (
+                          <span
+                            style={{
+                              fontSize: "0.65rem",
+                              fontWeight: 700,
+                              padding: "0.08rem 0.35rem",
+                              borderRadius: "4px",
+                              background: "rgba(2, 132, 199, 0.12)",
+                              color: "#0284c7",
+                              border: "1px solid rgba(2, 132, 199, 0.25)",
+                            }}
+                            title="Libreta de Ahorro Corriente Activa"
+                          >
+                            💰 Ahorro Corriente
+                          </span>
+                        )}
+                        {s.tiene_plazo_fijo && (
+                          <span
+                            style={{
+                              fontSize: "0.65rem",
+                              fontWeight: 700,
+                              padding: "0.08rem 0.35rem",
+                              borderRadius: "4px",
+                              background: "rgba(147, 51, 234, 0.12)",
+                              color: "#9333ea",
+                              border: "1px solid rgba(147, 51, 234, 0.25)",
+                            }}
+                            title="Certificado de Depósito a Plazo Fijo"
+                          >
+                            📈 Plazo Fijo
+                          </span>
+                        )}
+                        {Number(s.creditos_activos) > 0 && (
+                          <span
+                            style={{
+                              fontSize: "0.65rem",
+                              fontWeight: 700,
+                              padding: "0.08rem 0.35rem",
+                              borderRadius: "4px",
+                              background: "rgba(245, 158, 11, 0.12)",
+                              color: "#d97706",
+                              border: "1px solid rgba(245, 158, 11, 0.25)",
+                            }}
+                            title="Préstamo de Cartera Vigente en Amortización"
+                          >
+                            📄 Crédito Vigente
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ fontSize: "0.8rem" }}>{s.agencia_nombre}</td>
                     <td className="mono" style={{ fontSize: "0.78rem" }}>{new Date(s.fecha_ingreso).toLocaleDateString("es-GT")}</td>

@@ -34,7 +34,7 @@ Este documento registra el **avance real y completo** del sistema de la COOPERAT
    - **Recibos y Comprobantes Multi-Agencia:** Muestran tanto la **Agencia de Operación / Pago** como la **Agencia de Origen del Asociado**.
    - **Validador de DPI con Catálogo de 340 Municipios de Guatemala:** Detección de municipio por últimos 4 dígitos (`DDMM`), validación estricta de 13 dígitos y distintivo para asociados de otras localidades.
    - **Campos del asociado:** Nombres, DPI, Género (`M`/`F`), Dirección, Teléfono, y Datos de la persona beneficiaria (Nombre, Parentesco, DPI/CUI, Teléfono).
-   - **Padrón de Aportaciones de Capital (`/aportaciones`):** Métricas clave, filtro en tiempo real y vista imprimible (`🖨️ Imprimir`).
+   - **Padrón de Capital Social (`/aportaciones`):** Rediseño estricto en Pantalla Única (`100vh` sin scroll de ventana), KPIs compactos, segmentación automática `🌱 Ejercicio 2026` vs. `📜 Histórico Anterior (Pre-2026)` vs. `🌐 Consolidado`, filtro por año y fechas exactas (`Desde`/`Hasta`), distintivo visual de período por fila y vista oficial imprimible (`🖨️ Imprimir Padrón`).
 
 3. **Caja Chica (`/caja-chica`):**
    - Basado en `caja/Caja Chica 30-07-2026.xlsx`.
