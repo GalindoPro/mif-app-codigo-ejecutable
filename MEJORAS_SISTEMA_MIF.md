@@ -2987,3 +2987,21 @@ Resolver la inquietud contable del usuario sobre el origen y cuadre de las cifra
 - Claridad contable absoluta: directivos y revisores comprenden inmediatamente por qué el Histórico refleja Q 124,200.00 y cómo se desglosa el Fondo Global frente a los socios individuales, con filtros de fechas fluidos y sin bloqueos.
 
 
+
+### MEJORA #104 (30/09/2026) - Resolución de Error de Tipado en Tablero para Estadísticas de Socios
+
+**Objetivo:**
+Solucionar un error de compilación TypeScript en `frontend/src/pages/Tablero.tsx` que indicaba que las propiedades `sociosSoloCreditos`, `sociosConCuentas` y `sociosSinProductos` no existían en las interfaces correspondientes.
+
+**Detalles de la Implementación:**
+1. **Actualización de Interfaces en `types.ts`:**
+   - Se añadieron de forma opcional (`?`) las propiedades `sociosConCuentas`, `sociosSoloCreditos` y `sociosSinProductos` a las interfaces `ResumenDashboard` (`global`) y `ResumenAgencia`.
+   - Estas propiedades ya estaban siendo retornadas correctamente por el backend (`backend/src/modules/dashboard/service.ts`), pero no estaban tipificadas en el frontend, lo que causaba el error al intentar mostrarlas en el Tablero de KPI.
+
+**Archivos Modificados:**
+- `frontend/src/types.ts`
+- `MEJORAS_SISTEMA_MIF.md`
+- `02-codigo-frontend.md`
+
+**Resultado:**
+- Compilación del frontend exitosa y visualización correcta del desglose analítico de asociados (con cuentas, solo créditos, sin productos) en la tarjeta de Membresía Activa del Tablero.

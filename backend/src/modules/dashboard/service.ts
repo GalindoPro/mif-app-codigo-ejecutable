@@ -170,6 +170,9 @@ export async function resumen(agenciaId: string | null) {
       aportaciones: { count: 0, saldo: 0 },
       cuotasIngreso: { count: 0, monto: 0 },
       totalSocios: 0,
+      sociosConCuentas: 0,
+      sociosSoloCreditos: 0,
+      sociosSinProductos: 0,
       movimientosHoy: 0,
     },
   );

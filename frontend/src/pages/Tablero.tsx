@@ -331,7 +331,14 @@ export default function Tablero() {
           <span className="kpi-tile-value" style={{ color: "#10b981" }}>
             {formatoQ(global.cuotasIngreso?.monto ?? 0)}
           </span>
-          <span className="kpi-tile-sub">{global.cuotasIngreso?.count ?? 0} registradas en caja</span>
+          <span className="kpi-tile-sub">
+            {global.cuotasIngreso?.count ?? 0} registradas
+            {(global.cuotasIngreso?.monto ?? 0) !== (global.cuotasIngreso?.count ?? 0) * 50 && (
+              <span title="Diferencia por cobro de cuotas infantiles a Q25.00" style={{ marginLeft: "4px", fontSize: "0.55rem", opacity: 0.75 }}>
+                (incl. infantiles)
+              </span>
+            )}
+          </span>
         </Link>
 
         <Link to="/ahorros/infanto-juvenil" className="kpi-tile" style={{ borderLeft: "3px solid #ec4899" }}>

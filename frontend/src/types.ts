@@ -349,20 +349,26 @@ export interface ResumenAgencia {
   aportaciones?: { count: number; saldo: number };
   cuotasIngreso?: { count: number; monto: number };
   totalSocios: number;
+  sociosConCuentas?: number;
+  sociosSoloCreditos?: number;
+  sociosSinProductos?: number;
   movimientosHoy: number;
 }
 
 export interface ResumenDashboard {
   global: {
     cajaChica: number;
-    ahorroCorriente: number;
-    ahorroProgramado: number;
-    ahorroInfantoJuvenil: number;
+    ahorroCorriente: { count: number; saldo: number };
+    ahorroProgramado: { count: number; saldo: number };
+    ahorroInfantoJuvenil: { count: number; saldo: number };
     carteraPrestamos?: { count: number; saldo: number };
     plazoFijo?: { count: number; monto: number };
     aportaciones?: { count: number; saldo: number };
     cuotasIngreso?: { count: number; monto: number };
     totalSocios: number;
+    sociosConCuentas?: number;
+    sociosSoloCreditos?: number;
+    sociosSinProductos?: number;
     movimientosHoy: number;
   };
   porAgencia: ResumenAgencia[];
