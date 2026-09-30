@@ -2,6 +2,59 @@
 
 Este documento recopila de forma detallada todas las mejoras funcionales, reglas de negocio, formatos guatemaltecos y optimizaciones contables implementadas en el sistema.
 
+## 123. Aclaración Visual de Métricas Acumuladas vs Flujo Mensual
+
+**Archivos Modificados:**
+- `frontend/src/pages/AhorroList.tsx`
+
+**Objetivo y Reglas de Negocio:**
+- **Prevención de Confusión en Lectura de KPIs:** Dado que el Tablero Financiero proyecta operaciones segmentadas por mes (ej. flujo de caja en Julio), y el módulo central de Cuentas (Kardex) proyecta el gran total consolidado desde la apertura de la cooperativa; se agregó explícitamente la aclaración "(Acumulado a la fecha)" en los subtítulos de las tarjetas de Depósitos, Retiros y Flujo Neto de los padrones (descartando 'Histórico' para evitar cruces con cuentas pre-2026), brindando a los auditores y gerencia una distinción semántica instantánea.
+
+---
+
+## 122. Anclaje de Fechas Relativas en el Libro Auxiliar de Caja
+
+**Archivos Modificados:**
+- `frontend/src/components/cajaauxiliar/LibroCajaReporteModal.tsx`
+
+**Objetivo y Reglas de Negocio:**
+- **Facilitación de Pruebas y Auditoría Histórica:** Se modificó el comportamiento de los filtros rápidos ("Hoy", "Esta Semana", "Este Mes") en el modal de Comprobante del Libro de Caja Auxiliar. En lugar de utilizar la fecha real del sistema operativo, el reloj interno del componente se ha anclado temporalmente al `31 de Julio de 2026` (fecha de corte de los datos importados de Excel). Esto permite que con un solo clic se pueda visualizar de inmediato el flujo de caja del turno, semana y mes con datos reales, sin tener que ingresarlos siempre por el filtro "Personalizado".
+
+---
+
+## 121. Optimización Visual del Widget de Inteligencia Financiera en el Tablero
+
+**Archivos Modificados:**
+- `frontend/src/pages/Tablero.tsx`
+
+**Objetivo y Reglas de Negocio:**
+- **Modo Curva Despejado:** El widget oscuro de Inteligencia Financiera ahora se oculta automáticamente al cambiar a la vista de 'Curva' (Tendencia Temporal), permitiendo que la gráfica ocupe el protagonismo visual sin saturar la pantalla.
+- **Modo Balance Colapsable:** En la vista de 'Balance', el widget ahora incluye un botón para minimizar/expandir (colapsar), dándole a Gerencia el control manual sobre cuándo revisar las alertas e insights del sistema.
+
+---
+
+## 120. Perfeccionamiento de Cálculo de Promedio por Cuenta y Formato de Decimales Monetarios
+
+**Archivos Modificados:**
+- `frontend/src/pages/AhorroList.tsx`
+- `frontend/src/types.ts`
+
+**Objetivo y Reglas de Negocio:**
+- **Cálculo Exacto de Promedio:** Se ajustó el divisor del 'Promedio por Cuenta', calculándolo exclusivamente sobre las *cuentas activas* en lugar del total histórico. De esta manera, el sistema refleja de forma matemáticamente perfecta la aportación estatutaria exacta (ej. Q 100.00).
+- **Formateo Estricto de 2 Decimales:** Se añadió el parámetro `maximumFractionDigits: 2` a la función global `formatoQ()`, forzando a que cualquier cifra monetaria (incluyendo fracciones por divisiones decimales como Q 97.931) se muestre siempre bajo el estándar contable de dos decimales (ej. Q 97.93).
+
+---
+
+## 119. Clarificación de Etiquetas en Tablero de Aportaciones (Desglose de Cuentas Activas e Inactivas)
+
+**Archivos Modificados:**
+- `frontend/src/pages/AhorroList.tsx`
+
+**Objetivo y Reglas de Negocio:**
+- **Claridad Visual en KPIs:** Se ajustaron los subtítulos de los indicadores financieros en el panel superior de Aportaciones (y Ahorros en general) para evitar confusiones de lectura en los conteos de membresía. El Saldo Total Captado ahora indica explícitamente el número de 'cuentas en total', la tarjeta de Cuentas Activas despliega el desglose claro de 'activas / inactivas', y la tarjeta de Total Retiros detalla que los egresos incluyen a dichas cuentas canceladas.
+
+---
+
 ## 118. Sincronización Matemática y Aplicación de Regla de Frontera 2026 en Módulos de Créditos y Aportaciones
 
 **Archivos Modificados:**

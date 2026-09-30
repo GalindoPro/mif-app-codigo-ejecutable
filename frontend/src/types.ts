@@ -169,6 +169,7 @@ export interface Cuenta {
   titular_menor_parentesco?: string | null;
   titular_menor_cui?: string | null;
   titular_menor_fecha_nacimiento?: string | null;
+  socio_fecha_ingreso?: string | null;
   tiene_movimiento_2026?: boolean;
   ultima_fecha_movimiento?: string | null;
   created_at: string;
@@ -549,7 +550,7 @@ export interface DetalleCajaAuxiliar {
 }
 
 export function formatoQ(valor: string | number): string {
-  return `Q ${Number(valor).toLocaleString("es-GT", { minimumFractionDigits: 2 })}`;
+  return `Q ${Number(valor).toLocaleString("es-GT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export interface UsuarioItem {

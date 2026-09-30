@@ -472,6 +472,7 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
   const [mostrarReporteModal, setMostrarReporteModal] = useState(false);
   const [mostrarInputOtroMes, setMostrarInputOtroMes] = useState(false);
   const [mostrarAyudaFinanciera, setMostrarAyudaFinanciera] = useState(false);
+  const [widgetAiColapsado, setWidgetAiColapsado] = useState(false);
 
   const MESES_HISTORICOS = [
     { id: "2026-09", label: "Septiembre 2026" },
@@ -934,22 +935,24 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
 
           {/* Card de Diagnóstico Estratégico de Gerencia: Detección Inteligente de Debilidades y Fortalezas */}
           {/* Widget IA de Diagnóstico Estratégico (Dark Slate) */}
-          <div
-            style={{
-              background: "#0f172a", // Dark Slate institucional
-              border: `1px solid ${flujoNetoFiltro >= 0 ? "rgba(16, 185, 129, 0.4)" : "rgba(239, 68, 68, 0.4)"}`,
-              borderRadius: "12px",
-              padding: "0.85rem 1.1rem",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.6rem",
-              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.4)",
-              position: "relative",
-              overflow: "hidden"
-            }}
-          >
+          {modoVista === "BALANCE" && (
+            <div
+              style={{
+                background: "#0f172a", // Dark Slate institucional
+                border: `1px solid ${flujoNetoFiltro >= 0 ? "rgba(16, 185, 129, 0.4)" : "rgba(239, 68, 68, 0.4)"}`,
+                borderRadius: "12px",
+                padding: widgetAiColapsado ? "0.6rem 1.1rem" : "0.85rem 1.1rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: widgetAiColapsado ? "0" : "0.6rem",
+                boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.4)",
+                position: "relative",
+                overflow: "hidden",
+                transition: "all 0.3s ease"
+              }}
+            >
             {/* Brillo sutil de fondo */}
-            <div style={{ position: "absolute", top: -50, right: -50, width: 150, height: 150, background: flujoNetoFiltro >= 0 ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)", borderRadius: "50%", filter: "blur(40px)", pointerEvents: "none" }} />
+            {!widgetAiColapsado && <div style={{ position: "absolute", top: -50, right: -50, width: 150, height: 150, background: flujoNetoFiltro >= 0 ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)", borderRadius: "50%", filter: "blur(40px)", pointerEvents: "none" }} />}
             
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.4rem", zIndex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
@@ -957,19 +960,21 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
                 <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "#f8fafc", letterSpacing: "0.02em" }}>
                   Inteligencia Financiera ({periodoLabel})
                 </span>
-                <span
-                  style={{
-                    fontSize: "0.68rem",
-                    padding: "0.15rem 0.5rem",
-                    borderRadius: "100px",
-                    fontWeight: 700,
-                    background: flujoNetoFiltro >= 0 ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                    color: flujoNetoFiltro >= 0 ? "#34d399" : "#f87171",
-                    border: `1px solid ${flujoNetoFiltro >= 0 ? "rgba(52, 211, 153, 0.3)" : "rgba(248, 113, 113, 0.3)"}`
-                  }}
-                >
-                  {flujoNetoFiltro >= 0 ? "SUPERÁVIT DE LIQUIDEZ" : "ALERTA DE DÉFICIT / ALTA COLOCACIÓN"}
-                </span>
+                {!widgetAiColapsado && (
+                  <span
+                    style={{
+                      fontSize: "0.68rem",
+                      padding: "0.15rem 0.5rem",
+                      borderRadius: "100px",
+                      fontWeight: 700,
+                      background: flujoNetoFiltro >= 0 ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                      color: flujoNetoFiltro >= 0 ? "#34d399" : "#f87171",
+                      border: `1px solid ${flujoNetoFiltro >= 0 ? "rgba(52, 211, 153, 0.3)" : "rgba(248, 113, 113, 0.3)"}`
+                    }}
+                  >
+                    {flujoNetoFiltro >= 0 ? "SUPERÁVIT DE LIQUIDEZ" : "ALERTA DE DÉFICIT / ALTA COLOCACIÓN"}
+                  </span>
+                )}
                 
                 <button
                   type="button"
@@ -981,7 +986,8 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
                     fontSize: "0.75rem",
                     cursor: "pointer",
                     textDecoration: "underline",
-                    marginLeft: "0.5rem"
+                    marginLeft: "0.5rem",
+                    display: widgetAiColapsado ? "none" : "inline-block"
                   }}
                   title="¿Cómo se leen estos números?"
                 >
@@ -990,40 +996,62 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
               </div>
 
               <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                {!widgetAiColapsado && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setMostrarReporteModal(true)}
+                      className="btn btn-xs"
+                      style={{
+                        fontSize: "0.72rem",
+                        padding: "0.25rem 0.65rem",
+                        background: "rgba(2, 132, 199, 0.9)",
+                        color: "#ffffff",
+                        border: "1px solid rgba(2, 132, 199, 0.5)",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.3rem",
+                        borderRadius: "6px"
+                      }}
+                    >
+                      <span>🖨️</span> Reporte Oficial PDF
+                    </button>
+    
+                    <Link
+                      to={`/consolidado-financiero?fechaCorte=${fechaCorteAuditoria}`}
+                      className="btn btn-xs"
+                      style={{ 
+                        fontSize: "0.72rem", padding: "0.25rem 0.65rem", display: "inline-flex", alignItems: "center", gap: "0.3rem",
+                        background: "rgba(255,255,255,0.05)", color: "#cbd5e1", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px"
+                      }}
+                    >
+                      <span>📑</span> Estados Financieros al {fechaCorteAuditoria}
+                    </Link>
+                  </>
+                )}
                 <button
                   type="button"
-                  onClick={() => setMostrarReporteModal(true)}
-                  className="btn btn-xs"
+                  onClick={() => setWidgetAiColapsado(!widgetAiColapsado)}
                   style={{
-                    fontSize: "0.72rem",
-                    padding: "0.25rem 0.65rem",
-                    background: "rgba(2, 132, 199, 0.9)",
-                    color: "#ffffff",
-                    border: "1px solid rgba(2, 132, 199, 0.5)",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "0.3rem",
-                    borderRadius: "6px"
+                    background: "rgba(255,255,255,0.1)",
+                    border: "none",
+                    color: "#fff",
+                    fontSize: "0.75rem",
+                    cursor: "pointer",
+                    borderRadius: "6px",
+                    padding: "0.25rem 0.5rem",
+                    marginLeft: widgetAiColapsado ? "0" : "0.5rem"
                   }}
+                  title={widgetAiColapsado ? "Expandir" : "Minimizar"}
                 >
-                  <span>🖨️</span> Reporte Oficial PDF
+                  {widgetAiColapsado ? "▼ Expandir IA" : "▲ Minimizar"}
                 </button>
-
-                <Link
-                  to={`/consolidado-financiero?fechaCorte=${fechaCorteAuditoria}`}
-                  className="btn btn-xs"
-                  style={{ 
-                    fontSize: "0.72rem", padding: "0.25rem 0.65rem", display: "inline-flex", alignItems: "center", gap: "0.3rem",
-                    background: "rgba(255,255,255,0.05)", color: "#cbd5e1", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px"
-                  }}
-                >
-                  <span>📑</span> Estados Financieros al {fechaCorteAuditoria}
-                </Link>
               </div>
             </div>
 
             {/* Viñetas Directas de la IA */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.75rem", fontSize: "0.78rem", zIndex: 1, marginTop: "0.3rem" }}>
+            {!widgetAiColapsado && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.75rem", fontSize: "0.78rem", zIndex: 1, marginTop: "0.3rem" }}>
               {/* Viñeta 1 */}
               <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", background: "rgba(255,255,255,0.02)", padding: "0.5rem 0.6rem", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
                 <span style={{ color: ratioSalida > 100 ? "#f87171" : "#34d399", fontSize: "0.9rem", marginTop: "-0.1rem" }}>{ratioSalida > 100 ? "⚠️" : "✅"}</span>
@@ -1064,8 +1092,10 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
                   </div>
                 </div>
               </div>
-            </div>
+              </div>
+            )}
           </div>
+          )}
 
           {/* MODO 1: BALANCE & DISTRIBUCIÓN (3 Columnas Panorámicas) */}
           {modoVista === "BALANCE" && (

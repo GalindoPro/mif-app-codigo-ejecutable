@@ -24,7 +24,7 @@ export default function AhorroList() {
   const [cuentas, setCuentas] = useState<Cuenta[] | null>(null);
   const [resumen, setResumen] = useState<ResumenCuentas | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const filtroPeriodo = "ACTUAL_2026";
+  const [filtroPeriodo] = useState<"ACTUAL_2026" | "HISTORICO" | "TODOS">("ACTUAL_2026");
   const [filtroAno, setFiltroAno] = useState<string>("");
 
   const [page, setPage] = useState(1);
@@ -99,7 +99,7 @@ export default function AhorroList() {
   const totalDepositos = resumen?.totalDepositos ?? 0;
   const totalRetiros = resumen?.totalRetiros ?? 0;
   const flujoNeto = totalDepositos - totalRetiros;
-  const promedioPorCuenta = totalCuentas > 0 ? saldoTotal / totalCuentas : 0;
+  const promedioPorCuenta = cuentasActivas > 0 ? saldoTotal / cuentasActivas : 0;
 
   const totalPaginas = Math.max(1, Math.ceil(totalCuentas / pageSize));
   const cuentasPaginadas = cuentasFiltradas.slice((page - 1) * pageSize, page * pageSize);
@@ -194,7 +194,7 @@ export default function AhorroList() {
             {formatoQ(saldoTotal)}
           </span>
           <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>
-            {resumen?.totalCuentas ?? totalCuentas} cuentas activas
+            {resumen?.totalCuentas ?? totalCuentas} cuentas en total
           </span>
         </div>
 
@@ -220,7 +220,7 @@ export default function AhorroList() {
           <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#059669", fontFamily: "monospace" }}>
             {formatoQ(resumen?.totalDepositos ?? 0)}
           </span>
-          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Ingresos acumulados</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Ingresos (Acumulado a la fecha)</span>
         </div>
 
         {/* TOTAL RETIROS */}
@@ -245,7 +245,7 @@ export default function AhorroList() {
           <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#d97706", fontFamily: "monospace" }}>
             {formatoQ(resumen?.totalRetiros ?? 0)}
           </span>
-          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Egresos acumulados</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Egresos (Acumulado a la fecha) (incl. {(resumen?.totalCuentas ?? totalCuentas) - cuentasActivas} cuentas canceladas)</span>
         </div>
 
         {/* CUENTAS ACTIVAS */}
@@ -266,7 +266,7 @@ export default function AhorroList() {
             <span style={{ fontSize: "0.85rem" }}>👥</span>
           </div>
           <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#6366f1", fontFamily: "monospace" }}>{cuentasActivas}</span>
-          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>{totalCuentas} en total</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>{cuentasActivas} activas / {(resumen?.totalCuentas ?? totalCuentas) - cuentasActivas} inactivas</span>
         </div>
 
         {/* FLUJO NETO */}
@@ -289,7 +289,7 @@ export default function AhorroList() {
           <span style={{ fontSize: "1.08rem", fontWeight: 700, color: flujoNeto >= 0 ? "#10b981" : "#ef4444", fontFamily: "monospace" }}>
             {flujoNeto >= 0 ? "+" : ""}{formatoQ(flujoNeto)}
           </span>
-          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Depósitos menos retiros</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Depósitos menos retiros (Acumulado a la fecha)</span>
         </div>
 
         {/* PROMEDIO POR CUENTA */}

@@ -25,10 +25,11 @@ export default function LibroCajaReporteModal({
   const puedeVerHistorico =
     usuario?.rol === "GERENCIA" || usuario?.rol === "ADMIN" || usuario?.rol === "SUPERVISOR";
 
-  const hoyStr = new Date().toISOString().slice(0, 10);
+  const FECHA_HISTORICA = new Date("2026-07-31T12:00:00");
+  const hoyStr = "2026-07-31";
 
   function getLunesEstaSemana(): string {
-    const d = new Date();
+    const d = new Date(FECHA_HISTORICA);
     const day = d.getDay();
     const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     const lunes = new Date(d.setDate(diff));
@@ -36,7 +37,7 @@ export default function LibroCajaReporteModal({
   }
 
   function getInicioEsteMes(): string {
-    const d = new Date();
+    const d = new Date(FECHA_HISTORICA);
     return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
   }
 
