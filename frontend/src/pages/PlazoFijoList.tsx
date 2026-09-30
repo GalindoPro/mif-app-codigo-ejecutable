@@ -50,7 +50,7 @@ export default function PlazoFijoList() {
   }, [q, estadoFiltro]);
 
   const esContrato2026 = (c: PlazoFijoContrato) => {
-    return !!c.socio_fecha_ingreso && c.socio_fecha_ingreso >= "2026-01-01";
+    return !!c.fecha_inicio && c.fecha_inicio >= "2026-01-01";
   };
 
   const contratosActuales = useMemo(() => contratos?.filter(esContrato2026) ?? [], [contratos]);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { useAuth } from "../context/AuthContext";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import type { Socio, EstadoPrestamo, TipoPrestamo } from "../types";
@@ -68,6 +69,7 @@ const TIPO_SLUG: Record<string, string> = {
 };
 
 export default function SocioDetail() {
+  const { usuario } = useAuth();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 

@@ -9,7 +9,7 @@ export default function AportacionesList() {
   const [aportaciones, setAportaciones] = useState<AportacionSocio[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const filtroPeriodo = "ACTUAL_2026";
+  const [filtroPeriodo, setFiltroPeriodo] = useState<"ACTUAL_2026" | "HISTORICO" | "TODOS">("ACTUAL_2026");
   const [filtroAno, setFiltroAno] = useState<string>("");
   const [fechaDesde, setFechaDesde] = useState<string>("");
   const [fechaHasta, setFechaHasta] = useState<string>("");

@@ -35,7 +35,7 @@ export default function CreditosList() {
   const [q, setQ] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<string>("");
   const [filtroPromotor, setFiltroPromotor] = useState<"TODOS" | "DIEGO" | "WALTER">("TODOS");
-  const [filtroPeriodo, setFiltroPeriodo] = useState<"ACTUAL_2026" | "HISTORICO">("ACTUAL_2026");
+  const [filtroPeriodo] = useState<"ACTUAL_2026" | "HISTORICO">("ACTUAL_2026");
   const [filtroAno, setFiltroAno] = useState<string>("");
   const [filtroTipoFiador, setFiltroTipoFiador] = useState<"TODOS" | "EXTERNOS" | "SOCIOS">("TODOS");
   const [page, setPage] = useState(1);
@@ -139,7 +139,7 @@ export default function CreditosList() {
   };
 
   const prestamosActuales = useMemo(() => prestamos?.filter(esPrestamo2026) ?? [], [prestamos]);
-  const prestamosHistoricos = useMemo(() => prestamos?.filter((p) => !esPrestamo2026(p)) ?? [], [prestamos]);
+  // const prestamosHistoricos = useMemo(() => prestamos?.filter((p) => !esPrestamo2026(p)) ?? [], [prestamos]);
 
   const diegoCount =
     prestamosActuales.filter(
