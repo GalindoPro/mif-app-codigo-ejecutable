@@ -3058,3 +3058,29 @@ Solucionar un error de compilación TypeScript en `frontend/src/pages/Tablero.ts
 
 **Resultado:**
 - Compilación del frontend exitosa y visualización correcta del desglose analítico de asociados (con cuentas, solo créditos, sin productos) en la tarjeta de Membresía Activa del Tablero.
+
+### MEJORA #105 (30/09/2026) - Privacidad de Promotores, Fusión de Socios y Eliminación Segura
+
+**Objetivo y Reglas de Negocio:**
+1. **Regla Estricta de Privacidad por Rol:** Los usuarios con rol `PROMOTOR` ya no pueden ver los consolidados globales ni el total de créditos colocados por otros promotores. En la "Bandeja de Créditos" (`CreditosList.tsx`) y en el "Kardex de Cartera" (`KardexCarteraPromotor.tsx`), se ocultan las pestañas de totales para `PROMOTOR` y `CAJERO`. Además, el backend restringe a los Promotores para que al solicitar la lista de créditos, reciban únicamente los suyos.
+2. **Eliminación Segura de Socios:** Se implementó el botón `🗑️ Eliminar` en el perfil del socio (solo para GERENCIA, ADMIN, SUPERVISOR). Esta acción verifica a nivel de backend (`eliminarSocioSinVinculos`) que el socio tenga cero (0) registros en cuentas, préstamos, cobros de campo y movimientos de caja auxiliar. Si tiene historial, la eliminación es bloqueada.
+3. **Herramienta Avanzada de Fusión de Duplicados:** Si un asociado fue duplicado por un error en el DPI y ambos perfiles tienen registros (ej. uno con ahorros y otro con créditos), se habilitó el botón `🔗 Fusionar`. Un modal solicita el UUID del socio destino (el correcto) y el backend (`fusionarSocios`) transfiere mediante una transacción SQL todas las referencias (`cuentas`, `prestamos`, `caja_movimientos_auxiliar`, `prestamo_pagos`, `cobros_campo`, `ingresos_comif`, `traslados`) hacia el perfil correcto, eliminando definitivamente el perfil erróneo para mantener un único historial consolidado. Todo queda registrado en la bitácora de auditoría.
+4. **Regla de Caja Chica (Documentada):** Se instruyó sobre la norma institucional de *Caja Chica aislada*. Los gastos diarios de Caja Chica se restan exclusivamente de su propio fondo usando un EGRESO. Para rellenarla, se saca de Caja Auxiliar como un EGRESO_VARIO ("Reintegro a Caja Chica") y en Caja Chica como un INGRESO ("Reintegro desde Ventanilla"), asegurando así el cuadre al centavo de la ventanilla.
+5. **Bloqueo de Fuga de Datos (Excel):** Se restringió la visibilidad y el uso de los botones "📥 Descargar Excel" en toda la aplicación. Ya sea en Bandeja de Créditos, Kardex de Promotores, Libro de Caja Chica, Libro de Arqueo o Consolidado Financiero; el botón de exportación solo aparece si el usuario tiene rol `GERENCIA` o `SUPERVISOR`. Los Promotores y Cajeros ya no pueden descargar copias de la base de datos a sus dispositivos.
+
+**Archivos Modificados:**
+- `backend/src/modules/socios/routes.ts`
+- `backend/src/modules/socios/service.ts`
+- `backend/src/modules/prestamos/routes.ts`
+- `frontend/src/pages/CreditosList.tsx`
+- `frontend/src/pages/KardexCarteraPromotor.tsx`
+- `frontend/src/pages/SocioDetail.tsx`
+- `frontend/src/pages/CajaChica.tsx`
+- `frontend/src/pages/LibroArqueoMensual.tsx`
+- `frontend/src/pages/ConsolidadoFinanciero.tsx`
+
+**Resultado:**
+- Blindaje contra fuga de información confidencial.
+- Un sistema completamente resistente a manipulaciones visuales (cada rol enfocado en su área operativa sin espiar métricas ajenas).
+- Capacidad administrativa avanzada para resolver el problema real de "Socios duplicados por error de DPI", permitiendo eliminar perfiles vacíos o fusionar historiales financieros de forma 100% segura.
+- Regla contable de Caja Chica lista para uso en producción.

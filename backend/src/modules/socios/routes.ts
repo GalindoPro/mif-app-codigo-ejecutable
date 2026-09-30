@@ -173,6 +173,19 @@ sociosRouter.delete(
   }),
 );
 
+const fusionarSchema = z.object({
+  socioDestinoId: z.string().uuid("ID de socio destino inválido"),
+});
+
+sociosRouter.post(
+  "/:id/fusionar",
+  requireRole("GERENCIA", "ADMIN"),
+  asyncHandler(async (req, res) => {
+    const { socioDestinoId } = fusionarSchema.parse(req.body);
+    res.json(await service.fusionarSocios(req.params.id, socioDestinoId, req.user!.id, agenciaVisible(req)));
+  }),
+);
+
 // GET /socios/:id — Obtener socio por ID
 sociosRouter.get(
   "/:id",

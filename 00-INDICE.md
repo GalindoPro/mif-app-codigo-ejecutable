@@ -431,3 +431,5 @@ Todas las especificaciones operativas y estatutarias acordadas se encuentran doc
 
 
 
+- [✓] Funcionalidad Avanzada de Socios Duplicados: Fusión de Cuentas y Eliminación Segura implementada.
+- [✓] Privacidad por Roles: Aislamiento visual y de backend para métricas de Promotores.

@@ -35,7 +35,7 @@ export default function CreditosList() {
   const [q, setQ] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<string>("");
   const [filtroPromotor, setFiltroPromotor] = useState<"TODOS" | "DIEGO" | "WALTER">("TODOS");
-  const filtroPeriodo = "ACTUAL_2026";
+  const [filtroPeriodo, setFiltroPeriodo] = useState<"ACTUAL_2026" | "HISTORICO">("ACTUAL_2026");
   const [filtroAno, setFiltroAno] = useState<string>("");
   const [filtroTipoFiador, setFiltroTipoFiador] = useState<"TODOS" | "EXTERNOS" | "SOCIOS">("TODOS");
   const [page, setPage] = useState(1);
@@ -606,15 +606,17 @@ export default function CreditosList() {
               >
                 Pagados ({cancelados})
               </button>
-              <button
-                type="button"
-                className="btn secondary"
-                style={{ fontSize: "0.72rem", padding: "0.18rem 0.5rem" }}
-                onClick={exportarExcel}
-                title="Descargar Cartera en Excel"
-              >
-                📊 Excel
-              </button>
+              {(usuario?.rol === "GERENCIA" || usuario?.rol === "SUPERVISOR") && (
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ fontSize: "0.72rem", padding: "0.18rem 0.5rem" }}
+                  onClick={exportarExcel}
+                  title="Descargar Cartera en Excel"
+                >
+                  📊 Excel
+                </button>
+              )}
             </div>
           </div>
 

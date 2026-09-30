@@ -76,6 +76,9 @@ export default function SocioDetail() {
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [modalFusionar, setModalFusionar] = useState(false);
+  const [socioDestinoId, setSocioDestinoId] = useState("");
+  const [procesandoFusion, setProcesandoFusion] = useState(false);
 
   // Modal de Apertura de Aportación Inicial
   const [mostrarModalAportacion, setMostrarModalAportacion] = useState(false);
@@ -390,6 +393,33 @@ export default function SocioDetail() {
     }
   }
 
+  async function eliminarSocio() {
+    if (!window.confirm("¿Seguro que deseas eliminar a este socio? Solo funcionará si NO tiene historial financiero.")) return;
+    try {
+      await api.delete(`/socios/${id}/eliminar-sin-vinculos`);
+      window.alert("Socio vacío eliminado correctamente.");
+      navigate("/socios");
+    } catch (err) {
+      setError(mensajeError(err));
+    }
+  }
+
+  async function fusionarSocio(e: FormEvent) {
+    e.preventDefault();
+    if (!socioDestinoId) return;
+    if (!window.confirm("⚠️ ADVERTENCIA: Esta acción trasladará TODO el historial financiero al socio destino y ELIMINARÁ este socio permanentemente. ¿Estás seguro?")) return;
+    
+    setProcesandoFusion(true);
+    try {
+      await api.post(`/socios/${id}/fusionar`, { socioDestinoId });
+      window.alert("Socio fusionado correctamente.");
+      navigate("/socios");
+    } catch (err) {
+      setError(mensajeError(err));
+      setProcesandoFusion(false);
+    }
+  }
+
   if (error && !socio) return <div className="alert error">{error}</div>;
   if (!socio) return <p>Cargando…</p>;
 
@@ -534,6 +564,29 @@ export default function SocioDetail() {
             <button className="btn secondary" style={{ fontSize: "0.84rem" }} onClick={() => cambiarEstado("ACTIVO")}>
               Reactivar Socio
             </button>
+          )}
+
+          {(usuario?.rol === "GERENCIA" || usuario?.rol === "ADMIN" || usuario?.rol === "SUPERVISOR") && (
+            <>
+              <button
+                type="button"
+                className="btn secondary"
+                style={{ fontSize: "0.84rem", borderColor: "#dc2626", color: "#dc2626" }}
+                title="Fusionar cuenta duplicada"
+                onClick={() => setModalFusionar(true)}
+              >
+                🔗 Fusionar
+              </button>
+              <button
+                type="button"
+                className="btn danger"
+                style={{ fontSize: "0.84rem" }}
+                title="Eliminar si está vacío"
+                onClick={eliminarSocio}
+              >
+                🗑️ Eliminar
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -1399,6 +1452,41 @@ export default function SocioDetail() {
                   disabled={abriendoApor}
                 >
                   {abriendoApor ? "Creando cuenta…" : "✓ Confirmar y Crear Aportación"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {modalFusionar && (
+        <div className="modal-overlay" style={{ backdropFilter: "blur(4px)" }}>
+          <div className="modal-card" style={{ maxWidth: "500px", background: "#0f172a", border: "1px solid rgba(148, 163, 184, 0.25)", borderRadius: "14px", padding: "1.5rem", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.75)" }}>
+            <h3 style={{ marginTop: 0, color: "#f8fafc" }}>🔗 Fusionar Socio Duplicado</h3>
+            <p style={{ fontSize: "0.85rem", color: "#cbd5e1" }}>
+              Todo el historial financiero de <strong>{socio.nombres}</strong> (cuentas, préstamos, movimientos) será trasladado al socio destino. Este socio actual será <strong>eliminado definitivamente</strong>.
+            </p>
+            <form onSubmit={fusionarSocio}>
+              <div className="form-group" style={{ marginBottom: "1.5rem" }}>
+                <label style={{ color: "#e2e8f0" }}>ID del Socio Destino Correcto (UUID)</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={socioDestinoId}
+                  onChange={(e) => setSocioDestinoId(e.target.value.trim())}
+                  placeholder="Ej. 123e4567-e89b-12d3-a456-426614174000"
+                  required
+                />
+                <p style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.4rem" }}>
+                  Busca al socio correcto en otra pestaña, copia su ID de la URL y pégalo aquí.
+                </p>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+                <button type="button" className="btn secondary" onClick={() => setModalFusionar(false)} disabled={procesandoFusion}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn danger" style={{ background: "#dc2626", borderColor: "#dc2626" }} disabled={procesandoFusion}>
+                  {procesandoFusion ? "Fusionando..." : "Fusionar Definitivamente"}
                 </button>
               </div>
             </form>

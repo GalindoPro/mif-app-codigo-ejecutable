@@ -58,6 +58,7 @@ export default function CajaChica() {
   const [resultado, setResultado] = useState<ListaCajaChica | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [mostrarCategorias, setMostrarCategorias] = useState(false);
   const [mostrarReporte, setMostrarReporte] = useState(false);
   const [editarRegistro, setEditarRegistro] = useState<CajaChicaComprobante | null>(null);
   const [agencias, setAgencias] = useState<Agencia[]>([]);
@@ -364,6 +365,21 @@ export default function CajaChica() {
               📄 Informe de Gastos
             </button>
             <button
+              type="button"
+              className="btn secondary"
+              style={{ fontSize: "0.82rem", padding: "0.4rem 0.75rem", fontWeight: 700, borderColor: "var(--line)", background: mostrarCategorias ? "rgba(5, 150, 105, 0.1)" : "var(--paper)", color: mostrarCategorias ? "#059669" : "var(--ink)" }}
+              onClick={() => {
+                setMostrarCategorias((v) => !v);
+                if (!mostrarCategorias) {
+                  setMostrarForm(false);
+                  setMostrarReposicion(false);
+                  setEditarRegistro(null);
+                }
+              }}
+            >
+              📊 Categorías
+            </button>
+            <button
               className="btn"
               style={{ fontSize: "0.82rem", padding: "0.4rem 0.75rem", background: "#059669", borderColor: "#059669" }}
               onClick={() => {
@@ -381,6 +397,7 @@ export default function CajaChica() {
                 setMostrarForm((v) => !v);
                 setMostrarReposicion(false);
                 setEditarRegistro(null);
+                setMostrarCategorias(false);
               }}
             >
               {mostrarForm ? "Cancelar" : "+ Nuevo comprobante"}
@@ -496,8 +513,9 @@ export default function CajaChica() {
         )}
 
         {/* DISTRIBUCIÓN DE 2 COLUMNAS BALANCEADAS (PANTALLA COMPLETA 100VH) */}
-        <div className="screen-split-layout">
+        <div className="screen-split-layout" style={{ gridTemplateColumns: (editarRegistro || mostrarReposicion || mostrarForm || mostrarCategorias) ? "360px 1fr" : "1fr" }}>
           {/* PANEL IZQUIERDO: EGRESOS POR CATEGORÍA O FORMULARIOS DE ACCIÓN */}
+          {(editarRegistro || mostrarReposicion || mostrarForm || mostrarCategorias) && (
           <div className="screen-panel scrollable">
             {editarRegistro ? (
               <form onSubmit={handleGuardarEdicion} style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
@@ -762,6 +780,7 @@ export default function CajaChica() {
               </div>
             )}
           </div>
+          )}
 
           {/* PANEL DERECHO: BUSCADOR + TABLA DE COMPROBANTES CON SCROLL INTERNO */}
           <div className="screen-panel" style={{ padding: 0 }}>
@@ -810,22 +829,24 @@ export default function CajaChica() {
               </select>
 
               {/* BOTÓN EXCEL */}
-              <button
-                type="button"
-                onClick={exportarExcel}
-                className="btn secondary"
-                title="Descargar libro de caja chica en formato CSV/Excel"
-                style={{
-                  fontSize: "0.8rem",
-                  padding: "0.42rem 0.75rem",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.35rem",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                📥 Excel
-              </button>
+              {(usuario?.rol === "GERENCIA" || usuario?.rol === "SUPERVISOR") && (
+                <button
+                  type="button"
+                  onClick={exportarExcel}
+                  className="btn secondary"
+                  title="Descargar libro de caja chica en formato CSV/Excel"
+                  style={{
+                    fontSize: "0.8rem",
+                    padding: "0.42rem 0.75rem",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  📥 Excel
+                </button>
+              )}
 
               <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)", whiteSpace: "nowrap" }}>
                 {resultado?.data.length ?? 0} comprobantes

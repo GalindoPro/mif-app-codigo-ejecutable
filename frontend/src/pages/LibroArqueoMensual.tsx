@@ -231,15 +231,17 @@ export default function LibroArqueoMensual() {
               </select>
             )}
 
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={exportarCSV}
-              disabled={cargando}
-              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
-            >
-              📥 Excel (CSV)
-            </button>
+            {(usuario?.rol === "GERENCIA" || usuario?.rol === "SUPERVISOR") && (
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={exportarCSV}
+                disabled={cargando}
+                style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
+              >
+                📥 Excel (CSV)
+              </button>
+            )}
             <button
               type="button"
               className="btn"

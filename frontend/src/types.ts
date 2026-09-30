@@ -622,6 +622,7 @@ export interface Prestamo {
   socio_dpi?: string;
   socio_telefono?: string;
   socio_direccion?: string;
+  socio_fecha_ingreso?: string;
   agencia_id: string;
   agencia_nombre?: string;
   promotor_id: string | null;

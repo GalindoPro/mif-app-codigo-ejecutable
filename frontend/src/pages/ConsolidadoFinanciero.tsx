@@ -207,14 +207,16 @@ export function ConsolidadoFinanciero() {
             />
           </div>
 
-          <button
-            onClick={exportarCSV}
-            className="btn secondary"
-            style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.76rem", padding: "0.22rem 0.55rem", height: "28px" }}
-            title="Exportar a Microsoft Excel (CSV)"
-          >
-            📥 Excel
-          </button>
+          {(usuario?.rol === "GERENCIA" || usuario?.rol === "SUPERVISOR") && (
+            <button
+              onClick={exportarCSV}
+              className="btn secondary"
+              style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.76rem", padding: "0.22rem 0.55rem", height: "28px" }}
+              title="Exportar a Microsoft Excel (CSV)"
+            >
+              📥 Excel
+            </button>
+          )}
 
           <button
             onClick={imprimirReporte}

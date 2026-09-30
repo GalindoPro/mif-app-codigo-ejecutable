@@ -275,15 +275,17 @@ export default function KardexCarteraPromotor() {
           >
             🖨️ Imprimir
           </button>
-          <button
-            type="button"
-            className="btn secondary"
-            onClick={exportarExcel}
-            title="Descargar libro de cartera en Excel (CSV)"
-            style={{ fontSize: "0.76rem", padding: "0.25rem 0.55rem", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
-          >
-            📥 Excel
-          </button>
+          {(usuario?.rol === "GERENCIA" || usuario?.rol === "SUPERVISOR") && (
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={exportarExcel}
+              title="Descargar libro de cartera en Excel (CSV)"
+              style={{ fontSize: "0.76rem", padding: "0.25rem 0.55rem", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
+            >
+              📥 Excel
+            </button>
+          )}
           <button
             type="button"
             className="btn"

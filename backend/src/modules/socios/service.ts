@@ -764,26 +764,22 @@ export async function auditarImportacion(agenciaId: string | null) {
 }
 
 export async function eliminarSocioSinVinculos(socioId: string, usuarioId: string) {
-  // Verificar que no tenga cuentas ni movimientos
-  const { rows: check } = await pool.query(`
-    SELECT COUNT(c.id) AS cuentas, COUNT(m.id) AS movimientos
-    FROM socios s
-    LEFT JOIN cuentas c ON c.socio_id = s.id
-    LEFT JOIN movimientos m ON m.cuenta_id = c.id
-    WHERE s.id = $1
-    GROUP BY s.id
+  // Verificar que no tenga vínculos
+  const check = await pool.query(`
+    SELECT 
+      (SELECT COUNT(*) FROM cuentas WHERE socio_id = $1) as cuentas,
+      (SELECT COUNT(*) FROM prestamos WHERE socio_id = $1) as prestamos,
+      (SELECT COUNT(*) FROM caja_movimientos_auxiliar WHERE socio_id = $1) as movs_caja,
+      (SELECT COUNT(*) FROM cobros_campo WHERE socio_id = $1) as cobros
   `, [socioId]);
 
-  const cuentas = Number(check[0]?.cuentas || 0);
-  const movimientos = Number(check[0]?.movimientos || 0);
+  const stats = check.rows[0];
+  const total = Number(stats.cuentas) + Number(stats.prestamos) + Number(stats.movs_caja) + Number(stats.cobros);
 
-  if (cuentas > 0 || movimientos > 0) {
-    throw badRequest(
-      `No se puede eliminar el socio. Tiene ${cuentas} cuenta(s) y ${movimientos} movimiento(s) vinculados. Utilice el estado INACTIVO en su lugar.`
-    );
+  if (total > 0) {
+    throw badRequest(`No se puede eliminar el socio. Tiene historial financiero activo (${total} registros). Utiliza la opción de "Fusión" si es un duplicado.`);
   }
 
-  // Registrar auditoría antes de eliminar
   await registrarAuditoria({
     tabla: "socios",
     operacion: "DELETE",
@@ -791,9 +787,53 @@ export async function eliminarSocioSinVinculos(socioId: string, usuarioId: strin
     usuarioId,
     datosAntes: JSON.stringify({ socioId }),
     datosDespues: null,
-    descripcion: "Eliminación de socio sin vínculos desde Panel de Auditoría de Importación",
+    descripcion: "Eliminación de socio sin vínculos (limpieza de duplicados vacíos)",
   });
 
   await pool.query(`DELETE FROM socios WHERE id = $1`, [socioId]);
-  return { mensaje: "Socio eliminado correctamente." };
+  return { mensaje: "Socio vacío eliminado correctamente." };
+}
+
+export async function fusionarSocios(socioOrigenId: string, socioDestinoId: string, usuarioId: string, agenciaVisible: string | null) {
+  if (socioOrigenId === socioDestinoId) throw badRequest("No puedes fusionar un socio consigo mismo.");
+
+  return withTransaction(async (client) => {
+    // Validar que ambos existan y pertenezcan a la agencia visible
+    const res = await client.query(`SELECT id, agencia_id, nombres, dpi FROM socios WHERE id IN ($1, $2)`, [socioOrigenId, socioDestinoId]);
+    if (res.rows.length !== 2) throw notFound("Uno o ambos socios no existen.");
+    
+    const origen = res.rows.find(r => r.id === socioOrigenId);
+    const destino = res.rows.find(r => r.id === socioDestinoId);
+    
+    if (agenciaVisible) {
+      if (origen.agencia_id !== agenciaVisible || destino.agencia_id !== agenciaVisible) {
+        throw forbidden("Ambos socios deben pertenecer a tu agencia para fusionarlos.");
+      }
+    }
+
+    // Trasladar referencias de tablas
+    await client.query(`UPDATE cuentas SET socio_id = $1 WHERE socio_id = $2`, [socioDestinoId, socioOrigenId]);
+    await client.query(`UPDATE prestamos SET socio_id = $1 WHERE socio_id = $2`, [socioDestinoId, socioOrigenId]);
+    await client.query(`UPDATE prestamo_pagos SET socio_id = $1 WHERE socio_id = $2`, [socioDestinoId, socioOrigenId]);
+    await client.query(`UPDATE caja_movimientos_auxiliar SET socio_id = $1 WHERE socio_id = $2`, [socioDestinoId, socioOrigenId]);
+    await client.query(`UPDATE cobros_campo SET socio_id = $1 WHERE socio_id = $2`, [socioDestinoId, socioOrigenId]);
+    await client.query(`UPDATE ingresos_comif SET socio_id = $1 WHERE socio_id = $2`, [socioDestinoId, socioOrigenId]);
+    await client.query(`UPDATE traslados SET socio_id = $1 WHERE socio_id = $2`, [socioDestinoId, socioOrigenId]);
+    
+    // Registrar auditoría de la fusión
+    await client.query(`
+      INSERT INTO auditoria (usuario_id, modulo, accion, entidad_id, motivo, datos_anteriores, fecha)
+      VALUES ($1, 'SOCIOS', 'FUSIONAR', $2, $3, $4, NOW())
+    `, [
+      usuarioId, 
+      socioDestinoId, 
+      `Se absorbió la información del socio erróneo ${origen.nombres} (DPI ${origen.dpi})`, 
+      JSON.stringify({ eliminado: origen, fusionadoCon: destino })
+    ]);
+
+    // Eliminar el socio origen
+    await client.query(`DELETE FROM socios WHERE id = $1`, [socioOrigenId]);
+
+    return { mensaje: `Socio ${origen.nombres} fusionado correctamente hacia ${destino.nombres}.` };
+  });
 }
