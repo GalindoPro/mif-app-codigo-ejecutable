@@ -102,7 +102,7 @@ print(json.dumps(rows))
   try {
     // === 1.1 VALIDACIÓN PREVIA AL IMPORT (Nombres Similares y DPIs duplicados) ===
     await abortarSiHayErroresExcel(
-      rows.map((r: RowExcel) => ({ fila: r.row, nombres: r.nombre, dpi: r.dpi })),
+      rowsExcel.map((r) => ({ fila: r.row, nombres: r.nombre, dpi: "" })),
       "AHORRO CORRIENTE - SALDOS SEPTIEMBRE.xlsx"
     );
 

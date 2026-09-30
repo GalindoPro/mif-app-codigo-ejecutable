@@ -3,6 +3,7 @@ import { Socio } from "../../types/models";
 import { registrarAuditoria } from "../../utils/auditoria";
 import { badRequest, notFound, forbidden, conflict } from "../../utils/errors";
 import { validarDpiGuatemala, formatearDPI, type ResultadoValidacionDPI } from "../../utils/dpiGuatemala";
+import { withTransaction } from "../../db/transaction";
 
 export interface FiltrosSocios {
   agenciaId: string | null; // null = todas (ADMIN/GERENCIA)
@@ -781,13 +782,12 @@ export async function eliminarSocioSinVinculos(socioId: string, usuarioId: strin
   }
 
   await registrarAuditoria({
-    tabla: "socios",
-    operacion: "DELETE",
-    registroId: socioId,
+    entidad: "Socio",
+    entidadId: socioId,
+    accion: "ELIMINAR",
     usuarioId,
-    datosAntes: JSON.stringify({ socioId }),
-    datosDespues: null,
-    descripcion: "Eliminación de socio sin vínculos (limpieza de duplicados vacíos)",
+    datosAnteriores: { socioId },
+    motivo: "Eliminación de socio sin vínculos (limpieza de duplicados vacíos)",
   });
 
   await pool.query(`DELETE FROM socios WHERE id = $1`, [socioId]);
