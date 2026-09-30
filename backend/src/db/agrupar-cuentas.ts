@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { pool } from "./pool.ts";
+import { pool } from "./pool";
 
 async function run() {
   console.log("Iniciando agrupación de cuentas duplicadas por socio y tipo...");
