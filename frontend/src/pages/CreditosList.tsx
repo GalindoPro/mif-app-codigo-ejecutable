@@ -35,7 +35,7 @@ export default function CreditosList() {
   const [q, setQ] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<string>("");
   const [filtroPromotor, setFiltroPromotor] = useState<"TODOS" | "DIEGO" | "WALTER">("TODOS");
-  const [filtroPeriodo, setFiltroPeriodo] = useState<"TODOS" | "ACTUAL_2026" | "HISTORICO">("ACTUAL_2026");
+  const filtroPeriodo = "ACTUAL_2026";
   const [filtroAno, setFiltroAno] = useState<string>("");
   const [filtroTipoFiador, setFiltroTipoFiador] = useState<"TODOS" | "EXTERNOS" | "SOCIOS">("TODOS");
   const [page, setPage] = useState(1);
@@ -113,40 +113,40 @@ export default function CreditosList() {
     }
   }
 
+  const esPrestamo2026 = (p: Prestamo) => {
+    return !!p.socio_fecha_ingreso && p.socio_fecha_ingreso >= "2026-01-01";
+  };
+
+  const prestamosActuales = useMemo(() => prestamos?.filter(esPrestamo2026) ?? [], [prestamos]);
+  const prestamosHistoricos = useMemo(() => prestamos?.filter((p) => !esPrestamo2026(p)) ?? [], [prestamos]);
+
   const diegoCount =
-    prestamos?.filter(
+    prestamosActuales.filter(
       (p) =>
         (p.promotor_nombre && p.promotor_nombre.toUpperCase().includes("DIEGO")) ||
         p.origen_cartera === "POR_REGULARIZAR",
-    ).length ?? 0;
+    ).length;
 
   const walterCount =
-    prestamos?.filter(
+    prestamosActuales.filter(
       (p) =>
         (p.promotor_nombre && p.promotor_nombre.toUpperCase().includes("WALTER")) ||
-        p.origen_cartera === "OFICIAL_PROMOTOR" ||
-        (!p.origen_cartera && (!p.promotor_nombre || !p.promotor_nombre.toUpperCase().includes("DIEGO"))),
-    ).length ?? 0;
+        (p.origen_cartera === "OFICIAL_PROMOTOR" && (!p.promotor_nombre || !p.promotor_nombre.toUpperCase().includes("DIEGO"))) ||
+        (!p.origen_cartera && (!p.promotor_nombre || !p.promotor_nombre.toUpperCase().includes("DIEGO")))
+    ).length;
 
-  const totalCount = prestamos?.length ?? 0;
-
-  const esPrestamo2026 = (p: Prestamo) => {
-    const f = p.fecha_desembolso || p.fecha_solicitud || p.created_at;
-    return Boolean(f && f.startsWith("2026"));
-  };
+  const totalCount = prestamosActuales.length;
 
   const anosDisponibles = useMemo(() => {
-    if (!prestamos) return [];
+    if (!prestamosActuales) return [];
     const setAnos = new Set<string>();
-    prestamos.forEach((p) => {
+    prestamosActuales.forEach((p) => {
       const f = p.fecha_desembolso || p.fecha_solicitud || p.created_at;
       if (f) setAnos.add(f.slice(0, 4));
     });
     return Array.from(setAnos).filter((a) => a && a.length === 4).sort().reverse();
-  }, [prestamos]);
+  }, [prestamosActuales]);
 
-  const prestamosActuales = useMemo(() => prestamos?.filter(esPrestamo2026) ?? [], [prestamos]);
-  const prestamosHistoricos = useMemo(() => prestamos?.filter((p) => !esPrestamo2026(p)) ?? [], [prestamos]);
 
   const prestamosFiltrados = useMemo(() => {
     return (prestamos || []).filter((p) => {
@@ -507,87 +507,7 @@ export default function CreditosList() {
 
           {/* BARRA DE HERRAMIENTAS ULTRA-COMPACTA CON SEGMENTACIÓN TEMPORAL */}
           <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", marginBottom: "0.2rem", flexWrap: "wrap" }}>
-            {/* SEGMENTACIÓN TEMPORAL EJERCICIO ACTUAL VS HISTÓRICO */}
-            <div style={{ display: "inline-flex", background: "var(--paper-raised, rgba(15,23,42,0.6))", padding: "2px", borderRadius: "8px", border: "1px solid var(--line)" }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setFiltroPeriodo("ACTUAL_2026");
-                  setFiltroAno("");
-                  setPage(1);
-                }}
-                style={{
-                  padding: "0.22rem 0.55rem",
-                  fontSize: "0.74rem",
-                  fontWeight: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? 700 : 500,
-                  background: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? "#059669" : "transparent",
-                  color: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? "#fff" : "var(--ink-soft)",
-                  border: "none",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                }}
-              >
-                🌱 Ejercicio 2026
-                <span style={{ fontSize: "0.68rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 4px", borderRadius: "8px" }}>
-                  {prestamosActuales.length}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setFiltroPeriodo("HISTORICO");
-                  setFiltroAno("");
-                  setPage(1);
-                }}
-                style={{
-                  padding: "0.22rem 0.55rem",
-                  fontSize: "0.74rem",
-                  fontWeight: filtroPeriodo === "HISTORICO" && !filtroAno ? 700 : 500,
-                  background: filtroPeriodo === "HISTORICO" && !filtroAno ? "#BF9903" : "transparent",
-                  color: filtroPeriodo === "HISTORICO" && !filtroAno ? "#0f172a" : "var(--ink-soft)",
-                  border: "none",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                }}
-              >
-                📜 Histórico
-                <span style={{ fontSize: "0.68rem", opacity: 0.9, background: "rgba(0,0,0,0.15)", padding: "1px 4px", borderRadius: "8px" }}>
-                  {prestamosHistoricos.length}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setFiltroPeriodo("TODOS");
-                  setFiltroAno("");
-                  setPage(1);
-                }}
-                style={{
-                  padding: "0.22rem 0.55rem",
-                  fontSize: "0.74rem",
-                  fontWeight: filtroPeriodo === "TODOS" && !filtroAno ? 700 : 500,
-                  background: filtroPeriodo === "TODOS" && !filtroAno ? "#0284c7" : "transparent",
-                  color: filtroPeriodo === "TODOS" && !filtroAno ? "#fff" : "var(--ink-soft)",
-                  border: "none",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                }}
-              >
-                🌐 Consolidado
-                <span style={{ fontSize: "0.68rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 4px", borderRadius: "8px" }}>
-                  {prestamos?.length || 0}
-                </span>
-              </button>
-            </div>
+            {/* PILL TOGGLES REMOVIDOS POR DECISION GERENCIAL (SOLO 2026) */}
 
             {/* SELECTOR ESPECÍFICO DE AÑO */}
             <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>

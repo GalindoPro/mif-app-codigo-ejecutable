@@ -63,7 +63,7 @@ export async function listar(params: {
   const query = `
     select pf.*,
            c.id as cuenta_id, c.numero_cuenta, c.codigo_sistema, c.agencia_id,
-           s.id as socio_id, s.nombres as socio_nombres, s.numero_asociado, s.dpi as socio_dpi, s.telefono as socio_telefono,
+           s.id as socio_id, s.nombres as socio_nombres, s.numero_asociado, s.dpi as socio_dpi, s.telefono as socio_telefono, s.fecha_ingreso as socio_fecha_ingreso,
            a.nombre as agencia_nombre, a.codigo as agencia_codigo,
            coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual
     from plazo_fijo_contratos pf

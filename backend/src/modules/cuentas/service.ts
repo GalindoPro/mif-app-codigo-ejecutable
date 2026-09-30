@@ -49,7 +49,7 @@ export async function listar(params: {
   }
 
   const { rows } = await pool.query(
-    `select c.*, s.nombres as socio_nombres, s.numero_asociado,
+    `select c.*, s.nombres as socio_nombres, s.numero_asociado, s.fecha_ingreso as socio_fecha_ingreso,
             a.nombre as agencia_nombre, a.codigo as agencia_codigo,
             p.codigo as prestamo_codigo, p.estado as prestamo_estado,
             coalesce(sc.saldo_actual, c.saldo_inicial) as saldo_actual,
@@ -90,8 +90,9 @@ export async function resumen(params: { tipo: TipoCuentaAhorro; agenciaId: strin
        count(distinct c.id)::int as total_cuentas,
        coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0) as saldo_total
      from cuentas c
+     join socios s on s.id = c.socio_id
      left join saldos_cuenta sc on sc.cuenta_id = c.id
-     where ${where}`,
+     where ${where} and s.fecha_ingreso >= '2026-01-01'`,
     valores,
   );
 
@@ -101,8 +102,9 @@ export async function resumen(params: { tipo: TipoCuentaAhorro; agenciaId: strin
        coalesce(sum(case when m.tipo = 'DEPOSITO' then m.monto else 0 end), 0) as total_depositos,
        coalesce(sum(case when m.tipo = 'RETIRO' then m.monto else 0 end), 0) as total_retiros
      from cuentas c
+     join socios s on s.id = c.socio_id
      join movimientos m on m.cuenta_id = c.id
-     where ${where}`,
+     where ${where} and s.fecha_ingreso >= '2026-01-01'`,
     valores,
   );
 

@@ -70,7 +70,7 @@ export async function listar(params: {
 
   const query = `
     select p.*,
-           s.nombres as socio_nombres, s.numero_asociado, s.dpi as socio_dpi, s.telefono as socio_telefono,
+           s.nombres as socio_nombres, s.numero_asociado, s.dpi as socio_dpi, s.telefono as socio_telefono, s.fecha_ingreso as socio_fecha_ingreso,
            a.nombre as agencia_nombre, a.codigo as agencia_codigo,
            u.nombre as promotor_nombre,
            exists(

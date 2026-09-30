@@ -9,7 +9,7 @@ export default function AportacionesList() {
   const [aportaciones, setAportaciones] = useState<AportacionSocio[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [filtroPeriodo, setFiltroPeriodo] = useState<"TODOS" | "ACTUAL_2026" | "HISTORICO">("ACTUAL_2026");
+  const filtroPeriodo = "ACTUAL_2026";
   const [filtroAno, setFiltroAno] = useState<string>("");
   const [fechaDesde, setFechaDesde] = useState<string>("");
   const [fechaHasta, setFechaHasta] = useState<string>("");
@@ -39,20 +39,20 @@ export default function AportacionesList() {
     return f.startsWith("2026") || f >= "2026-01-01";
   };
 
+  const aportacionesActuales = useMemo(() => aportaciones?.filter(esAportacion2026) ?? [], [aportaciones]);
+  const aportacionesHistoricas = useMemo(() => aportaciones?.filter((a) => !esAportacion2026(a)) ?? [], [aportaciones]);
+
   const anosDisponibles = useMemo(() => {
-    if (!aportaciones) return [];
+    if (!aportacionesActuales) return [];
     const setAnos = new Set<string>();
-    aportaciones.forEach((a) => {
+    aportacionesActuales.forEach((a) => {
       if (a.fecha_ingreso) {
         const ano = a.fecha_ingreso.slice(0, 4);
         if (ano && ano.length === 4) setAnos.add(ano);
       }
     });
     return Array.from(setAnos).sort().reverse();
-  }, [aportaciones]);
-
-  const aportacionesActuales = useMemo(() => aportaciones?.filter(esAportacion2026) ?? [], [aportaciones]);
-  const aportacionesHistoricas = useMemo(() => aportaciones?.filter((a) => !esAportacion2026(a)) ?? [], [aportaciones]);
+  }, [aportacionesActuales]);
 
   const socioFondoHistorico = useMemo(() => aportaciones?.find((a) => a.numero_asociado === "CHAJ-00000"), [aportaciones]);
   const montoFondoHistorico = Number(socioFondoHistorico?.total_aportaciones || 0);
@@ -60,8 +60,8 @@ export default function AportacionesList() {
   const montoHistoricoIndiv = useMemo(() => sociosHistoricosIndiv.reduce((s, a) => s + Number(a.total_aportaciones), 0), [sociosHistoricosIndiv]);
   const monto2026 = useMemo(() => aportacionesActuales.reduce((s, a) => s + Number(a.total_aportaciones), 0), [aportacionesActuales]);
 
-  const sociosConAportacion = useMemo(() => aportaciones?.filter((a) => Number(a.total_aportaciones) > 0) ?? [], [aportaciones]);
-  const sociosPendientes = useMemo(() => aportaciones?.filter((a) => Number(a.total_aportaciones) <= 0) ?? [], [aportaciones]);
+  const sociosConAportacion = useMemo(() => aportacionesActuales.filter((a) => Number(a.total_aportaciones) > 0), [aportacionesActuales]);
+  const sociosPendientes = useMemo(() => aportacionesActuales.filter((a) => Number(a.total_aportaciones) <= 0), [aportacionesActuales]);
 
   const aportacionesFiltradas = useMemo(() => {
     if (!aportaciones) return [];
@@ -278,93 +278,7 @@ export default function AportacionesList() {
 
       {/* BARRA DE HERRAMIENTAS CON SEGMENTACIÓN TEMPORAL Y RANGO DE FECHAS */}
       <div className="screen-toolbar" style={{ flexWrap: "wrap", gap: "0.35rem", padding: "0.25rem 0.4rem", flexShrink: 0 }}>
-        {/* SEGMENTACIÓN TEMPORAL (2026 VS HISTÓRICO) */}
-        <div style={{ display: "inline-flex", background: "var(--paper-raised, rgba(15,23,42,0.6))", padding: "2px", borderRadius: "8px", border: "1px solid var(--line)" }}>
-          <button
-            type="button"
-            onClick={() => {
-              setFiltroPeriodo("ACTUAL_2026");
-              setFiltroAno("");
-              setFechaDesde("");
-              setFechaHasta("");
-              setPage(1);
-            }}
-            style={{
-              padding: "0.22rem 0.55rem",
-              fontSize: "0.74rem",
-              fontWeight: filtroPeriodo === "ACTUAL_2026" && !filtroAno && !fechaDesde ? 700 : 500,
-              background: filtroPeriodo === "ACTUAL_2026" && !filtroAno && !fechaDesde ? "#059669" : "transparent",
-              color: filtroPeriodo === "ACTUAL_2026" && !filtroAno && !fechaDesde ? "#fff" : "var(--ink-soft)",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-            }}
-          >
-            🌱 Ejercicio 2026
-            <span style={{ fontSize: "0.66rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 4px", borderRadius: "8px" }}>
-              {aportacionesActuales.length}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setFiltroPeriodo("HISTORICO");
-              setFiltroAno("");
-              setFechaDesde("");
-              setFechaHasta("");
-              setPage(1);
-            }}
-            style={{
-              padding: "0.22rem 0.55rem",
-              fontSize: "0.74rem",
-              fontWeight: filtroPeriodo === "HISTORICO" && !filtroAno && !fechaDesde ? 700 : 500,
-              background: filtroPeriodo === "HISTORICO" && !filtroAno && !fechaDesde ? "#BF9903" : "transparent",
-              color: filtroPeriodo === "HISTORICO" && !filtroAno && !fechaDesde ? "#0f172a" : "var(--ink-soft)",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-            }}
-          >
-            📜 Histórico Anterior
-            <span style={{ fontSize: "0.66rem", opacity: 0.9, background: "rgba(0,0,0,0.15)", padding: "1px 4px", borderRadius: "8px" }}>
-              {aportacionesHistoricas.length}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setFiltroPeriodo("TODOS");
-              setFiltroAno("");
-              setFechaDesde("");
-              setFechaHasta("");
-              setPage(1);
-            }}
-            style={{
-              padding: "0.22rem 0.55rem",
-              fontSize: "0.74rem",
-              fontWeight: filtroPeriodo === "TODOS" && !filtroAno && !fechaDesde ? 700 : 500,
-              background: filtroPeriodo === "TODOS" && !filtroAno && !fechaDesde ? "#0284c7" : "transparent",
-              color: filtroPeriodo === "TODOS" && !filtroAno && !fechaDesde ? "#fff" : "var(--ink-soft)",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-            }}
-          >
-            🌐 Consolidado
-            <span style={{ fontSize: "0.66rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 4px", borderRadius: "8px" }}>
-              {aportaciones?.length || 0}
-            </span>
-          </button>
-        </div>
+        {/* PILL TOGGLES REMOVIDOS POR DECISION GERENCIAL (SOLO 2026) */}
 
         {/* SELECTOR DE ESTADO DE APORTACIÓN */}
         <div style={{ display: "inline-flex", background: "var(--paper-raised, rgba(15,23,42,0.6))", padding: "2px", borderRadius: "8px", border: "1px solid var(--line)" }}>

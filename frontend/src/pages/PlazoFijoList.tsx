@@ -25,7 +25,7 @@ export default function PlazoFijoList() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<string>("");
-  const [filtroPeriodo, setFiltroPeriodo] = useState<"TODOS" | "ACTUAL_2026" | "HISTORICO">("ACTUAL_2026");
+  const filtroPeriodo = "ACTUAL_2026";
   const [filtroAno, setFiltroAno] = useState<string>("");
   const [page, setPage] = useState(1);
   const pageSize = 10;
@@ -49,23 +49,22 @@ export default function PlazoFijoList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, estadoFiltro]);
 
-  const esContrato2026 = (c: PlazoFijoContrato) =>
-    c.estado === "ACTIVO" ||
-    (c.fecha_inicio && c.fecha_inicio.startsWith("2026")) ||
-    (c.fecha_vencimiento && c.fecha_vencimiento >= "2026-01-01");
+  const esContrato2026 = (c: PlazoFijoContrato) => {
+    return !!c.socio_fecha_ingreso && c.socio_fecha_ingreso >= "2026-01-01";
+  };
 
   const contratosActuales = useMemo(() => contratos?.filter(esContrato2026) ?? [], [contratos]);
   const contratosHistoricos = useMemo(() => contratos?.filter((c) => !esContrato2026(c)) ?? [], [contratos]);
 
   const anosDisponibles = useMemo(() => {
-    if (!contratos) return [];
+    if (!contratosActuales) return [];
     const setAnos = new Set<string>();
-    contratos.forEach((c) => {
+    contratosActuales.forEach((c) => {
       if (c.fecha_vencimiento) setAnos.add(c.fecha_vencimiento.slice(0, 4));
       if (c.fecha_inicio) setAnos.add(c.fecha_inicio.slice(0, 4));
     });
     return Array.from(setAnos).filter((a) => a && a.length === 4).sort().reverse();
-  }, [contratos]);
+  }, [contratosActuales]);
 
   const contratosFiltrados = useMemo(() => {
     if (!contratos) return [];
@@ -83,14 +82,14 @@ export default function PlazoFijoList() {
     return lista;
   }, [contratos, filtroPeriodo, filtroAno, contratosActuales, contratosHistoricos]);
 
-  const activos = contratos?.filter((c) => c.estado === "ACTIVO") ?? [];
+  const activos = contratosFiltrados.filter((c) => c.estado === "ACTIVO");
   const totalInversionActiva = activos.reduce((sum, c) => sum + Number(c.monto_deposito), 0);
   const totalInteresesComprometidos = activos.reduce((sum, c) => sum + Number(c.interes_neto || c.interes_generado), 0);
 
   const hoy = new Date().toISOString().slice(0, 10);
   const porVencerOyaVencidos = activos.filter((c) => c.fecha_vencimiento <= hoy).length;
 
-  const totalCapitalHistorico = (contratos ?? []).reduce((sum, c) => sum + Number(c.monto_deposito), 0);
+  const totalCapitalHistorico = (contratosFiltrados).reduce((sum, c) => sum + Number(c.monto_deposito), 0);
   const totalCapitalFiltrado = contratosFiltrados.reduce((sum, c) => sum + Number(c.monto_deposito), 0);
   const totalCertificados = contratosFiltrados.length;
   const promedioPorCertificado = totalCertificados > 0 ? totalCapitalFiltrado / totalCertificados : 0;
@@ -316,90 +315,7 @@ export default function PlazoFijoList() {
       </div>
       )}
       <div className="screen-toolbar" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
-        {/* SEGMENTACIÓN TEMPORAL RÁPIDA */}
-        <div style={{ display: "inline-flex", background: "var(--paper-raised, rgba(15,23,42,0.6))", padding: "2px", borderRadius: "8px", border: "1px solid var(--line)" }}>
-          <button
-            type="button"
-            onClick={() => {
-              setFiltroPeriodo("ACTUAL_2026");
-              setFiltroAno("");
-              setPage(1);
-            }}
-            style={{
-              padding: "0.3rem 0.65rem",
-              fontSize: "0.78rem",
-              fontWeight: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? 700 : 500,
-              background: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? "#059669" : "transparent",
-              color: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? "#fff" : "var(--ink-soft)",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              transition: "all 0.15s ease",
-            }}
-          >
-            🌱 Ejercicio 2026
-            <span style={{ fontSize: "0.7rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 5px", borderRadius: "10px" }}>
-              {contratosActuales.length}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setFiltroPeriodo("HISTORICO");
-              setFiltroAno("");
-              setPage(1);
-            }}
-            style={{
-              padding: "0.3rem 0.65rem",
-              fontSize: "0.78rem",
-              fontWeight: filtroPeriodo === "HISTORICO" && !filtroAno ? 700 : 500,
-              background: filtroPeriodo === "HISTORICO" && !filtroAno ? "#BF9903" : "transparent",
-              color: filtroPeriodo === "HISTORICO" && !filtroAno ? "#0f172a" : "var(--ink-soft)",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              transition: "all 0.15s ease",
-            }}
-          >
-            📜 Histórico Anterior
-            <span style={{ fontSize: "0.7rem", opacity: 0.9, background: "rgba(0,0,0,0.15)", padding: "1px 5px", borderRadius: "10px" }}>
-              {contratosHistoricos.length}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setFiltroPeriodo("TODOS");
-              setFiltroAno("");
-              setPage(1);
-            }}
-            style={{
-              padding: "0.3rem 0.65rem",
-              fontSize: "0.78rem",
-              fontWeight: filtroPeriodo === "TODOS" && !filtroAno ? 700 : 500,
-              background: filtroPeriodo === "TODOS" && !filtroAno ? "#0284c7" : "transparent",
-              color: filtroPeriodo === "TODOS" && !filtroAno ? "#fff" : "var(--ink-soft)",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              transition: "all 0.15s ease",
-            }}
-          >
-            🌐 Consolidado
-            <span style={{ fontSize: "0.7rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 5px", borderRadius: "10px" }}>
-              {contratos?.length || 0}
-            </span>
-          </button>
-        </div>
+        {/* PILL TOGGLES REMOVIDOS POR DECISION GERENCIAL (SOLO 2026) */}
 
         {/* SELECTOR ESPECÍFICO DE AÑO */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>

@@ -24,7 +24,7 @@ export default function AhorroList() {
   const [cuentas, setCuentas] = useState<Cuenta[] | null>(null);
   const [resumen, setResumen] = useState<ResumenCuentas | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filtroPeriodo, setFiltroPeriodo] = useState<"TODOS" | "ACTUAL_2026" | "HISTORICO">("TODOS");
+  const filtroPeriodo = "ACTUAL_2026";
   const [filtroAno, setFiltroAno] = useState<string>("");
 
   const [page, setPage] = useState(1);
@@ -53,18 +53,24 @@ export default function AhorroList() {
       .catch((err) => setError(mensajeError(err)));
   }, [config]);
 
-  const cuentasActuales = useMemo(() => cuentas?.filter((c) => c.tiene_movimiento_2026) ?? [], [cuentas]);
-  const cuentasHistoricas = useMemo(() => cuentas?.filter((c) => !c.tiene_movimiento_2026) ?? [], [cuentas]);
+  const cuentasActuales = useMemo(() => cuentas?.filter((c) => {
+    // Si viene del backend y su fecha de ingreso del socio es >= 2026
+    return c.socio_fecha_ingreso ? c.socio_fecha_ingreso >= "2026-01-01" : c.tiene_movimiento_2026;
+  }) ?? [], [cuentas]);
+  
+  const cuentasHistoricas = useMemo(() => cuentas?.filter((c) => {
+    return c.socio_fecha_ingreso ? c.socio_fecha_ingreso < "2026-01-01" : !c.tiene_movimiento_2026;
+  }) ?? [], [cuentas]);
 
   const anosDisponibles = useMemo(() => {
-    if (!cuentas) return [];
+    if (!cuentasActuales) return [];
     const setAnos = new Set<string>();
-    cuentas.forEach((c) => {
+    cuentasActuales.forEach((c) => {
       if (c.ultima_fecha_movimiento) setAnos.add(c.ultima_fecha_movimiento.slice(0, 4));
       if (c.created_at) setAnos.add(c.created_at.slice(0, 4));
     });
     return Array.from(setAnos).filter((a) => a && a.length === 4).sort().reverse();
-  }, [cuentas]);
+  }, [cuentasActuales]);
 
   const cuentasFiltradas = useMemo(() => {
     if (!cuentas) return [];
@@ -309,62 +315,8 @@ export default function AhorroList() {
       </div>
       )}
 
-      {/* BARRA DE BÚSQUEDA Y PESTAÑAS DE FILTRO — PILL TOGGLE INSTITUCIONAL */}
       <div className="screen-toolbar" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
-        {/* PILL TOGGLE TEMPORAL */}
-        <div style={{ display: "inline-flex", background: "var(--paper-raised, rgba(15,23,42,0.6))", padding: "2px", borderRadius: "8px", border: "1px solid var(--line)" }}>
-          <button
-            type="button"
-            onClick={() => { setFiltroPeriodo("ACTUAL_2026"); setPage(1); }}
-            style={{
-              padding: "0.3rem 0.65rem", fontSize: "0.78rem",
-              fontWeight: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? 700 : 500,
-              background: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? "#059669" : "transparent",
-              color: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? "#fff" : "var(--ink-soft)",
-              border: "none", borderRadius: "6px", cursor: "pointer",
-              display: "flex", alignItems: "center", gap: "4px", transition: "all 0.15s ease",
-            }}
-          >
-            🌱 Ejercicio 2026
-            <span style={{ fontSize: "0.7rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 5px", borderRadius: "10px" }}>
-              {cuentasActuales.length}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => { setFiltroPeriodo("HISTORICO"); setFiltroAno(""); setPage(1); }}
-            style={{
-              padding: "0.3rem 0.65rem", fontSize: "0.78rem",
-              fontWeight: filtroPeriodo === "HISTORICO" && !filtroAno ? 700 : 500,
-              background: filtroPeriodo === "HISTORICO" && !filtroAno ? "#BF9903" : "transparent",
-              color: filtroPeriodo === "HISTORICO" && !filtroAno ? "#0f172a" : "var(--ink-soft)",
-              border: "none", borderRadius: "6px", cursor: "pointer",
-              display: "flex", alignItems: "center", gap: "4px", transition: "all 0.15s ease",
-            }}
-          >
-            📜 Histórico Anterior
-            <span style={{ fontSize: "0.7rem", opacity: 0.9, background: "rgba(0,0,0,0.15)", padding: "1px 5px", borderRadius: "10px" }}>
-              {cuentasHistoricas.length}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => { setFiltroPeriodo("TODOS"); setFiltroAno(""); setPage(1); }}
-            style={{
-              padding: "0.3rem 0.65rem", fontSize: "0.78rem",
-              fontWeight: filtroPeriodo === "TODOS" && !filtroAno ? 700 : 500,
-              background: filtroPeriodo === "TODOS" && !filtroAno ? "#0284c7" : "transparent",
-              color: filtroPeriodo === "TODOS" && !filtroAno ? "#fff" : "var(--ink-soft)",
-              border: "none", borderRadius: "6px", cursor: "pointer",
-              display: "flex", alignItems: "center", gap: "4px", transition: "all 0.15s ease",
-            }}
-          >
-            🌐 Consolidado
-            <span style={{ fontSize: "0.7rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 5px", borderRadius: "10px" }}>
-              {cuentas?.length || 0}
-            </span>
-          </button>
-        </div>
+        {/* PILL TOGGLES REMOVIDOS POR DECISION GERENCIAL (SOLO 2026) */}
 
         {/* SELECTOR ESPECÍFICO DE AÑO */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>

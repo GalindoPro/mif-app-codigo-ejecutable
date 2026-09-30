@@ -1350,11 +1350,24 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
       )}
 
       {mostrarAyudaFinanciera && (
-        <div className="modal-overlay">
-          <div className="modal-card" style={{ maxWidth: "550px" }}>
-            <div className="modal-header">
-              <h2>ℹ️ Guía Rápida de Inteligencia Financiera</h2>
-              <button className="btn-close" onClick={() => setMostrarAyudaFinanciera(false)}>✕</button>
+        <div className="modal-overlay" style={{ backdropFilter: "blur(4px)" }}>
+          <div 
+            className="modal-card" 
+            style={{ 
+              maxWidth: "550px",
+              background: "#0f172a",
+              border: "1px solid rgba(148, 163, 184, 0.25)",
+              borderRadius: "14px",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.75)",
+              padding: "1.5rem"
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(148, 163, 184, 0.2)", paddingBottom: "1rem", marginBottom: "1rem" }}>
+              <h2 style={{ color: "#f8fafc", margin: 0, fontSize: "1.1rem", fontWeight: 700 }}>ℹ️ Guía Rápida de Inteligencia Financiera</h2>
+              <button 
+                onClick={() => setMostrarAyudaFinanciera(false)} 
+                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: "1.2rem", padding: "0.2rem" }}
+              >✕</button>
             </div>
             <div className="modal-body" style={{ color: "#e2e8f0", fontSize: "0.85rem", lineHeight: 1.5 }}>
               <p style={{ marginBottom: "1rem" }}>
@@ -1363,29 +1376,35 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
               
               <div style={{ background: "rgba(255,255,255,0.03)", padding: "0.75rem", borderRadius: "8px", marginBottom: "0.75rem", border: "1px solid rgba(255,255,255,0.1)" }}>
                 <h4 style={{ color: "#38bdf8", margin: "0 0 0.25rem 0", fontSize: "0.9rem" }}>1. Tasa de Salida de Efectivo</h4>
-                <p style={{ margin: 0 }}>
+                <p style={{ margin: 0, color: "#cbd5e1" }}>
                   Compara todo el dinero que entró (depósitos, cuotas cobradas) vs el que salió (retiros, préstamos dados). 
-                  Si dice <strong>115.6%</strong>, significa que la cooperativa gastó/prestó un 15.6% más de lo que ingresó este mes. 
+                  Si dice <strong className="mono" style={{ color: "#f8fafc" }}>115.6%</strong>, significa que la cooperativa gastó/prestó un 15.6% más de lo que ingresó este mes. 
                   Esto es normal (Alta Colocación) si la cooperativa está usando reservas pasadas para dar nuevos créditos.
                 </p>
               </div>
 
               <div style={{ background: "rgba(255,255,255,0.03)", padding: "0.75rem", borderRadius: "8px", marginBottom: "0.75rem", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <h4 style={{ color: "#34d399", margin: "0 0 0.25rem 0", fontSize: "0.9rem" }}>2. Comportamiento de Ahorros</h4>
-                <p style={{ margin: 0 }}>
-                  Evalúa la confianza de los socios. Si dice <strong>Captación Neta Positiva</strong>, significa que, aunque la gente retiró dinero, el total de dinero nuevo depositado fue mayor. La cuenta de ahorros general de la cooperativa creció.
+                <h4 style={{ color: "#10b981", margin: "0 0 0.25rem 0", fontSize: "0.9rem" }}>2. Comportamiento de Ahorros</h4>
+                <p style={{ margin: 0, color: "#cbd5e1" }}>
+                  Evalúa la confianza de los socios. Si dice <strong style={{ color: "#10b981" }}>Captación Neta Positiva</strong>, significa que, aunque la gente retiró dinero, el total de dinero nuevo depositado fue mayor. La cuenta de ahorros general de la cooperativa creció.
                 </p>
               </div>
 
               <div style={{ background: "rgba(255,255,255,0.03)", padding: "0.75rem", borderRadius: "8px", marginBottom: "0.75rem", border: "1px solid rgba(255,255,255,0.1)" }}>
                 <h4 style={{ color: "#f59e0b", margin: "0 0 0.25rem 0", fontSize: "0.9rem" }}>3. Dinámica de Cartera</h4>
-                <p style={{ margin: 0 }}>
+                <p style={{ margin: 0, color: "#cbd5e1" }}>
                   Te dice cuánto efectivo "líquido" recuperaste por cobro de cuotas (capital + interés) y te lo compara con el efectivo que acabas de prestar (desembolsos nuevos). Si el cobro es alto, la recuperación de la cartera es excelente.
                 </p>
               </div>
             </div>
-            <div className="modal-footer" style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end" }}>
-              <button className="btn secondary" onClick={() => setMostrarAyudaFinanciera(false)}>Entendido</button>
+            <div style={{ marginTop: "1.2rem", display: "flex", justifyContent: "flex-end", borderTop: "1px solid rgba(148, 163, 184, 0.2)", paddingTop: "1rem" }}>
+              <button 
+                className="btn" 
+                style={{ background: "#059669", color: "#f8fafc", padding: "0.4rem 1rem", borderRadius: "6px", border: "none", fontWeight: 600, cursor: "pointer" }}
+                onClick={() => setMostrarAyudaFinanciera(false)}
+              >
+                Entendido
+              </button>
             </div>
           </div>
         </div>

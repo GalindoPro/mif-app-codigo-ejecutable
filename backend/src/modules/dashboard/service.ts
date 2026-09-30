@@ -73,7 +73,7 @@ export async function resumen(agenciaId: string | null) {
      from plazo_fijo_contratos pf
      join cuentas c on c.id = pf.cuenta_id
      join socios s on s.id = c.socio_id
-     where s.fecha_ingreso >= '2026-01-01'
+     where s.fecha_ingreso >= '2026-01-01' and pf.estado = 'ACTIVO'
      group by c.agencia_id`,
   );
 

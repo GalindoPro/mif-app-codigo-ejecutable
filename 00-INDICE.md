@@ -325,6 +325,10 @@ Este documento registra el **avance real y completo** del sistema de la COOPERAT
 
 Todas las especificaciones operativas y estatutarias acordadas se encuentran documentadas en detalle en [MEJORAS_SISTEMA_MIF.md](file:///Users/galindo/Downloads/mif-app-codigo-ejecutable/MEJORAS_SISTEMA_MIF.md):
 
+2. **Aportaciones de Capital y Créditos (Regla Frontera 2026):**
+   - **Módulo Créditos:** Se ajustaron los contadores de las pestañas (Toda la Cartera, Promotor 1, Promotor 2) para contar estrictamente sobre los socios admitidos desde 2026 (`prestamosActuales`).
+   - **Padrón de Aportaciones:** Se inyectó el parámetro inmutable `ACTUAL_2026` para sumar el capital pagado exclusivamente por socios vigentes en 2026, suprimiendo los botones de consolidación histórica.
+
 1. **Formato DPI y Detección de Duplicados en Vivo:** Estándar `xxxx-xxxxx-xxxx` con bloqueo al detectar DPIs repetidos.
 2. **Teléfono con WhatsApp (+502):** Conexión directa para notificaciones de apertura de cuenta.
 3. **Parentesco del Beneficiario:** Lista oficial de parentescos en ficha de socio y padrón.

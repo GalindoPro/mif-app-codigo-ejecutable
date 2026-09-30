@@ -2,6 +2,18 @@
 
 Este documento recopila de forma detallada todas las mejoras funcionales, reglas de negocio, formatos guatemaltecos y optimizaciones contables implementadas en el sistema.
 
+## 118. Sincronización Matemática y Aplicación de Regla de Frontera 2026 en Módulos de Créditos y Aportaciones
+
+**Archivos Modificados:**
+- `frontend/src/pages/CreditosList.tsx`
+- `frontend/src/pages/AportacionesList.tsx`
+
+**Objetivo y Reglas de Negocio:**
+- **Cartera de Créditos:** Se ajustaron los contadores de la botonera de promotores (Toda la Cartera, Diego, Walter) para que calculen sus valores basándose exclusivamente en los socios admitidos a partir de 2026 (`prestamosActuales`), asegurando concordancia matemática exacta con la sumatoria del Tablero Global (105 activos + 7 pagados = 112 totales). Adicionalmente, se corrigió el operador lógico de atribución para el promotor Walter, excluyendo adecuadamente los créditos pertenecientes a Diego.
+- **Padrón de Aportaciones Estatutarias:** Se impuso de manera permanente y estricta la regla contable 2026 (`ACTUAL_2026`), retirando los botones de navegación histórica y consolidada en la interfaz. El padrón ahora proyecta, suma y pagina únicamente el capital y membresía de asociados activos del ejercicio correspondiente, proveyendo a auditoría un entorno blindado.
+
+---
+
 ## 117. Rediseño Ejecutivo del Tablero Global (Inteligencia Financiera y Desglose de Membresía)
 
 **Archivos Modificados:**
