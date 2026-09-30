@@ -71,12 +71,7 @@ sociosRouter.get(
   }),
 );
 
-sociosRouter.get(
-  "/:id",
-  asyncHandler(async (req, res) => {
-    res.json(await service.obtener(req.params.id, agenciaVisible(req)));
-  }),
-);
+
 
 const datosSocioSchema = z.object({
   numeroAsociado: z.string().min(1),
@@ -175,5 +170,13 @@ sociosRouter.delete(
   requireRole("GERENCIA", "ADMIN"),
   asyncHandler(async (req, res) => {
     res.json(await service.eliminarSocioSinVinculos(req.params.id, req.user!.id));
+  }),
+);
+
+// GET /socios/:id — Obtener socio por ID
+sociosRouter.get(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    res.json(await service.obtener(req.params.id, agenciaVisible(req)));
   }),
 );
