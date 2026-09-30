@@ -63,7 +63,7 @@ prestamosRouter.get(
     const agId = interAgencia || socioId ? null : (agenciaVisible(req) ?? (req.query.agenciaId as string) ?? null);
     const prestamos = await service.listar({
       agenciaId: agId,
-      promotorId: req.query.promotorId as string,
+      promotorId: req.user?.rol === "PROMOTOR" ? req.user.id : (req.query.promotorId as string),
       socioId,
       estado: req.query.estado as any,
       q: req.query.q as string,

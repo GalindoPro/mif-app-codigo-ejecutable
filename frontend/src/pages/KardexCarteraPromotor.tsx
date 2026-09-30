@@ -416,54 +416,58 @@ export default function KardexCarteraPromotor() {
         }}
       >
         <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", alignItems: "center" }}>
-          <button
-            type="button"
-            className={`btn ${promotorSel === "TODOS" && tabTipo === "TODOS" ? "" : "secondary"}`}
-            style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
-            onClick={() => {
-              setPromotorSel("TODOS");
-              setTabTipo("TODOS");
-            }}
-          >
-            🌐 Toda la Cartera ({kardex?.resumen.countTotal ?? 150})
-          </button>
-          <button
-            type="button"
-            className={`btn ${promotorSel === "DIEGO" ? "" : "secondary"}`}
-            style={{
-              fontSize: "0.78rem",
-              padding: "0.25rem 0.6rem",
-              borderColor: promotorSel === "DIEGO" ? "#059669" : undefined,
-              color: promotorSel === "DIEGO" ? "#ffffff" : undefined,
-              background: promotorSel === "DIEGO" ? "#059669" : undefined,
-              fontWeight: 600,
-            }}
-            onClick={() => {
-              setPromotorSel("DIEGO");
-              setTabTipo("TODOS");
-            }}
-          >
-            🌾 Promotor 1: Diego Laynez ({kardex?.resumen.countDiego ?? 84})
-          </button>
-          <button
-            type="button"
-            className={`btn ${promotorSel === "WALTER" ? "" : "secondary"}`}
-            style={{
-              fontSize: "0.78rem",
-              padding: "0.25rem 0.6rem",
-              borderColor: promotorSel === "WALTER" ? "#0284c7" : undefined,
-              color: promotorSel === "WALTER" ? "#ffffff" : undefined,
-              background: promotorSel === "WALTER" ? "#0284c7" : undefined,
-              fontWeight: 600,
-            }}
-            onClick={() => {
-              setPromotorSel("WALTER");
-              setTabTipo("TODOS");
-            }}
-          >
-            🌾 Promotor 2: Walter Mendoza ({kardex?.resumen.countWalter ?? 66})
-          </button>
-          <span style={{ color: "var(--line)", margin: "0 0.2rem" }}>|</span>
+          {(usuario?.rol === "GERENCIA" || usuario?.rol === "SUPERVISOR") && (
+            <>
+              <button
+                type="button"
+                className={`btn ${promotorSel === "TODOS" && tabTipo === "TODOS" ? "" : "secondary"}`}
+                style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem" }}
+                onClick={() => {
+                  setPromotorSel("TODOS");
+                  setTabTipo("TODOS");
+                }}
+              >
+                🌐 Toda la Cartera ({kardex?.resumen.countTotal ?? 150})
+              </button>
+              <button
+                type="button"
+                className={`btn ${promotorSel === "DIEGO" ? "" : "secondary"}`}
+                style={{
+                  fontSize: "0.78rem",
+                  padding: "0.25rem 0.6rem",
+                  borderColor: promotorSel === "DIEGO" ? "#059669" : undefined,
+                  color: promotorSel === "DIEGO" ? "#ffffff" : undefined,
+                  background: promotorSel === "DIEGO" ? "#059669" : undefined,
+                  fontWeight: 600,
+                }}
+                onClick={() => {
+                  setPromotorSel("DIEGO");
+                  setTabTipo("TODOS");
+                }}
+              >
+                🌾 Promotor 1: Diego Laynez ({kardex?.resumen.countDiego ?? 84})
+              </button>
+              <button
+                type="button"
+                className={`btn ${promotorSel === "WALTER" ? "" : "secondary"}`}
+                style={{
+                  fontSize: "0.78rem",
+                  padding: "0.25rem 0.6rem",
+                  borderColor: promotorSel === "WALTER" ? "#0284c7" : undefined,
+                  color: promotorSel === "WALTER" ? "#ffffff" : undefined,
+                  background: promotorSel === "WALTER" ? "#0284c7" : undefined,
+                  fontWeight: 600,
+                }}
+                onClick={() => {
+                  setPromotorSel("WALTER");
+                  setTabTipo("TODOS");
+                }}
+              >
+                🌾 Promotor 2: Walter Mendoza ({kardex?.resumen.countWalter ?? 66})
+              </button>
+              <span style={{ color: "var(--line)", margin: "0 0.2rem" }}>|</span>
+            </>
+          )}
           <button
             type="button"
             className={`btn ${tabTipo === "HIPOTECARIO" ? "" : "secondary"}`}

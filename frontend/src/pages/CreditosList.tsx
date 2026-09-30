@@ -321,7 +321,7 @@ export default function CreditosList() {
           </div>
 
           {/* TABS DE PROMOTORES: DIEGO (84), WALTER (66), TODA LA CARTERA (150) */}
-          {pestanaActiva === "CREDITOS" && (
+          {pestanaActiva === "CREDITOS" && (usuario?.rol === "GERENCIA" || usuario?.rol === "SUPERVISOR") && (
             <div style={{ display: "flex", gap: "0.2rem", background: "var(--paper-raised)", padding: "0.15rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
               <button
                 type="button"
