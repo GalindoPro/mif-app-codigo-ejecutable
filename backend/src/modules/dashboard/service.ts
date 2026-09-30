@@ -28,18 +28,30 @@ export async function resumen(agenciaId: string | null) {
             coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0) as saldo_total
      from cuentas c
      left join saldos_cuenta sc on sc.cuenta_id = c.id
+     join socios s on s.id = c.socio_id
      where c.tipo in ('AHORRO_CORRIENTE', 'AHORRO_PROGRAMADO', 'AHORRO_INFANTO_JUVENIL')
+       and s.fecha_ingreso >= '2026-01-01'
      group by c.agencia_id, c.tipo`,
   );
 
   const { rows: socios } = await queryWithRetry(
-    `select agencia_id, count(*)::int as total from socios where estado = 'ACTIVO' group by agencia_id`,
+    `select agencia_id, 
+            count(*)::int as total,
+            count(*) filter (where exists (select 1 from cuentas where socio_id = socios.id and estado = 'ACTIVA'))::int as con_cuentas,
+            count(*) filter (where not exists (select 1 from cuentas where socio_id = socios.id and estado = 'ACTIVA') and exists (select 1 from prestamos where socio_id = socios.id and estado = 'DESEMBOLSADO' and saldo_capital > 0))::int as solo_creditos,
+            count(*) filter (where not exists (select 1 from cuentas where socio_id = socios.id and estado = 'ACTIVA') and not exists (select 1 from prestamos where socio_id = socios.id and estado = 'DESEMBOLSADO' and saldo_capital > 0))::int as sin_productos
+     from socios 
+     where estado = 'ACTIVO' and fecha_ingreso >= '2026-01-01' 
+     group by agencia_id`,
   );
 
   const { rows: movimientosHoy } = await queryWithRetry(
     `select cu.agencia_id, count(*)::int as total
-     from movimientos m join cuentas cu on cu.id = m.cuenta_id
+     from movimientos m 
+     join cuentas cu on cu.id = m.cuenta_id
+     join socios s on s.id = cu.socio_id
      where m.fecha = current_date
+       and s.fecha_ingreso >= '2026-01-01'
      group by cu.agencia_id`,
   );
 
@@ -48,7 +60,9 @@ export async function resumen(agenciaId: string | null) {
             count(*)::int as total_prestamos,
             coalesce(sum(coalesce(p.saldo_capital, p.monto_aprobado)), 0)::numeric(14,2) as saldo_total
      from prestamos p
+     join socios s on s.id = p.socio_id
      where p.estado in ('DESEMBOLSADO', 'APROBADO')
+       and s.fecha_ingreso >= '2026-01-01'
      group by p.agencia_id`,
   );
 
@@ -58,6 +72,8 @@ export async function resumen(agenciaId: string | null) {
             coalesce(sum(pf.monto_deposito), 0)::numeric(14,2) as monto_total
      from plazo_fijo_contratos pf
      join cuentas c on c.id = pf.cuenta_id
+     join socios s on s.id = c.socio_id
+     where s.fecha_ingreso >= '2026-01-01'
      group by c.agencia_id`,
   );
 
@@ -67,7 +83,9 @@ export async function resumen(agenciaId: string | null) {
             coalesce(sum(coalesce(sc.saldo_actual, c.saldo_inicial)), 0)::numeric(14,2) as saldo_total
      from cuentas c
      left join saldos_cuenta sc on sc.cuenta_id = c.id
+     join socios s on s.id = c.socio_id
      where c.tipo = 'APORTACION'
+       and s.fecha_ingreso >= '2026-01-01'
      group by c.agencia_id`,
   );
 
@@ -81,7 +99,7 @@ export async function resumen(agenciaId: string | null) {
   );
 
   const mapaCajaChica = new Map(cajaChica.map((r) => [r.agencia_id, Number(r.saldo)]));
-  const mapaSocios = new Map(socios.map((r) => [r.agencia_id, r.total]));
+  const mapaSocios = new Map(socios.map((r) => [r.agencia_id, { total: r.total, conCuentas: r.con_cuentas, soloCreditos: r.solo_creditos, sinProductos: r.sin_productos }]));
   const mapaMovHoy = new Map(movimientosHoy.map((r) => [r.agencia_id, r.total]));
   const mapaPrestamos = new Map(prestamos.map((r) => [r.agencia_id, { count: r.total_prestamos, saldo: Number(r.saldo_total) }]));
   const mapaPlazoFijo = new Map(plazoFijo.map((r) => [r.agencia_id, { count: r.total_certificados, monto: Number(r.monto_total) }]));
@@ -106,7 +124,10 @@ export async function resumen(agenciaId: string | null) {
       plazoFijo: mapaPlazoFijo.get(ag.id) ?? { count: 0, monto: 0 },
       aportaciones: mapaAportaciones.get(ag.id) ?? { count: 0, saldo: 0 },
       cuotasIngreso: mapaCuotasIngreso.get(ag.id) ?? { count: 0, monto: 0 },
-      totalSocios: mapaSocios.get(ag.id) ?? 0,
+      totalSocios: (mapaSocios.get(ag.id) as any)?.total ?? 0,
+      sociosConCuentas: (mapaSocios.get(ag.id) as any)?.conCuentas ?? 0,
+      sociosSoloCreditos: (mapaSocios.get(ag.id) as any)?.soloCreditos ?? 0,
+      sociosSinProductos: (mapaSocios.get(ag.id) as any)?.sinProductos ?? 0,
       movimientosHoy: mapaMovHoy.get(ag.id) ?? 0,
     };
   });
@@ -114,9 +135,9 @@ export async function resumen(agenciaId: string | null) {
   const global = porAgencia.reduce(
     (acc, a) => ({
       cajaChica: acc.cajaChica + a.cajaChica.saldo,
-      ahorroCorriente: acc.ahorroCorriente + a.ahorroCorriente.saldoTotal,
-      ahorroProgramado: acc.ahorroProgramado + a.ahorroProgramado.saldoTotal,
-      ahorroInfantoJuvenil: acc.ahorroInfantoJuvenil + a.ahorroInfantoJuvenil.saldoTotal,
+      ahorroCorriente: { count: acc.ahorroCorriente.count + a.ahorroCorriente.totalCuentas, saldo: acc.ahorroCorriente.saldo + a.ahorroCorriente.saldoTotal },
+      ahorroProgramado: { count: acc.ahorroProgramado.count + a.ahorroProgramado.totalCuentas, saldo: acc.ahorroProgramado.saldo + a.ahorroProgramado.saldoTotal },
+      ahorroInfantoJuvenil: { count: acc.ahorroInfantoJuvenil.count + a.ahorroInfantoJuvenil.totalCuentas, saldo: acc.ahorroInfantoJuvenil.saldo + a.ahorroInfantoJuvenil.saldoTotal },
       carteraPrestamos: {
         count: acc.carteraPrestamos.count + a.carteraPrestamos.count,
         saldo: acc.carteraPrestamos.saldo + a.carteraPrestamos.saldo,
@@ -134,13 +155,16 @@ export async function resumen(agenciaId: string | null) {
         monto: acc.cuotasIngreso.monto + a.cuotasIngreso.monto,
       },
       totalSocios: acc.totalSocios + a.totalSocios,
+      sociosConCuentas: (acc.sociosConCuentas || 0) + a.sociosConCuentas,
+      sociosSoloCreditos: (acc.sociosSoloCreditos || 0) + a.sociosSoloCreditos,
+      sociosSinProductos: (acc.sociosSinProductos || 0) + a.sociosSinProductos,
       movimientosHoy: acc.movimientosHoy + a.movimientosHoy,
     }),
     {
       cajaChica: 0,
-      ahorroCorriente: 0,
-      ahorroProgramado: 0,
-      ahorroInfantoJuvenil: 0,
+      ahorroCorriente: { count: 0, saldo: 0 },
+      ahorroProgramado: { count: 0, saldo: 0 },
+      ahorroInfantoJuvenil: { count: 0, saldo: 0 },
       carteraPrestamos: { count: 0, saldo: 0 },
       plazoFijo: { count: 0, monto: 0 },
       aportaciones: { count: 0, saldo: 0 },

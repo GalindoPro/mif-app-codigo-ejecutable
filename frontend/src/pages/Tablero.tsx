@@ -275,8 +275,8 @@ export default function Tablero() {
             <span className="kpi-tile-label">Ahorro Corriente</span>
             <span style={{ fontSize: "0.85rem" }}>💰</span>
           </div>
-          <span className="kpi-tile-value" style={{ color: "var(--accent)" }}>{formatoQ(global.ahorroCorriente)}</span>
-          <span className="kpi-tile-sub">Disponible a la vista</span>
+          <span className="kpi-tile-value" style={{ color: "var(--accent)" }}>{formatoQ(global.ahorroCorriente?.saldo ?? 0)}</span>
+          <span className="kpi-tile-sub">{global.ahorroCorriente?.count ?? 0} cuentas activas</span>
         </Link>
 
         <Link to="/ahorros/plazo-fijo" className="kpi-tile" style={{ borderLeft: "3px solid #7c3aed" }}>
@@ -307,8 +307,8 @@ export default function Tablero() {
               <span className="kpi-tile-label">Ahorro Programado</span>
               <span style={{ fontSize: "0.85rem" }}>📅</span>
             </div>
-            <span className="kpi-tile-value">{formatoQ(global.ahorroProgramado)}</span>
-            <span className="kpi-tile-sub">Cuotas pactadas</span>
+            <span className="kpi-tile-value">{formatoQ(global.ahorroProgramado?.saldo ?? 0)}</span>
+            <span className="kpi-tile-sub">{global.ahorroProgramado?.count ?? 0} cuentas activas</span>
           </Link>
         )}
 
@@ -339,17 +339,33 @@ export default function Tablero() {
             <span className="kpi-tile-label">Ahorro Infantil</span>
             <span style={{ fontSize: "0.85rem" }}>👶</span>
           </div>
-          <span className="kpi-tile-value" style={{ color: "#ec4899" }}>{formatoQ(global.ahorroInfantoJuvenil)}</span>
-          <span className="kpi-tile-sub">Infanto juvenil</span>
+          <span className="kpi-tile-value" style={{ color: "#ec4899" }}>{formatoQ(global.ahorroInfantoJuvenil?.saldo ?? 0)}</span>
+          <span className="kpi-tile-sub">{global.ahorroInfantoJuvenil?.count ?? 0} libretas infantiles</span>
         </Link>
 
-        <Link to="/socios" className="kpi-tile" style={{ borderLeft: "3px solid #6366f1" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span className="kpi-tile-label">Membresía / Socios</span>
-            <span style={{ fontSize: "0.85rem" }}>👥</span>
+        <Link to="/socios" className="kpi-tile" style={{ borderLeft: "3px solid #6366f1", padding: "0.6rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.2rem" }}>
+            <span className="kpi-tile-label" style={{ fontSize: "0.75rem", letterSpacing: "0.02em" }}>Membresía Activa (2026+)</span>
+            <span style={{ fontSize: "1rem" }}>👥</span>
           </div>
-          <span className="kpi-tile-value mono" style={{ color: "#6366f1" }}>{global.totalSocios}</span>
-          <span className="kpi-tile-sub">{global.movimientosHoy} mov. registrados hoy</span>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "0.3rem" }}>
+            <span className="kpi-tile-value mono" style={{ color: "#6366f1", fontSize: "1.3rem" }}>{global.totalSocios}</span>
+            <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>asociados</span>
+          </div>
+          <div style={{ marginTop: "0.4rem", display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(16, 185, 129, 0.08)", padding: "0.15rem 0.3rem", borderRadius: "4px" }}>
+              <span style={{ fontSize: "0.65rem", color: "#059669", fontWeight: 600 }}>💳 Con Cuentas</span>
+              <span className="mono" style={{ fontSize: "0.7rem", color: "#059669", fontWeight: 700 }}>{global.sociosConCuentas || 0}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(217, 119, 6, 0.08)", padding: "0.15rem 0.3rem", borderRadius: "4px" }}>
+              <span style={{ fontSize: "0.65rem", color: "#d97706", fontWeight: 600 }}>💰 Solo Créditos</span>
+              <span className="mono" style={{ fontSize: "0.7rem", color: "#d97706", fontWeight: 700 }}>{global.sociosSoloCreditos || 0}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(100, 116, 139, 0.08)", padding: "0.15rem 0.3rem", borderRadius: "4px" }}>
+              <span style={{ fontSize: "0.65rem", color: "#64748b", fontWeight: 600 }}>⏳ Sin Productos</span>
+              <span className="mono" style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 700 }}>{global.sociosSinProductos || 0}</span>
+            </div>
+          </div>
         </Link>
       </div>
 
@@ -448,6 +464,7 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
   const [cargando, setCargando] = useState(false);
   const [mostrarReporteModal, setMostrarReporteModal] = useState(false);
   const [mostrarInputOtroMes, setMostrarInputOtroMes] = useState(false);
+  const [mostrarAyudaFinanciera, setMostrarAyudaFinanciera] = useState(false);
 
   const MESES_HISTORICOS = [
     { id: "2026-09", label: "Septiembre 2026" },
@@ -909,115 +926,136 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
           </div>
 
           {/* Card de Diagnóstico Estratégico de Gerencia: Detección Inteligente de Debilidades y Fortalezas */}
+          {/* Widget IA de Diagnóstico Estratégico (Dark Slate) */}
           <div
             style={{
-              background: "var(--paper-raised)",
-              border: `1px solid ${flujoNetoFiltro >= 0 ? "rgba(16, 185, 129, 0.35)" : "rgba(239, 68, 68, 0.35)"}`,
-              borderLeft: `4px solid ${flujoNetoFiltro >= 0 ? "#10b981" : "#ef4444"}`,
-              borderRadius: "8px",
-              padding: "0.6rem 0.85rem",
+              background: "#0f172a", // Dark Slate institucional
+              border: `1px solid ${flujoNetoFiltro >= 0 ? "rgba(16, 185, 129, 0.4)" : "rgba(239, 68, 68, 0.4)"}`,
+              borderRadius: "12px",
+              padding: "0.85rem 1.1rem",
               display: "flex",
               flexDirection: "column",
-              gap: "0.45rem",
+              gap: "0.6rem",
+              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.4)",
+              position: "relative",
+              overflow: "hidden"
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.4rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                <span style={{ fontSize: "1rem" }}>{flujoNetoFiltro >= 0 ? "🛡️" : "⚠️"}</span>
-                <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--ink)" }}>
-                  Diagnóstico Estratégico de Gerencia ({periodoLabel})
+            {/* Brillo sutil de fondo */}
+            <div style={{ position: "absolute", top: -50, right: -50, width: 150, height: 150, background: flujoNetoFiltro >= 0 ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)", borderRadius: "50%", filter: "blur(40px)", pointerEvents: "none" }} />
+            
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.4rem", zIndex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                <span style={{ fontSize: "1.2rem", filter: "drop-shadow(0 0 8px rgba(255,255,255,0.3))" }}>🧠</span>
+                <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "#f8fafc", letterSpacing: "0.02em" }}>
+                  Inteligencia Financiera ({periodoLabel})
                 </span>
                 <span
                   style={{
                     fontSize: "0.68rem",
-                    padding: "0.1rem 0.4rem",
-                    borderRadius: "4px",
+                    padding: "0.15rem 0.5rem",
+                    borderRadius: "100px",
                     fontWeight: 700,
-                    background: flujoNetoFiltro >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
-                    color: flujoNetoFiltro >= 0 ? "#059669" : "#dc2626",
+                    background: flujoNetoFiltro >= 0 ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                    color: flujoNetoFiltro >= 0 ? "#34d399" : "#f87171",
+                    border: `1px solid ${flujoNetoFiltro >= 0 ? "rgba(52, 211, 153, 0.3)" : "rgba(248, 113, 113, 0.3)"}`
                   }}
                 >
-                  {flujoNetoFiltro >= 0 ? "SUPERÁVIT DE LIQUIDEZ" : "DÉFICIT DE CAJA / ALTA COLOCACIÓN"}
+                  {flujoNetoFiltro >= 0 ? "SUPERÁVIT DE LIQUIDEZ" : "ALERTA DE DÉFICIT / ALTA COLOCACIÓN"}
                 </span>
+                
+                <button
+                  type="button"
+                  onClick={() => setMostrarAyudaFinanciera(true)}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "#94a3b8",
+                    fontSize: "0.75rem",
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    marginLeft: "0.5rem"
+                  }}
+                  title="¿Cómo se leen estos números?"
+                >
+                  ℹ️ ¿Cómo leer esto?
+                </button>
               </div>
 
-              <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
                 <button
                   type="button"
                   onClick={() => setMostrarReporteModal(true)}
                   className="btn btn-xs"
                   style={{
                     fontSize: "0.72rem",
-                    padding: "0.22rem 0.55rem",
-                    background: "#0284c7",
+                    padding: "0.25rem 0.65rem",
+                    background: "rgba(2, 132, 199, 0.9)",
                     color: "#ffffff",
+                    border: "1px solid rgba(2, 132, 199, 0.5)",
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "0.3rem",
+                    borderRadius: "6px"
                   }}
-                  title="Emitir dictamen oficial para Gerencia con firmas y descarga en PDF o Excel"
                 >
-                  <span>🖨️</span> Reporte Oficial PDF / Excel
+                  <span>🖨️</span> Reporte Oficial PDF
                 </button>
 
                 <Link
                   to={`/consolidado-financiero?fechaCorte=${fechaCorteAuditoria}`}
-                  className="btn btn-xs secondary"
-                  style={{ fontSize: "0.72rem", padding: "0.22rem 0.5rem", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
-                  title={`Auditar Balance General y Estado de Resultados al corte ${fechaCorteAuditoria}`}
+                  className="btn btn-xs"
+                  style={{ 
+                    fontSize: "0.72rem", padding: "0.25rem 0.65rem", display: "inline-flex", alignItems: "center", gap: "0.3rem",
+                    background: "rgba(255,255,255,0.05)", color: "#cbd5e1", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px"
+                  }}
                 >
                   <span>📑</span> Estados Financieros al {fechaCorteAuditoria}
                 </Link>
               </div>
             </div>
 
-            {/* Parrilla de Diagnóstico en 3 Columnas Clave */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.5rem", fontSize: "0.74rem" }}>
-              {/* Factor 1: Presión de Salidas sobre Entradas */}
-              <div style={{ background: "var(--mono-bg)", padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
-                <div style={{ fontWeight: 600, color: "var(--ink)", marginBottom: "0.2rem", display: "flex", justifyContent: "space-between" }}>
-                  <span>🌊 Tasa de Salida de Efectivo</span>
-                  <span className="mono" style={{ color: ratioSalida > 100 ? "#dc2626" : "#059669", fontWeight: 700 }}>
-                    {ratioSalida.toFixed(1)}%
-                  </span>
+            {/* Viñetas Directas de la IA */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.75rem", fontSize: "0.78rem", zIndex: 1, marginTop: "0.3rem" }}>
+              {/* Viñeta 1 */}
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", background: "rgba(255,255,255,0.02)", padding: "0.5rem 0.6rem", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <span style={{ color: ratioSalida > 100 ? "#f87171" : "#34d399", fontSize: "0.9rem", marginTop: "-0.1rem" }}>{ratioSalida > 100 ? "⚠️" : "✅"}</span>
+                <div>
+                  <div style={{ color: "#e2e8f0", fontWeight: 700, marginBottom: "0.15rem" }}>Tasa de Salida: <span className="mono">{ratioSalida.toFixed(1)}%</span></div>
+                  <div style={{ color: "#94a3b8", lineHeight: 1.4 }}>
+                    {ratioSalida > 100
+                      ? `Por cada Q100 que ingresaron, salieron Q${ratioSalida.toFixed(1)}. Tienes una fuga de liquidez de Q${formatoQ(Math.abs(flujoNetoFiltro))}.`
+                      : `Excelente retención. Por cada Q100 que ingresaron, solo se gastaron/prestaron Q${ratioSalida.toFixed(1)}.`}
+                  </div>
                 </div>
-                <p style={{ margin: 0, color: "var(--ink-soft)", lineHeight: 1.35 }}>
-                  {ratioSalida > 100
-                    ? `⚠️ Alerta: Por cada Q100 que ingresaron, salieron Q${ratioSalida.toFixed(1)}. Salidas superan los ingresos en Q${formatoQ(Math.abs(flujoNetoFiltro))}.`
-                    : `✅ Liquidez Óptima: Por cada Q100 que ingresaron, únicamente salieron Q${ratioSalida.toFixed(1)}. Excelente capacidad de retención de fondos.`}
-                </p>
               </div>
 
-              {/* Factor 2: Comportamiento Ahorro vs Retiros */}
-              <div style={{ background: "var(--mono-bg)", padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
-                <div style={{ fontWeight: 600, color: "var(--ink)", marginBottom: "0.2rem", display: "flex", justifyContent: "space-between" }}>
-                  <span>💰 Captación vs Fuga de Ahorros</span>
-                  <span className="mono" style={{ color: depositosAhorro >= retirosAhorro ? "#059669" : "#dc2626", fontWeight: 700 }}>
-                    Dep: {formatoQ(depositosAhorro)} | Ret: {formatoQ(retirosAhorro)}
-                  </span>
+              {/* Viñeta 2 */}
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", background: "rgba(255,255,255,0.02)", padding: "0.5rem 0.6rem", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <span style={{ color: retirosAhorro > depositosAhorro ? "#f87171" : "#34d399", fontSize: "0.9rem", marginTop: "-0.1rem" }}>{retirosAhorro > depositosAhorro ? "📉" : "📈"}</span>
+                <div>
+                  <div style={{ color: "#e2e8f0", fontWeight: 700, marginBottom: "0.15rem" }}>Comportamiento de Ahorros</div>
+                  <div style={{ color: "#94a3b8", lineHeight: 1.4 }}>
+                    {retirosAhorro > depositosAhorro
+                      ? `Los retiros superan a los depósitos en Q${formatoQ(retirosAhorro - depositosAhorro)}. Evaluar estrategias de retención.`
+                      : depositosAhorro > 0
+                        ? `Captación neta positiva (+Q${formatoQ(depositosAhorro - retirosAhorro)}). Alta confianza institucional.`
+                        : `Sin variación sustancial en cuentas de ahorro.`}
+                  </div>
                 </div>
-                <p style={{ margin: 0, color: "var(--ink-soft)", lineHeight: 1.35 }}>
-                  {retirosAhorro > depositosAhorro
-                    ? `⚠️ Debilidad en Ahorros: Los retiros superaron a los nuevos depósitos en Q${formatoQ(retirosAhorro - depositosAhorro)}. Se aconseja fidelización o tasa escalonada.`
-                    : depositosAhorro > 0
-                      ? `✅ Fortaleza: Captaciones netas de ahorro positivas (+Q${formatoQ(depositosAhorro - retirosAhorro)}). Confianza sólida de los asociados.`
-                      : `ℹ️ Sin variación sustancial en cuentas de ahorros en este corte.`}
-                </p>
               </div>
 
-              {/* Factor 3: Colocación y Recuperación de Cartera */}
-              <div style={{ background: "var(--mono-bg)", padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid var(--line)" }}>
-                <div style={{ fontWeight: 600, color: "var(--ink)", marginBottom: "0.2rem", display: "flex", justifyContent: "space-between" }}>
-                  <span>💼 Dinámica de Créditos y Gastos</span>
-                  <span className="mono" style={{ color: "#0284c7", fontWeight: 700 }}>
-                    Cobro: {formatoQ(cobroCreditos)}
-                  </span>
+              {/* Viñeta 3 */}
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", background: "rgba(255,255,255,0.02)", padding: "0.5rem 0.6rem", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <span style={{ color: "#38bdf8", fontSize: "0.9rem", marginTop: "-0.1rem" }}>💼</span>
+                <div>
+                  <div style={{ color: "#e2e8f0", fontWeight: 700, marginBottom: "0.15rem" }}>Dinámica de Cartera</div>
+                  <div style={{ color: "#94a3b8", lineHeight: 1.4 }}>
+                    {cobroCreditos > 0
+                      ? `Recuperación de Q${formatoQ(cobroCreditos)} en cuotas. ${desembolsoCreditos > 0 ? `Se desembolsaron Q${formatoQ(desembolsoCreditos)} en nuevos créditos.` : "No hubo desembolsos fuertes."}`
+                      : `Alerta: Baja recuperación de cartera en este período.`}
+                  </div>
                 </div>
-                <p style={{ margin: 0, color: "var(--ink-soft)", lineHeight: 1.35 }}>
-                  {cobroCreditos > 0
-                    ? `✅ Cobranza Activa: Se recuperaron ${formatoQ(cobroCreditos)} en amortizaciones e intereses. ${desembolsoCreditos > 0 ? `Desembolsos del mes: ${formatoQ(desembolsoCreditos)}.` : ""} ${gastoCajaChica > 0 ? `Gastos menores: ${formatoQ(gastoCajaChica)}.` : ""}`
-                    : `⚠️ Atención: Nula o baja recuperación de cuotas de crédito registrada en este período. Verificar gestión de cobro.`}
-                </p>
               </div>
             </div>
           </div>
@@ -1309,6 +1347,48 @@ function PanelGraficaServicios({ agenciaIdInicial }: { agenciaIdInicial?: string
           gastoCajaChica={gastoCajaChica}
           usuarioNombre={usuario?.nombre}
         />
+      )}
+
+      {mostrarAyudaFinanciera && (
+        <div className="modal-overlay">
+          <div className="modal-card" style={{ maxWidth: "550px" }}>
+            <div className="modal-header">
+              <h2>ℹ️ Guía Rápida de Inteligencia Financiera</h2>
+              <button className="btn-close" onClick={() => setMostrarAyudaFinanciera(false)}>✕</button>
+            </div>
+            <div className="modal-body" style={{ color: "#e2e8f0", fontSize: "0.85rem", lineHeight: 1.5 }}>
+              <p style={{ marginBottom: "1rem" }}>
+                El módulo de Inteligencia Financiera no muestra descuadres, sino que te explica <strong>cómo se está moviendo el efectivo de la cooperativa</strong>.
+              </p>
+              
+              <div style={{ background: "rgba(255,255,255,0.03)", padding: "0.75rem", borderRadius: "8px", marginBottom: "0.75rem", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <h4 style={{ color: "#38bdf8", margin: "0 0 0.25rem 0", fontSize: "0.9rem" }}>1. Tasa de Salida de Efectivo</h4>
+                <p style={{ margin: 0 }}>
+                  Compara todo el dinero que entró (depósitos, cuotas cobradas) vs el que salió (retiros, préstamos dados). 
+                  Si dice <strong>115.6%</strong>, significa que la cooperativa gastó/prestó un 15.6% más de lo que ingresó este mes. 
+                  Esto es normal (Alta Colocación) si la cooperativa está usando reservas pasadas para dar nuevos créditos.
+                </p>
+              </div>
+
+              <div style={{ background: "rgba(255,255,255,0.03)", padding: "0.75rem", borderRadius: "8px", marginBottom: "0.75rem", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <h4 style={{ color: "#34d399", margin: "0 0 0.25rem 0", fontSize: "0.9rem" }}>2. Comportamiento de Ahorros</h4>
+                <p style={{ margin: 0 }}>
+                  Evalúa la confianza de los socios. Si dice <strong>Captación Neta Positiva</strong>, significa que, aunque la gente retiró dinero, el total de dinero nuevo depositado fue mayor. La cuenta de ahorros general de la cooperativa creció.
+                </p>
+              </div>
+
+              <div style={{ background: "rgba(255,255,255,0.03)", padding: "0.75rem", borderRadius: "8px", marginBottom: "0.75rem", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <h4 style={{ color: "#f59e0b", margin: "0 0 0.25rem 0", fontSize: "0.9rem" }}>3. Dinámica de Cartera</h4>
+                <p style={{ margin: 0 }}>
+                  Te dice cuánto efectivo "líquido" recuperaste por cobro de cuotas (capital + interés) y te lo compara con el efectivo que acabas de prestar (desembolsos nuevos). Si el cobro es alto, la recuperación de la cartera es excelente.
+                </p>
+              </div>
+            </div>
+            <div className="modal-footer" style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end" }}>
+              <button className="btn secondary" onClick={() => setMostrarAyudaFinanciera(false)}>Entendido</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

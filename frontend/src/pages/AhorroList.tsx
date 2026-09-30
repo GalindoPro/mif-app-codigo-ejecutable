@@ -5,6 +5,17 @@ import { formatoQ, TIPOS_AHORRO } from "../types";
 import type { Cuenta, ResumenCuentas } from "../types";
 import { DualCuentaBadge } from "../components/DualCuentaBadge";
 
+// ─── Esqueleto de carga para KPIs ─────────────────────────────────────────────
+function KpiSkeleton() {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.5rem" }}>
+      {[...Array(6)].map((_, i) => (
+        <div key={i} style={{ height: 72, borderRadius: 8, background: "rgba(148,163,184,0.08)", border: "1px solid var(--line)", animation: "pulse 1.5s ease-in-out infinite" }} />
+      ))}
+    </div>
+  );
+}
+
 export default function AhorroList() {
   const { slug } = useParams<{ slug: string }>();
   const config = TIPOS_AHORRO.find((t) => t.slug === slug);
@@ -74,10 +85,15 @@ export default function AhorroList() {
   if (!config) return <div className="alert error">Tipo de ahorro no reconocido.</div>;
 
   const totalCuentas = cuentasFiltradas.length;
+  const cuentasActivas = cuentasFiltradas.filter((c) => c.estado === "ACTIVA").length;
   const saldoTotal =
     filtroPeriodo !== "TODOS"
       ? cuentasFiltradas.reduce((acc, c) => acc + Number(c.saldo_actual), 0)
       : resumen?.saldoTotal ?? cuentasFiltradas.reduce((acc, c) => acc + Number(c.saldo_actual), 0);
+  const totalDepositos = resumen?.totalDepositos ?? 0;
+  const totalRetiros = resumen?.totalRetiros ?? 0;
+  const flujoNeto = totalDepositos - totalRetiros;
+  const promedioPorCuenta = totalCuentas > 0 ? saldoTotal / totalCuentas : 0;
 
   const totalPaginas = Math.max(1, Math.ceil(totalCuentas / pageSize));
   const cuentasPaginadas = cuentasFiltradas.slice((page - 1) * pageSize, page * pageSize);
@@ -146,8 +162,9 @@ export default function AhorroList() {
         </div>
       )}
 
-      {/* STRIP DE KPIS HORIZONTALES CON ESTILO FINTECH */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
+      {/* STRIP DE 6 KPIS HORIZONTALES — FINTECH INSTITUCIONAL */}
+      {!resumen && cuentas === null ? <KpiSkeleton /> : (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.5rem" }}>
         {/* SALDO TOTAL */}
         <div
           style={{
@@ -225,7 +242,7 @@ export default function AhorroList() {
           <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Egresos acumulados</span>
         </div>
 
-        {/* PADRÓN DE CUENTAS */}
+        {/* CUENTAS ACTIVAS */}
         <div
           style={{
             background: "var(--paper)",
@@ -239,87 +256,113 @@ export default function AhorroList() {
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", letterSpacing: "0.03em" }}>
-              PADRÓN DE CUENTAS
-            </span>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#6366f1", letterSpacing: "0.03em" }}>CUENTAS ACTIVAS</span>
             <span style={{ fontSize: "0.85rem" }}>👥</span>
           </div>
-          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#6366f1", fontFamily: "monospace" }}>
-            {totalCuentas}
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#6366f1", fontFamily: "monospace" }}>{cuentasActivas}</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>{totalCuentas} en total</span>
+        </div>
+
+        {/* FLUJO NETO */}
+        <div
+          style={{
+            background: flujoNeto >= 0 ? "rgba(5, 150, 105, 0.06)" : "rgba(239, 68, 68, 0.06)",
+            border: "1px solid var(--line)",
+            borderLeft: `4px solid ${flujoNeto >= 0 ? "#059669" : "#ef4444"}`,
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: flujoNeto >= 0 ? "#059669" : "#ef4444", letterSpacing: "0.03em" }}>FLUJO NETO</span>
+            <span style={{ fontSize: "0.85rem" }}>{flujoNeto >= 0 ? "📈" : "📉"}</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: flujoNeto >= 0 ? "#10b981" : "#ef4444", fontFamily: "monospace" }}>
+            {flujoNeto >= 0 ? "+" : ""}{formatoQ(flujoNeto)}
           </span>
-          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Pág {page} de {totalPaginas}</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Depósitos menos retiros</span>
+        </div>
+
+        {/* PROMEDIO POR CUENTA */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #BF9903",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#BF9903", letterSpacing: "0.03em" }}>PROMEDIO / CUENTA</span>
+            <span style={{ fontSize: "0.85rem" }}>📊</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#d97706", fontFamily: "monospace" }}>{formatoQ(promedioPorCuenta)}</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Saldo promedio por socio</span>
         </div>
       </div>
+      )}
 
-      {/* BARRA DE BÚSQUEDA Y PESTAÑAS DE FILTRO */}
-      <div className="screen-toolbar">
-        <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", alignItems: "center" }}>
+      {/* BARRA DE BÚSQUEDA Y PESTAÑAS DE FILTRO — PILL TOGGLE INSTITUCIONAL */}
+      <div className="screen-toolbar" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
+        {/* PILL TOGGLE TEMPORAL */}
+        <div style={{ display: "inline-flex", background: "var(--paper-raised, rgba(15,23,42,0.6))", padding: "2px", borderRadius: "8px", border: "1px solid var(--line)" }}>
           <button
             type="button"
-            onClick={() => {
-              setFiltroPeriodo("ACTUAL_2026");
-              setPage(1);
-            }}
+            onClick={() => { setFiltroPeriodo("ACTUAL_2026"); setPage(1); }}
             style={{
-              padding: "0.26rem 0.65rem",
-              borderRadius: "6px",
-              fontSize: "0.78rem",
-              fontWeight: 700,
-              cursor: "pointer",
-              border: filtroPeriodo === "ACTUAL_2026" ? "1.5px solid #059669" : "1px solid var(--line)",
-              background: filtroPeriodo === "ACTUAL_2026" ? "rgba(16, 185, 129, 0.15)" : "var(--paper-raised)",
-              color: filtroPeriodo === "ACTUAL_2026" ? "#10b981" : "var(--ink-soft)",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.3rem",
+              padding: "0.3rem 0.65rem", fontSize: "0.78rem",
+              fontWeight: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? 700 : 500,
+              background: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? "#059669" : "transparent",
+              color: filtroPeriodo === "ACTUAL_2026" && !filtroAno ? "#fff" : "var(--ink-soft)",
+              border: "none", borderRadius: "6px", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: "4px", transition: "all 0.15s ease",
             }}
           >
-            <span>🌱</span> Ejercicio Actual 2026 ({cuentasActuales.length})
+            🌱 Ejercicio 2026
+            <span style={{ fontSize: "0.7rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 5px", borderRadius: "10px" }}>
+              {cuentasActuales.length}
+            </span>
           </button>
           <button
             type="button"
-            onClick={() => {
-              setFiltroPeriodo("HISTORICO");
-              setPage(1);
-            }}
+            onClick={() => { setFiltroPeriodo("HISTORICO"); setFiltroAno(""); setPage(1); }}
             style={{
-              padding: "0.26rem 0.65rem",
-              borderRadius: "6px",
-              fontSize: "0.78rem",
-              fontWeight: 700,
-              cursor: "pointer",
-              border: filtroPeriodo === "HISTORICO" ? "1.5px solid #d97706" : "1px solid var(--line)",
-              background: filtroPeriodo === "HISTORICO" ? "rgba(217, 119, 6, 0.15)" : "var(--paper-raised)",
-              color: filtroPeriodo === "HISTORICO" ? "#f59e0b" : "var(--ink-soft)",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.3rem",
+              padding: "0.3rem 0.65rem", fontSize: "0.78rem",
+              fontWeight: filtroPeriodo === "HISTORICO" && !filtroAno ? 700 : 500,
+              background: filtroPeriodo === "HISTORICO" && !filtroAno ? "#BF9903" : "transparent",
+              color: filtroPeriodo === "HISTORICO" && !filtroAno ? "#0f172a" : "var(--ink-soft)",
+              border: "none", borderRadius: "6px", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: "4px", transition: "all 0.15s ease",
             }}
           >
-            <span>📜</span> Histórico Anterior ({cuentasHistoricas.length})
+            📜 Histórico Anterior
+            <span style={{ fontSize: "0.7rem", opacity: 0.9, background: "rgba(0,0,0,0.15)", padding: "1px 5px", borderRadius: "10px" }}>
+              {cuentasHistoricas.length}
+            </span>
           </button>
           <button
             type="button"
-            onClick={() => {
-              setFiltroPeriodo("TODOS");
-              setFiltroAno("");
-              setPage(1);
-            }}
+            onClick={() => { setFiltroPeriodo("TODOS"); setFiltroAno(""); setPage(1); }}
             style={{
-              padding: "0.26rem 0.65rem",
-              borderRadius: "6px",
-              fontSize: "0.78rem",
-              fontWeight: 700,
-              cursor: "pointer",
-              border: filtroPeriodo === "TODOS" && !filtroAno ? "1.5px solid #0284c7" : "1px solid var(--line)",
-              background: filtroPeriodo === "TODOS" && !filtroAno ? "rgba(2, 132, 199, 0.15)" : "var(--paper-raised)",
-              color: filtroPeriodo === "TODOS" && !filtroAno ? "#38bdf8" : "var(--ink-soft)",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.3rem",
+              padding: "0.3rem 0.65rem", fontSize: "0.78rem",
+              fontWeight: filtroPeriodo === "TODOS" && !filtroAno ? 700 : 500,
+              background: filtroPeriodo === "TODOS" && !filtroAno ? "#0284c7" : "transparent",
+              color: filtroPeriodo === "TODOS" && !filtroAno ? "#fff" : "var(--ink-soft)",
+              border: "none", borderRadius: "6px", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: "4px", transition: "all 0.15s ease",
             }}
           >
-            <span>🌐</span> Consolidado Total ({cuentas?.length ?? 0})
+            🌐 Consolidado
+            <span style={{ fontSize: "0.7rem", opacity: 0.9, background: "rgba(0,0,0,0.2)", padding: "1px 5px", borderRadius: "10px" }}>
+              {cuentas?.length || 0}
+            </span>
           </button>
         </div>
 

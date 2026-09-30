@@ -25,3 +25,7 @@ Cada vez que se realice un cambio preciso, mejora o nueva funcionalidad en el c�
      * **Cifras Monetarias y Códigos:** Obligatoriamente en `"IBM Plex Mono", monospace` con `font-variant-numeric: tabular-nums`.
      * **Arquitectura Obligatoria de Modales Emergentes:** Todo diálogo emergente debe construirse con el contenedor `.modal-overlay` (fixed, centrado con backdrop-filter blur) y la tarjeta interior `.modal-card` con fondo opaco institucional `#0f172a`, bordes definidos `1px solid rgba(148, 163, 184, 0.25)`, esquinas `14px`, sombra elevada `box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75)` y padding de `1.5rem`. Queda estrictamente prohibido anidar clases duplicadas o dejar tarjetas transparentes.
 
+6. **Regla de Fidelidad Absoluta a los Libros Excel Oficiales y Validación Previa:**
+   - La base indiscutible de datos, saldos, nombres y operaciones son exclusivamente los archivos **Excel oficiales de la cooperativa** (`importar/...` y `caja/...`). Queda estrictamente prohibido inventar o alterar cifras contables, supuestos o saldos que no provengan directamente de las hojas Excel.
+   - Si se detecta alguna discrepancia matemática, duplicidad o inconsistencia en la información, es de carácter **OBLIGATORIO** verificar primero el contenido real en los archivos Excel y notificar al usuario mediante preguntas estructuradas (`ask_question`), obteniendo su autorización previa antes de aplicar cualquier cambio o corrección en la base de datos o en el código del sistema.
+

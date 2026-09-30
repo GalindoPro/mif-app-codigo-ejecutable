@@ -4,9 +4,11 @@ import { Link } from "react-router-dom";
 import { api, mensajeError } from "../lib/api";
 import type { ListaSocios, FiadorItem } from "../types";
 import { formatearDPI, formatearQuetzales } from "../lib/formatters";
+import { useAuth } from "../context/AuthContext";
 
 export default function SociosList() {
-  const [tab, setTab] = useState<"socios" | "prospectos">("socios");
+  const { usuario } = useAuth();
+  const [tab, setTab] = useState<"todos" | "socios" | "creditos" | "historicos" | "prospectos">("todos");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [resultado, setResultado] = useState<ListaSocios | null>(null);
@@ -17,16 +19,21 @@ export default function SociosList() {
 
   const [recargar, setRecargar] = useState(0);
 
-  // Cargar lista de socios
+  // Cargar lista de socios o históricos
   useEffect(() => {
-    if (tab !== "socios") return;
+    if (tab === "prospectos") return;
     const controller = new AbortController();
     setCargando(true);
     setError(null);
     const timeout = setTimeout(() => {
+      let vinculacion = "TODOS";
+      if (tab === "socios") vinculacion = "SOCIOS";
+      if (tab === "creditos") vinculacion = "CREDITOS";
+      if (tab === "historicos") vinculacion = "HISTORICOS";
+
       api
         .get<ListaSocios>("/socios", {
-          params: { q: q || undefined, page, pageSize: 10 },
+          params: { q: q || undefined, page, pageSize: 10, vinculacion },
           signal: controller.signal,
         })
         .then(({ data }) => {
@@ -74,49 +81,69 @@ export default function SociosList() {
           <h1 style={{ display: "flex", alignItems: "center", gap: "0.4rem", margin: 0, fontSize: "1.2rem" }}>
             <span>👥</span> Socios y Asociados
           </h1>
-          <div style={{ display: "flex", gap: "0.25rem", background: "var(--paper-raised)", padding: "0.18rem", borderRadius: "8px", border: "1px solid var(--line)" }}>
+          {/* TABS PILL-TOGGLE */}
+          <div style={{ display: "flex", gap: "0.25rem", background: "var(--paper-raised)", padding: "0.25rem", borderRadius: "100px", border: "1px solid rgba(148, 163, 184, 0.1)" }}>
             <button
-              type="button"
-              onClick={() => {
-                setTab("socios");
-                setQ("");
-                setPage(1);
-              }}
+              onClick={() => { setTab("todos"); setPage(1); setQ(""); }}
+              className="btn clear"
               style={{
-                padding: "0.22rem 0.65rem",
-                borderRadius: "6px",
-                border: "none",
-                fontSize: "0.8rem",
-                fontWeight: 700,
-                cursor: "pointer",
-                background: tab === "socios" ? "var(--primary, #0284c7)" : "transparent",
-                color: tab === "socios" ? "#fff" : "var(--ink-soft)",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.35rem",
+                borderRadius: "100px", padding: "0.25rem 0.75rem", fontSize: "0.85rem", fontWeight: 600,
+                background: tab === "todos" ? "rgba(5, 150, 105, 0.15)" : "transparent",
+                color: tab === "todos" ? "#10b981" : "var(--ink-soft)",
+                display: "flex", alignItems: "center", gap: "0.35rem", transition: "all 0.2s"
               }}
             >
-              <span>Padrón</span>
-              <span style={{ fontSize: "0.72rem", opacity: 0.9 }}>({resultado?.total ?? "—"})</span>
+              <span>Padrón Completo</span>
+              {tab === "todos" && <span style={{ fontSize: "0.72rem", opacity: 0.9 }}>({resultado?.total ?? "—"})</span>}
             </button>
             <button
-              type="button"
-              onClick={() => {
-                setTab("prospectos");
-                setQ("");
-              }}
+              onClick={() => { setTab("socios"); setPage(1); setQ(""); }}
+              className="btn clear"
               style={{
-                padding: "0.22rem 0.65rem",
-                borderRadius: "6px",
-                border: "none",
-                fontSize: "0.8rem",
-                fontWeight: 700,
-                cursor: "pointer",
-                background: tab === "prospectos" ? "#d97706" : "transparent",
-                color: tab === "prospectos" ? "#fff" : "var(--ink-soft)",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.35rem",
+                borderRadius: "100px", padding: "0.25rem 0.75rem", fontSize: "0.85rem", fontWeight: 600,
+                background: tab === "socios" ? "rgba(5, 150, 105, 0.9)" : "transparent",
+                color: tab === "socios" ? "#fff" : "var(--ink-soft)",
+                display: "flex", alignItems: "center", gap: "0.35rem", transition: "all 0.2s"
+              }}
+            >
+              <span>💳 Socios (Con Cuentas)</span>
+              {tab === "socios" && <span style={{ fontSize: "0.72rem", opacity: 0.9 }}>({resultado?.total ?? "—"})</span>}
+            </button>
+            <button
+              onClick={() => { setTab("creditos"); setPage(1); setQ(""); }}
+              className="btn clear"
+              style={{
+                borderRadius: "100px", padding: "0.25rem 0.75rem", fontSize: "0.85rem", fontWeight: 600,
+                background: tab === "creditos" ? "rgba(217, 119, 6, 0.9)" : "transparent",
+                color: tab === "creditos" ? "#fff" : "var(--ink-soft)",
+                display: "flex", alignItems: "center", gap: "0.35rem", transition: "all 0.2s"
+              }}
+            >
+              <span>💰 Solo Créditos</span>
+              {tab === "creditos" && <span style={{ fontSize: "0.72rem", opacity: 0.9 }}>({resultado?.total ?? "—"})</span>}
+            </button>
+            <button
+              onClick={() => { setTab("historicos"); setPage(1); setQ(""); }}
+              className="btn clear"
+              style={{
+                borderRadius: "100px", padding: "0.25rem 0.75rem", fontSize: "0.85rem", fontWeight: 600,
+                background: tab === "historicos" ? "#64748b" : "transparent",
+                color: tab === "historicos" ? "#fff" : "var(--ink-soft)",
+                display: "flex", alignItems: "center", gap: "0.35rem", transition: "all 0.2s"
+              }}
+            >
+              <span>🗄️ Históricos</span>
+              {tab === "historicos" && <span style={{ fontSize: "0.72rem", opacity: 0.9 }}>({resultado?.total ?? "—"})</span>}
+            </button>
+            <div style={{ width: "1px", background: "rgba(148, 163, 184, 0.2)", margin: "0 4px" }} />
+            <button
+              onClick={() => { setTab("prospectos"); setQ(""); }}
+              className="btn clear"
+              style={{
+                borderRadius: "100px", padding: "0.25rem 0.75rem", fontSize: "0.85rem", fontWeight: 600,
+                background: tab === "prospectos" ? "rgba(99, 102, 241, 0.15)" : "transparent",
+                color: tab === "prospectos" ? "#6366f1" : "var(--ink-soft)",
+                display: "flex", alignItems: "center", gap: "0.35rem", transition: "all 0.2s"
               }}
             >
               <span>🎯 Prospectos</span>
@@ -125,9 +152,20 @@ export default function SociosList() {
           </div>
         </div>
 
-        <Link to="/socios/nuevo" className="btn" style={{ fontSize: "0.78rem", padding: "0.3rem 0.75rem", fontWeight: 700 }}>
-          + Nuevo socio
-        </Link>
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+          {(usuario?.rol === "GERENCIA" || usuario?.rol === "ADMIN") && (
+            <Link
+              to="/socios/auditoria-importacion"
+              className="btn secondary"
+              style={{ fontSize: "0.78rem", padding: "0.3rem 0.65rem", fontWeight: 600, textDecoration: "none", display: "flex", alignItems: "center", gap: "0.3rem" }}
+            >
+              🧹 Auditoría Importación
+            </Link>
+          )}
+          <Link to="/socios/nuevo" className="btn" style={{ fontSize: "0.78rem", padding: "0.3rem 0.75rem", fontWeight: 700 }}>
+            + Nuevo socio
+          </Link>
+        </div>
       </div>
 
       {error && (
@@ -262,7 +300,7 @@ export default function SociosList() {
       </div>
 
       {/* TABLA DE PADRÓN CON SCROLL INTERNO Y CABECERA STICKY */}
-      {tab === "socios" ? (
+      {tab !== "prospectos" ? (
         <>
           <div className="table-scroll-container">
             <table className="table-compact" style={{ width: "100%" }}>

@@ -54,6 +54,12 @@ export default function AportacionesList() {
   const aportacionesActuales = useMemo(() => aportaciones?.filter(esAportacion2026) ?? [], [aportaciones]);
   const aportacionesHistoricas = useMemo(() => aportaciones?.filter((a) => !esAportacion2026(a)) ?? [], [aportaciones]);
 
+  const socioFondoHistorico = useMemo(() => aportaciones?.find((a) => a.numero_asociado === "CHAJ-00000"), [aportaciones]);
+  const montoFondoHistorico = Number(socioFondoHistorico?.total_aportaciones || 0);
+  const sociosHistoricosIndiv = useMemo(() => aportacionesHistoricas.filter((a) => a.numero_asociado !== "CHAJ-00000"), [aportacionesHistoricas]);
+  const montoHistoricoIndiv = useMemo(() => sociosHistoricosIndiv.reduce((s, a) => s + Number(a.total_aportaciones), 0), [sociosHistoricosIndiv]);
+  const monto2026 = useMemo(() => aportacionesActuales.reduce((s, a) => s + Number(a.total_aportaciones), 0), [aportacionesActuales]);
+
   const sociosConAportacion = useMemo(() => aportaciones?.filter((a) => Number(a.total_aportaciones) > 0) ?? [], [aportaciones]);
   const sociosPendientes = useMemo(() => aportaciones?.filter((a) => Number(a.total_aportaciones) <= 0) ?? [], [aportaciones]);
 
@@ -61,11 +67,13 @@ export default function AportacionesList() {
     if (!aportaciones) return [];
     let lista = aportaciones;
 
-    // Filtro temporal rápido
-    if (filtroPeriodo === "ACTUAL_2026") {
-      lista = lista.filter(esAportacion2026);
-    } else if (filtroPeriodo === "HISTORICO") {
-      lista = lista.filter((a) => !esAportacion2026(a));
+    // Filtro temporal rápido (aplica cuando no hay fechas específicas o año manual)
+    if (!fechaDesde && !fechaHasta && !filtroAno) {
+      if (filtroPeriodo === "ACTUAL_2026") {
+        lista = lista.filter(esAportacion2026);
+      } else if (filtroPeriodo === "HISTORICO") {
+        lista = lista.filter((a) => !esAportacion2026(a));
+      }
     }
 
     // Filtro por año específico
@@ -182,7 +190,13 @@ export default function AportacionesList() {
           <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "#059669", fontFamily: "monospace", lineHeight: 1.2 }}>
             {formatoQ(totalCapital)}
           </span>
-          <span style={{ fontSize: "0.6rem", color: "var(--ink-soft)" }}>Patrimonio en padrón</span>
+          <span style={{ fontSize: "0.6rem", color: "var(--ink-soft)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={filtroPeriodo === "HISTORICO" ? `Fondo Global: ${formatoQ(montoFondoHistorico)} | ${sociosHistoricosIndiv.length} Socios: ${formatoQ(montoHistoricoIndiv)}` : undefined}>
+            {filtroPeriodo === "HISTORICO"
+              ? `Fondo: ${formatoQ(montoFondoHistorico)} + Socios: ${formatoQ(montoHistoricoIndiv)}`
+              : filtroPeriodo === "ACTUAL_2026"
+              ? `Ejercicio 2026 (${aportacionesActuales.length} asociados)`
+              : `Histórico: ${formatoQ(montoFondoHistorico + montoHistoricoIndiv)} + 2026: ${formatoQ(monto2026)}`}
+          </span>
         </div>
 
         {/* ASOCIADOS EN PADRÓN */}
@@ -206,7 +220,11 @@ export default function AportacionesList() {
           <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "#6366f1", fontFamily: "monospace", lineHeight: 1.2 }}>
             {totalSocios}
           </span>
-          <span style={{ fontSize: "0.6rem", color: "var(--ink-soft)" }}>Socios mostrados</span>
+          <span style={{ fontSize: "0.6rem", color: "var(--ink-soft)" }}>
+            {filtroPeriodo === "HISTORICO"
+              ? `1 Fondo Global + ${sociosHistoricosIndiv.length} Socios`
+              : "Socios mostrados"}
+          </span>
         </div>
 
         {/* APORTACIÓN PROMEDIO */}
@@ -424,6 +442,7 @@ export default function AportacionesList() {
               setFiltroAno(e.target.value);
               setFechaDesde("");
               setFechaHasta("");
+              setFiltroPeriodo("TODOS");
               setPage(1);
             }}
             style={{
@@ -454,6 +473,7 @@ export default function AportacionesList() {
             onChange={(e) => {
               setFechaDesde(e.target.value);
               setFiltroAno("");
+              setFiltroPeriodo("TODOS");
               setPage(1);
             }}
             style={{
@@ -472,6 +492,7 @@ export default function AportacionesList() {
             onChange={(e) => {
               setFechaHasta(e.target.value);
               setFiltroAno("");
+              setFiltroPeriodo("TODOS");
               setPage(1);
             }}
             style={{
@@ -493,17 +514,21 @@ export default function AportacionesList() {
                 setPage(1);
               }}
               style={{
-                padding: "0.18rem 0.4rem",
-                borderRadius: "4px",
-                border: "1px solid var(--line)",
-                background: "transparent",
-                color: "var(--ink-soft)",
-                fontSize: "0.7rem",
+                padding: "0.18rem 0.5rem",
+                borderRadius: "5px",
+                border: "1px solid rgba(191, 153, 3, 0.4)",
+                background: "rgba(191, 153, 3, 0.15)",
+                color: "#f59e0b",
+                fontSize: "0.72rem",
+                fontWeight: 700,
                 cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "3px",
               }}
-              title="Limpiar fechas"
+              title="Limpiar fechas y filtros manuales"
             >
-              ✕
+              ✕ Limpiar
             </button>
           )}
         </div>
@@ -571,6 +596,11 @@ export default function AportacionesList() {
                   >
                     {a.nombres}
                   </Link>
+                  {a.numero_asociado === "CHAJ-00000" && (
+                    <span style={{ fontSize: "0.62rem", color: "#BF9903", background: "rgba(191,153,3,0.15)", padding: "1px 5px", borderRadius: "3px", fontWeight: 700, marginLeft: "6px", border: "1px solid rgba(191,153,3,0.3)" }}>
+                      Fondo Global Histórico
+                    </span>
+                  )}
                   {a.telefono && (
                     <div style={{ fontSize: "0.74rem", color: "var(--ink-soft)" }}>Tel: {a.telefono}</div>
                   )}

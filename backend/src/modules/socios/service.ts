@@ -8,6 +8,7 @@ export interface FiltrosSocios {
   agenciaId: string | null; // null = todas (ADMIN/GERENCIA)
   q?: string;
   estado?: "ACTIVO" | "INACTIVO";
+  vinculacion?: "TODOS" | "SOCIOS" | "CREDITOS" | "HISTORICOS";
   page: number;
   pageSize: number;
 }
@@ -71,6 +72,21 @@ export async function listar(filtros: FiltrosSocios) {
       condiciones.push(
         `(lower(s.nombres) like $${idx} or s.dpi like $${idx} or lower(s.numero_asociado) like $${idx})`,
       );
+    }
+  }
+
+  // Filtro de vinculación y año 2026
+  if (filtros.vinculacion === "HISTORICOS") {
+    // Históricos: Todos los de 2025 o antes, o inactivos explícitos
+    condiciones.push(`(s.fecha_ingreso < '2026-01-01' or s.estado = 'INACTIVO')`);
+  } else {
+    // Para TODOS, SOCIOS y CREDITOS, solo aplica a los activos desde 2026 en adelante
+    condiciones.push(`s.fecha_ingreso >= '2026-01-01' and s.estado = 'ACTIVO'`);
+    
+    if (filtros.vinculacion === "SOCIOS") {
+      condiciones.push(`exists (select 1 from cuentas where socio_id = s.id and estado = 'ACTIVA')`);
+    } else if (filtros.vinculacion === "CREDITOS") {
+      condiciones.push(`not exists (select 1 from cuentas where socio_id = s.id and estado = 'ACTIVA') and exists (select 1 from prestamos where socio_id = s.id and estado = 'DESEMBOLSADO' and saldo_capital > 0)`);
     }
   }
 
@@ -677,4 +693,107 @@ export async function listarAportaciones(params: { agenciaId: string | null; q?:
 
   const { rows } = await pool.query(query, valores);
   return rows;
+}
+
+// ─── PANEL DE AUDITORÍA DE IMPORTACIÓN ──────────────────────────────────────
+// Socios sin DPI, posibles duplicados por nombre y estadísticas de integridad.
+
+export async function auditarImportacion(agenciaId: string | null) {
+  const agCondicion = agenciaId ? `AND s.agencia_id = '${agenciaId}'` : "";
+
+  // 1. Socios sin DPI
+  const { rows: sinDpi } = await pool.query(`
+    SELECT
+      s.id, s.numero_asociado, s.nombres, s.estado,
+      s.dpi, s.advertencia_importacion, s.created_at,
+      COALESCE(a.nombre, 'Sin agencia') AS agencia,
+      COUNT(c.id) AS total_cuentas,
+      COUNT(m.id) AS total_movimientos
+    FROM socios s
+    LEFT JOIN agencias a ON a.id = s.agencia_id
+    LEFT JOIN cuentas c ON c.socio_id = s.id
+    LEFT JOIN movimientos m ON m.cuenta_id = c.id
+    WHERE (s.dpi IS NULL OR TRIM(s.dpi) = '' OR LENGTH(TRIM(s.dpi)) < 5)
+      ${agCondicion}
+    GROUP BY s.id, a.nombre
+    ORDER BY s.numero_asociado DESC
+  `);
+
+  // 2. Posibles duplicados por nombre (mismo nombre exacto, diferente código)
+  const { rows: duplicados } = await pool.query(`
+    SELECT
+      s1.id AS id1, s1.numero_asociado AS codigo1, s1.nombres AS nombre1,
+      s1.dpi AS dpi1,
+      s2.id AS id2, s2.numero_asociado AS codigo2, s2.nombres AS nombre2,
+      s2.dpi AS dpi2
+    FROM socios s1
+    JOIN socios s2 ON LOWER(TRIM(s1.nombres)) = LOWER(TRIM(s2.nombres))
+      AND s1.id <> s2.id
+      AND s1.numero_asociado < s2.numero_asociado
+    ${agenciaId ? `WHERE s1.agencia_id = '${agenciaId}' AND s2.agencia_id = '${agenciaId}'` : ""}
+    ORDER BY s1.nombres ASC
+    LIMIT 50
+  `);
+
+  // 3. Estadísticas generales de integridad
+  const { rows: stats } = await pool.query(`
+    SELECT
+      COUNT(*) AS total_socios,
+      COUNT(*) FILTER (WHERE dpi IS NOT NULL AND TRIM(dpi) <> '' AND LENGTH(TRIM(dpi)) >= 5) AS con_dpi,
+      COUNT(*) FILTER (WHERE dpi IS NULL OR TRIM(dpi) = '' OR LENGTH(TRIM(dpi)) < 5) AS sin_dpi,
+      COUNT(*) FILTER (WHERE advertencia_importacion IS NOT NULL) AS con_advertencia
+    FROM socios s
+    ${agenciaId ? `WHERE s.agencia_id = '${agenciaId}'` : ""}
+  `);
+
+  return {
+    sinDpi: sinDpi.map((r) => ({
+      ...r,
+      total_cuentas: Number(r.total_cuentas),
+      total_movimientos: Number(r.total_movimientos),
+      se_puede_eliminar: Number(r.total_cuentas) === 0 && Number(r.total_movimientos) === 0,
+    })),
+    duplicados,
+    estadisticas: {
+      totalSocios: Number(stats[0]?.total_socios || 0),
+      conDpi: Number(stats[0]?.con_dpi || 0),
+      sinDpi: Number(stats[0]?.sin_dpi || 0),
+      conAdvertencia: Number(stats[0]?.con_advertencia || 0),
+    },
+  };
+}
+
+export async function eliminarSocioSinVinculos(socioId: string, usuarioId: string) {
+  // Verificar que no tenga cuentas ni movimientos
+  const { rows: check } = await pool.query(`
+    SELECT COUNT(c.id) AS cuentas, COUNT(m.id) AS movimientos
+    FROM socios s
+    LEFT JOIN cuentas c ON c.socio_id = s.id
+    LEFT JOIN movimientos m ON m.cuenta_id = c.id
+    WHERE s.id = $1
+    GROUP BY s.id
+  `, [socioId]);
+
+  const cuentas = Number(check[0]?.cuentas || 0);
+  const movimientos = Number(check[0]?.movimientos || 0);
+
+  if (cuentas > 0 || movimientos > 0) {
+    throw badRequest(
+      `No se puede eliminar el socio. Tiene ${cuentas} cuenta(s) y ${movimientos} movimiento(s) vinculados. Utilice el estado INACTIVO en su lugar.`
+    );
+  }
+
+  // Registrar auditoría antes de eliminar
+  await registrarAuditoria({
+    tabla: "socios",
+    operacion: "DELETE",
+    registroId: socioId,
+    usuarioId,
+    datosAntes: JSON.stringify({ socioId }),
+    datosDespues: null,
+    descripcion: "Eliminación de socio sin vínculos desde Panel de Auditoría de Importación",
+  });
+
+  await pool.query(`DELETE FROM socios WHERE id = $1`, [socioId]);
+  return { mensaje: "Socio eliminado correctamente." };
 }

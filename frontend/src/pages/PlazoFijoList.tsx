@@ -9,6 +9,17 @@ import type { PlazoFijoContrato } from "../types";
 import { formatearDPI } from "../lib/formatters";
 import { DualCuentaBadge } from "../components/DualCuentaBadge";
 
+// ─── Esqueleto de carga para KPIs ─────────────────────────────────────────────
+function KpiSkeleton() {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.5rem" }}>
+      {[...Array(6)].map((_, i) => (
+        <div key={i} style={{ height: 72, borderRadius: 8, background: "rgba(148,163,184,0.08)", border: "1px solid var(--line)", animation: "pulse 1.5s ease-in-out infinite" }} />
+      ))}
+    </div>
+  );
+}
+
 export default function PlazoFijoList() {
   const [contratos, setContratos] = useState<PlazoFijoContrato[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +90,11 @@ export default function PlazoFijoList() {
   const hoy = new Date().toISOString().slice(0, 10);
   const porVencerOyaVencidos = activos.filter((c) => c.fecha_vencimiento <= hoy).length;
 
+  const totalCapitalHistorico = (contratos ?? []).reduce((sum, c) => sum + Number(c.monto_deposito), 0);
+  const totalCapitalFiltrado = contratosFiltrados.reduce((sum, c) => sum + Number(c.monto_deposito), 0);
   const totalCertificados = contratosFiltrados.length;
+  const promedioPorCertificado = totalCertificados > 0 ? totalCapitalFiltrado / totalCertificados : 0;
+
   const totalPaginas = Math.max(1, Math.ceil(totalCertificados / pageSize));
   const contratosPaginados = contratosFiltrados.slice((page - 1) * pageSize, page * pageSize);
 
@@ -141,9 +156,10 @@ export default function PlazoFijoList() {
         </div>
       )}
 
-      {/* STRIP DE KPIS HORIZONTALES CON ESTILO FINTECH */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem" }}>
-        {/* CAPITAL A PLAZO FIJO */}
+      {/* STRIP DE 6 KPIS HORIZONTALES — FINTECH INSTITUCIONAL */}
+      {contratos === null ? <KpiSkeleton /> : (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.5rem" }}>
+        {/* CAPITAL A PLAZO FIJO (ACTIVOS) */}
         <div
           style={{
             background: "rgba(124, 58, 237, 0.06)",
@@ -256,9 +272,49 @@ export default function PlazoFijoList() {
           </span>
           <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Listos para pago o renovación</span>
         </div>
-      </div>
+        {/* TOTAL CAPITAL HISTÓRICO (CONSOLIDADO) */}
+        <div
+          style={{
+            background: "rgba(2, 132, 199, 0.06)",
+            border: "1px solid rgba(2, 132, 199, 0.25)",
+            borderLeft: "4px solid #0284c7",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#0284c7", letterSpacing: "0.03em" }}>CAPITAL TOTAL HISTÓRICO</span>
+            <span style={{ fontSize: "0.85rem" }}>🏦</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#0284c7", fontFamily: "monospace" }}>{formatoQ(totalCapitalHistorico)}</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Todo el capital gestionado</span>
+        </div>
 
-      {/* BARRA DE FILTROS COMPACTA CON SEGMENTACIÓN TEMPORAL */}
+        {/* PROMEDIO POR CERTIFICADO */}
+        <div
+          style={{
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            borderLeft: "4px solid #BF9903",
+            borderRadius: "8px",
+            padding: "0.45rem 0.65rem",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#BF9903", letterSpacing: "0.03em" }}>PROMEDIO / CERT.</span>
+            <span style={{ fontSize: "0.85rem" }}>📊</span>
+          </div>
+          <span style={{ fontSize: "1.08rem", fontWeight: 700, color: "#d97706", fontFamily: "monospace" }}>{formatoQ(promedioPorCertificado)}</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-soft)" }}>Capital promedio por inversionista</span>
+        </div>
+      </div>
+      )}
       <div className="screen-toolbar" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
         {/* SEGMENTACIÓN TEMPORAL RÁPIDA */}
         <div style={{ display: "inline-flex", background: "var(--paper-raised, rgba(15,23,42,0.6))", padding: "2px", borderRadius: "8px", border: "1px solid var(--line)" }}>

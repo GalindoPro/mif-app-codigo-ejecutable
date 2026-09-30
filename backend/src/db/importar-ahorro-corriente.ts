@@ -2,6 +2,7 @@ import "dotenv/config";
 import { pool } from "./pool";
 import { execSync } from "child_process";
 import path from "path";
+import { abortarSiHayErroresExcel } from "../utils/validadorImportacion";
 
 /**
  * Script Oficial de Importación — Fase 2: Ahorro Corriente
@@ -99,6 +100,12 @@ print(json.dumps(rows))
 
   const client = await pool.connect();
   try {
+    // === 1.1 VALIDACIÓN PREVIA AL IMPORT (Nombres Similares y DPIs duplicados) ===
+    await abortarSiHayErroresExcel(
+      rows.map((r: RowExcel) => ({ fila: r.row, nombres: r.nombre, dpi: r.dpi })),
+      "AHORRO CORRIENTE - SALDOS SEPTIEMBRE.xlsx"
+    );
+
     await client.query("BEGIN");
 
     // Limpiar importación previa de Ahorro Corriente si existiera (idempotente)
@@ -206,7 +213,7 @@ print(json.dumps(rows))
             numero_cuenta, codigo_sistema, tipo, estado, socio_id, agencia_id, saldo_inicial,
             observaciones_apertura, creado_por_id
           ) values (
-            'APO-HIST', $1, 'APORTACION', 'ACTIVA', $2, $3, 100,
+            'APO-HIST', $1, 'APORTACION', 'ACTIVA', $2, $3, 0,
             'Aportación estatutaria inicial previa a 2026', $4
           ) returning id;
         `, [codApoHist, socioId, agenciaChajulId, adminUserId]);

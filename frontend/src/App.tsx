@@ -29,6 +29,7 @@ import Alertas from "./pages/Alertas";
 import Sesiones from "./pages/Sesiones";
 import TrasladosInterAgencia from "./pages/TrasladosInterAgencia";
 import { ConsolidadoFinanciero } from "./pages/ConsolidadoFinanciero";
+import AuditoriaImportacion from "./pages/AuditoriaImportacion";
 
 import { useAuth } from "./context/AuthContext";
 
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="/arqueos/mensual" element={<LibroArqueoMensual />} />
           <Route path="/socios" element={<SociosList />} />
           <Route path="/socios/nuevo" element={<SocioForm />} />
+          <Route path="/socios/auditoria-importacion" element={<AuditoriaImportacion />} />
           <Route path="/socios/:id" element={<SocioDetail />} />
           <Route path="/aportaciones" element={<AportacionesList />} />
           <Route path="/caja-chica" element={<CajaChica />} />

@@ -402,6 +402,7 @@ export default function Layout() {
               <NavItem to="/agencias"  icon="🏢" label="Agencias"            onClick={closeSidebar} />
               <NavItem to="/traslados" icon="🔀" label="Traslados Inter"     onClick={closeSidebar} />
               <NavItem to="/auditoria" icon="🔍" label="Bitácora Auditoría"  onClick={closeSidebar} />
+              <NavItem to="/socios/auditoria-importacion" icon="🧹" label="Auditoría Importación" onClick={closeSidebar} />
               <NavItem to="/sesiones"  icon="🛡️" label="Sesiones Activas"    onClick={closeSidebar} />
             </NavFolder>
           </>)}

@@ -2,7 +2,135 @@
 
 Este documento recopila de forma detallada todas las mejoras funcionales, reglas de negocio, formatos guatemaltecos y optimizaciones contables implementadas en el sistema.
 
+## 117. Rediseño Ejecutivo del Tablero Global (Inteligencia Financiera y Desglose de Membresía)
+
+**Archivos Modificados:**
+- `frontend/src/pages/Tablero.tsx`
+- `backend/src/modules/dashboard/service.ts`
+
+**Objetivo y Reglas de Negocio:**
+- **KPI de Membresía:** La tarjeta de "161 Socios" (regla 2026) ahora incluye un desglose interactivo interno que muestra cuántos de esos socios son "Con Cuentas" y cuántos son "Solo Créditos", manteniendo la coherencia con los filtros del padrón.
+- **Inteligencia Financiera (Widget IA):** Se transformó el antiguo cajetín de diagnóstico en un moderno Widget de Inteligencia Artificial con diseño "Dark Slate Institucional". Este panel evalúa la salud de la cooperativa en tiempo real y expone 3 viñetas ejecutivas:
+  1. Tasa de Salida de Efectivo (riesgo de liquidez).
+  2. Comportamiento de Ahorros (captación vs retiros).
+  3. Dinámica de Cartera (recuperación vs desembolsos).
+
+---
+
+## 116. Partición Histórica Estricta (Límite Contable 2026)
+
+**Archivos Modificados:**
+- `backend/src/modules/socios/service.ts`
+- `backend/src/modules/dashboard/service.ts`
+
+**Objetivo y Reglas de Negocio:**
+Por instrucción explícita de Gerencia, el sistema implementa una **partición contable estricta en el año 2026**. 
+Cualquier socio registrado en **2025 o antes** se considera automáticamente "Histórico" (Ex-socio o expediente cerrado) y no debe aparecer en los listados operativos principales ni sumar a los KPIs del Tablero Global, independientemente de si el Excel indicó que tiene aportaciones o créditos vinculados. 
+
+**Lógica Implementada:**
+- El **Padrón Completo**, la vista de **Socios (Con Cuentas)** y la vista de **Solo Créditos** inyectan forzosamente la condición SQL `fecha_ingreso >= '2026-01-01'`.
+- La pestaña **Históricos** captura el universo opuesto: `fecha_ingreso < '2026-01-01'`, moviendo allí a los 546 socios antiguos para consulta exclusiva de auditoría.
+- El cálculo total de membresía del Tablero también fue ajustado para contar únicamente a los activos de 2026 en adelante.
+
+---
+
+## 115. Clasificación Dinámica de Socios (Vinculación: Cuentas vs Créditos)
+
+**Archivos Modificados:**
+- `frontend/src/pages/SociosList.tsx`
+- `backend/src/modules/socios/service.ts`
+- `backend/src/modules/socios/routes.ts`
+
+**Objetivo y Reglas de Negocio:**
+Permitir a Gerencia diferenciar visualmente y de forma rápida entre:
+1. **Padrón Completo:** Todos los registros (activos).
+2. **Socios (Con Cuentas):** Tienen aportaciones o cuentas de ahorro activas. (Socios formales).
+3. **Solo Créditos:** Tienen estado activo por un préstamo vigente, pero *0 cuentas* de ahorro o aportación (prestatarios).
+4. **Históricos / Inactivos:** Socios pre-2026 sin cuentas ni créditos vigentes, ocultos del padrón principal para no contaminar la visual.
+5. **Prospectos:** Fiadores externos registrados, sin productos activos aún.
+
+**Lógica Implementada:**
+- El backend procesa el query param `vinculacion` (TODOS, SOCIOS, CREDITOS, HISTORICOS) utilizando validación dinámica en SQL `exists (select 1 from cuentas...)`.
+- En el frontend, se rediseñó la cabecera reemplazando los botones antiguos por un sistema de **Pill-Toggle** moderno de 5 pestañas con animación suave y contadores dedicados, unificando la estética de la plataforma.
+
+---
+
+## 114. Validación Preventiva Anti-Duplicados en Importación Excel (Fuzzy Matching con `pg_trgm`)
+
+**Archivos Modificados:**
+- `backend/src/utils/validadorImportacion.ts` *(nuevo)*
+- `backend/src/db/importar-aportaciones.ts`
+- `backend/src/db/importar-ahorro-corriente.ts`
+- `backend/src/db/importar-plazo-fijo.ts`
+
+**Objetivo y Reglas de Negocio:**
+Evitar la creación involuntaria de socios duplicados cuando un mismo asociado aparece en distintas hojas de Excel (Aportaciones, Ahorro, Plazo Fijo) pero con ligeros errores tipográficos o diferencias de espacios.
+
+**Lógica Implementada:**
+1. **Extensión PostgreSQL `pg_trgm`:** Habilitada en la base de datos para análisis de similitud trigramática (`similarity > 0.85`).
+2. **Validación Pre-Importación:** Todos los scripts de migración ahora pasan los datos leídos por la función `abortarSiHayErroresExcel` **antes** de iniciar el `BEGIN` transaccional.
+3. **Bloqueo Inteligente:**
+   - **Detección de DPI cruzado:** Bloquea si el DPI del Excel ya le pertenece a otro nombre en la BD, o si un mismo archivo Excel tiene el mismo DPI para dos nombres distintos.
+   - **Nombres "casi iguales" (Fuzzy Match):** Si el Excel trae "MARIA PEREZ" y la BD tiene "MARÍA PÉREZ", el sistema detiene la importación, imprime una tabla de errores en la terminal y sugiere la corrección: *"Copie exactamente el nombre registrado en la BD hacia su Excel"*.
+4. **Respuesta Rápida:** La ejecución se detiene con `process.exit(1)`, protegiendo la base de datos de cruce de saldos o contaminación del Padrón.
+
+---
+
+## 113. Panel de Auditoría de Importación de Socios (`/socios/auditoria-importacion`)
+
+**Archivos Creados/Modificados:**
+- `frontend/src/pages/AuditoriaImportacion.tsx` *(nuevo)*
+- `frontend/src/App.tsx` — ruta `/socios/auditoria-importacion` registrada
+- `frontend/src/pages/Layout.tsx` — enlace `🧹 Auditoría Importación` en menú Seguridad y Control
+- `frontend/src/pages/SociosList.tsx` — botón directo en cabecera (solo Gerencia/Admin)
+- `backend/src/modules/socios/service.ts` — 3 funciones nuevas: `auditarImportacion`, `eliminarSocioSinVinculos`
+- `backend/src/modules/socios/routes.ts` — 2 rutas nuevas: `GET /auditoria-importacion`, `DELETE /:id/eliminar-sin-vinculos`
+
+**Funcionalidades del Panel:**
+1. **4 KPIs de Integridad:** Total Socios, Con DPI (%), Sin DPI (alerta roja), Con Advertencia.
+2. **Barra de Progreso de Integridad DPI:** Porcentaje visual con color semáforo (verde ≥90%, ámbar ≥70%, rojo <70%).
+3. **Tab "Sin DPI":** Lista todos los socios sin DPI con: código, nombre, cuentas vinculadas, movimientos, advertencia de importación y acción:
+   - `✏️ Editar DPI` → redirige a `/socios/:id` para corregir el dato.
+   - `🗑️ Eliminar` (solo si no tiene cuentas ni movimientos) → modal de confirmación con registro en Bitácora de Auditoría.
+4. **Tab "Posibles Duplicados":** Detecta pares de socios con nombre exactamente igual para que Gerencia los compare lado a lado.
+5. **Seguridad:** Solo accesible a roles `GERENCIA` y `ADMIN`. El backend valida con `requireRole("GERENCIA", "ADMIN")`.
+6. **Eliminación Segura con Auditoría:** El endpoint verifica que `total_cuentas = 0` y `total_movimientos = 0` antes de eliminar, y registra la operación en la tabla `auditoria` antes de ejecutar el `DELETE`.
+
+**Diagnóstico Actual en Base de Datos (Supabase):**
+- 30+ socios sin DPI (incluye socios migrados de Plazo Fijo y prospectos de crédito sin libreta)
+- Los socios `CHAJ-00693` a `CHAJ-00706` (14 registros) son prospectos sin cuentas = candidatos a eliminación segura
+- Los socios `CHAJ-00676` a `CHAJ-00691` tienen cuentas de Plazo Fijo y **no se pueden eliminar** (solo editar su DPI)
+
+---
+
+## 112. Upgrade 6 KPIs + Skeleton + Pill-Toggle Institucional en Ahorro Corriente y Plazo Fijo
+
+
+**Archivos Modificados:** `frontend/src/pages/AhorroList.tsx`, `frontend/src/pages/PlazoFijoList.tsx`
+
+**Mejoras Implementadas:**
+1. **Strip de 6 KPIs en Ahorro Corriente:** Saldo Total Captado, Cuentas Activas, Total Depósitos, Total Retiros, Flujo Neto (depósitos − retiros con color dinámico verde/rojo) y Promedio por Cuenta (dorado `#BF9903`).
+2. **Strip de 6 KPIs en Plazo Fijo:** Capital Activo, Intereses Comprometidos, Certificados Vigentes, Vencidos/Por Liquidar, Capital Total Histórico y Promedio por Certificado.
+3. **Pill-Toggle Institucional:** Los botones de segmentación temporal (🌱 2026 / 📜 Histórico / 🌐 Consolidado) se actualizaron en `AhorroList` al mismo diseño sólido (background relleno) ya presente en `PlazoFijoList` — consistencia visual total entre módulos.
+4. **Skeleton de Carga (`KpiSkeleton`):** Componente de 6 tiles animados con `pulse` institucional que se muestra mientras el backend responde, eliminando el salto visual brusco.
+5. **Cero errores TypeScript:** Validado con `npx tsc --noEmit` (exit code 0).
+
+---
+
+## 111. Corrección Contable de Saldos Históricos de Aportaciones (Q 100.00 exactos por Socio)
+
+**Archivos Modificados:** `backend/src/db/importar-ahorro-corriente.ts`, `backend/src/db/importar-plazo-fijo.ts`
+
+**Regla de Negocio Aplicada:**
+- Cuota estatutaria de aportación al capital social: **Q 100.00 exactos** por socio (Art. 12 Estatutos COMIF R.L.).
+- Los 545 socios históricos migrados desde Ahorro Corriente y Plazo Fijo tenían `saldo_inicial = 100` (duplicado porque ya existía 1 movimiento de depósito de Q 100.00), resultando en saldo aparente de **Q 200.00**.
+- Corrección: `saldo_inicial` ajustado a `0` para que la vista `saldos_cuenta` calcule: `Q 0 (inicial) + Q 100 (movimiento) = Q 100.00 exacto`.
+- Las funciones de importación actualizadas previenen reincidencia en futuras recargas desde Excel.
+
+---
+
 ## 110. Ordenamiento Correlativo Ascendente y Segmentación de Cumplimiento en Padrón de Capital Social (`/aportaciones`): Con Aportación Cubierta (691) vs Pendientes de Pago (16)
+
 
 **Objetivo y Reglas de Negocio:**
 1. **Diagnóstico del Saldo en Cero (Q 0.00) en Pantalla:**
@@ -2810,4 +2938,40 @@ Ajustar la vista del Padrón de Aportaciones (`/aportaciones`) al estándar estr
 
 **Resultado:**
 - Padrón de Capital Social con navegación fluida en una sola pantalla (100vh), clasificación nítida e instantánea entre el ejercicio vigente 2026 y el historial acumulado anterior, filtro por fechas personalizadas y trazabilidad institucional completa.
+
+---
+
+### MEJORA #103 (29/09/2026) - Desglose Matemático del Padrón Histórico: Fondo Global Pre-2026 (Q 15,200) vs. Socios Migrados (Q 109,000), Desacoplamiento de Fechas y Botón Limpiar
+
+**Objetivo:**
+Resolver la inquietud contable del usuario sobre el origen y cuadre de las cifras en el Padrón de Capital Social:
+1. Explicar con total transparencia matemática por qué el segmento **📜 Histórico Anterior** suma **Q 124,200.00**, de dónde proviene el registro **CHAJ-00000 con Q 15,200.00** y cómo se integra con el **🌐 Consolidado de Q 138,600.00**.
+2. Desacoplar los filtros de rango de fechas (`Desde:` / `Hasta:`) y selector de año para que operen sobre la totalidad del catálogo sin entrar en conflicto con la pestaña temporal seleccionada.
+3. Incorporar botón visual destacado `✕ Limpiar` con acento dorado para restablecer fechas y filtros al instante.
+
+**Detalles de la Implementación:**
+1. **Auditoría y Origen de las Cifras Contables:**
+   - **Registro `CHAJ-00000` (Q 15,200.00):** Corresponde a la Fila 8 del libro Excel oficial de origen (`importar/APORTACIONES 31-09-26.xlsx`), donde figuraba el saldo consolidado acumulado pre-2026 (Q 15,400.00 menos Q 200.00 de 2 cuentas retiradas e inactivas).
+   - **545 Socios Migrados Históricos (Q 109,000.00):** Socios dados de alta en libros de captación previos (Ahorro Corriente, Plazo Fijo) con fecha pre-2026 (`2025-12-31`), cada uno registrado con su cuenta de aportación estatutaria.
+   - **Cuadre Exacto de Histórico:** `Q 15,200.00 (Fondo Global)` + `Q 109,000.00 (545 Socios)` = **`Q 124,200.00`**.
+   - **Cuadre del Padrón Consolidado:** `Q 124,200.00 (Histórico)` + `Q 14,400.00 (Ejercicio 2026)` = **`Q 138,600.00`** (707 asociados en total).
+2. **Presentación Ejecutiva en Tarjetas KPI:**
+   - En la tarjeta **CAPITAL SOCIAL FILTRADO**, el subtítulo ahora detalla de forma explícita:
+     * Al ver Histórico: `Fondo: Q 15,200.00 + Socios: Q 109,000.00`.
+     * Al ver Consolidado: `Histórico: Q 124,200.00 + 2026: Q 14,400.00`.
+   - En la tarjeta **ASOCIADOS FILTRADOS**:
+     * Al ver Histórico: `1 Fondo Global + 545 Socios`.
+   - En la fila del registro `CHAJ-00000`:
+     * Insignia distintiva dorada `Fondo Global Histórico` junto al nombre.
+3. **Desacoplamiento de Filtros de Fechas y Botón Limpiar:**
+   - Al seleccionar un rango manual (`Desde:` / `Hasta:`) o un año (`📅 Año`), el sistema conmuta automáticamente la segmentación a `TODOS` (Consolidado) para que las fechas busquen en todo el padrón sin filtrar a cero.
+   - Botón interactivo `✕ Limpiar` con tono dorado `#f59e0b` que aparece únicamente cuando hay filtros activos para restaurar la vista original con 1 clic.
+
+**Archivos Modificados:**
+- `frontend/src/pages/AportacionesList.tsx`
+- `MEJORAS_SISTEMA_MIF.md`
+
+**Resultado:**
+- Claridad contable absoluta: directivos y revisores comprenden inmediatamente por qué el Histórico refleja Q 124,200.00 y cómo se desglosa el Fondo Global frente a los socios individuales, con filtros de fechas fluidos y sin bloqueos.
+
 

@@ -4,6 +4,7 @@ import { execSync } from "child_process";
 import { randomUUID } from "crypto";
 import path from "path";
 import { calcularVencimiento, calcularDiasExactos } from "../modules/plazofijo/calculo";
+import { abortarSiHayErroresExcel } from "../utils/validadorImportacion";
 
 /**
  * Script Oficial de Importación — Fase 3: Depósito a Plazo Fijo (Kardex PF 2018-2026)
@@ -116,6 +117,12 @@ print(json.dumps(certs))
 
   const client = await pool.connect();
   try {
+    // === 1.1 VALIDACIÓN PREVIA AL IMPORT ===
+    await abortarSiHayErroresExcel(
+      certsExcel.map((r: RawCertRow) => ({ fila: r.row, nombres: r.nombre, dpi: null })), // Plazo fijo históricamente no trajo DPIs
+      "KARDEX AHORRO PF 2026-08.xlsx"
+    );
+
     await client.query("BEGIN");
 
     // Limpieza idempotente previa de Plazo Fijo
@@ -209,7 +216,7 @@ print(json.dumps(certs))
       const ctaParams: any[] = [];
       pIdx = 1;
       for (const s of batch) {
-        ctaValues.push(`($${pIdx++}, 'APO-HIST-PF', $${pIdx++}, 'APORTACION', 'ACTIVA', $${pIdx++}, $${pIdx++}, 100, 'Aportación estatutaria previa de socio inversor', $${pIdx++})`);
+        ctaValues.push(`($${pIdx++}, 'APO-HIST-PF', $${pIdx++}, 'APORTACION', 'ACTIVA', $${pIdx++}, $${pIdx++}, 0, 'Aportación estatutaria previa de socio inversor', $${pIdx++})`);
         ctaParams.push(s.apoCtaId, s.codApoHist, s.socioId, agenciaChajulId, adminUserId);
       }
       await client.query(`

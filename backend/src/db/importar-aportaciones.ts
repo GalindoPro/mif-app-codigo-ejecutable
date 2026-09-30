@@ -4,6 +4,7 @@ import path from "path";
 import { pool } from "./pool";
 import { hashPassword } from "../utils/auth";
 import { validarDpiGuatemala, formatearDPI } from "../utils/dpiGuatemala";
+import { abortarSiHayErroresExcel } from "../utils/validadorImportacion";
 
 interface RowExcel {
   row: number;
@@ -109,6 +110,12 @@ print(json.dumps(rows))
 
   const client = await pool.connect();
   try {
+    // === 1.1 VALIDACIÓN PREVIA AL IMPORT ===
+    await abortarSiHayErroresExcel(
+      rowsExcel.map((r: RowExcel) => ({ fila: r.row, nombres: r.nombre, dpi: r.dpi })),
+      "APORTACIONES 31-09-26.xlsx"
+    );
+
     await client.query("BEGIN");
 
     // PASO 1: Limpiar base de datos

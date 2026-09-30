@@ -15,11 +15,15 @@ sociosRouter.get(
     const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 10));
     const estadoRaw = typeof req.query.estado === "string" ? req.query.estado.toUpperCase() : undefined;
     const estado = estadoRaw === "ACTIVO" || estadoRaw === "INACTIVO" ? (estadoRaw as "ACTIVO" | "INACTIVO") : undefined;
+    const vinculacionRaw = typeof req.query.vinculacion === "string" ? req.query.vinculacion.toUpperCase() : undefined;
+    const vinculacion = ["TODOS", "SOCIOS", "CREDITOS", "HISTORICOS"].includes(vinculacionRaw as string) 
+      ? (vinculacionRaw as "TODOS" | "SOCIOS" | "CREDITOS" | "HISTORICOS") 
+      : undefined;
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
     const interAgencia = req.query.interAgencia === "true";
     const agId = interAgencia ? null : agenciaVisible(req);
 
-    res.json(await service.listar({ agenciaId: agId, q, estado, page, pageSize }));
+    res.json(await service.listar({ agenciaId: agId, q, estado, vinculacion, page, pageSize }));
   }),
 );
 
@@ -151,5 +155,25 @@ sociosRouter.get(
   asyncHandler(async (req, res) => {
     const agenciaId = req.query.agenciaId as string | undefined;
     res.json(await service.sociosSinAportacion(agenciaId || null, agenciaVisible(req)));
+  }),
+);
+
+// ─── PANEL DE AUDITORÍA DE IMPORTACIÓN ───────────────────────────────────────
+
+// GET /socios/auditoria-importacion — socios sin DPI, duplicados y estadísticas
+sociosRouter.get(
+  "/auditoria-importacion",
+  requireRole("GERENCIA", "ADMIN"),
+  asyncHandler(async (req, res) => {
+    res.json(await service.auditarImportacion(agenciaVisible(req)));
+  }),
+);
+
+// DELETE /socios/:id/eliminar-sin-vinculos — elimina socios sin cuentas ni movimientos
+sociosRouter.delete(
+  "/:id/eliminar-sin-vinculos",
+  requireRole("GERENCIA", "ADMIN"),
+  asyncHandler(async (req, res) => {
+    res.json(await service.eliminarSocioSinVinculos(req.params.id, req.user!.id));
   }),
 );
