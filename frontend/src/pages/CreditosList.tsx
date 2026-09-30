@@ -51,6 +51,11 @@ export default function CreditosList() {
     colorBoton: string;
   } | null>(null);
 
+  const [modalAnular, setModalAnular] = useState<{
+    prestamo: Prestamo;
+    motivo: string;
+  } | null>(null);
+
   function cargar() {
     api
       .get<Prestamo[]>("/prestamos", {
@@ -112,6 +117,22 @@ export default function CreditosList() {
       setProcesandoId(null);
     }
   }
+
+  const ejecutarAnulacion = async () => {
+    if (!modalAnular || modalAnular.motivo.trim().length < 5) return;
+    try {
+      setProcesandoId(modalAnular.prestamo.id);
+      await api.delete(`/prestamos/${modalAnular.prestamo.id}`, { data: { motivo: modalAnular.motivo } });
+      setModalAnular(null);
+      setMensajeExito(`Crédito ${modalAnular.prestamo.codigo} anulado/eliminado correctamente`);
+      cargar();
+      setTimeout(() => setMensajeExito(null), 3000);
+    } catch (err: any) {
+      setError(mensajeError(err));
+    } finally {
+      setProcesandoId(null);
+    }
+  };
 
   const esPrestamo2026 = (p: Prestamo) => {
     return !!p.socio_fecha_ingreso && p.socio_fecha_ingreso >= "2026-01-01";
@@ -718,6 +739,7 @@ export default function CreditosList() {
                         <div style={{ display: "flex", gap: "0.25rem", justifyContent: "center", alignItems: "center", whiteSpace: "nowrap" }}>
                           {/* ACCIÓN PARA ESTADO APROBADO: DESEMBOLSAR */}
                           {p.estado === "APROBADO" && puedeGestionar && (
+                            <>
                             <button
                               type="button"
                               className="btn"
@@ -741,6 +763,17 @@ export default function CreditosList() {
                             >
                               {estaProcesando ? "…" : "⚡ Desembolsar"}
                             </button>
+                            <button
+                              type="button"
+                              className="btn danger"
+                              style={{ fontSize: "0.72rem", padding: "0.18rem 0.35rem", background: "#475569", borderColor: "#475569" }}
+                              disabled={estaProcesando}
+                              title="Anular / Eliminar Crédito"
+                              onClick={() => setModalAnular({ prestamo: p, motivo: "" })}
+                            >
+                              🗑️
+                            </button>
+                            </>
                           )}
 
                           {/* ACCIÓN PARA ESTADO SOLICITUD: APROBAR O RECHAZAR */}
@@ -776,6 +809,16 @@ export default function CreditosList() {
                                 }
                               >
                                 ✕
+                              </button>
+                              <button
+                                type="button"
+                                className="btn danger"
+                                style={{ fontSize: "0.72rem", padding: "0.18rem 0.35rem", background: "#475569", borderColor: "#475569" }}
+                                disabled={estaProcesando}
+                                title="Anular / Eliminar Crédito"
+                                onClick={() => setModalAnular({ prestamo: p, motivo: "" })}
+                              >
+                                🗑️
                               </button>
                             </>
                           )}
@@ -1253,6 +1296,36 @@ export default function CreditosList() {
                 }
               >
                 {procesandoId ? "Procesando…" : "Confirmar Acción"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalAnular && (
+        <div className="modal-overlay" style={{ backdropFilter: "blur(4px)" }}>
+          <div className="modal-card" style={{ maxWidth: "480px", background: "#0f172a", border: "1px solid rgba(148, 163, 184, 0.25)", borderRadius: "14px", padding: "1.5rem", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.75)" }}>
+            <h3 style={{ color: "#f8fafc", margin: "0 0 1rem", fontSize: "1.1rem" }}>🗑️ Anular Crédito {modalAnular.prestamo.codigo}</h3>
+            <p style={{ color: "#cbd5e1", fontSize: "0.85rem", marginBottom: "1rem", lineHeight: 1.5 }}>
+              Estás a punto de anular/eliminar este crédito. Esta acción registrará el movimiento en la bitácora de auditoría. 
+              Por favor, explica el <strong>motivo</strong> (ej. error de digitación, duplicado).
+            </p>
+            <textarea
+              className="input-field"
+              value={modalAnular.motivo}
+              onChange={(e) => setModalAnular({ ...modalAnular, motivo: e.target.value })}
+              placeholder="Escribe el motivo detallado..."
+              style={{ width: "100%", minHeight: "80px", marginBottom: "1.5rem" }}
+            />
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+              <button className="btn secondary" onClick={() => setModalAnular(null)} disabled={Boolean(procesandoId)}>Cancelar</button>
+              <button
+                className="btn danger"
+                style={{ background: "#dc2626", borderColor: "#dc2626", fontWeight: 700 }}
+                disabled={Boolean(procesandoId) || modalAnular.motivo.trim().length < 5}
+                onClick={ejecutarAnulacion}
+              >
+                {procesandoId ? "Eliminando..." : "Eliminar Definitivamente"}
               </button>
             </div>
           </div>

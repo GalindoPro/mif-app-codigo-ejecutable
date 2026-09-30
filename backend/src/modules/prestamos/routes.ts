@@ -200,3 +200,17 @@ prestamosRouter.get(
   }),
 );
 
+const anularSchema = z.object({
+  motivo: z.string().min(5, "Debes especificar el motivo para anular/eliminar el crédito"),
+});
+
+prestamosRouter.delete(
+  "/:id",
+  requireRole("GERENCIA", "SUPERVISOR"),
+  asyncHandler(async (req, res) => {
+    const { motivo } = anularSchema.parse(req.body);
+    await service.anular(req.params.id, req.user!.id, motivo, agenciaVisible(req));
+    res.json({ success: true, message: "Crédito anulado exitosamente" });
+  }),
+);
+

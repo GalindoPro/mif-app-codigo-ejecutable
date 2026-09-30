@@ -861,3 +861,36 @@ export async function listarFiadores(filtros: FiltrosFiadores) {
   return rows;
 }
 
+export async function anular(
+  id: string,
+  usuarioId: string,
+  motivo: string,
+  agenciaVisible: string | null,
+) {
+  return withTransaction(async (client) => {
+    const { rows: pRows } = await client.query(
+      `select * from prestamos where id = $1`,
+      [id]
+    );
+    const prestamo = pRows[0];
+    if (!prestamo) throw notFound("Préstamo no encontrado");
+    if (agenciaVisible && prestamo.agencia_id !== agenciaVisible) {
+      throw forbidden("Ese préstamo pertenece a otra agencia");
+    }
+
+    if (prestamo.estado === "DESEMBOLSADO" || prestamo.estado === "CANCELADO") {
+      throw conflict("No se puede anular un préstamo que ya fue desembolsado o cancelado. Los fondos ya fueron movidos.");
+    }
+
+    await client.query(`delete from prestamos where id = $1`, [id]);
+    
+    await client.query(
+      `insert into auditoria (usuario_id, modulo, accion, entidad_id, motivo, datos_anteriores, fecha)
+       values ($1, 'CREDITOS', 'ELIMINAR', $2, $3, $4, now())`,
+      [usuarioId, id, motivo, JSON.stringify(prestamo)]
+    );
+
+    return { success: true };
+  });
+}
+
